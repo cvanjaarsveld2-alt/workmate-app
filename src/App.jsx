@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Bell, BriefcaseBusiness, CalendarCheck, CalendarDays, Camera, ChevronRight,
