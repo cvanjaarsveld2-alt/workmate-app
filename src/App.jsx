@@ -857,6 +857,36 @@ function ClientsScreen({ clientList, setClientList }) {
   );
 }
 function ServiceScreen() {
+  const [report, setReport] = useState({
+    client: "",
+    machine: "",
+    fault: "",
+    workDone: "",
+    partsUsed: "",
+    technician: "",
+  });
+
+  const [serviceFiles, setServiceFiles] = useState([]);
+
+  const updateReport = (field, value) => {
+    setReport((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleServiceFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+
+    const newFiles = files.map((file) => ({
+      id: Date.now() + Math.random(),
+      name: file.name,
+      type: file.type,
+      url: URL.createObjectURL(file),
+    }));
+
+    setServiceFiles((current) => [...current, ...newFiles]);
+    e.target.value = "";
+  };
+
+  const deleteServiceFile = (id) => { {
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioURL, setAudioURL] = useState(null);
