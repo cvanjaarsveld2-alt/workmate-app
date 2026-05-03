@@ -213,7 +213,12 @@ function QuickAddScreen() {
 
       <Card className="rounded-3xl shadow-sm">
         <CardContent className="space-y-4 p-4">
-          <FriendlyInput label="Client" placeholder="Client name" />
+          <select className="w-full rounded-2xl border border-slate-200 p-4">
+  <option>Select existing client</option>
+  {clients.map((c) => (
+    <option key={c.id}>{c.name}</option>
+  ))}
+</select>
           <FriendlyInput label="Contact person" placeholder="Who you spoke to" />
 
           <FriendlyInput
