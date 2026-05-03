@@ -1084,9 +1084,121 @@ function ServiceScreen() {
 }
 
 function DocumentsScreen() {
-  return <div className="space-y-5"><div><h1 className="text-2xl font-bold text-slate-900">Documents</h1><p className="text-sm text-slate-500">Keep all photos, reports, quotes and files in one place.</p></div><Button className="w-full rounded-2xl py-6"><Upload size={18} className="mr-2" /> Upload photo or file</Button><div className="space-y-3">{docs.map((doc) => <Card key={doc.id} className="rounded-3xl shadow-sm"><CardContent className="flex items-center gap-3 p-4"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><FileText size={22} /></div><div className="flex-1"><p className="font-bold text-slate-900">{doc.name}</p><p className="text-sm text-slate-500">{doc.type} • {doc.date}</p></div><ChevronRight className="text-slate-400" /></CardContent></Card>)}</div></div>;
-}
+  const [uploadedDocs, setUploadedDocs] = useState([]);
 
+  const handleDocsUpload = (e) => {
+    const files = Array.from(e.target.files || []);
+
+    const newDocs = files.map((file) => ({
+      id: Date.now() + Math.random(),
+      name: file.name,
+      type: file.type || "File",
+      url: URL.createObjectURL(file),
+    }));
+
+    setUploadedDocs((current) => [...current, ...newDocs]);
+    e.target.value = "";
+  };
+
+  const deleteDoc = (id) => {
+    setUploadedDocs((current) => {
+      const doc = current.find((item) => item.id === id);
+      if (doc?.url) URL.revokeObjectURL(doc.url);
+      return current.filter((item) => item.id !== id);
+    });
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Documents</h1>
+        <p className="text-sm text-slate-500">
+          Upload, view and manage your files.
+        </p>
+      </div>
+
+      <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-6 font-semibold text-white">
+        <Upload size={18} />
+        Upload photo, video or document
+
+        <input
+          type="file"
+          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"
+          multiple
+          className="hidden"
+          onChange={handleDocsUpload}
+        />
+      </label>
+
+      <div className="space-y-3">
+        {uploadedDocs.length === 0 && (
+          <div className="rounded-3xl bg-white p-4 text-sm text-slate-500 shadow-sm">
+            No documents uploaded yet.
+          </div>
+        )}
+
+        {uploadedDocs.map((doc) => (
+          <Card key={doc.id} className="rounded-3xl shadow-sm">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-slate-100 p-3 text-slate-700">
+                  <FileText size={22} />
+                </div>
+
+                <div className="flex-1">
+                  <p className="font-bold text-slate-900">{doc.name}</p>
+                  <p className="text-sm text-slate-500">{doc.type}</p>
+                </div>
+              </div>
+
+              {doc.type.startsWith("image/") && (
+                <img
+                  src={doc.url}
+                  alt={doc.name}
+                  className="max-h-72 w-full rounded-2xl object-cover"
+                />
+              )}
+
+              {doc.type.startsWith("video/") && (
+                <video
+                  controls
+                  src={doc.url}
+                  className="max-h-72 w-full rounded-2xl"
+                />
+              )}
+
+              {doc.type === "application/pdf" && (
+                <iframe
+                  src={doc.url}
+                  title={doc.name}
+                  className="h-96 w-full rounded-2xl border"
+                />
+              )}
+
+              {!doc.type.startsWith("image/") &&
+                !doc.type.startsWith("video/") &&
+                doc.type !== "application/pdf" && (
+                  <a href={doc.url} target="_blank" rel="noreferrer">
+                    <Button className="w-full rounded-2xl">
+                      Open document
+                    </Button>
+                  </a>
+                )}
+
+              <button
+                type="button"
+                onClick={() => deleteDoc(doc.id)}
+                className="w-full rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+              >
+                Delete document
+              </button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
 function NotificationSettingsScreen() {
   const reminderOptions = ["Remind me before meetings", "Remind me to follow up on quotes", "Alert me when a client has not been contacted for 14 days", "Remind me to complete open service reports", "Send me a morning summary of my day"];
   return <div className="space-y-5"><div><h1 className="text-2xl font-bold text-slate-900">Calendar & Notifications</h1><p className="text-sm text-slate-500">Connect your calendar and control when WorkMate reminds you.</p></div><Card className="rounded-3xl shadow-sm"><CardContent className="space-y-4 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-900 p-3 text-white"><CalendarCheck size={24} /></div><div className="flex-1"><h2 className="font-bold text-slate-900">Link your calendar</h2><p className="text-sm text-slate-500">Sync meetings, site visits, service jobs and follow-ups.</p></div></div><div className="grid grid-cols-1 gap-3"><Button className="rounded-2xl py-6"><LinkIcon size={18} className="mr-2" /> Connect Google Calendar</Button><Button variant="outline" className="rounded-2xl py-6"><LinkIcon size={18} className="mr-2" /> Connect Outlook Calendar</Button></div><div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">Once connected, new jobs, visits and follow-ups can automatically appear in your phone calendar.</div></CardContent></Card><Card className="rounded-3xl shadow-sm"><CardContent className="space-y-4 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><Bell size={24} /></div><div><h2 className="font-bold text-slate-900">Notification rules</h2><p className="text-sm text-slate-500">Choose what WorkMate must remind you about.</p></div></div><div className="space-y-3">{reminderOptions.map((option, index) => <label key={option} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4"><span className="pr-4 text-sm font-medium text-slate-800">{option}</span><input type="checkbox" defaultChecked={index < 4} className="h-6 w-6 accent-slate-900" /></label>)}</div></CardContent></Card><Card className="rounded-3xl shadow-sm"><CardContent className="space-y-3 p-4"><h2 className="font-bold text-slate-900">Default reminder times</h2><FriendlyInput label="Before meetings" placeholder="Example: 30 minutes before" /><FriendlyInput label="Quote follow-ups" placeholder="Example: 3 days after quote sent" /><FriendlyInput label="No client contact" placeholder="Example: 14 days after last conversation" /><Button className="w-full rounded-2xl py-6 text-base">Save notification settings</Button></CardContent></Card></div>;
