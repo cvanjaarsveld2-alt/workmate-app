@@ -558,7 +558,54 @@ const [conversationNote, setConversationNote] = useState("");
 }
     
 
-function CalendarScreen({ planList = dailyPlan }) {
+function CalendarScreen({ planList, setPlanList }) {
+  const [newItem, setNewItem] = useState({
+    time: "",
+    title: "",
+    client: "",
+    location: "",
+    type: "Follow-up",
+  });
+
+  const updateNewItem = (field, value) => {
+    setNewItem((current) => ({ ...current, [field]: value }));
+  };
+
+  const addCalendarItem = () => {
+    if (!newItem.time || !newItem.title) {
+      alert("Please add at least a time and title.");
+      return;
+    }
+
+    setPlanList((current) => [
+      ...current,
+      {
+        id: Date.now(),
+        ...newItem,
+      },
+    ]);
+
+    setNewItem({
+      time: "",
+      title: "",
+      client: "",
+      location: "",
+      type: "Follow-up",
+    });
+  };
+
+  const deleteCalendarItem = (id) => {
+    setPlanList((current) => current.filter((item) => item.id !== id));
+  };
+
+  const updateCalendarItem = (id, field, value) => {
+    setPlanList((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  };
+
   const createGoogleCalendarLink = (item) => {
     const title = encodeURIComponent(item.title);
     const location = encodeURIComponent(item.location);
@@ -572,28 +619,104 @@ function CalendarScreen({ planList = dailyPlan }) {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Calendar</h1>
         <p className="text-sm text-slate-500">
-          Add your planned jobs and follow-ups to your phone calendar.
+          Add, edit, delete and send items to Google Calendar.
         </p>
       </div>
+
+      <Card className="rounded-3xl shadow-sm">
+        <CardContent className="space-y-3 p-4">
+          <h2 className="text-lg font-bold text-slate-900">Add new item</h2>
+
+          <input
+            type="time"
+            value={newItem.time}
+            onChange={(e) => updateNewItem("time", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
+          />
+
+          <input
+            placeholder="Title"
+            value={newItem.title}
+            onChange={(e) => updateNewItem("title", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
+          />
+
+          <input
+            placeholder="Client"
+            value={newItem.client}
+            onChange={(e) => updateNewItem("client", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
+          />
+
+          <input
+            placeholder="Location"
+            value={newItem.location}
+            onChange={(e) => updateNewItem("location", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
+          />
+
+          <select
+            value={newItem.type}
+            onChange={(e) => updateNewItem("type", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
+          >
+            <option>Follow-up</option>
+            <option>Service</option>
+            <option>Sales</option>
+            <option>Meeting</option>
+            <option>Site visit</option>
+          </select>
+
+          <Button className="w-full rounded-2xl py-6" onClick={addCalendarItem}>
+            Add calendar item
+          </Button>
+        </CardContent>
+      </Card>
 
       <div className="space-y-3">
         {planList.map((item) => (
           <Card key={item.id} className="rounded-3xl shadow-sm">
             <CardContent className="space-y-3 p-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-2xl bg-slate-900 p-3 text-white">
-                  <Clock size={20} />
-                </div>
+              <input
+                type="time"
+                value={item.time}
+                onChange={(e) =>
+                  updateCalendarItem(item.id, "time", e.target.value)
+                }
+                className="w-full rounded-2xl border border-slate-200 p-3"
+              />
 
-                <div className="flex-1">
-                  <p className="font-bold text-slate-900">
-                    {item.time} - {item.title}
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    {item.client} • {item.location}
-                  </p>
-                </div>
-              </div>
+              <input
+                value={item.title}
+                onChange={(e) =>
+                  updateCalendarItem(item.id, "title", e.target.value)
+                }
+                className="w-full rounded-2xl border border-slate-200 p-3"
+              />
+
+              <input
+                value={item.client}
+                onChange={(e) =>
+                  updateCalendarItem(item.id, "client", e.target.value)
+                }
+                className="w-full rounded-2xl border border-slate-200 p-3"
+              />
+
+              <input
+                value={item.location}
+                onChange={(e) =>
+                  updateCalendarItem(item.id, "location", e.target.value)
+                }
+                className="w-full rounded-2xl border border-slate-200 p-3"
+              />
+
+              <input
+                value={item.type}
+                onChange={(e) =>
+                  updateCalendarItem(item.id, "type", e.target.value)
+                }
+                className="w-full rounded-2xl border border-slate-200 p-3"
+              />
 
               <a
                 href={createGoogleCalendarLink(item)}
@@ -605,6 +728,14 @@ function CalendarScreen({ planList = dailyPlan }) {
                   Add to Google Calendar
                 </Button>
               </a>
+
+              <button
+                type="button"
+                onClick={() => deleteCalendarItem(item.id)}
+                className="w-full rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+              >
+                Delete item
+              </button>
             </CardContent>
           </Card>
         ))}
