@@ -819,6 +819,7 @@ function MoreScreen({ go }) {
 
 export default function WorkMateApp() {
   const [screen, setScreen] = useState("Home");
+const [clientList, setClientList] = useState(clients);
   const views = { Home: <HomeScreen go={setScreen} />, QuickAdd: <QuickAddScreen />, Calendar: <CalendarScreen />, Clients: <ClientsScreen />, Service: <ServiceScreen />, Documents: <DocumentsScreen />, More: <MoreScreen go={setScreen} />, Notifications: <NotificationSettingsScreen />, Install: <InstallAppScreen /> };
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
