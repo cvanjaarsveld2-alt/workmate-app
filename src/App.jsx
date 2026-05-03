@@ -82,7 +82,36 @@ function BottomTab({ icon: Icon, label, active, onClick }) {
 function HomeScreen({ go, planList, setPlanList }) {
   const [viewMode, setViewMode] = useState("main");
   const [editingId, setEditingId] = useState(null);
+useEffect(() => {
+  if (!("Notification" in window)) return;
 
+  if (Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+}, []);
+
+useEffect(() => {
+  if (!("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+
+  if (dueFollowUps.length > 0) {
+    new Notification("PowerMate follow-up reminder", {
+      body: `You have ${dueFollowUps.length} client follow-up(s) due.`,
+    });
+  }
+
+  if (staleClients.length > 0) {
+    new Notification("PowerMate client reminder", {
+      body: `${staleClients.length} client(s) have not been contacted in 7 days.`,
+    });
+  }
+
+  if (planList.length > 0) {
+    new Notification("PowerMate daily plan", {
+      body: `You have ${planList.length} job(s) or visit(s) today.`,
+    });
+  }
+}, []);
   const dueFollowUps = clients.filter(
     (client) => new Date(client.nextFollowUp) <= today
   );
