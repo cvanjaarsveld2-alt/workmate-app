@@ -220,10 +220,23 @@ const [conversationNote, setConversationNote] = useState("");
   onChange={(e) => setSelectedClient(e.target.value)}
 >
   <option value="">Select existing client</option>
-  {clients.map((c) => (
-    <option key={c.id} value={c.name}>{c.name}</option>
-  ))}
+<option value="__new__">+ Add new client</option>
+
+{clients.map((c) => (
+  <option key={c.id} value={c.name}>
+    {c.name}
+  </option>
+))}
 </select>
+          {selectedClient === "__new__" && (
+  <div className="space-y-3 rounded-2xl bg-slate-50 p-3">
+    <FriendlyInput label="New client name" placeholder="Example: New Mine / Company" />
+    <FriendlyInput label="Contact person" placeholder="Example: Johan Smith" />
+    <FriendlyInput label="Phone number" placeholder="Example: 082 000 0000" />
+    <FriendlyInput label="Email" placeholder="Example: client@email.com" />
+    <FriendlyInput label="Location" placeholder="Example: Rustenburg" />
+  </div>
+)}
           <div>
   <label className="mb-1 block text-sm font-semibold text-slate-800">
     What was discussed?
