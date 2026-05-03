@@ -79,37 +79,111 @@ function BottomTab({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function HomeScreen({ go }) {
+function HomeScreen({ go, planList, setPlanList }) {
   const dueFollowUps = clients.filter((client) => new Date(client.nextFollowUp) <= today).length;
   const staleClients = clients.filter((client) => daysSince(client.lastConversation) >= 14).length;
+  const [editingId, setEditingId] = useState(null);
+
+  const updatePlanItem = (id, field, value) => {
+    setPlanList((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
+    );
+  };
+
   return (
     <div className="space-y-5">
       <div className="rounded-3xl bg-slate-900 p-5 text-white shadow-sm">
         <p className="text-sm text-slate-300">Today, 03 May 2026</p>
         <h1 className="mt-1 text-3xl font-bold">Your day is ready</h1>
-        <p className="mt-2 text-slate-300">You have {dailyPlan.length} planned items, {dueFollowUps} follow-up due, and {staleClients} clients needing attention.</p>
+        <p className="mt-2 text-slate-300">
+          You have {planList.length} planned items, {dueFollowUps} follow-up due, and {staleClients} clients needing attention.
+        </p>
       </div>
+
       <div className="grid grid-cols-2 gap-3">
-        <Card className="rounded-3xl shadow-sm"><CardContent className="p-4"><p className="text-sm text-slate-500">Today</p><p className="text-3xl font-bold text-slate-900">{dailyPlan.length}</p><p className="text-sm text-slate-500">jobs / visits</p></CardContent></Card>
-        <Card className="rounded-3xl shadow-sm"><CardContent className="p-4"><p className="text-sm text-slate-500">Follow-ups</p><p className="text-3xl font-bold text-slate-900">{dueFollowUps}</p><p className="text-sm text-slate-500">due now</p></CardContent></Card>
+        <Card className="rounded-3xl shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-sm text-slate-500">Today</p>
+            <p className="text-3xl font-bold text-slate-900">{planList.length}</p>
+            <p className="text-sm text-slate-500">jobs / visits</p>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-sm text-slate-500">Follow-ups</p>
+            <p className="text-3xl font-bold text-slate-900">{dueFollowUps}</p>
+            <p className="text-sm text-slate-500">due now</p>
+          </CardContent>
+        </Card>
       </div>
+
       <div className="space-y-3">
         <h2 className="text-lg font-bold text-slate-900">Quick actions</h2>
+
+        <BigAction
+          icon={CalendarDays}
+          title="Calendar"
+          subtitle="View, edit and link your calendar"
+          onClick={() => go("Calendar")}
+        />
+
         <BigAction icon={Plus} title="Add conversation" subtitle="Log a client call, WhatsApp, email, or visit" onClick={() => go("QuickAdd")} />
         <BigAction icon={Wrench} title="Create service report" subtitle="Fault, work done, parts, photos and PDF" onClick={() => go("Service")} />
         <BigAction icon={Camera} title="Take photos / upload document" subtitle="Attach evidence to a client or job" onClick={() => go("Documents")} />
       </div>
-      <Card className="rounded-3xl shadow-sm"><CardContent className="p-4">
-        <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">Next up</h2><Button variant="outline" className="rounded-xl" onClick={() => go("Calendar")}>View all</Button></div>
-        <div className="space-y-3">
-          {dailyPlan.map((item) => (
-            <div key={item.id} className="flex gap-3 rounded-2xl bg-slate-50 p-3">
-              <div className="w-16 rounded-2xl bg-white p-2 text-center shadow-sm"><p className="text-sm font-bold text-slate-900">{item.time}</p><p className="text-xs text-slate-500">{item.type}</p></div>
-              <div className="flex-1"><p className="font-semibold text-slate-900">{item.title}</p><p className="text-sm text-slate-500">{item.client}</p><p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><MapPin size={13} /> {item.location}</p></div>
-            </div>
-          ))}
-        </div>
-      </CardContent></Card>
+
+      <Card className="rounded-3xl shadow-sm">
+        <CardContent className="p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold text-slate-900">Next up</h2>
+            <Button variant="outline" className="rounded-xl" onClick={() => go("Calendar")}>
+              View all
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {planList.map((item) => (
+              <div key={item.id} className="rounded-2xl bg-slate-50 p-3">
+                {editingId === item.id ? (
+                  <div className="space-y-2">
+                    <input value={item.time} onChange={(e) => updatePlanItem(item.id, "time", e.target.value)} className="w-full rounded-xl border p-2" />
+                    <input value={item.title} onChange={(e) => updatePlanItem(item.id, "title", e.target.value)} className="w-full rounded-xl border p-2" />
+                    <input value={item.client} onChange={(e) => updatePlanItem(item.id, "client", e.target.value)} className="w-full rounded-xl border p-2" />
+                    <input value={item.location} onChange={(e) => updatePlanItem(item.id, "location", e.target.value)} className="w-full rounded-xl border p-2" />
+                    <input value={item.type} onChange={(e) => updatePlanItem(item.id, "type", e.target.value)} className="w-full rounded-xl border p-2" />
+
+                    <Button className="w-full rounded-2xl" onClick={() => setEditingId(null)}>
+                      Done
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-3">
+                    <div className="w-16 rounded-2xl bg-white p-2 text-center shadow-sm">
+                      <p className="text-sm font-bold text-slate-900">{item.time}</p>
+                      <p className="text-xs text-slate-500">{item.type}</p>
+                    </div>
+
+                    <div className="flex-1">
+                      <p className="font-semibold text-slate-900">{item.title}</p>
+                      <p className="text-sm text-slate-500">{item.client}</p>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                        <MapPin size={13} /> {item.location}
+                      </p>
+                    </div>
+
+                    <Button variant="outline" className="rounded-xl" onClick={() => setEditingId(item.id)}>
+                      Edit
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
