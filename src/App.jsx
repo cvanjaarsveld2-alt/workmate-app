@@ -1264,8 +1264,6 @@ function MoreScreen({ go }) {
     </div>
   );
 }
-  return <div className="space-y-5"><div><h1 className="text-2xl font-bold text-slate-900">More</h1><p className="text-sm text-slate-500">Reports, reminders and settings.</p></div><div className="space-y-3"><BigAction icon={Bell} title="Calendar & Notifications" subtitle="Link calendar and set reminder rules" onClick={() => go("Notifications")} /><BigAction icon={Home} title="Install on phone" subtitle="Add WorkMate to iOS or Android home screen" onClick={() => go("Install")} /><BigAction icon={BriefcaseBusiness} title="Sales reports" subtitle="Weekly visit report and pipeline" /><BigAction icon={ClipboardList} title="Settings" subtitle="PDF templates and account" /></div></div>;
-}
 
 export default function WorkMateApp() {
   const [screen, setScreen] = useState("Home");
