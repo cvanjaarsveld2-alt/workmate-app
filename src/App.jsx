@@ -349,7 +349,259 @@ function ClientsScreen() {
 }
 
 function ServiceScreen() {
-  return <div className="space-y-5"><div><h1 className="text-2xl font-bold text-slate-900">Service report</h1><p className="text-sm text-slate-500">Simple step-by-step job card for field work.</p></div><Card className="rounded-3xl shadow-sm"><CardContent className="space-y-4 p-4"><FriendlyInput label="Client / Site" placeholder="Example: ABC Mining - Shaft 3" /><FriendlyInput label="Machine / Equipment" placeholder="Example: Hydraulic starter on generator" /><FriendlyInput label="Fault found" placeholder="What was wrong?" multiline /><FriendlyInput label="Work done" placeholder="What did you repair, test or inspect?" multiline /><FriendlyInput label="Parts used" placeholder="List parts, oil, fittings, cables, etc." /><div className="grid grid-cols-2 gap-3"><Button variant="outline" className="rounded-2xl py-6"><Camera size={18} className="mr-2" /> Photos</Button><Button variant="outline" className="rounded-2xl py-6"><Upload size={18} className="mr-2" /> Files</Button></div><Button className="w-full rounded-2xl py-6 text-base">Save & create PDF</Button></CardContent></Card></div>;
+  const [recording, setRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioURL, setAudioURL] = useState(null);
+  const [audioError, setAudioError] = useState("");
+  const [serviceFiles, setServiceFiles] = useState([]);
+
+  const startRecording = async () => {
+    try {
+      setAudioError("");
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setAudioError("Voice recording is not supported on this browser.");
+        return;
+      }
+
+      if (typeof MediaRecorder === "undefined") {
+        setAudioError("Voice recording is not supported on this device/browser.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, {
+          type: recorder.mimeType || "audio/webm",
+        });
+
+        setAudioURL(URL.createObjectURL(blob));
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setRecording(true);
+    } catch (err) {
+      setAudioError("Microphone permission was blocked. Check browser permissions.");
+      console.error(err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && recording) {
+      mediaRecorder.stop();
+      setRecording(false);
+      setMediaRecorder(null);
+    }
+  };
+
+  const deleteVoiceNote = () => {
+    if (audioURL) URL.revokeObjectURL(audioURL);
+    setAudioURL(null);
+    setAudioError("");
+  };
+
+  const handleServiceFiles = (e) => {
+    const selectedFiles = Array.from(e.target.files || []);
+
+    const newFiles = selectedFiles.map((file) => ({
+      file,
+      name: file.name,
+      type: file.type,
+      url: URL.createObjectURL(file),
+    }));
+
+    setServiceFiles((current) => [...current, ...newFiles]);
+    e.target.value = "";
+  };
+
+  const deleteServiceFile = (indexToDelete) => {
+    setServiceFiles((currentFiles) => {
+      const fileToDelete = currentFiles[indexToDelete];
+      if (fileToDelete?.url) URL.revokeObjectURL(fileToDelete.url);
+      return currentFiles.filter((_, index) => index !== indexToDelete);
+    });
+  };
+
+  const deleteAllServiceFiles = () => {
+    serviceFiles.forEach((item) => {
+      if (item.url) URL.revokeObjectURL(item.url);
+    });
+
+    setServiceFiles([]);
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Service report</h1>
+        <p className="text-sm text-slate-500">
+          Capture job details, photos, videos, documents and voice notes.
+        </p>
+      </div>
+
+      <Card className="rounded-3xl shadow-sm">
+        <CardContent className="space-y-4 p-4">
+          <FriendlyInput
+            label="Client / Site"
+            placeholder="Example: ABC Mining - Shaft 3"
+          />
+
+          <FriendlyInput
+            label="Machine / Equipment"
+            placeholder="Example: Hydraulic starter on generator"
+          />
+
+          <FriendlyInput
+            label="Fault found"
+            placeholder="What was wrong?"
+            multiline
+          />
+
+          <FriendlyInput
+            label="Work done"
+            placeholder="What did you repair, test or inspect?"
+            multiline
+          />
+
+          <FriendlyInput
+            label="Parts used"
+            placeholder="List parts, oil, fittings, cables, etc."
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className={`rounded-2xl py-6 ${
+                recording ? "border-red-300 bg-red-100 text-red-700" : ""
+              }`}
+              onClick={recording ? stopRecording : startRecording}
+            >
+              <Mic size={18} className="mr-2" />
+              {recording ? "Stop recording" : "Voice note"}
+            </Button>
+
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold">
+              <Upload size={18} />
+              Add files
+
+              <input
+                type="file"
+                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"
+                multiple
+                className="hidden"
+                onChange={handleServiceFiles}
+              />
+            </label>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+            You can add photos, videos, PDFs, Word documents, Excel files, or choose from your phone library / Google Photos.
+          </div>
+
+          {audioError && (
+            <div className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+              {audioError}
+            </div>
+          )}
+
+          {recording && (
+            <div className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+              Recording... tap Stop recording when finished.
+            </div>
+          )}
+
+          {audioURL && (
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold">Service voice note:</p>
+                <button
+                  type="button"
+                  onClick={deleteVoiceNote}
+                  className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700"
+                >
+                  Delete voice
+                </button>
+              </div>
+
+              <audio controls src={audioURL} className="w-full" />
+            </div>
+          )}
+
+          {serviceFiles.length > 0 && (
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold">Selected service files:</p>
+                <button
+                  type="button"
+                  onClick={deleteAllServiceFiles}
+                  className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700"
+                >
+                  Delete all
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {serviceFiles.map((item, index) => (
+                  <div
+                    key={`${item.name}-${index}`}
+                    className="rounded-2xl bg-white p-2"
+                  >
+                    {item.type.startsWith("image/") ? (
+                      <img
+                        src={item.url}
+                        alt={item.name}
+                        className="h-32 w-full rounded-xl object-cover"
+                      />
+                    ) : item.type.startsWith("video/") ? (
+                      <video
+                        controls
+                        src={item.url}
+                        className="h-32 w-full rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-32 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                        <FileText size={32} />
+                      </div>
+                    )}
+
+                    <p className="mt-2 truncate text-xs text-slate-600">
+                      {item.type.startsWith("video/")
+                        ? "🎥"
+                        : item.type.startsWith("image/")
+                        ? "📷"
+                        : "📄"}{" "}
+                      {item.name}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => deleteServiceFile(index)}
+                      className="mt-2 w-full rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <Button className="w-full rounded-2xl py-6 text-base">
+            Save & create PDF
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
 
 function DocumentsScreen() {
