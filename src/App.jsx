@@ -88,7 +88,7 @@ function HomeScreen({ go, planList, setPlanList }) {
   );
 
   const staleClients = clients.filter(
-    (client) => daysSince(client.lastConversation) >= 14
+    (client) => daysSince(client.lastConversation) >= 7
   );
 
   const updatePlanItem = (id, field, value) => {
