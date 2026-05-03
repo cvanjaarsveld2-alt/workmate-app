@@ -118,13 +118,20 @@ function QuickAddScreen() {
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
   const [audioURL, setAudioURL] = useState(null);
-  const [photos, setPhotos] = useState([]);
+  const [audioError, setAudioError] = useState("");
+  const [mediaFiles, setMediaFiles] = useState([]);
 
-  // 🎤 START RECORDING
   const startRecording = async () => {
     try {
-      if (!navigator.mediaDevices) {
-        alert("Voice recording not supported on this device.");
+      setAudioError("");
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setAudioError("Voice recording is not supported on this browser.");
+        return;
+      }
+
+      if (typeof MediaRecorder === "undefined") {
+        setAudioError("Voice recording is not supported on this device/browser.");
         return;
       }
 
@@ -133,15 +140,12 @@ function QuickAddScreen() {
       const chunks = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data);
+        if (e.data && e.data.size > 0) chunks.push(e.data);
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: "audio/webm" });
-        const url = URL.createObjectURL(blob);
-        setAudioURL(url);
-
-        // stop mic
+        const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+        setAudioURL(URL.createObjectURL(blob));
         stream.getTracks().forEach((track) => track.stop());
       };
 
@@ -149,24 +153,53 @@ function QuickAddScreen() {
       setMediaRecorder(recorder);
       setRecording(true);
     } catch (err) {
-      alert("Microphone permission denied.");
+      setAudioError("Microphone permission was blocked. Check browser permissions.");
       console.error(err);
     }
   };
 
-  // 🛑 STOP RECORDING
   const stopRecording = () => {
-    if (mediaRecorder) {
+    if (mediaRecorder && recording) {
       mediaRecorder.stop();
       setRecording(false);
       setMediaRecorder(null);
     }
   };
 
-  // 📷 HANDLE PHOTO
-  const handlePhoto = (e) => {
-    const files = Array.from(e.target.files || []);
-    setPhotos(files);
+  const deleteVoiceNote = () => {
+    if (audioURL) URL.revokeObjectURL(audioURL);
+    setAudioURL(null);
+    setAudioError("");
+  };
+
+  const handleMediaUpload = (e) => {
+    const selectedFiles = Array.from(e.target.files || []);
+
+    const newFiles = selectedFiles.map((file) => ({
+      file,
+      name: file.name,
+      type: file.type,
+      url: URL.createObjectURL(file),
+    }));
+
+    setMediaFiles((current) => [...current, ...newFiles]);
+
+    e.target.value = "";
+  };
+
+  const deleteMediaFile = (indexToDelete) => {
+    setMediaFiles((currentFiles) => {
+      const fileToDelete = currentFiles[indexToDelete];
+      if (fileToDelete?.url) URL.revokeObjectURL(fileToDelete.url);
+      return currentFiles.filter((_, index) => index !== indexToDelete);
+    });
+  };
+
+  const deleteAllMedia = () => {
+    mediaFiles.forEach((item) => {
+      if (item.url) URL.revokeObjectURL(item.url);
+    });
+    setMediaFiles([]);
   };
 
   return (
@@ -174,7 +207,7 @@ function QuickAddScreen() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Add conversation</h1>
         <p className="text-sm text-slate-500">
-          Capture the important details quickly.
+          Capture notes, photos, videos and voice notes quickly.
         </p>
       </div>
 
@@ -189,13 +222,11 @@ function QuickAddScreen() {
             multiline
           />
 
-          {/* 🎤 + 📷 */}
           <div className="grid grid-cols-2 gap-3">
-            {/* VOICE */}
             <Button
               variant="outline"
               className={`rounded-2xl py-6 ${
-                recording ? "bg-red-100 text-red-700" : ""
+                recording ? "border-red-300 bg-red-100 text-red-700" : ""
               }`}
               onClick={recording ? stopRecording : startRecording}
             >
@@ -203,39 +234,97 @@ function QuickAddScreen() {
               {recording ? "Stop recording" : "Voice note"}
             </Button>
 
-            {/* CAMERA */}
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold">
               <Camera size={18} />
-              Add photo
+              Add photo/video
 
               <input
                 type="file"
-                accept="image/*"
-                capture="environment"
+                accept="image/*,video/*"
                 multiple
                 className="hidden"
-                onChange={handlePhoto}
+                onChange={handleMediaUpload}
               />
             </label>
           </div>
 
-          {/* AUDIO PREVIEW */}
+          <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
+            Tip: On Android you can select from Gallery or Google Photos. On iPhone use Safari and choose Photo Library, Take Photo, or Choose File.
+          </div>
+
+          {audioError && (
+            <div className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+              {audioError}
+            </div>
+          )}
+
+          {recording && (
+            <div className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+              Recording... tap Stop recording when finished.
+            </div>
+          )}
+
           {audioURL && (
             <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-sm font-semibold">Voice note:</p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-sm font-semibold">Voice note:</p>
+                <button
+                  type="button"
+                  onClick={deleteVoiceNote}
+                  className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700"
+                >
+                  Delete voice
+                </button>
+              </div>
+
               <audio controls src={audioURL} className="w-full" />
             </div>
           )}
 
-          {/* PHOTO PREVIEW */}
-          {photos.length > 0 && (
+          {mediaFiles.length > 0 && (
             <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-sm font-semibold">Photos selected:</p>
-              {photos.map((file, i) => (
-                <p key={i} className="text-xs text-slate-600">
-                  📷 {file.name}
-                </p>
-              ))}
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold">Selected files:</p>
+                <button
+                  type="button"
+                  onClick={deleteAllMedia}
+                  className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700"
+                >
+                  Delete all
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {mediaFiles.map((item, index) => (
+                  <div key={`${item.name}-${index}`} className="rounded-2xl bg-white p-2">
+                    {item.type.startsWith("video/") ? (
+                      <video
+                        controls
+                        src={item.url}
+                        className="h-32 w-full rounded-xl object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={item.url}
+                        alt={item.name}
+                        className="h-32 w-full rounded-xl object-cover"
+                      />
+                    )}
+
+                    <p className="mt-2 truncate text-xs text-slate-600">
+                      {item.type.startsWith("video/") ? "🎥" : "📷"} {item.name}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => deleteMediaFile(index)}
+                      className="mt-2 w-full rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
