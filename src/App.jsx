@@ -907,10 +907,11 @@ function MoreScreen({ go }) {
 export default function WorkMateApp() {
   const [screen, setScreen] = useState("Home");
 const [clientList, setClientList] = useState(clients);
+const [planList, setPlanList] = useState(dailyPlan);
   const views = {
-  Home: <HomeScreen go={setScreen} />,
+  Home: <HomeScreen go={setScreen} planList={planList} setPlanList={setPlanList} />,
   QuickAdd: <QuickAddScreen />,
-  Calendar: <CalendarScreen />,
+  Calendar: <CalendarScreen planList={planList} setPlanList={setPlanList} />,
   Clients: <ClientsScreen clientList={clientList} setClientList={setClientList} />,
   Service: <ServiceScreen />,
   Documents: <DocumentsScreen />,
