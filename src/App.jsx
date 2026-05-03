@@ -80,9 +80,16 @@ function BottomTab({ icon: Icon, label, active, onClick }) {
 }
 
 function HomeScreen({ go, planList, setPlanList }) {
-  const dueFollowUps = clients.filter((client) => new Date(client.nextFollowUp) <= today).length;
-  const staleClients = clients.filter((client) => daysSince(client.lastConversation) >= 14).length;
+  const [viewMode, setViewMode] = useState("main");
   const [editingId, setEditingId] = useState(null);
+
+  const dueFollowUps = clients.filter(
+    (client) => new Date(client.nextFollowUp) <= today
+  );
+
+  const staleClients = clients.filter(
+    (client) => daysSince(client.lastConversation) >= 14
+  );
 
   const updatePlanItem = (id, field, value) => {
     setPlanList((current) =>
@@ -92,32 +99,96 @@ function HomeScreen({ go, planList, setPlanList }) {
     );
   };
 
+  if (viewMode === "today") {
+    return (
+      <div className="space-y-5">
+        <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>
+          ← Back
+        </Button>
+
+        <h1 className="text-2xl font-bold text-slate-900">Today’s jobs / visits</h1>
+
+        {planList.map((item) => (
+          <Card key={item.id} className="rounded-3xl shadow-sm">
+            <CardContent className="space-y-3 p-4">
+              <p className="text-sm font-bold text-slate-900">{item.time} - {item.title}</p>
+              <p className="text-sm text-slate-600">{item.client}</p>
+              <p className="text-sm text-slate-500">{item.location}</p>
+              <p className="text-xs font-semibold text-slate-500">{item.type}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (viewMode === "followups") {
+    return (
+      <div className="space-y-5">
+        <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>
+          ← Back
+        </Button>
+
+        <h1 className="text-2xl font-bold text-slate-900">Follow-ups due</h1>
+
+        {dueFollowUps.map((client) => (
+          <Card key={client.id} className="rounded-3xl shadow-sm">
+            <CardContent className="space-y-3 p-4">
+              <h2 className="text-lg font-bold text-slate-900">{client.name}</h2>
+              <p className="text-sm text-slate-600">{client.contact}</p>
+              <p className="text-sm text-slate-500">{client.status}</p>
+              <p className="text-xs text-slate-500">Due: {client.nextFollowUp}</p>
+
+              <div className="grid grid-cols-2 gap-2">
+                <a href={`tel:${client.phone}`}>
+                  <Button variant="outline" className="w-full rounded-2xl">
+                    <Phone size={16} className="mr-2" /> Call
+                  </Button>
+                </a>
+
+                <a href={`mailto:${client.email}`}>
+                  <Button variant="outline" className="w-full rounded-2xl">
+                    <Mail size={16} className="mr-2" /> Email
+                  </Button>
+                </a>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <div className="rounded-3xl bg-slate-900 p-5 text-white shadow-sm">
         <p className="text-sm text-slate-300">Today, 03 May 2026</p>
         <h1 className="mt-1 text-3xl font-bold">Your day is ready</h1>
         <p className="mt-2 text-slate-300">
-          You have {planList.length} planned items, {dueFollowUps} follow-up due, and {staleClients} clients needing attention.
+          You have {planList.length} planned items, {dueFollowUps.length} follow-up due, and {staleClients.length} clients needing attention.
         </p>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Card className="rounded-3xl shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Today</p>
-            <p className="text-3xl font-bold text-slate-900">{planList.length}</p>
-            <p className="text-sm text-slate-500">jobs / visits</p>
-          </CardContent>
-        </Card>
+        <button onClick={() => setViewMode("today")} className="text-left">
+          <Card className="rounded-3xl shadow-sm">
+            <CardContent className="p-4">
+              <p className="text-sm text-slate-500">Today</p>
+              <p className="text-3xl font-bold text-slate-900">{planList.length}</p>
+              <p className="text-sm text-slate-500">jobs / visits</p>
+            </CardContent>
+          </Card>
+        </button>
 
-        <Card className="rounded-3xl shadow-sm">
-          <CardContent className="p-4">
-            <p className="text-sm text-slate-500">Follow-ups</p>
-            <p className="text-3xl font-bold text-slate-900">{dueFollowUps}</p>
-            <p className="text-sm text-slate-500">due now</p>
-          </CardContent>
-        </Card>
+        <button onClick={() => setViewMode("followups")} className="text-left">
+          <Card className="rounded-3xl shadow-sm">
+            <CardContent className="p-4">
+              <p className="text-sm text-slate-500">Follow-ups</p>
+              <p className="text-3xl font-bold text-slate-900">{dueFollowUps.length}</p>
+              <p className="text-sm text-slate-500">due now</p>
+            </CardContent>
+          </Card>
+        </button>
       </div>
 
       <div className="space-y-3">
