@@ -120,7 +120,8 @@ function QuickAddScreen() {
   const [audioURL, setAudioURL] = useState(null);
   const [audioError, setAudioError] = useState("");
   const [mediaFiles, setMediaFiles] = useState([]);
-
+const [selectedClient, setSelectedClient] = useState("");
+const [conversationNote, setConversationNote] = useState("");
   const startRecording = async () => {
     try {
       setAudioError("");
@@ -213,10 +214,14 @@ function QuickAddScreen() {
 
       <Card className="rounded-3xl shadow-sm">
         <CardContent className="space-y-4 p-4">
-          <select className="w-full rounded-2xl border border-slate-200 p-4">
-  <option>Select existing client</option>
+         <select
+  className="w-full rounded-2xl border border-slate-200 p-4"
+  value={selectedClient}
+  onChange={(e) => setSelectedClient(e.target.value)}
+>
+  <option value="">Select existing client</option>
   {clients.map((c) => (
-    <option key={c.id}>{c.name}</option>
+    <option key={c.id} value={c.name}>{c.name}</option>
   ))}
 </select>
           <FriendlyInput label="Contact person" placeholder="Who you spoke to" />
