@@ -511,8 +511,6 @@ function CalendarScreen({ planList = dailyPlan }) {
       </div>
     </div>
   );
-} {
-  return <div className="space-y-5"><div><h1 className="text-2xl font-bold text-slate-900">Calendar</h1><p className="text-sm text-slate-500">Your app can later sync this with Google Calendar or Outlook.</p></div><Button className="w-full rounded-2xl py-6"><CalendarDays size={18} className="mr-2" /> Connect Calendar</Button><div className="space-y-3">{dailyPlan.map((item) => <Card key={item.id} className="rounded-3xl shadow-sm"><CardContent className="flex items-center gap-3 p-4"><div className="rounded-2xl bg-slate-900 p-3 text-white"><Clock size={20} /></div><div className="flex-1"><p className="font-bold text-slate-900">{item.time} - {item.title}</p><p className="text-sm text-slate-500">{item.client} • {item.location}</p></div></CardContent></Card>)}</div></div>;
 }
 
 function ClientsScreen({ clientList, setClientList }) {
