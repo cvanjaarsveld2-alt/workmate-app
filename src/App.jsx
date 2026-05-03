@@ -886,95 +886,59 @@ function ServiceScreen() {
     e.target.value = "";
   };
 
-  const deleteServiceFile = (id) => { {
-  const [recording, setRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioURL, setAudioURL] = useState(null);
-  const [audioError, setAudioError] = useState("");
-  const [serviceFiles, setServiceFiles] = useState([]);
-
-  const startRecording = async () => {
-    try {
-      setAudioError("");
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setAudioError("Voice recording is not supported on this browser.");
-        return;
-      }
-
-      if (typeof MediaRecorder === "undefined") {
-        setAudioError("Voice recording is not supported on this device/browser.");
-        return;
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunks.push(e.data);
-      };
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, {
-          type: recorder.mimeType || "audio/webm",
-        });
-
-        setAudioURL(URL.createObjectURL(blob));
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      recorder.start();
-      setMediaRecorder(recorder);
-      setRecording(true);
-    } catch (err) {
-      setAudioError("Microphone permission was blocked. Check browser permissions.");
-      console.error(err);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorder && recording) {
-      mediaRecorder.stop();
-      setRecording(false);
-      setMediaRecorder(null);
-    }
-  };
-
-  const deleteVoiceNote = () => {
-    if (audioURL) URL.revokeObjectURL(audioURL);
-    setAudioURL(null);
-    setAudioError("");
-  };
-
-  const handleServiceFiles = (e) => {
-    const selectedFiles = Array.from(e.target.files || []);
-
-    const newFiles = selectedFiles.map((file) => ({
-      file,
-      name: file.name,
-      type: file.type,
-      url: URL.createObjectURL(file),
-    }));
-
-    setServiceFiles((current) => [...current, ...newFiles]);
-    e.target.value = "";
-  };
-
-  const deleteServiceFile = (indexToDelete) => {
-    setServiceFiles((currentFiles) => {
-      const fileToDelete = currentFiles[indexToDelete];
-      if (fileToDelete?.url) URL.revokeObjectURL(fileToDelete.url);
-      return currentFiles.filter((_, index) => index !== indexToDelete);
+  const deleteServiceFile = (id) => {
+    setServiceFiles((current) => {
+      const file = current.find((item) => item.id === id);
+      if (file?.url) URL.revokeObjectURL(file.url);
+      return current.filter((item) => item.id !== id);
     });
   };
 
-  const deleteAllServiceFiles = () => {
-    serviceFiles.forEach((item) => {
-      if (item.url) URL.revokeObjectURL(item.url);
-    });
+  const createPDF = () => {
+    const printWindow = window.open("", "_blank");
 
-    setServiceFiles([]);
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Service Report</title>
+          <style>
+            body { font-family: Arial; padding: 30px; color: #111827; }
+            h1 { border-bottom: 2px solid #111827; padding-bottom: 10px; }
+            .section { margin-bottom: 20px; }
+            .label { font-weight: bold; }
+            img { max-width: 100%; margin-top: 10px; border-radius: 10px; }
+          </style>
+        </head>
+        <body>
+          <h1>PowerMate Service Report</h1>
+
+          <div class="section"><span class="label">Client / Site:</span> ${report.client}</div>
+          <div class="section"><span class="label">Machine / Equipment:</span> ${report.machine}</div>
+          <div class="section"><span class="label">Technician:</span> ${report.technician}</div>
+          <div class="section"><span class="label">Fault Found:</span><br/>${report.fault}</div>
+          <div class="section"><span class="label">Work Done:</span><br/>${report.workDone}</div>
+          <div class="section"><span class="label">Parts Used:</span><br/>${report.partsUsed}</div>
+
+          <h2>Attached Files</h2>
+          ${serviceFiles
+            .map(
+              (file) =>
+                file.type.startsWith("image/")
+                  ? `<div><p>${file.name}</p><img src="${file.url}" /></div>`
+                  : `<p>${file.name}</p>`
+            )
+            .join("")}
+
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
   };
 
   return (
@@ -982,158 +946,96 @@ function ServiceScreen() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Service report</h1>
         <p className="text-sm text-slate-500">
-          Capture job details, photos, videos, documents and voice notes.
+          Complete the report and create a PDF.
         </p>
       </div>
 
       <Card className="rounded-3xl shadow-sm">
         <CardContent className="space-y-4 p-4">
-          <FriendlyInput
-            label="Client / Site"
-            placeholder="Example: ABC Mining - Shaft 3"
+          <input
+            placeholder="Client / Site"
+            value={report.client}
+            onChange={(e) => updateReport("client", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
           />
 
-          <FriendlyInput
-            label="Machine / Equipment"
-            placeholder="Example: Hydraulic starter on generator"
+          <input
+            placeholder="Machine / Equipment"
+            value={report.machine}
+            onChange={(e) => updateReport("machine", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
           />
 
-          <FriendlyInput
-            label="Fault found"
-            placeholder="What was wrong?"
-            multiline
+          <input
+            placeholder="Technician"
+            value={report.technician}
+            onChange={(e) => updateReport("technician", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
           />
 
-          <FriendlyInput
-            label="Work done"
-            placeholder="What did you repair, test or inspect?"
-            multiline
+          <textarea
+            rows={4}
+            placeholder="Fault found"
+            value={report.fault}
+            onChange={(e) => updateReport("fault", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
           />
 
-          <FriendlyInput
-            label="Parts used"
-            placeholder="List parts, oil, fittings, cables, etc."
+          <textarea
+            rows={4}
+            placeholder="Work done"
+            value={report.workDone}
+            onChange={(e) => updateReport("workDone", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
           />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant="outline"
-              className={`rounded-2xl py-6 ${
-                recording ? "border-red-300 bg-red-100 text-red-700" : ""
-              }`}
-              onClick={recording ? stopRecording : startRecording}
-            >
-              <Mic size={18} className="mr-2" />
-              {recording ? "Stop recording" : "Voice note"}
-            </Button>
+          <textarea
+            rows={3}
+            placeholder="Parts used"
+            value={report.partsUsed}
+            onChange={(e) => updateReport("partsUsed", e.target.value)}
+            className="w-full rounded-2xl border border-slate-200 p-4"
+          />
 
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold">
-              <Upload size={18} />
-              Add files
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold">
+            <Upload size={18} />
+            Add photos / files
 
-              <input
-                type="file"
-                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"
-                multiple
-                className="hidden"
-                onChange={handleServiceFiles}
-              />
-            </label>
-          </div>
+            <input
+              type="file"
+              accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx"
+              multiple
+              className="hidden"
+              onChange={handleServiceFiles}
+            />
+          </label>
 
-          <div className="rounded-2xl bg-slate-50 p-3 text-xs text-slate-600">
-            You can add photos, videos, PDFs, Word documents, Excel files, or choose from your phone library / Google Photos.
-          </div>
+          {serviceFiles.map((file) => (
+            <div key={file.id} className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-sm font-semibold">{file.name}</p>
 
-          {audioError && (
-            <div className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
-              {audioError}
+              {file.type.startsWith("image/") && (
+                <img
+                  src={file.url}
+                  alt={file.name}
+                  className="mt-2 max-h-56 w-full rounded-2xl object-cover"
+                />
+              )}
+
+              <button
+                type="button"
+                onClick={() => deleteServiceFile(file.id)}
+                className="mt-2 w-full rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700"
+              >
+                Delete
+              </button>
             </div>
-          )}
+          ))}
 
-          {recording && (
-            <div className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">
-              Recording... tap Stop recording when finished.
-            </div>
-          )}
-
-          {audioURL && (
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-semibold">Service voice note:</p>
-                <button
-                  type="button"
-                  onClick={deleteVoiceNote}
-                  className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700"
-                >
-                  Delete voice
-                </button>
-              </div>
-
-              <audio controls src={audioURL} className="w-full" />
-            </div>
-          )}
-
-          {serviceFiles.length > 0 && (
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-semibold">Selected service files:</p>
-                <button
-                  type="button"
-                  onClick={deleteAllServiceFiles}
-                  className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700"
-                >
-                  Delete all
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {serviceFiles.map((item, index) => (
-                  <div
-                    key={`${item.name}-${index}`}
-                    className="rounded-2xl bg-white p-2"
-                  >
-                    {item.type.startsWith("image/") ? (
-                      <img
-                        src={item.url}
-                        alt={item.name}
-                        className="h-32 w-full rounded-xl object-cover"
-                      />
-                    ) : item.type.startsWith("video/") ? (
-                      <video
-                        controls
-                        src={item.url}
-                        className="h-32 w-full rounded-xl object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-32 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-                        <FileText size={32} />
-                      </div>
-                    )}
-
-                    <p className="mt-2 truncate text-xs text-slate-600">
-                      {item.type.startsWith("video/")
-                        ? "🎥"
-                        : item.type.startsWith("image/")
-                        ? "📷"
-                        : "📄"}{" "}
-                      {item.name}
-                    </p>
-
-                    <button
-                      type="button"
-                      onClick={() => deleteServiceFile(index)}
-                      className="mt-2 w-full rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <Button className="w-full rounded-2xl py-6 text-base">
+          <Button
+            className="w-full rounded-2xl py-6 text-base"
+            onClick={createPDF}
+          >
             Save & create PDF
           </Button>
         </CardContent>
