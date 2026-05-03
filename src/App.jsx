@@ -377,8 +377,171 @@ function CalendarScreen() {
 
 function ClientsScreen() {
   const [search, setSearch] = useState("");
-  const filtered = useMemo(() => clients.filter((client) => `${client.name} ${client.contact}`.toLowerCase().includes(search.toLowerCase())), [search]);
-  return <div className="space-y-5"><div><h1 className="text-2xl font-bold text-slate-900">Clients</h1><p className="text-sm text-slate-500">See who you spoke to and who needs follow-up.</p></div><div className="flex items-center gap-2 rounded-3xl bg-white p-3 shadow-sm"><Search size={20} className="text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client or contact" className="w-full bg-transparent p-2 text-base outline-none" /></div><div className="space-y-3">{filtered.map((client) => <Card key={client.id} className="rounded-3xl shadow-sm"><CardContent className="p-4"><div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold text-slate-900">{client.name}</h2><p className="text-sm text-slate-500">{client.contact}</p></div><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{daysSince(client.lastConversation)} days ago</span></div><div className="mt-4 rounded-2xl bg-slate-50 p-3"><p className="text-sm font-semibold text-slate-800">Latest note</p><p className="mt-1 text-sm text-slate-600">{client.notes}</p></div><div className="mt-4 grid grid-cols-3 gap-2"><Button variant="outline" className="rounded-2xl"><Phone size={16} /></Button><Button variant="outline" className="rounded-2xl"><Mail size={16} /></Button><Button className="rounded-2xl">Note</Button></div></CardContent></Card>)}</div></div>;
+  const [selectedClient, setSelectedClient] = useState(null);
+
+  const filtered = useMemo(
+    () =>
+      clients.filter((client) =>
+        `${client.name} ${client.contact}`
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      ),
+    [search]
+  );
+
+  if (selectedClient) {
+    return (
+      <div className="space-y-5">
+        <Button
+          variant="outline"
+          className="rounded-2xl"
+          onClick={() => setSelectedClient(null)}
+        >
+          ← Back to clients
+        </Button>
+
+        <Card className="rounded-3xl shadow-sm">
+          <CardContent className="space-y-4 p-4">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                {selectedClient.name}
+              </h1>
+              <p className="text-sm text-slate-500">
+                {selectedClient.contact}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
+              <p><strong>Phone:</strong> {selectedClient.phone}</p>
+              <p><strong>Email:</strong> {selectedClient.email}</p>
+              <p><strong>Location:</strong> {selectedClient.location}</p>
+              <p><strong>Status:</strong> {selectedClient.status}</p>
+              <p><strong>Value:</strong> {selectedClient.value}</p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-sm font-semibold text-slate-800">Notes</p>
+              <p className="mt-1 text-sm text-slate-600">
+                {selectedClient.notes}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <a href={`tel:${selectedClient.phone}`}>
+                <Button variant="outline" className="w-full rounded-2xl">
+                  <Phone size={16} />
+                </Button>
+              </a>
+
+              <a href={`mailto:${selectedClient.email}`}>
+                <Button variant="outline" className="w-full rounded-2xl">
+                  <Mail size={16} />
+                </Button>
+              </a>
+
+              <Button className="rounded-2xl">
+                Add entry
+              </Button>
+            </div>
+
+            <div>
+              <h2 className="mb-2 text-lg font-bold text-slate-900">
+                Client history
+              </h2>
+
+              <div className="space-y-2">
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Last conversation
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {selectedClient.lastConversation}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {selectedClient.notes}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl bg-slate-50 p-3">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Next follow-up
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {selectedClient.nextFollowUp}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {selectedClient.status}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
+        <p className="text-sm text-slate-500">
+          Tap a client to open their profile.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2 rounded-3xl bg-white p-3 shadow-sm">
+        <Search size={20} className="text-slate-400" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search client or contact"
+          className="w-full bg-transparent p-2 text-base outline-none"
+        />
+      </div>
+
+      <div className="space-y-3">
+        {filtered.map((client) => (
+          <button
+            key={client.id}
+            onClick={() => setSelectedClient(client)}
+            className="w-full text-left"
+          >
+            <Card className="rounded-3xl shadow-sm transition hover:scale-[1.01] hover:shadow-md">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">
+                      {client.name}
+                    </h2>
+                    <p className="text-sm text-slate-500">{client.contact}</p>
+                  </div>
+
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {daysSince(client.lastConversation)} days ago
+                  </span>
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-slate-50 p-3">
+                  <p className="text-sm font-semibold text-slate-800">
+                    Latest note
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {client.notes}
+                  </p>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
+                  <span>Open client</span>
+                  <ChevronRight size={18} />
+                </div>
+              </CardContent>
+            </Card>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function ServiceScreen() {
