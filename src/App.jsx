@@ -224,13 +224,18 @@ const [conversationNote, setConversationNote] = useState("");
     <option key={c.id} value={c.name}>{c.name}</option>
   ))}
 </select>
-          <FriendlyInput label="Contact person" placeholder="Who you spoke to" />
-
-          <FriendlyInput
-            label="What was discussed?"
-            placeholder="Notes..."
-            multiline
-          />
+          <div>
+  <label className="mb-1 block text-sm font-semibold text-slate-800">
+    What was discussed?
+  </label>
+  <textarea
+    rows={4}
+    value={conversationNote}
+    onChange={(e) => setConversationNote(e.target.value)}
+    placeholder="Notes..."
+    className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-base outline-none focus:border-slate-500"
+  />
+</div>
 
           <div className="grid grid-cols-2 gap-3">
             <Button
@@ -338,9 +343,27 @@ const [conversationNote, setConversationNote] = useState("");
             </div>
           )}
 
-          <Button className="w-full rounded-2xl py-6 text-base">
-            Save conversation
-          </Button>
+          <Button
+  className="w-full rounded-2xl py-6 text-base"
+  onClick={() => {
+    if (!selectedClient) {
+      alert("Please select a client first.");
+      return;
+    }
+
+    console.log("Saved conversation:", {
+      client: selectedClient,
+      note: conversationNote,
+      files: mediaFiles,
+      voiceNote: audioURL,
+      date: new Date().toISOString(),
+    });
+
+    alert("Conversation saved to client.");
+  }}
+>
+  Save conversation
+</Button>
         </CardContent>
       </Card>
     </div>
