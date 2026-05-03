@@ -375,19 +375,31 @@ function CalendarScreen() {
   return <div className="space-y-5"><div><h1 className="text-2xl font-bold text-slate-900">Calendar</h1><p className="text-sm text-slate-500">Your app can later sync this with Google Calendar or Outlook.</p></div><Button className="w-full rounded-2xl py-6"><CalendarDays size={18} className="mr-2" /> Connect Calendar</Button><div className="space-y-3">{dailyPlan.map((item) => <Card key={item.id} className="rounded-3xl shadow-sm"><CardContent className="flex items-center gap-3 p-4"><div className="rounded-2xl bg-slate-900 p-3 text-white"><Clock size={20} /></div><div className="flex-1"><p className="font-bold text-slate-900">{item.time} - {item.title}</p><p className="text-sm text-slate-500">{item.client} • {item.location}</p></div></CardContent></Card>)}</div></div>;
 }
 
-function ClientsScreen() {
+function ClientsScreen({ clientList, setClientList }) {
   const [search, setSearch] = useState("");
   const [selectedClient, setSelectedClient] = useState(null);
+  const [editMode, setEditMode] = useState(false);
 
   const filtered = useMemo(
     () =>
-      clients.filter((client) =>
+      clientList.filter((client) =>
         `${client.name} ${client.contact}`
           .toLowerCase()
           .includes(search.toLowerCase())
       ),
-    [search]
+    [search, clientList]
   );
+
+  const updateClientField = (field, value) => {
+    const updatedClient = { ...selectedClient, [field]: value };
+    setSelectedClient(updatedClient);
+
+    setClientList((current) =>
+      current.map((client) =>
+        client.id === updatedClient.id ? updatedClient : client
+      )
+    );
+  };
 
   if (selectedClient) {
     return (
@@ -395,37 +407,102 @@ function ClientsScreen() {
         <Button
           variant="outline"
           className="rounded-2xl"
-          onClick={() => setSelectedClient(null)}
+          onClick={() => {
+            setSelectedClient(null);
+            setEditMode(false);
+          }}
         >
           ← Back to clients
         </Button>
 
         <Card className="rounded-3xl shadow-sm">
           <CardContent className="space-y-4 p-4">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">
-                {selectedClient.name}
-              </h1>
-              <p className="text-sm text-slate-500">
-                {selectedClient.contact}
-              </p>
+
+            {/* HEADER */}
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                {editMode ? (
+                  <input
+                    value={selectedClient.name}
+                    onChange={(e) => updateClientField("name", e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 p-3 text-xl font-bold"
+                  />
+                ) : (
+                  <h1 className="text-2xl font-bold text-slate-900">
+                    {selectedClient.name}
+                  </h1>
+                )}
+
+                {editMode ? (
+                  <input
+                    value={selectedClient.contact}
+                    onChange={(e) => updateClientField("contact", e.target.value)}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 p-3 text-sm"
+                  />
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    {selectedClient.contact}
+                  </p>
+                )}
+              </div>
+
+              <Button
+                variant="outline"
+                className="rounded-2xl"
+                onClick={() => setEditMode(!editMode)}
+              >
+                {editMode ? "Done" : "Edit"}
+              </Button>
             </div>
 
-            <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">
-              <p><strong>Phone:</strong> {selectedClient.phone}</p>
-              <p><strong>Email:</strong> {selectedClient.email}</p>
-              <p><strong>Location:</strong> {selectedClient.location}</p>
-              <p><strong>Status:</strong> {selectedClient.status}</p>
-              <p><strong>Value:</strong> {selectedClient.value}</p>
+            {/* DETAILS */}
+            <div className="space-y-3 rounded-2xl bg-slate-50 p-3">
+              {[
+                ["phone", "Phone"],
+                ["email", "Email"],
+                ["location", "Location"],
+                ["status", "Status"],
+                ["value", "Value"],
+              ].map(([field, label]) => (
+                <div key={field}>
+                  <label className="mb-1 block text-xs font-bold text-slate-500">
+                    {label}
+                  </label>
+
+                  {editMode ? (
+                    <input
+                      value={selectedClient[field] || ""}
+                      onChange={(e) => updateClientField(field, e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm"
+                    />
+                  ) : (
+                    <p className="text-sm text-slate-700">
+                      {selectedClient[field]}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
 
+            {/* NOTES */}
             <div className="rounded-2xl bg-slate-50 p-3">
               <p className="text-sm font-semibold text-slate-800">Notes</p>
-              <p className="mt-1 text-sm text-slate-600">
-                {selectedClient.notes}
-              </p>
+
+              {editMode ? (
+                <textarea
+                  rows={4}
+                  value={selectedClient.notes}
+                  onChange={(e) => updateClientField("notes", e.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm"
+                />
+              ) : (
+                <p className="mt-1 text-sm text-slate-600">
+                  {selectedClient.notes}
+                </p>
+              )}
             </div>
 
+            {/* ACTIONS */}
             <div className="grid grid-cols-3 gap-2">
               <a href={`tel:${selectedClient.phone}`}>
                 <Button variant="outline" className="w-full rounded-2xl">
@@ -444,6 +521,7 @@ function ClientsScreen() {
               </Button>
             </div>
 
+            {/* HISTORY */}
             <div>
               <h2 className="mb-2 text-lg font-bold text-slate-900">
                 Client history
@@ -454,27 +532,46 @@ function ClientsScreen() {
                   <p className="text-sm font-semibold text-slate-900">
                     Last conversation
                   </p>
-                  <p className="text-xs text-slate-500">
-                    {selectedClient.lastConversation}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {selectedClient.notes}
-                  </p>
+
+                  {editMode ? (
+                    <input
+                      type="date"
+                      value={selectedClient.lastConversation}
+                      onChange={(e) =>
+                        updateClientField("lastConversation", e.target.value)
+                      }
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm"
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      {selectedClient.lastConversation}
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-2xl bg-slate-50 p-3">
                   <p className="text-sm font-semibold text-slate-900">
                     Next follow-up
                   </p>
-                  <p className="text-xs text-slate-500">
-                    {selectedClient.nextFollowUp}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {selectedClient.status}
-                  </p>
+
+                  {editMode ? (
+                    <input
+                      type="date"
+                      value={selectedClient.nextFollowUp}
+                      onChange={(e) =>
+                        updateClientField("nextFollowUp", e.target.value)
+                      }
+                      className="mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm"
+                    />
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      {selectedClient.nextFollowUp}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
+
           </CardContent>
         </Card>
       </div>
@@ -486,7 +583,7 @@ function ClientsScreen() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
         <p className="text-sm text-slate-500">
-          Tap a client to open their profile.
+          Tap a client to open and edit their profile.
         </p>
       </div>
 
@@ -507,34 +604,12 @@ function ClientsScreen() {
             onClick={() => setSelectedClient(client)}
             className="w-full text-left"
           >
-            <Card className="rounded-3xl shadow-sm transition hover:scale-[1.01] hover:shadow-md">
+            <Card className="rounded-3xl shadow-sm">
               <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900">
-                      {client.name}
-                    </h2>
-                    <p className="text-sm text-slate-500">{client.contact}</p>
-                  </div>
-
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                    {daysSince(client.lastConversation)} days ago
-                  </span>
-                </div>
-
-                <div className="mt-4 rounded-2xl bg-slate-50 p-3">
-                  <p className="text-sm font-semibold text-slate-800">
-                    Latest note
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {client.notes}
-                  </p>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between text-sm font-semibold text-slate-500">
-                  <span>Open client</span>
-                  <ChevronRight size={18} />
-                </div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  {client.name}
+                </h2>
+                <p className="text-sm text-slate-500">{client.contact}</p>
               </CardContent>
             </Card>
           </button>
@@ -543,7 +618,6 @@ function ClientsScreen() {
     </div>
   );
 }
-
 function ServiceScreen() {
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
