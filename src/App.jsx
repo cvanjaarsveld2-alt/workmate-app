@@ -458,7 +458,60 @@ const [conversationNote, setConversationNote] = useState("");
 }
     
 
-function CalendarScreen() {
+function CalendarScreen({ planList = dailyPlan }) {
+  const createGoogleCalendarLink = (item) => {
+    const title = encodeURIComponent(item.title);
+    const location = encodeURIComponent(item.location);
+    const details = encodeURIComponent(`${item.client} - ${item.type}`);
+
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}`;
+  };
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Calendar</h1>
+        <p className="text-sm text-slate-500">
+          Add your planned jobs and follow-ups to your phone calendar.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        {planList.map((item) => (
+          <Card key={item.id} className="rounded-3xl shadow-sm">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-slate-900 p-3 text-white">
+                  <Clock size={20} />
+                </div>
+
+                <div className="flex-1">
+                  <p className="font-bold text-slate-900">
+                    {item.time} - {item.title}
+                  </p>
+                  <p className="text-sm text-slate-500">
+                    {item.client} • {item.location}
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={createGoogleCalendarLink(item)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Button className="w-full rounded-2xl">
+                  <CalendarDays size={18} className="mr-2" />
+                  Add to Google Calendar
+                </Button>
+              </a>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+} {
   return <div className="space-y-5"><div><h1 className="text-2xl font-bold text-slate-900">Calendar</h1><p className="text-sm text-slate-500">Your app can later sync this with Google Calendar or Outlook.</p></div><Button className="w-full rounded-2xl py-6"><CalendarDays size={18} className="mr-2" /> Connect Calendar</Button><div className="space-y-3">{dailyPlan.map((item) => <Card key={item.id} className="rounded-3xl shadow-sm"><CardContent className="flex items-center gap-3 p-4"><div className="rounded-2xl bg-slate-900 p-3 text-white"><Clock size={20} /></div><div className="flex-1"><p className="font-bold text-slate-900">{item.time} - {item.title}</p><p className="text-sm text-slate-500">{item.client} • {item.location}</p></div></CardContent></Card>)}</div></div>;
 }
 
