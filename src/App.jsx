@@ -874,6 +874,21 @@ function ClientsScreen({ clientList, setClientList }) {
             {/* ACTIONS */}
             <div className="grid grid-cols-3 gap-2">
               <a href={`tel:${selectedClient.phone}`}>
+                <button
+  type="button"
+  onClick={() => {
+    if (!confirm("Are you sure you want to delete this client?")) return;
+
+    setClientList((current) =>
+      current.filter((c) => c.id !== selectedClient.id)
+    );
+
+    setSelectedClient(null);
+  }}
+  className="w-full rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+>
+  Delete client
+</button>
                 <Button variant="outline" className="w-full rounded-2xl">
                   <Phone size={16} />
                 </Button>
