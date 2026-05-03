@@ -115,22 +115,139 @@ function HomeScreen({ go }) {
 }
 
 function QuickAddScreen() {
+  const [recording, setRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [audioURL, setAudioURL] = useState(null);
+  const [photos, setPhotos] = useState([]);
+
+  // 🎤 START RECORDING
+  const startRecording = async () => {
+    try {
+      if (!navigator.mediaDevices) {
+        alert("Voice recording not supported on this device.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        const url = URL.createObjectURL(blob);
+        setAudioURL(url);
+
+        // stop mic
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setRecording(true);
+    } catch (err) {
+      alert("Microphone permission denied.");
+      console.error(err);
+    }
+  };
+
+  // 🛑 STOP RECORDING
+  const stopRecording = () => {
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      setRecording(false);
+      setMediaRecorder(null);
+    }
+  };
+
+  // 📷 HANDLE PHOTO
+  const handlePhoto = (e) => {
+    const files = Array.from(e.target.files || []);
+    setPhotos(files);
+  };
+
   return (
     <div className="space-y-5">
-      <div><h1 className="text-2xl font-bold text-slate-900">Add conversation</h1><p className="text-sm text-slate-500">Capture the important details quickly. You can complete the rest later.</p></div>
-      <Card className="rounded-3xl shadow-sm"><CardContent className="space-y-4 p-4">
-        <FriendlyInput label="Client" placeholder="Start typing client name" />
-        <FriendlyInput label="Who did you speak to?" placeholder="Contact person" />
-        <div><label className="mb-1 block text-sm font-semibold text-slate-800">Conversation type</label><div className="grid grid-cols-2 gap-2">{["Phone", "WhatsApp", "Email", "Site visit"].map((type) => <button key={type} className="rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700 hover:border-slate-900">{type}</button>)}</div></div>
-        <FriendlyInput label="What was discussed?" placeholder="Example: Client wants pricing on hydraulic starter..." multiline />
-        <FriendlyInput label="Next action" placeholder="Example: Send quote / book service / follow up" />
-        <FriendlyInput label="Reminder date" placeholder="Example: Tomorrow / 7 days / 2026-05-10" />
-        <div className="grid grid-cols-2 gap-3"><Button variant="outline" className="rounded-2xl py-6"><Mic size={18} className="mr-2" /> Voice note</Button><Button variant="outline" className="rounded-2xl py-6"><Camera size={18} className="mr-2" /> Add photo</Button></div>
-        <Button className="w-full rounded-2xl py-6 text-base">Save conversation</Button>
-      </CardContent></Card>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Add conversation</h1>
+        <p className="text-sm text-slate-500">
+          Capture the important details quickly.
+        </p>
+      </div>
+
+      <Card className="rounded-3xl shadow-sm">
+        <CardContent className="space-y-4 p-4">
+          <FriendlyInput label="Client" placeholder="Client name" />
+          <FriendlyInput label="Contact person" placeholder="Who you spoke to" />
+
+          <FriendlyInput
+            label="What was discussed?"
+            placeholder="Notes..."
+            multiline
+          />
+
+          {/* 🎤 + 📷 */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* VOICE */}
+            <Button
+              variant="outline"
+              className={`rounded-2xl py-6 ${
+                recording ? "bg-red-100 text-red-700" : ""
+              }`}
+              onClick={recording ? stopRecording : startRecording}
+            >
+              <Mic size={18} className="mr-2" />
+              {recording ? "Stop recording" : "Voice note"}
+            </Button>
+
+            {/* CAMERA */}
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold">
+              <Camera size={18} />
+              Add photo
+
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                multiple
+                className="hidden"
+                onChange={handlePhoto}
+              />
+            </label>
+          </div>
+
+          {/* AUDIO PREVIEW */}
+          {audioURL && (
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-sm font-semibold">Voice note:</p>
+              <audio controls src={audioURL} className="w-full" />
+            </div>
+          )}
+
+          {/* PHOTO PREVIEW */}
+          {photos.length > 0 && (
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-sm font-semibold">Photos selected:</p>
+              {photos.map((file, i) => (
+                <p key={i} className="text-xs text-slate-600">
+                  📷 {file.name}
+                </p>
+              ))}
+            </div>
+          )}
+
+          <Button className="w-full rounded-2xl py-6 text-base">
+            Save conversation
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+    
 
 function CalendarScreen() {
   return <div className="space-y-5"><div><h1 className="text-2xl font-bold text-slate-900">Calendar</h1><p className="text-sm text-slate-500">Your app can later sync this with Google Calendar or Outlook.</p></div><Button className="w-full rounded-2xl py-6"><CalendarDays size={18} className="mr-2" /> Connect Calendar</Button><div className="space-y-3">{dailyPlan.map((item) => <Card key={item.id} className="rounded-3xl shadow-sm"><CardContent className="flex items-center gap-3 p-4"><div className="rounded-2xl bg-slate-900 p-3 text-white"><Clock size={20} /></div><div className="flex-1"><p className="font-bold text-slate-900">{item.time} - {item.title}</p><p className="text-sm text-slate-500">{item.client} • {item.location}</p></div></CardContent></Card>)}</div></div>;
