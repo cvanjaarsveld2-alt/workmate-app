@@ -1416,11 +1416,12 @@ export default function WorkMateApp() {
   const [screen, setScreen] = useState("Home");
 const [clientList, setClientList] = useState(clients);
 const [planList, setPlanList] = useState(dailyPlan);
+  const [followUps, setFollowUps] = useState([]);
   const views = {
-  Home: <HomeScreen go={setScreen} planList={planList} setPlanList={setPlanList} />,
+  Home: <HomeScreen go={setScreen} planList={planList} setPlanList={setPlanList} followUps={followUps} setFollowUps={setFollowUps} />,
   QuickAdd: <QuickAddScreen />,
   Calendar: <CalendarScreen planList={planList} setPlanList={setPlanList} />,
-  Clients: <ClientsScreen clientList={clientList} setClientList={setClientList} />,
+  Clients: <ClientsScreen clientList={clientList} setClientList={setClientList} setFollowUps={setFollowUps} />,
   Service: <ServiceScreen />,
   Documents: <DocumentsScreen />,
   More: <MoreScreen go={setScreen} />,
