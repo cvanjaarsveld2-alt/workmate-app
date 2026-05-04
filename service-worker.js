@@ -1,4 +1,4 @@
-const CACHE_NAME = "powermate-pwa-v2";
+const CACHE_NAME = "powermate-pwa-v4";
 const ASSETS = ["/", "/manifest.webmanifest", "/index.html"];
 
 self.addEventListener("install", (event) => {
