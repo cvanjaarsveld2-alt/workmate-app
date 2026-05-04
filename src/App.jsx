@@ -125,7 +125,10 @@ async function filesToStoredFiles(fileList, clientId = "") {
   const converted = [];
 
   for (const file of files) {
-    const dataUrl = await fileToDataUrl(file);
+    const publicUrl = await uploadFile(file);
+
+    if (!publicUrl) continue;
+
     converted.push({
       id: makeId("file"),
       name: file.name,
@@ -133,7 +136,8 @@ async function filesToStoredFiles(fileList, clientId = "") {
       size: file.size,
       clientId,
       date: todayISO(),
-      dataUrl,
+      dataUrl: publicUrl,
+      storage: "supabase",
     });
   }
 
