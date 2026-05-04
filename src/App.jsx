@@ -41,7 +41,6 @@ const uploadFile = async (file) => {
 
     if (error) {
       alert("Supabase error: " + error.message);
-      console.error("Supabase upload error:", error);
       return null;
     }
 
@@ -52,9 +51,9 @@ const uploadFile = async (file) => {
       .getPublicUrl(fileName);
 
     return data.publicUrl;
+
   } catch (err) {
     alert("Upload crashed: " + err.message);
-    console.error("Upload crashed:", err);
     return null;
   }
 };
