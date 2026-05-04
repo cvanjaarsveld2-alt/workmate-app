@@ -475,10 +475,15 @@ function QuickAddScreen({ data, setData, go }) {
   };
 
   const handleMediaUpload = async (e) => {
-    const stored = await filesToStoredFiles(e.target.files, selectedClientId);
-    setMediaFiles((current) => [...current, ...stored]);
-    e.target.value = "";
-  };
+  alert("Media upload started");
+
+  const stored = await filesToStoredFiles(e.target.files, selectedClientId);
+
+  alert("Files returned: " + stored.length);
+
+  setMediaFiles((current) => [...current, ...stored]);
+  e.target.value = "";
+};
 
   const saveConversation = () => {
     if (!selectedClientId && !newClient.company.trim()) {
@@ -1091,11 +1096,20 @@ function ServiceScreen({ data, setData }) {
 function DocumentsScreen({ data, setData }) {
   const [clientId, setClientId] = useState("");
 
-  const handleDocsUpload = async (e) => {
-    const stored = await filesToStoredFiles(e.target.files, clientId);
-    setData((current) => ({ ...current, documents: [...current.documents, ...stored] }));
-    e.target.value = "";
-  };
+ const handleDocsUpload = async (e) => {
+  alert("Document upload started");
+
+  const stored = await filesToStoredFiles(e.target.files, clientId);
+
+  alert("Files returned: " + stored.length);
+
+  setData((current) => ({
+    ...current,
+    documents: [...current.documents, ...stored],
+  }));
+
+  e.target.value = "";
+};
 
   const deleteDoc = (id) => {
     setData((current) => ({ ...current, documents: current.documents.filter((doc) => doc.id !== id) }));
