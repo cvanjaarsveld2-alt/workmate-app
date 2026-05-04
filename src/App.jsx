@@ -203,7 +203,7 @@ useEffect(() => {
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={item.completed}
+                checked={!!item.completed}
                 onChange={(e) => updateFollowUp(item.id, "completed", e.target.checked)}
               />
               Completed
