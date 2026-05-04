@@ -41,9 +41,21 @@ const uploadFile = async (file) => {
 
     if (error) {
       alert("Supabase error: " + error.message);
-      console.error("Supabase upload error:", error);
       return null;
     }
+
+    alert("Supabase accepted file");
+
+    const { data } = supabase.storage
+      .from("powermate-files")
+      .getPublicUrl(fileName);
+
+    return data.publicUrl;
+  } catch (err) {
+    alert("Upload crashed: " + err.message);
+    return null;
+  }
+};
 
     alert("Supabase accepted file");
 
