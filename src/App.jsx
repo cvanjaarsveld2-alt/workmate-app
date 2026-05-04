@@ -11,7 +11,6 @@ import {
   ClipboardList,
   FileText,
   Home,
-  Link as LinkIcon,
   Mail,
   MapPin,
   Mic,
@@ -26,32 +25,21 @@ import {
 } from "lucide-react";
 
 const uploadFile = async (file) => {
-  alert("Sending to Supabase: " + file.name);
+  try {
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const fileName = `${Date.now()}-${cleanFileName}`;
 
-  const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const fileName = `${Date.now()}-${cleanFileName}`;
+    const { error } = await supabase.storage
+      .from("powermate-files")
+      .upload(fileName, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
 
-  const { error } = await supabase.storage
-    .from("powermate-files")
-    .upload(fileName, file, {
-      cacheControl: "3600",
-      upsert: false,
-    });
-
-  if (error) {
-    alert("Supabase error: " + error.message);
-    return null;
-  }
-
-  alert("Supabase accepted file");
-
-  const { data } = supabase.storage
-    .from("powermate-files")
-    .getPublicUrl(fileName);
-
-  return data.publicUrl;
-};
-    alert("Supabase accepted file");
+    if (error) {
+      alert("Upload error: " + error.message);
+      return null;
+    }
 
     const { data } = supabase.storage
       .from("powermate-files")
@@ -59,20 +47,7 @@ const uploadFile = async (file) => {
 
     return data.publicUrl;
   } catch (err) {
-    alert("Upload crashed: " + err.message);
-    return null;
-  }
-};
-
-    alert("Supabase accepted file");
-
-    const { data } = supabase.storage
-      .from("powermate-files")
-      .getPublicUrl(fileName);
-
-    return data.publicUrl;
-  } catch (err) {
-    alert("Upload crashed: " + err.message);
+    alert("Upload failed: " + err.message);
     console.error("Upload crashed:", err);
     return null;
   }
@@ -145,24 +120,12 @@ function daysSince(dateString) {
   return Math.max(0, Math.floor((today - oldDate) / 86400000));
 }
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 async function filesToStoredFiles(fileList, clientId = "") {
   const files = Array.from(fileList || []);
   const converted = [];
-
   for (const file of files) {
     const publicUrl = await uploadFile(file);
-
     if (!publicUrl) continue;
-
     converted.push({
       id: makeId("file"),
       name: file.name,
@@ -174,7 +137,6 @@ async function filesToStoredFiles(fileList, clientId = "") {
       storage: "supabase",
     });
   }
-
   return converted;
 }
 
@@ -187,15 +149,13 @@ function CardContent({ className = "", children }) {
 }
 
 function Button({ children, className = "", variant = "solid", onClick, type = "button" }) {
-  const base =
-    "inline-flex items-center justify-center gap-2 font-semibold transition active:scale-[0.98] disabled:opacity-50";
+  const base = "inline-flex items-center justify-center gap-2 font-semibold transition active:scale-[0.98] disabled:opacity-50";
   const style =
     variant === "outline"
       ? "border border-slate-200 bg-white text-slate-900"
       : variant === "danger"
       ? "bg-red-50 text-red-700"
       : "bg-slate-900 text-white";
-
   return (
     <button type={type} onClick={onClick} className={`${base} ${style} px-4 py-3 ${className}`}>
       {children}
@@ -276,7 +236,6 @@ function HomeScreen({ go, data, setData }) {
   const dueFollowUps = data.followUps.filter(
     (item) => !item.completed && item.dueDate && item.dueDate <= todayISO()
   );
-
   const staleClients = data.clients.filter((client) => daysSince(client.lastConversation) >= 7);
 
   useEffect(() => {
@@ -318,10 +277,8 @@ function HomeScreen({ go, data, setData }) {
   if (viewMode === "today") {
     return (
       <div className="space-y-5">
-        <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>
-          ← Back
-        </Button>
-        <h1 className="text-2xl font-bold text-slate-900">Today’s jobs / visits</h1>
+        <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>← Back</Button>
+        <h1 className="text-2xl font-bold text-slate-900">Today's jobs / visits</h1>
         {data.planList.length === 0 && <EmptyState title="No items planned" text="Add jobs and visits from the Calendar screen." />}
         {data.planList.map((item) => (
           <Card key={item.id} className="rounded-3xl shadow-sm">
@@ -331,9 +288,7 @@ function HomeScreen({ go, data, setData }) {
               <Field label="Client" value={item.client} onChange={(v) => updatePlanItem(item.id, "client", v)} />
               <Field label="Location" value={item.location} onChange={(v) => updatePlanItem(item.id, "location", v)} />
               <Field label="Type" value={item.type} onChange={(v) => updatePlanItem(item.id, "type", v)} />
-              <Button variant="danger" className="w-full rounded-2xl" onClick={() => deletePlanItem(item.id)}>
-                Delete item
-              </Button>
+              <Button variant="danger" className="w-full rounded-2xl" onClick={() => deletePlanItem(item.id)}>Delete item</Button>
             </CardContent>
           </Card>
         ))}
@@ -344,9 +299,7 @@ function HomeScreen({ go, data, setData }) {
   if (viewMode === "followups") {
     return (
       <div className="space-y-5">
-        <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>
-          ← Back
-        </Button>
+        <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>← Back</Button>
         <h1 className="text-2xl font-bold text-slate-900">Follow-ups</h1>
         {data.followUps.length === 0 && <EmptyState title="No follow-ups yet" text="Create one from a client profile or conversation." />}
         {data.followUps.map((item) => (
@@ -415,9 +368,7 @@ function HomeScreen({ go, data, setData }) {
         <CardContent className="p-4">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-900">Next up</h2>
-            <Button variant="outline" className="rounded-xl" onClick={() => go("Calendar")}>
-              View all
-            </Button>
+            <Button variant="outline" className="rounded-xl" onClick={() => go("Calendar")}>View all</Button>
           </div>
           {data.planList.length === 0 && <p className="text-sm text-slate-500">Nothing planned yet.</p>}
           <div className="space-y-3">
@@ -430,9 +381,7 @@ function HomeScreen({ go, data, setData }) {
                     <input value={item.client || ""} onChange={(e) => updatePlanItem(item.id, "client", e.target.value)} className="w-full rounded-xl border p-2" />
                     <input value={item.location || ""} onChange={(e) => updatePlanItem(item.id, "location", e.target.value)} className="w-full rounded-xl border p-2" />
                     <input value={item.type || ""} onChange={(e) => updatePlanItem(item.id, "type", e.target.value)} className="w-full rounded-xl border p-2" />
-                    <Button className="w-full rounded-2xl" onClick={() => setEditingId(null)}>
-                      Done
-                    </Button>
+                    <Button className="w-full rounded-2xl" onClick={() => setEditingId(null)}>Done</Button>
                   </div>
                 ) : (
                   <div className="flex gap-3">
@@ -443,13 +392,9 @@ function HomeScreen({ go, data, setData }) {
                     <div className="flex-1">
                       <p className="font-semibold text-slate-900">{item.title}</p>
                       <p className="text-sm text-slate-500">{item.client}</p>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
-                        <MapPin size={13} /> {item.location}
-                      </p>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><MapPin size={13} /> {item.location}</p>
                     </div>
-                    <Button variant="outline" className="rounded-xl" onClick={() => setEditingId(item.id)}>
-                      Edit
-                    </Button>
+                    <Button variant="outline" className="rounded-xl" onClick={() => setEditingId(item.id)}>Edit</Button>
                   </div>
                 )}
               </div>
@@ -471,6 +416,7 @@ function QuickAddScreen({ data, setData, go }) {
   const [audioDataUrl, setAudioDataUrl] = useState("");
   const [audioError, setAudioError] = useState("");
   const [mediaFiles, setMediaFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
 
   const selectedClient = data.clients.find((c) => c.id === selectedClientId);
 
@@ -509,15 +455,12 @@ function QuickAddScreen({ data, setData, go }) {
   };
 
   const handleMediaUpload = async (e) => {
-  alert("Media upload started");
-
-  const stored = await filesToStoredFiles(e.target.files, selectedClientId);
-
-  alert("Files returned: " + stored.length);
-
-  setMediaFiles((current) => [...current, ...stored]);
-  e.target.value = "";
-};
+    setUploading(true);
+    const stored = await filesToStoredFiles(e.target.files, selectedClientId);
+    setMediaFiles((current) => [...current, ...stored]);
+    e.target.value = "";
+    setUploading(false);
+  };
 
   const saveConversation = () => {
     if (!selectedClientId && !newClient.company.trim()) {
@@ -611,7 +554,6 @@ function QuickAddScreen({ data, setData, go }) {
         <h1 className="text-2xl font-bold text-slate-900">Add conversation</h1>
         <p className="text-sm text-slate-500">Capture notes, photos, videos and voice notes quickly.</p>
       </div>
-
       <Card className="rounded-3xl shadow-sm">
         <CardContent className="space-y-4 p-4">
           <select value={selectedClientId} onChange={(e) => setSelectedClientId(e.target.value)} className="w-full rounded-2xl border border-slate-200 p-4">
@@ -638,27 +580,30 @@ function QuickAddScreen({ data, setData, go }) {
           <Field label="Next follow-up date" type="date" value={nextFollowUp} onChange={setNextFollowUp} />
 
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className={`rounded-2xl py-6 ${recording ? "border-red-300 bg-red-100 text-red-700" : ""}`} onClick={recording ? stopRecording : startRecording}>
+            <Button
+              variant="outline"
+              className={`rounded-2xl py-6 ${recording ? "border-red-300 bg-red-100 text-red-700" : ""}`}
+              onClick={recording ? stopRecording : startRecording}
+            >
               <Mic size={18} /> {recording ? "Stop" : "Voice note"}
             </Button>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold">
-              <Camera size={18} /> Add photo/video
-              <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleMediaUpload} />
+            <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
+              <Camera size={18} /> {uploading ? "Uploading…" : "Add photo/video"}
+              <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleMediaUpload} disabled={uploading} />
             </label>
           </div>
 
-          <div className="rounded-2xl bg-amber-50 p-3 text-xs text-amber-800">
-            Local storage works for photos and small videos, but very large videos can fill your phone browser storage. Later, use Supabase Storage for heavy media.
+          <div className="rounded-2xl bg-blue-50 p-3 text-xs text-blue-800">
+            Photos and videos are uploaded securely to cloud storage via Supabase.
           </div>
 
           {audioError && <div className="rounded-2xl bg-red-50 p-3 text-sm font-semibold text-red-700">{audioError}</div>}
+
           {audioDataUrl && (
             <div className="rounded-2xl bg-slate-50 p-3">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-sm font-semibold">Voice note</p>
-                <button onClick={() => setAudioDataUrl("")} className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">
-                  Delete
-                </button>
+                <button onClick={() => setAudioDataUrl("")} className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">Delete</button>
               </div>
               <audio controls src={audioDataUrl} className="w-full" />
             </div>
@@ -727,7 +672,6 @@ function CalendarScreen({ data, setData }) {
         <h1 className="text-2xl font-bold text-slate-900">Calendar</h1>
         <p className="text-sm text-slate-500">Add, edit, delete and send items to Google Calendar.</p>
       </div>
-
       <Card className="rounded-3xl shadow-sm">
         <CardContent className="space-y-3 p-4">
           <h2 className="text-lg font-bold text-slate-900">Add new item</h2>
@@ -749,9 +693,7 @@ function CalendarScreen({ data, setData }) {
             <option>Meeting</option>
             <option>Site visit</option>
           </select>
-          <Button className="w-full rounded-2xl py-6" onClick={addCalendarItem}>
-            Add calendar item
-          </Button>
+          <Button className="w-full rounded-2xl py-6" onClick={addCalendarItem}>Add calendar item</Button>
         </CardContent>
       </Card>
 
@@ -766,13 +708,9 @@ function CalendarScreen({ data, setData }) {
               <Field label="Location" value={item.location} onChange={(v) => updateCalendarItem(item.id, "location", v)} />
               <Field label="Type" value={item.type} onChange={(v) => updateCalendarItem(item.id, "type", v)} />
               <a href={createGoogleCalendarLink(item)} target="_blank" rel="noreferrer" className="block">
-                <Button className="w-full rounded-2xl">
-                  <CalendarDays size={18} /> Add to Google Calendar
-                </Button>
+                <Button className="w-full rounded-2xl"><CalendarDays size={18} /> Add to Google Calendar</Button>
               </a>
-              <Button variant="danger" className="w-full rounded-2xl" onClick={() => deleteCalendarItem(item.id)}>
-                Delete item
-              </Button>
+              <Button variant="danger" className="w-full rounded-2xl" onClick={() => deleteCalendarItem(item.id)}>Delete item</Button>
             </CardContent>
           </Card>
         ))}
@@ -791,7 +729,9 @@ function ClientsScreen({ data, setData, go }) {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return data.clients.filter((client) => `${client.company} ${client.division} ${client.contact} ${client.location}`.toLowerCase().includes(q));
+    return data.clients.filter((client) =>
+      `${client.company} ${client.division} ${client.contact} ${client.location}`.toLowerCase().includes(q)
+    );
   }, [search, data.clients]);
 
   const addBlankClient = () => {
@@ -824,7 +764,9 @@ function ClientsScreen({ data, setData, go }) {
   const updateClientField = (field, value) => {
     setData((current) => ({
       ...current,
-      clients: current.clients.map((client) => (client.id === selectedClientId ? { ...client, [field]: value } : client)),
+      clients: current.clients.map((client) =>
+        client.id === selectedClientId ? { ...client, [field]: value } : client
+      ),
     }));
   };
 
@@ -866,7 +808,6 @@ function ClientsScreen({ data, setData, go }) {
         <Button variant="outline" className="rounded-2xl" onClick={() => { setSelectedClientId(null); setEditMode(false); }}>
           ← Back to clients
         </Button>
-
         <Card className="rounded-3xl shadow-sm">
           <CardContent className="space-y-4 p-4">
             <div className="flex items-start justify-between gap-3">
@@ -916,24 +857,16 @@ function ClientsScreen({ data, setData, go }) {
 
             <div className="grid grid-cols-3 gap-2">
               <a href={`tel:${selectedClient.phone || ""}`} className="block">
-                <Button variant="outline" className="w-full rounded-2xl">
-                  <Phone size={16} />
-                </Button>
+                <Button variant="outline" className="w-full rounded-2xl"><Phone size={16} /></Button>
               </a>
               <a href={`mailto:${selectedClient.email || ""}`} className="block">
-                <Button variant="outline" className="w-full rounded-2xl">
-                  <Mail size={16} />
-                </Button>
+                <Button variant="outline" className="w-full rounded-2xl"><Mail size={16} /></Button>
               </a>
-              <Button className="rounded-2xl" onClick={() => go("QuickAdd")}>
-                Add entry
-              </Button>
+              <Button className="rounded-2xl" onClick={() => go("QuickAdd")}>Add entry</Button>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" className="rounded-2xl" onClick={addFollowUp}>
-                Add follow-up
-              </Button>
+              <Button variant="outline" className="rounded-2xl" onClick={addFollowUp}>Add follow-up</Button>
               <Button variant="danger" className="rounded-2xl" onClick={deleteClient}>
                 <Trash2 size={16} /> Delete client
               </Button>
@@ -990,9 +923,7 @@ function ClientsScreen({ data, setData, go }) {
           <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
           <p className="text-sm text-slate-500">Company, division, contacts, history and files.</p>
         </div>
-        <Button className="rounded-2xl" onClick={addBlankClient}>
-          <Plus size={18} /> Add
-        </Button>
+        <Button className="rounded-2xl" onClick={addBlankClient}><Plus size={18} /> Add</Button>
       </div>
 
       <div className="flex items-center gap-2 rounded-3xl bg-white p-3 shadow-sm">
@@ -1000,7 +931,7 @@ function ClientsScreen({ data, setData, go }) {
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, division or contact" className="w-full bg-transparent p-2 text-base outline-none" />
       </div>
 
-      {data.clients.length === 0 && <EmptyState title="No demo clients loaded" text="Tap Add to create your first real client." />}
+      {data.clients.length === 0 && <EmptyState title="No clients yet" text="Tap Add to create your first client." />}
 
       <div className="space-y-3">
         {filtered.map((client) => (
@@ -1027,18 +958,31 @@ function ClientsScreen({ data, setData, go }) {
 function ServiceScreen({ data, setData }) {
   const [report, setReport] = useState({ clientId: "", machine: "", fault: "", workDone: "", partsUsed: "", technician: "" });
   const [serviceFiles, setServiceFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
 
   const selectedClient = data.clients.find((c) => c.id === report.clientId);
 
   const handleServiceFiles = async (e) => {
+    setUploading(true);
     const stored = await filesToStoredFiles(e.target.files, report.clientId);
     setServiceFiles((current) => [...current, ...stored]);
     e.target.value = "";
+    setUploading(false);
   };
 
   const saveReport = () => {
-    const savedReport = { id: makeId("service"), date: todayISO(), ...report, clientName: selectedClient?.company || "", fileIds: serviceFiles.map((f) => f.id) };
-    setData((current) => ({ ...current, serviceReports: [savedReport, ...current.serviceReports], documents: [...current.documents, ...serviceFiles] }));
+    const savedReport = {
+      id: makeId("service"),
+      date: todayISO(),
+      ...report,
+      clientName: selectedClient?.company || "",
+      fileIds: serviceFiles.map((f) => f.id),
+    };
+    setData((current) => ({
+      ...current,
+      serviceReports: [savedReport, ...current.serviceReports],
+      documents: [...current.documents, ...serviceFiles],
+    }));
     createPDF(savedReport, serviceFiles, data.settings);
     setReport({ clientId: "", machine: "", fault: "", workDone: "", partsUsed: "", technician: "" });
     setServiceFiles([]);
@@ -1050,8 +994,8 @@ function ServiceScreen({ data, setData }) {
       alert("Popup blocked. Allow popups to create PDF.");
       return;
     }
-
-    const esc = (value) => String(value || "").replace(/[&<>'"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" }[m]));
+    const esc = (value) =>
+      String(value || "").replace(/[&<>'"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" }[m]));
 
     printWindow.document.write(`
       <html>
@@ -1077,7 +1021,7 @@ function ServiceScreen({ data, setData }) {
           <div class="section"><span class="label">Work Done:</span><br/>${esc(savedReport.workDone).replace(/\n/g, "<br/>")}</div>
           <div class="section"><span class="label">Parts Used:</span><br/>${esc(savedReport.partsUsed).replace(/\n/g, "<br/>")}</div>
           <h2>Attached Images</h2>
-          ${files.map((file) => (file.type.startsWith("image/") ? `<div><p>${esc(file.name)}</p><img src="${file.dataUrl}" /></div>` : `<p>${esc(file.name)}</p>`)).join("")}
+          ${files.map((file) => file.type.startsWith("image/") ? `<div><p>${esc(file.name)}</p><img src="${file.dataUrl}" /></div>` : `<p>${esc(file.name)}</p>`).join("")}
           <div class="footer">${esc(settings.pdfFooterNote)}</div>
           <script>window.onload = function(){ window.print(); }</script>
         </body>
@@ -1105,9 +1049,9 @@ function ServiceScreen({ data, setData }) {
           <Field label="Fault found" multiline value={report.fault} onChange={(v) => setReport((r) => ({ ...r, fault: v }))} />
           <Field label="Work done" multiline value={report.workDone} onChange={(v) => setReport((r) => ({ ...r, workDone: v }))} />
           <Field label="Parts used" multiline value={report.partsUsed} onChange={(v) => setReport((r) => ({ ...r, partsUsed: v }))} />
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold">
-            <Upload size={18} /> Add photos / files
-            <input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={handleServiceFiles} />
+          <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
+            <Upload size={18} /> {uploading ? "Uploading…" : "Add photos / files"}
+            <input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={handleServiceFiles} disabled={uploading} />
           </label>
           {serviceFiles.map((file) => (
             <div key={file.id} className="rounded-2xl bg-slate-50 p-3">
@@ -1118,9 +1062,7 @@ function ServiceScreen({ data, setData }) {
               </Button>
             </div>
           ))}
-          <Button className="w-full rounded-2xl py-6 text-base" onClick={saveReport}>
-            Save & create PDF
-          </Button>
+          <Button className="w-full rounded-2xl py-6 text-base" onClick={saveReport}>Save & create PDF</Button>
         </CardContent>
       </Card>
     </div>
@@ -1129,21 +1071,18 @@ function ServiceScreen({ data, setData }) {
 
 function DocumentsScreen({ data, setData }) {
   const [clientId, setClientId] = useState("");
+  const [uploading, setUploading] = useState(false);
 
- const handleDocsUpload = async (e) => {
-  alert("Document upload started");
-
-  const stored = await filesToStoredFiles(e.target.files, clientId);
-
-  alert("Files returned: " + stored.length);
-
-  setData((current) => ({
-    ...current,
-    documents: [...current.documents, ...stored],
-  }));
-
-  e.target.value = "";
-};
+  const handleDocsUpload = async (e) => {
+    setUploading(true);
+    const stored = await filesToStoredFiles(e.target.files, clientId);
+    setData((current) => ({
+      ...current,
+      documents: [...current.documents, ...stored],
+    }));
+    e.target.value = "";
+    setUploading(false);
+  };
 
   const deleteDoc = (id) => {
     setData((current) => ({ ...current, documents: current.documents.filter((doc) => doc.id !== id) }));
@@ -1163,12 +1102,13 @@ function DocumentsScreen({ data, setData }) {
               <option key={client.id} value={client.id}>{client.company} {client.division ? `- ${client.division}` : ""}</option>
             ))}
           </select>
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-6 font-semibold text-white">
-            <Upload size={18} /> Upload photo, video or document
-            <input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={handleDocsUpload} />
+          <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-6 font-semibold text-white ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
+            <Upload size={18} /> {uploading ? "Uploading…" : "Upload photo, video or document"}
+            <input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={handleDocsUpload} disabled={uploading} />
           </label>
         </CardContent>
       </Card>
+
       {data.documents.length === 0 && <EmptyState title="No documents uploaded" text="Upload your first file above." />}
       <div className="space-y-3">
         {data.documents.map((doc) => {
@@ -1210,6 +1150,12 @@ function NotificationSettingsScreen() {
     "Send me a morning summary of my day",
   ];
 
+  const [checked, setChecked] = useState(() => reminderOptions.map((_, i) => i < 4));
+
+  const toggle = (index) => {
+    setChecked((current) => current.map((v, i) => (i === index ? !v : v)));
+  };
+
   return (
     <div className="space-y-5">
       <div>
@@ -1225,20 +1171,30 @@ function NotificationSettingsScreen() {
               <p className="text-sm text-slate-500">Google Calendar links are supported from calendar items.</p>
             </div>
           </div>
-          <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">Full live calendar sync will need a backend later. For now, each item can be pushed to Google Calendar manually.</div>
+          <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
+            Full live calendar sync will need a backend later. For now, each item can be pushed to Google Calendar manually.
+          </div>
         </CardContent>
       </Card>
       <Card className="rounded-3xl shadow-sm">
         <CardContent className="space-y-4 p-4">
           <div className="flex items-center gap-3">
             <div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><Bell size={24} /></div>
-            <div><h2 className="font-bold text-slate-900">Notification rules</h2><p className="text-sm text-slate-500">Choose what PowerMate must remind you about.</p></div>
+            <div>
+              <h2 className="font-bold text-slate-900">Notification rules</h2>
+              <p className="text-sm text-slate-500">Choose what PowerMate must remind you about.</p>
+            </div>
           </div>
           <div className="space-y-3">
             {reminderOptions.map((option, index) => (
-              <label key={option} className="flex items-center justify-between rounded-2xl bg-slate-50 p-4">
+              <label key={option} className="flex cursor-pointer items-center justify-between rounded-2xl bg-slate-50 p-4">
                 <span className="pr-4 text-sm font-medium text-slate-800">{option}</span>
-                <input type="checkbox" defaultChecked={index < 4} className="h-6 w-6 accent-slate-900" />
+                <input
+                  type="checkbox"
+                  checked={checked[index]}
+                  onChange={() => toggle(index)}
+                  className="h-6 w-6 accent-slate-900"
+                />
               </label>
             ))}
           </div>
@@ -1292,7 +1248,10 @@ function MoreScreen({ go, data, setData }) {
   const [salesReport, setSalesReport] = useState({ week: "", visits: "", quotes: "", followUps: "", newLeads: "", summary: "" });
 
   const saveSalesReport = () => {
-    setData((current) => ({ ...current, salesReports: [{ id: makeId("sales"), date: todayISO(), ...salesReport }, ...current.salesReports] }));
+    setData((current) => ({
+      ...current,
+      salesReports: [{ id: makeId("sales"), date: todayISO(), ...salesReport }, ...current.salesReports],
+    }));
     setSalesReport({ week: "", visits: "", quotes: "", followUps: "", newLeads: "", summary: "" });
     alert("Sales report saved.");
   };
@@ -1334,7 +1293,12 @@ function MoreScreen({ go, data, setData }) {
           </CardContent>
         </Card>
         {data.salesReports.map((r) => (
-          <Card key={r.id} className="rounded-3xl shadow-sm"><CardContent className="p-4"><p className="font-bold">{r.week || r.date}</p><p className="mt-1 text-sm text-slate-600">{r.summary}</p></CardContent></Card>
+          <Card key={r.id} className="rounded-3xl shadow-sm">
+            <CardContent className="p-4">
+              <p className="font-bold">{r.week || r.date}</p>
+              <p className="mt-1 text-sm text-slate-600">{r.summary}</p>
+            </CardContent>
+          </Card>
         ))}
       </div>
     );
@@ -1362,7 +1326,10 @@ function MoreScreen({ go, data, setData }) {
 
   return (
     <div className="space-y-5">
-      <div><h1 className="text-2xl font-bold text-slate-900">More</h1><p className="text-sm text-slate-500">Reports, reminders and settings.</p></div>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">More</h1>
+        <p className="text-sm text-slate-500">Reports, reminders and settings.</p>
+      </div>
       <div className="space-y-3">
         <BigAction icon={Bell} title="Calendar & Notifications" subtitle="Reminder rules and calendar notes" onClick={() => go("Notifications")} />
         <BigAction icon={Home} title="Install on phone" subtitle="Add PowerMate to iOS or Android home screen" onClick={() => go("Install")} />
@@ -1383,7 +1350,7 @@ export default function PowerMateApp() {
     } catch (error) {
       console.error("Could not auto-save PowerMate data", error);
       if (String(error?.name).includes("Quota")) {
-        alert("Your browser storage is full. Remove large videos or export a backup before continuing.");
+        alert("Your browser storage is full. Export a backup before continuing.");
       }
     }
   }, [data]);
