@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { supabase } from "./supabase";
 import {
   Bell,
   BriefcaseBusiness,
@@ -23,6 +24,25 @@ import {
   Wrench,
   X,
 } from "lucide-react";
+
+const uploadFile = async (file) => {
+  const fileName = `${Date.now()}-${file.name}`;
+
+  const { error } = await supabase.storage
+    .from("powermate-files")
+    .upload(fileName, file);
+
+  if (error) {
+    console.error("Upload error:", error);
+    return null;
+  }
+
+  const { data } = supabase.storage
+    .from("powermate-files")
+    .getPublicUrl(fileName);
+
+  return data.publicUrl;
+};
 
 const APP_NAME = "PowerMate";
 const STORAGE_KEY = "powermate_app_data_v1";
