@@ -153,41 +153,67 @@ useEffect(() => {
 }
 
   if (viewMode === "followups") {
-    return (
-      <div className="space-y-5">
-        <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>
-          ← Back
-        </Button>
-
-        <h1 className="text-2xl font-bold text-slate-900">Follow-ups due</h1>
-
-        {dueFollowUps.map((client) => (
-          <Card key={client.id} className="rounded-3xl shadow-sm">
-            <CardContent className="space-y-3 p-4">
-              <h2 className="text-lg font-bold text-slate-900">{client.name}</h2>
-              <p className="text-sm text-slate-600">{client.contact}</p>
-              <p className="text-sm text-slate-500">{client.status}</p>
-              <p className="text-xs text-slate-500">Due: {client.nextFollowUp}</p>
-
-              <div className="grid grid-cols-2 gap-2">
-                <a href={`tel:${client.phone}`}>
-                  <Button variant="outline" className="w-full rounded-2xl">
-                    <Phone size={16} className="mr-2" /> Call
-                  </Button>
-                </a>
-
-                <a href={`mailto:${client.email}`}>
-                  <Button variant="outline" className="w-full rounded-2xl">
-                    <Mail size={16} className="mr-2" /> Email
-                  </Button>
-                </a>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+  const updateFollowUp = (id, field, value) => {
+    setFollowUps((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      )
     );
-  }
+  };
+
+  return (
+    <div className="space-y-5">
+      <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>
+        ← Back
+      </Button>
+
+      <h1 className="text-2xl font-bold text-slate-900">Follow-ups</h1>
+
+      {followUps.length === 0 && (
+        <div className="rounded-3xl bg-white p-4 text-sm text-slate-500 shadow-sm">
+          No follow-ups created yet.
+        </div>
+      )}
+
+      {followUps.map((item) => (
+        <Card key={item.id} className="rounded-3xl shadow-sm">
+          <CardContent className="space-y-3 p-4">
+            <h2 className="text-lg font-bold text-slate-900">{item.clientName}</h2>
+
+            <input
+              type="date"
+              value={item.dueDate || ""}
+              onChange={(e) => updateFollowUp(item.id, "dueDate", e.target.value)}
+              className="w-full rounded-xl border p-2"
+            />
+
+            <input
+              value={item.status || ""}
+              onChange={(e) => updateFollowUp(item.id, "status", e.target.value)}
+              className="w-full rounded-xl border p-2"
+            />
+
+            <textarea
+              value={item.outcome || ""}
+              onChange={(e) => updateFollowUp(item.id, "outcome", e.target.value)}
+              placeholder="Outcome..."
+              className="w-full rounded-xl border p-2"
+            />
+
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={item.completed}
+                onChange={(e) => updateFollowUp(item.id, "completed", e.target.checked)}
+              />
+              Completed
+            </label>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
   return (
     <div className="space-y-5">
