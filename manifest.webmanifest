@@ -1,11 +1,11 @@
 {
-  "name": "WorkMate Field & Sales Assistant",
-  "short_name": "WorkMate",
-  "description": "Daily field service, sales, follow-up and document assistant.",
+  "name": "PowerMate - Powerworks Field Assistant",
+  "short_name": "PowerMate",
+  "description": "Field service, sales, follow-up and reporting system by Powerworks (PTY) Ltd.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f1f5f9",
+  "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "orientation": "portrait",
   "icons": [
