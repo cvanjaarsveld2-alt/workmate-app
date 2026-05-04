@@ -129,27 +129,28 @@ useEffect(() => {
   };
 
   if (viewMode === "today") {
-    return (
-      <div className="space-y-5">
-        <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>
-          ← Back
-        </Button>
+  return (
+    <div className="space-y-5">
+      <Button variant="outline" className="rounded-2xl" onClick={() => setViewMode("main")}>
+        ← Back
+      </Button>
 
-        <h1 className="text-2xl font-bold text-slate-900">Today’s jobs / visits</h1>
+      <h1 className="text-2xl font-bold text-slate-900">Today’s jobs / visits</h1>
 
-        {planList.map((item) => (
-          <Card key={item.id} className="rounded-3xl shadow-sm">
-            <CardContent className="space-y-3 p-4">
-              <p className="text-sm font-bold text-slate-900">{item.time} - {item.title}</p>
-              <p className="text-sm text-slate-600">{item.client}</p>
-              <p className="text-sm text-slate-500">{item.location}</p>
-              <p className="text-xs font-semibold text-slate-500">{item.type}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
+      {planList.map((item) => (
+        <Card key={item.id} className="rounded-3xl shadow-sm">
+          <CardContent className="space-y-3 p-4">
+            <input value={item.time} onChange={(e) => updatePlanItem(item.id, "time", e.target.value)} className="w-full rounded-xl border p-2" />
+            <input value={item.title} onChange={(e) => updatePlanItem(item.id, "title", e.target.value)} className="w-full rounded-xl border p-2" />
+            <input value={item.client} onChange={(e) => updatePlanItem(item.id, "client", e.target.value)} className="w-full rounded-xl border p-2" />
+            <input value={item.location} onChange={(e) => updatePlanItem(item.id, "location", e.target.value)} className="w-full rounded-xl border p-2" />
+            <input value={item.type} onChange={(e) => updatePlanItem(item.id, "type", e.target.value)} className="w-full rounded-xl border p-2" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
 
   if (viewMode === "followups") {
     return (
