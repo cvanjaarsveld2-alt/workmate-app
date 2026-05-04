@@ -79,7 +79,7 @@ function BottomTab({ icon: Icon, label, active, onClick }) {
   );
 }
 
-function HomeScreen({ go, planList, setPlanList }) {
+function HomeScreen({ go, planList, setPlanList, followUps = [], setFollowUps }) {
   const [viewMode, setViewMode] = useState("main");
   const [editingId, setEditingId] = useState(null);
 useEffect(() => {
