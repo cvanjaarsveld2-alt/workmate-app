@@ -218,7 +218,13 @@ useEffect(() => {
   return (
     <div className="space-y-5">
       <div className="rounded-3xl bg-slate-900 p-5 text-white shadow-sm">
-        <p className="text-sm text-slate-300">Today, 03 May 2026</p>
+        <p className="text-sm text-slate-300">
+  Today, {new Date().toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  })}
+</p>
         <h1 className="mt-1 text-3xl font-bold">Your day is ready</h1>
         <p className="mt-2 text-slate-300">
           You have {planList.length} planned items, {dueFollowUps.length} follow-up due, and {staleClients.length} clients needing attention.
