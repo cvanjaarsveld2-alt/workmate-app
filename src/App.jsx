@@ -26,22 +26,37 @@ import {
 } from "lucide-react";
 
 const uploadFile = async (file) => {
-  const fileName = `${Date.now()}-${file.name}`;
+  try {
+    alert("Sending to Supabase: " + file.name);
 
-  const { error } = await supabase.storage
-    .from("powermate-files")
-    .upload(fileName, file);
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const fileName = `${Date.now()}-${cleanFileName}`;
 
-  if (error) {
-    console.error("Upload error:", error);
+    const { error } = await supabase.storage
+      .from("powermate-files")
+      .upload(fileName, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (error) {
+      alert("Supabase error: " + error.message);
+      console.error("Supabase upload error:", error);
+      return null;
+    }
+
+    alert("Supabase accepted file");
+
+    const { data } = supabase.storage
+      .from("powermate-files")
+      .getPublicUrl(fileName);
+
+    return data.publicUrl;
+  } catch (err) {
+    alert("Upload crashed: " + err.message);
+    console.error("Upload crashed:", err);
     return null;
   }
-
-  const { data } = supabase.storage
-    .from("powermate-files")
-    .getPublicUrl(fileName);
-
-  return data.publicUrl;
 };
 
 const APP_NAME = "PowerMate";
