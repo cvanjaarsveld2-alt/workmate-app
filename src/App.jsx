@@ -26,38 +26,31 @@ import {
 } from "lucide-react";
 
 const uploadFile = async (file) => {
-  try {
-    alert("Sending to Supabase: " + file.name);
+  alert("Sending to Supabase: " + file.name);
 
-    const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const fileName = `${Date.now()}-${cleanFileName}`;
+  const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const fileName = `${Date.now()}-${cleanFileName}`;
 
-    const { error } = await supabase.storage
-      .from("powermate-files")
-      .upload(fileName, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
+  const { error } = await supabase.storage
+    .from("powermate-files")
+    .upload(fileName, file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
 
-    if (error) {
-      alert("Supabase error: " + error.message);
-      return null;
-    }
-
-    alert("Supabase accepted file");
-
-    const { data } = supabase.storage
-      .from("powermate-files")
-      .getPublicUrl(fileName);
-
-    return data.publicUrl;
-
-  } catch (err) {
-    alert("Upload crashed: " + err.message);
+  if (error) {
+    alert("Supabase error: " + error.message);
     return null;
   }
-};
 
+  alert("Supabase accepted file");
+
+  const { data } = supabase.storage
+    .from("powermate-files")
+    .getPublicUrl(fileName);
+
+  return data.publicUrl;
+};
     alert("Supabase accepted file");
 
     const { data } = supabase.storage
