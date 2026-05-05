@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 
+// ─── Supabase upload helper ───────────────────────────────────────────────────
 const uploadFile = async (file) => {
   try {
     const cleanFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -53,6 +54,7 @@ const uploadFile = async (file) => {
   }
 };
 
+// ─── Constants ────────────────────────────────────────────────────────────────
 const APP_NAME = "PowerMate";
 const STORAGE_KEY = "powermate_app_data_v1";
 
@@ -74,6 +76,7 @@ const starterData = {
   settings: blankSettings,
 };
 
+// ─── Utilities ────────────────────────────────────────────────────────────────
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -140,6 +143,7 @@ async function filesToStoredFiles(fileList, clientId = "") {
   return converted;
 }
 
+// ─── Base UI components ───────────────────────────────────────────────────────
 function Card({ className = "", children }) {
   return <div className={`bg-white ${className}`}>{children}</div>;
 }
@@ -229,6 +233,7 @@ function EmptyState({ title, text }) {
   );
 }
 
+// ─── Screens ──────────────────────────────────────────────────────────────────
 function HomeScreen({ go, data, setData }) {
   const [viewMode, setViewMode] = useState("main");
   const [editingId, setEditingId] = useState(null);
@@ -1340,6 +1345,7 @@ function MoreScreen({ go, data, setData }) {
   );
 }
 
+// ─── Root app ─────────────────────────────────────────────────────────────────
 export default function PowerMateApp() {
   const [screen, setScreen] = useState("Home");
   const [data, setData] = useState(() => safeLoad());
