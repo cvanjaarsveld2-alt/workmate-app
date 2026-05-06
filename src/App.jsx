@@ -5,7 +5,7 @@ import {
   Bell, BriefcaseBusiness, CalendarDays, Camera, ChevronRight,
   ClipboardList, FileText, Home, LogOut, Mail, Mic, Phone,
   Plus, Search, ShieldCheck, Trash2, Upload, Users, Wrench, X,
-  Eye, EyeOff, BarChart2, RefreshCw, WifiOff, Share2,
+  Eye, EyeOff, BarChart2, RefreshCw, WifiOff, Wifi, Share2,
   MessageCircle, Copy, PenLine, ChevronLeft, CheckCircle,
   AlertTriangle, Target, Cog, TrendingUp, Flag, Clock,
 } from "lucide-react";
@@ -1194,24 +1194,52 @@ export default function PowerWorksApp() {
     Admin: <AdminDashboard />,
   };
 
+  // Screen history for back button
+  const NAV_SCREENS = ["Home", "Clients", "Pipeline", "Equipment", "Quotes", "More"];
+  const canGoBack = !NAV_SCREENS.includes(screen);
+  const backMap = {
+    QuickAdd: "Home", Calendar: "Home", Service: "Home", Documents: "Home",
+    Pipeline: "Home", Equipment: "Home", Quotes: "Home", Targets: "More",
+    Dashboard: "More", Admin: "More",
+  };
+  const goBack = () => setScreen(backMap[screen] || "Home");
+
   return (
     <div className="min-h-screen text-slate-900" style={{ background: BRAND.light }}>
       {/* Offline banner */}
-      {(!isOnline||queueCount>0)&&(<div className={`fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-2 py-2 text-sm font-semibold text-white`} style={{background:isOnline?BRAND.primary:"#d97706"}}>{isOnline?<><Wifi size={16} />Back online — syncing {queueCount} item{queueCount!==1?"s":""}…</>:<><WifiOff size={16} />Offline — changes saved locally</>}</div>)}
+      {(!isOnline||queueCount>0)&&(
+        <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-2 py-2 text-sm font-semibold text-white"
+          style={{background:isOnline?BRAND.primary:"#d97706"}}>
+          {isOnline?<><Wifi size={16} />Back online — syncing {queueCount} item{queueCount!==1?"s":""}…</>:<><WifiOff size={16} />Offline — changes saved locally</>}
+        </div>
+      )}
 
       <div className={`mx-auto max-w-2xl px-4 pb-28 pt-4 ${(!isOnline||queueCount>0)?"mt-8":""}`}>
+
         {/* Header */}
-        <header className="mb-4 flex items-center justify-between rounded-3xl bg-white p-4 shadow-sm" style={{ borderTop: `3px solid ${BRAND.primary}` }}>
-          <div className="flex items-center gap-3">
-            <img src={BRAND.logo} alt="Power Works" className="h-10 object-contain" onError={e=>{e.target.style.display="none";}} />
-            <div>
-              <p className="text-xs font-bold" style={{ color: BRAND.primary }}>POWER WORKS</p>
-              <p className="text-xs text-slate-500">{uname}</p>
+        <header className="mb-4 rounded-3xl bg-white shadow-sm overflow-hidden" style={{ borderTop: `4px solid ${BRAND.primary}` }}>
+          {/* Top row — logo + actions */}
+          <div className="flex items-center justify-between px-4 pt-3 pb-2">
+            <img src={BRAND.logo} alt="Power Works" className="h-9 object-contain max-w-[160px]"
+              onError={e=>{e.target.style.display="none";}} />
+            <div className="flex items-center gap-2">
+              {!isOnline&&<WifiOff size={18} className="text-amber-500" />}
+              <Btn onClick={() => setScreen("QuickAdd")} className="py-2 px-3"><Plus size={18} /></Btn>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {!isOnline&&<WifiOff size={18} className="text-amber-500" />}
-            <Btn onClick={() => setScreen("QuickAdd")}><Plus size={18} /></Btn>
+          {/* Bottom row — back button + screen name + user */}
+          <div className="flex items-center gap-2 px-4 pb-3 border-t border-slate-100 pt-2">
+            {canGoBack ? (
+              <button onClick={goBack} className="flex items-center gap-1 rounded-xl px-2 py-1 text-xs font-bold text-white" style={{background:BRAND.primary}}>
+                <ChevronLeft size={14} />Back
+              </button>
+            ) : (
+              <div className="rounded-xl px-2 py-1 text-xs font-bold" style={{background:BRAND.light, color:BRAND.primary}}>
+                {screen}
+              </div>
+            )}
+            <div className="flex-1" />
+            <p className="text-xs text-slate-500 truncate max-w-[140px]">{uname}</p>
           </div>
         </header>
 
