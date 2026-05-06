@@ -961,44 +961,183 @@ function QuickAddScreen({ data, setData, go, userId, userName, isOnline }) {
 
 // ─── Clients ───────────────────────────────────────────────────────────────────
 function ClientsScreen({ data, setData, go, userId, isOnline }) {
-  const [search, setSearch] = useState(""); const [selId, setSelId] = useState(null); const [edit, setEdit] = useState(false); const [shareModal, setShareModal] = useState(null);
+  const [search, setSearch] = useState("");
+  const [selId, setSelId] = useState(null);
+  const [edit, setEdit] = useState(false);
+  const [shareModal, setShareModal] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newClient, setNewClient] = useState({ company: "", division: "", contact: "", phone: "", email: "", location: "", notes: "" });
+
   const sel = data.clients.find(c => c.id === selId);
   const docs = data.documents.filter(d => d.client_id === selId);
   const convs = data.conversations.filter(c => c.client_id === selId);
   const clientEquipment = (data.equipment || []).filter(e => e.client_id === selId);
-  const filtered = useMemo(() => { const q = search.toLowerCase(); return data.clients.filter(c => `${c.company} ${c.division} ${c.contact} ${c.location}`.toLowerCase().includes(q)); }, [search, data.clients]);
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return data.clients.filter(c => `${c.company} ${c.division} ${c.contact} ${c.location}`.toLowerCase().includes(q));
+  }, [search, data.clients]);
 
-  const addBlank = async () => { const payload = { user_id:userId, company:"New Company", division:"", contact:"", phone:"", email:"", location:"", notes:"", pipeline_status:"New Lead" }; if (isOnline) { const {data:r} = await supabase.from("clients").insert(payload).select().single(); if (r) { setData(c=>({...c,clients:[...c.clients,r]})); setSelId(r.id); setEdit(true); } } else { const id=`offline_${Date.now()}`; addToQueue({type:"insert",table:"clients",data:{...payload,id}}); setData(c=>({...c,clients:[...c.clients,{...payload,id}]})); setSelId(id); setEdit(true); } };
-  const upd = async (field, val) => { if (isOnline) await supabase.from("clients").update({[field]:val}).eq("id",selId).eq("user_id",userId); else addToQueue({type:"update",table:"clients",id:selId,data:{[field]:val}}); setData(c=>({...c,clients:c.clients.map(cl=>cl.id===selId?{...cl,[field]:val}:cl)})); };
-  const del = async () => { if (!sel||!confirm(`Delete ${sel.company}?`)) return; if (isOnline) await supabase.from("clients").delete().eq("id",sel.id).eq("user_id",userId); else addToQueue({type:"delete",table:"clients",id:sel.id}); setData(c=>({...c,clients:c.clients.filter(cl=>cl.id!==sel.id),followUps:c.followUps.filter(f=>f.client_id!==sel.id)})); setSelId(null); setEdit(false); };
-  const addFU = async () => { if (!sel) return; const payload = { user_id:userId, client_id:sel.id, client_name:sel.company, due_date:todayISO(), status:"Open", outcome:"", completed:false, recurring:false, recurring_days:7 }; if (isOnline) { const {data:fu} = await supabase.from("follow_ups").insert(payload).select().single(); if (fu) setData(c=>({...c,followUps:[...c.followUps,fu]})); } else { addToQueue({type:"insert",table:"follow_ups",data:payload}); setData(c=>({...c,followUps:[...c.followUps,{...payload,id:`offline_${Date.now()}`}]})); } alert("Follow-up created."); };
+  const saveNewClient = async () => {
+    if (!newClient.company.trim()) { alert("Please enter a company name."); return; }
+    setSaving(true);
+    const payload = {
+      user_id: userId,
+      company: newClient.company.trim(),
+      division: newClient.division.trim(),
+      contact: newClient.contact.trim(),
+      phone: newClient.phone.trim(),
+      email: newClient.email.trim(),
+      location: newClient.location.trim(),
+      notes: newClient.notes.trim(),
+      pipeline_status: "New Lead"
+    };
+    try {
+      if (isOnline) {
+        const { data: r, error } = await supabase.from("clients").insert(payload).select().single();
+        if (error) { alert("Error saving client: " + error.message); setSaving(false); return; }
+        if (r) { setData(c => ({ ...c, clients: [...c.clients, r] })); setSelId(r.id); }
+      } else {
+        const id = `offline_${Date.now()}`;
+        addToQueue({ type: "insert", table: "clients", data: { ...payload, id } });
+        setData(c => ({ ...c, clients: [...c.clients, { ...payload, id }] }));
+        setSelId(`offline_${Date.now() - 1}`);
+      }
+      setShowAddForm(false);
+      setNewClient({ company: "", division: "", contact: "", phone: "", email: "", location: "", notes: "" });
+    } catch (e) {
+      alert("Failed to save: " + e.message);
+    }
+    setSaving(false);
+  };
+
+  const upd = async (field, val) => {
+    if (isOnline) await supabase.from("clients").update({ [field]: val }).eq("id", selId).eq("user_id", userId);
+    else addToQueue({ type: "update", table: "clients", id: selId, data: { [field]: val } });
+    setData(c => ({ ...c, clients: c.clients.map(cl => cl.id === selId ? { ...cl, [field]: val } : cl) }));
+  };
+  const del = async () => {
+    if (!sel || !confirm(`Delete ${sel.company}?`)) return;
+    if (isOnline) await supabase.from("clients").delete().eq("id", sel.id).eq("user_id", userId);
+    else addToQueue({ type: "delete", table: "clients", id: sel.id });
+    setData(c => ({ ...c, clients: c.clients.filter(cl => cl.id !== sel.id), followUps: c.followUps.filter(f => f.client_id !== sel.id) }));
+    setSelId(null); setEdit(false);
+  };
+  const addFU = async () => {
+    if (!sel) return;
+    const payload = { user_id: userId, client_id: sel.id, client_name: sel.company, due_date: todayISO(), status: "Open", outcome: "", completed: false, recurring: false, recurring_days: 7 };
+    if (isOnline) { const { data: fu } = await supabase.from("follow_ups").insert(payload).select().single(); if (fu) setData(c => ({ ...c, followUps: [...c.followUps, fu] })); }
+    else { addToQueue({ type: "insert", table: "follow_ups", data: payload }); setData(c => ({ ...c, followUps: [...c.followUps, { ...payload, id: `offline_${Date.now()}` }] })); }
+    alert("Follow-up created.");
+  };
+
+  // Add client form
+  if (showAddForm) return (
+    <div className="space-y-5">
+      <Btn variant="outline" onClick={() => setShowAddForm(false)}>← Back to clients</Btn>
+      <h1 className="text-2xl font-bold">Add new client</h1>
+      <Card className="rounded-3xl shadow-sm">
+        <CC className="space-y-4 p-4">
+          <Field label="Company name *" value={newClient.company} onChange={v => setNewClient(c => ({ ...c, company: v }))} placeholder="e.g. Harmony Gold Mine" />
+          <Field label="Division / Site" value={newClient.division} onChange={v => setNewClient(c => ({ ...c, division: v }))} placeholder="e.g. Shaft 3 Workshop" />
+          <Field label="Contact person" value={newClient.contact} onChange={v => setNewClient(c => ({ ...c, contact: v }))} placeholder="Full name" />
+          <Field label="Phone number" value={newClient.phone} onChange={v => setNewClient(c => ({ ...c, phone: v }))} placeholder="+27 11 000 0000" type="tel" />
+          <Field label="Email address" value={newClient.email} onChange={v => setNewClient(c => ({ ...c, email: v }))} placeholder="contact@company.co.za" type="email" />
+          <Field label="Location / Address" value={newClient.location} onChange={v => setNewClient(c => ({ ...c, location: v }))} placeholder="City or address" />
+          <Field label="Notes" multiline value={newClient.notes} onChange={v => setNewClient(c => ({ ...c, notes: v }))} placeholder="Any additional notes…" />
+          <Btn className="w-full py-5 text-base" onClick={saveNewClient} disabled={saving}>
+            {saving ? "Saving…" : "Save client"}
+          </Btn>
+        </CC>
+      </Card>
+    </div>
+  );
 
   if (sel) return (
     <div className="space-y-5">
       {shareModal && <ShareModal {...shareModal} onClose={() => setShareModal(null)} />}
       <Btn variant="outline" onClick={() => { setSelId(null); setEdit(false); }}>← Back to clients</Btn>
       <Card className="rounded-3xl shadow-sm"><CC className="space-y-4 p-4">
-        <div className="flex items-start justify-between gap-3"><div className="flex-1">{edit?<Field label="Company" value={sel.company} onChange={v=>upd("company",v)} />:<h1 className="text-2xl font-bold">{sel.company}</h1>}{!edit&&sel.division&&<p className="text-sm text-slate-500">{sel.division}</p>}</div><Btn variant="outline" onClick={()=>setEdit(!edit)}>{edit?"Done":"Edit"}</Btn></div>
-        {edit&&<Field label="Division / Site" value={sel.division} onChange={v=>upd("division",v)} />}
-        <div><label className="mb-2 block text-sm font-semibold">Pipeline stage</label><div className="flex flex-wrap gap-2">{PIPELINE_STAGES.map(s=>(<button key={s} onClick={()=>upd("pipeline_status",s)} className={`rounded-2xl px-3 py-1.5 text-xs font-bold transition ${(sel.pipeline_status||"New Lead")===s?"ring-2 ":""} ${STAGE_COLORS[s]}`} style={(sel.pipeline_status||"New Lead")===s?{ringColor:BRAND.primary}:{}}>{s}</button>))}</div></div>
-        <div className="space-y-3 rounded-2xl bg-slate-50 p-3">{[["contact","Contact"],["phone","Phone"],["email","Email"],["location","Location"]].map(([f,l])=>(<div key={f}><label className="mb-1 block text-xs font-bold text-slate-500">{l}</label>{edit?<input value={sel[f]||""} onChange={e=>upd(f,e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm" />:<p className="text-sm text-slate-700">{sel[f]||"-"}</p>}</div>))}</div>
-        <div className="rounded-2xl bg-slate-50 p-3"><p className="text-sm font-semibold">Notes</p>{edit?<textarea rows={3} value={sel.notes||""} onChange={e=>upd("notes",e.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm" />:<p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{sel.notes||"No notes yet."}</p>}</div>
-        <div className="grid grid-cols-3 gap-2"><a href={`tel:${sel.phone||""}`}><Btn variant="outline" className="w-full"><Phone size={16} /></Btn></a><a href={`mailto:${sel.email||""}`}><Btn variant="outline" className="w-full"><Mail size={16} /></Btn></a><Btn onClick={()=>go("QuickAdd")}>Add entry</Btn></div>
-        <div className="grid grid-cols-2 gap-2"><Btn variant="outline" onClick={addFU}>Add follow-up</Btn><Btn variant="outline" onClick={()=>setShareModal({title:sel.company,text:`Client: ${sel.company}\nContact: ${sel.contact||"-"}\nPhone: ${sel.phone||"-"}\nEmail: ${sel.email||"-"}\nLocation: ${sel.location||"-"}\nStage: ${sel.pipeline_status||"New Lead"}`})}><Share2 size={16} />Share</Btn></div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1">{edit ? <Field label="Company" value={sel.company} onChange={v => upd("company", v)} /> : <h1 className="text-2xl font-bold">{sel.company}</h1>}
+          {!edit && sel.division && <p className="text-sm text-slate-500">{sel.division}</p>}</div>
+          <Btn variant="outline" onClick={() => setEdit(!edit)}>{edit ? "Done" : "Edit"}</Btn>
+        </div>
+        {edit && <Field label="Division / Site" value={sel.division} onChange={v => upd("division", v)} />}
+        <div><label className="mb-2 block text-sm font-semibold">Pipeline stage</label>
+          <div className="flex flex-wrap gap-2">{PIPELINE_STAGES.map(s => (<button key={s} onClick={() => upd("pipeline_status", s)} className={`rounded-2xl px-3 py-1.5 text-xs font-bold transition ${(sel.pipeline_status || "New Lead") === s ? "ring-2 " : ""} ${STAGE_COLORS[s]}`}>{s}</button>))}</div>
+        </div>
+        <div className="space-y-3 rounded-2xl bg-slate-50 p-3">
+          {[["contact","Contact"],["phone","Phone"],["email","Email"],["location","Location"]].map(([f,l]) => (
+            <div key={f}><label className="mb-1 block text-xs font-bold text-slate-500">{l}</label>
+              {edit ? <input value={sel[f] || ""} onChange={e => upd(f, e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm" />
+              : <p className="text-sm text-slate-700">{sel[f] || "-"}</p>}
+            </div>
+          ))}
+        </div>
+        <div className="rounded-2xl bg-slate-50 p-3"><p className="text-sm font-semibold">Notes</p>
+          {edit ? <textarea rows={3} value={sel.notes || ""} onChange={e => upd("notes", e.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 text-sm" />
+          : <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{sel.notes || "No notes yet."}</p>}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          <a href={`tel:${sel.phone || ""}`}><Btn variant="outline" className="w-full"><Phone size={16} /></Btn></a>
+          <a href={`mailto:${sel.email || ""}`}><Btn variant="outline" className="w-full"><Mail size={16} /></Btn></a>
+          <Btn onClick={() => go("QuickAdd")}>Add entry</Btn>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Btn variant="outline" onClick={addFU}>Add follow-up</Btn>
+          <Btn variant="outline" onClick={() => setShareModal({ title: sel.company, text: `Client: ${sel.company}\nContact: ${sel.contact || "-"}\nPhone: ${sel.phone || "-"}\nEmail: ${sel.email || "-"}\nLocation: ${sel.location || "-"}\nStage: ${sel.pipeline_status || "New Lead"}` })}><Share2 size={16} />Share</Btn>
+        </div>
         <Btn variant="danger" className="w-full" onClick={del}><Trash2 size={16} />Delete client</Btn>
-        {clientEquipment.length > 0 && (<div><h2 className="mb-2 text-lg font-bold">Equipment at site</h2>{clientEquipment.map(e=>(<div key={e.id} className="mb-2 rounded-2xl bg-slate-50 p-3 flex items-center gap-3"><Cog size={18} style={{color:BRAND.primary}} /><div className="flex-1"><p className="font-semibold">{e.name}</p>{e.next_service_date&&<p className="text-xs text-slate-500">Next service: {e.next_service_date}</p>}</div></div>))}</div>)}
-        <div><h2 className="mb-2 text-lg font-bold">History</h2>{convs.length===0&&<p className="text-sm text-slate-500">No history yet.</p>}{convs.map(e=>(<div key={e.id} className="mb-2 rounded-2xl bg-slate-50 p-3"><div className="flex justify-between"><p className="text-xs font-bold text-slate-500">{e.created_at?.slice(0,10)}</p><p className="text-xs text-slate-400">{e.created_by_name}</p></div><p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{e.note}</p>{e.audio_data_url&&<audio controls src={e.audio_data_url} className="mt-2 w-full" />}</div>))}</div>
-        <div><h2 className="mb-2 text-lg font-bold">Linked files</h2>{docs.length===0&&<p className="text-sm text-slate-500">No files yet.</p>}<div className="grid grid-cols-2 gap-3">{docs.map(d=>{const isImg=d.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);const isVid=d.name?.match(/\.(mp4|mov|webm)$/i);return(<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg?<img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" />:isVid?<video controls src={d.file_url} className="h-28 w-full rounded-xl" />:<div className="flex h-28 items-center justify-center rounded-xl bg-white"><FileText /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>);})}</div></div>
+        {clientEquipment.length > 0 && (
+          <div><h2 className="mb-2 text-lg font-bold">Equipment at site</h2>
+            {clientEquipment.map(e => (<div key={e.id} className="mb-2 rounded-2xl bg-slate-50 p-3 flex items-center gap-3"><Cog size={18} style={{ color: BRAND.primary }} /><div className="flex-1"><p className="font-semibold">{e.name}</p>{e.next_service_date && <p className="text-xs text-slate-500">Next service: {e.next_service_date}</p>}</div></div>))}
+          </div>
+        )}
+        <div><h2 className="mb-2 text-lg font-bold">History</h2>
+          {convs.length === 0 && <p className="text-sm text-slate-500">No history yet.</p>}
+          {convs.map(e => (<div key={e.id} className="mb-2 rounded-2xl bg-slate-50 p-3"><div className="flex justify-between"><p className="text-xs font-bold text-slate-500">{e.created_at?.slice(0, 10)}</p><p className="text-xs text-slate-400">{e.created_by_name}</p></div><p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{e.note}</p>{e.audio_data_url && <audio controls src={e.audio_data_url} className="mt-2 w-full" />}</div>))}
+        </div>
+        <div><h2 className="mb-2 text-lg font-bold">Linked files</h2>
+          {docs.length === 0 && <p className="text-sm text-slate-500">No files yet.</p>}
+          <div className="grid grid-cols-2 gap-3">
+            {docs.map(d => { const isImg = d.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i); const isVid = d.name?.match(/\.(mp4|mov|webm)$/i); return (<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg ? <img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" /> : isVid ? <video controls src={d.file_url} className="h-28 w-full rounded-xl" /> : <div className="flex h-28 items-center justify-center rounded-xl bg-white"><FileText /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>); })}
+          </div>
+        </div>
       </CC></Card>
     </div>
   );
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3"><div><h1 className="text-2xl font-bold">My Clients</h1><p className="text-sm text-slate-500">{data.clients.length} clients</p></div><Btn onClick={addBlank}><Plus size={18} />Add</Btn></div>
-      <div className="flex items-center gap-2 rounded-3xl bg-white p-3 shadow-sm"><Search size={20} className="text-slate-400" /><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search clients…" className="w-full bg-transparent p-2 text-base outline-none" /></div>
-      {data.clients.length===0&&<Empty title="No clients yet" text="Tap Add to create your first client." />}
-      <div className="space-y-3">{filtered.map(c=>(<button key={c.id} onClick={()=>setSelId(c.id)} className="w-full text-left"><Card className="rounded-3xl shadow-sm"><CC className="p-4"><div className="flex items-start justify-between gap-3"><div><h2 className="text-lg font-bold">{c.company}</h2><p className="text-sm text-slate-500">{c.division||"No division"}</p><p className="mt-1 text-xs text-slate-500">{c.contact||"No contact"}</p></div><div className="flex flex-col items-end gap-2"><ChevronRight className="text-slate-400" /><span className={`rounded-xl px-2 py-0.5 text-xs font-bold ${STAGE_COLORS[c.pipeline_status||"New Lead"]}`}>{c.pipeline_status||"New Lead"}</span></div></div></CC></Card></button>))}</div>
+      <div className="flex items-start justify-between gap-3">
+        <div><h1 className="text-2xl font-bold">My Clients</h1><p className="text-sm text-slate-500">{data.clients.length} client{data.clients.length !== 1 ? "s" : ""}</p></div>
+        <Btn onClick={() => setShowAddForm(true)}><Plus size={18} />Add client</Btn>
+      </div>
+      <div className="flex items-center gap-2 rounded-3xl bg-white p-3 shadow-sm">
+        <Search size={20} className="text-slate-400" />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients…" className="w-full bg-transparent p-2 text-base outline-none" />
+      </div>
+      {data.clients.length === 0 && <Empty title="No clients yet" text="Tap Add client to create your first client." />}
+      <div className="space-y-3">
+        {filtered.map(c => (
+          <button key={c.id} onClick={() => setSelId(c.id)} className="w-full text-left">
+            <Card className="rounded-3xl shadow-sm"><CC className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold">{c.company}</h2>
+                  <p className="text-sm text-slate-500">{c.division || "No division"}</p>
+                  <p className="mt-1 text-xs text-slate-500">{c.contact || "No contact"}</p>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <ChevronRight className="text-slate-400" />
+                  <span className={`rounded-xl px-2 py-0.5 text-xs font-bold ${STAGE_COLORS[c.pipeline_status || "New Lead"]}`}>{c.pipeline_status || "New Lead"}</span>
+                </div>
+              </div>
+            </CC></Card>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
