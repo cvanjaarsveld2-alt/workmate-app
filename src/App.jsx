@@ -7,7 +7,7 @@ import {
   Plus, Search, ShieldCheck, Trash2, Upload, Users, Wrench, X,
   Eye, EyeOff, BarChart2, RefreshCw, WifiOff, Wifi, Share2,
   MessageCircle, Copy, PenLine, ChevronLeft, CheckCircle,
-  AlertTriangle, Target, Cog, TrendingUp, Flag, Clock,
+  AlertTriangle, Target, Cog, TrendingUp, Flag, Clock, StickyNote, AlarmClock,
 } from "lucide-react";
 
 // ─── Brand colours ────────────────────────────────────────────────────────────
@@ -1245,11 +1245,188 @@ function MoreScreen({ go, data, setData, currentUser, onSignOut }) {
   );
 }
 
+
+// ─── Notes & Reminders ─────────────────────────────────────────────────────────
+function NotesScreen({ data, setData, userId, isOnline }) {
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ title: "", body: "", reminder_date: "", reminder_time: "" });
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState("active"); // active | done
+  const timers = useRef([]);
+
+  const notes = (data.notes || []);
+  const activeNotes = notes.filter(n => !n.completed);
+  const doneNotes = notes.filter(n => n.completed);
+  const displayed = filter === "active" ? activeNotes : doneNotes;
+
+  // Schedule notifications for notes with reminders on load
+  useEffect(() => {
+    if (Notification?.permission !== "granted") return;
+    activeNotes.forEach(note => {
+      if (note.reminder_date && note.reminder_time) {
+        const fireAt = new Date(`${note.reminder_date}T${note.reminder_time}:00`).getTime();
+        const delay = fireAt - Date.now();
+        if (delay > 0) {
+          const t = setTimeout(() => {
+            new Notification("📝 Power Works Reminder", { body: note.title, icon: "/icon-192.png" });
+          }, delay);
+          timers.current.push(t);
+        }
+      }
+    });
+    return () => timers.current.forEach(t => clearTimeout(t));
+  }, []);
+
+  const save = async () => {
+    if (!form.title.trim()) { alert("Please enter a title."); return; }
+    setSaving(true);
+    const payload = { user_id: userId, title: form.title.trim(), body: form.body.trim(), reminder_date: form.reminder_date || null, reminder_time: form.reminder_time || null, completed: false };
+    try {
+      if (isOnline) {
+        const { data: r, error } = await supabase.from("notes").insert(payload).select().single();
+        if (error) { alert("Error saving note: " + error.message); setSaving(false); return; }
+        if (r) {
+          setData(c => ({ ...c, notes: [r, ...(c.notes || [])] }));
+          // Schedule notification
+          if (r.reminder_date && r.reminder_time && Notification?.permission === "granted") {
+            const fireAt = new Date(`${r.reminder_date}T${r.reminder_time}:00`).getTime();
+            const delay = fireAt - Date.now();
+            if (delay > 0) setTimeout(() => new Notification("📝 Power Works Reminder", { body: r.title, icon: "/icon-192.png" }), delay);
+          }
+        }
+      } else {
+        const id = `offline_${Date.now()}`;
+        addToQueue({ type: "insert", table: "notes", data: { ...payload, id } });
+        setData(c => ({ ...c, notes: [{ ...payload, id, created_at: new Date().toISOString() }, ...(c.notes || [])] }));
+      }
+      setForm({ title: "", body: "", reminder_date: "", reminder_time: "" });
+      setShowForm(false);
+    } catch (e) { alert("Failed: " + e.message); }
+    setSaving(false);
+  };
+
+  const markDone = async (id) => {
+    if (isOnline) await supabase.from("notes").update({ completed: true }).eq("id", id).eq("user_id", userId);
+    else addToQueue({ type: "update", table: "notes", id, data: { completed: true } });
+    setData(c => ({ ...c, notes: (c.notes || []).map(n => n.id === id ? { ...n, completed: true } : n) }));
+  };
+
+  const deleteNote = async (id) => {
+    if (!confirm("Delete this note?")) return;
+    if (isOnline) await supabase.from("notes").delete().eq("id", id).eq("user_id", userId);
+    else addToQueue({ type: "delete", table: "notes", id });
+    setData(c => ({ ...c, notes: (c.notes || []).filter(n => n.id !== id) }));
+  };
+
+  const isOverdue = (note) => {
+    if (!note.reminder_date) return false;
+    return note.reminder_date < todayISO();
+  };
+
+  const isDueToday = (note) => note.reminder_date === todayISO();
+
+  if (showForm) return (
+    <div className="space-y-5">
+      <Btn variant="outline" onClick={() => setShowForm(false)}>← Back to notes</Btn>
+      <h1 className="text-2xl font-bold">New note</h1>
+      <Card className="rounded-3xl shadow-sm">
+        <CC className="space-y-4 p-4">
+          <Field label="Title *" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="What do you need to remember?" />
+          <Field label="Details" multiline value={form.body} onChange={v => setForm(f => ({ ...f, body: v }))} placeholder="Any additional details…" />
+          <div className="rounded-2xl bg-slate-50 p-4 space-y-3">
+            <p className="text-sm font-bold text-slate-700">⏰ Set a reminder (optional)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Reminder date" type="date" value={form.reminder_date} onChange={v => setForm(f => ({ ...f, reminder_date: v }))} />
+              <Field label="Reminder time" type="time" value={form.reminder_time} onChange={v => setForm(f => ({ ...f, reminder_time: v }))} />
+            </div>
+          </div>
+          <Btn className="w-full py-5 text-base" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save note"}
+          </Btn>
+        </CC>
+      </Card>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Notes & Reminders</h1>
+          <p className="text-sm text-slate-500">{activeNotes.length} active · {doneNotes.length} done</p>
+        </div>
+        <Btn onClick={() => setShowForm(true)}><Plus size={18} />Add note</Btn>
+      </div>
+
+      {/* Notification prompt */}
+      {Notification?.permission !== "granted" && (
+        <div className="flex items-center justify-between rounded-2xl p-4" style={{ background: "#fffbeb", border: "1px solid #fcd34d" }}>
+          <div className="flex items-center gap-2">
+            <Bell size={18} className="text-amber-600" />
+            <p className="text-sm font-semibold text-amber-800">Enable notifications for reminders</p>
+          </div>
+          <Btn className="text-sm py-2 px-3" onClick={async () => { await requestNotifPermission(); }}>Enable</Btn>
+        </div>
+      )}
+
+      {/* Filter tabs */}
+      <div className="flex rounded-2xl p-1 gap-1" style={{ background: "#f1f1f1" }}>
+        {[["active", `Active (${activeNotes.length})`], ["done", `Done (${doneNotes.length})`]].map(([k, l]) => (
+          <button key={k} onClick={() => setFilter(k)} className="flex-1 rounded-xl py-2 text-sm font-semibold transition"
+            style={{ background: filter === k ? "#fff" : "transparent", color: filter === k ? BRAND.primary : "#64748b" }}>{l}</button>
+        ))}
+      </div>
+
+      {displayed.length === 0 && (
+        <Empty
+          title={filter === "active" ? "No active notes" : "No completed notes"}
+          text={filter === "active" ? "Tap Add note to create your first note or reminder." : "Completed notes will appear here."}
+        />
+      )}
+
+      <div className="space-y-3">
+        {displayed.map(note => (
+          <Card key={note.id} className="rounded-3xl shadow-sm" style={{ borderLeft: isOverdue(note) && !note.completed ? `4px solid #dc2626` : isDueToday(note) && !note.completed ? `4px solid #f59e0b` : `4px solid transparent` }}>
+            <CC className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <p className={`font-bold text-slate-900 ${note.completed ? "line-through text-slate-400" : ""}`}>{note.title}</p>
+                  {note.body && <p className="mt-1 text-sm text-slate-600 whitespace-pre-wrap">{note.body}</p>}
+                  {note.reminder_date && (
+                    <div className="mt-2 flex items-center gap-1">
+                      <AlarmClock size={13} style={{ color: isOverdue(note) ? "#dc2626" : isDueToday(note) ? "#f59e0b" : BRAND.primary }} />
+                      <p className="text-xs font-semibold" style={{ color: isOverdue(note) ? "#dc2626" : isDueToday(note) ? "#f59e0b" : BRAND.primary }}>
+                        {isOverdue(note) && !note.completed ? "OVERDUE · " : isDueToday(note) ? "TODAY · " : ""}
+                        {note.reminder_date}{note.reminder_time ? ` at ${note.reminder_time}` : ""}
+                      </p>
+                    </div>
+                  )}
+                  <p className="mt-1 text-xs text-slate-400">{note.created_at?.slice(0, 10)}</p>
+                </div>
+                <button onClick={() => deleteNote(note.id)} className="rounded-xl bg-red-50 p-2 text-red-600">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+              {!note.completed && (
+                <button onClick={() => markDone(note.id)}
+                  className="mt-3 w-full rounded-2xl py-3 text-sm font-bold text-white flex items-center justify-center gap-2"
+                  style={{ background: BRAND.primary }}>
+                  <CheckCircle size={16} /> Mark as done
+                </button>
+              )}
+            </CC>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Root ──────────────────────────────────────────────────────────────────────
 export default function PowerWorksApp() {
   const [session, setSession] = useState(null); const [currentUser, setCurrentUser] = useState(null); const [authLoading, setAuthLoading] = useState(true);
   const [screen, setScreen] = useState("Home");
-  const [data, setData] = useState({ clients:[], planList:[], followUps:[], documents:[], conversations:[], serviceReports:[], salesReports:[], equipment:[], targets:[], quotes:[] });
+  const [data, setData] = useState({ clients:[], planList:[], followUps:[], documents:[], conversations:[], serviceReports:[], salesReports:[], equipment:[], targets:[], quotes:[], notes:[] });
   const [dataLoading, setDataLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [queueCount, setQueueCount] = useState(getQueue().length);
@@ -1278,7 +1455,7 @@ export default function PowerWorksApp() {
     const uid = currentUser.id;
     const load = async () => {
       setDataLoading(true);
-      const [clients,plans,fus,docs,convs,svcs,sales,equip,targets,quotes] = await Promise.all([
+      const [clients,plans,fus,docs,convs,svcs,sales,equip,targets,quotes,noteRows] = await Promise.all([
         supabase.from("clients").select("*").eq("user_id",uid).order("company"),
         supabase.from("plan_items").select("*").eq("user_id",uid).order("date").order("time"),
         supabase.from("follow_ups").select("*").eq("user_id",uid).order("due_date"),
@@ -1289,8 +1466,9 @@ export default function PowerWorksApp() {
         supabase.from("equipment").select("*").eq("user_id",uid).order("name"),
         supabase.from("targets").select("*").eq("user_id",uid),
         supabase.from("quotes").select("*").eq("user_id",uid).order("created_at",{ascending:false}),
+        supabase.from("notes").select("*").eq("user_id",uid).order("created_at",{ascending:false}),
       ]);
-      setData({ clients:clients.data||[], planList:plans.data||[], followUps:fus.data||[], documents:docs.data||[], conversations:convs.data||[], serviceReports:svcs.data||[], salesReports:sales.data||[], equipment:equip.data||[], targets:targets.data||[], quotes:quotes.data||[] });
+      setData({ clients:clients.data||[], planList:plans.data||[], followUps:fus.data||[], documents:docs.data||[], conversations:convs.data||[], serviceReports:svcs.data||[], salesReports:sales.data||[], equipment:equip.data||[], targets:targets.data||[], quotes:quotes.data||[], notes:noteRows.data||[] });
       setDataLoading(false);
     };
     load();
@@ -1329,17 +1507,18 @@ export default function PowerWorksApp() {
     Quotes: <QuoteScreen {...props} />,
     Targets: <TargetScreen {...props} />,
     Dashboard: <DashboardScreen data={data} userId={uid} />,
+    Notes: <NotesScreen {...props} />,
     More: <MoreScreen go={setScreen} data={data} setData={setData} currentUser={currentUser} onSignOut={signOut} />,
     Admin: <AdminDashboard />,
   };
 
   // Screen history for back button
-  const NAV_SCREENS = ["Home", "Clients", "Pipeline", "Equipment", "Quotes", "More"];
+  const NAV_SCREENS = ["Home", "Clients", "Pipeline", "Equipment", "Quotes", "Notes", "More"];
   const canGoBack = !NAV_SCREENS.includes(screen);
   const backMap = {
     QuickAdd: "Home", Calendar: "Home", Service: "Home", Documents: "Home",
     Pipeline: "Home", Equipment: "Home", Quotes: "Home", Targets: "More",
-    Dashboard: "More", Admin: "More",
+    Dashboard: "More", Admin: "More", Notes: "Home",
   };
   const goBack = () => setScreen(backMap[screen] || "Home");
 
@@ -1389,13 +1568,12 @@ export default function PowerWorksApp() {
 
       {/* Bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 p-2 shadow-lg backdrop-blur">
-        <div className="mx-auto grid max-w-2xl grid-cols-6 gap-1">
+        <div className="mx-auto grid max-w-2xl grid-cols-5 gap-1">
           <NavTab icon={Home} label="Home" active={screen==="Home"} onClick={()=>setScreen("Home")} />
           <NavTab icon={Users} label="Clients" active={screen==="Clients"} onClick={()=>setScreen("Clients")} />
-          <NavTab icon={ChevronRight} label="Pipeline" active={screen==="Pipeline"} onClick={()=>setScreen("Pipeline")} />
-          <NavTab icon={Cog} label="Equipment" active={screen==="Equipment"} onClick={()=>setScreen("Equipment")} />
           <NavTab icon={FileText} label="Quotes" active={screen==="Quotes"} onClick={()=>setScreen("Quotes")} badge={flaggedQuotes} />
-          <NavTab icon={Bell} label="More" active={screen==="More"} onClick={()=>setScreen("More")} />
+          <NavTab icon={StickyNote} label="Notes" active={screen==="Notes"} onClick={()=>setScreen("Notes")} badge={(data.notes||[]).filter(n=>!n.completed&&n.reminder_date&&n.reminder_date<=todayISO()).length||0} />
+          <NavTab icon={Cog} label="More" active={screen==="More"} onClick={()=>setScreen("More")} />
         </div>
       </nav>
     </div>
