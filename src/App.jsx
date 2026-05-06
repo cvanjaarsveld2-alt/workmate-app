@@ -39,6 +39,57 @@ const QUOTE_STATUS_COLORS = {
 };
 const OFFLINE_KEY = "powerworks_offline_queue";
 
+// ─── Push Notification Config ─────────────────────────────────────────────────
+const VAPID_PUBLIC_KEY = "BMntC_yC4nVCfpLiAZAl-DclOBugaSqneMdcUqFu9km4GrhDkEiUKi_ve9ANnN6d2Rc5etlP4cgFgGU1vLjbljo";
+
+// Register service worker and subscribe to push notifications
+async function registerPushNotifications(userId) {
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      console.log("Push not supported");
+      return false;
+    }
+
+    // Register service worker
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+
+    // Request permission
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") return false;
+
+    // Check if already subscribed
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      // Subscribe
+      const key = Uint8Array.from(atob(VAPID_PUBLIC_KEY.replace(/-/g,"+").replace(/_/g,"/")), c => c.charCodeAt(0));
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: key
+      });
+    }
+
+    // Save subscription to Supabase
+    const subJson = sub.toJSON();
+    const { error } = await supabase.from("push_subscriptions").upsert({
+      user_id: userId,
+      endpoint: subJson.endpoint,
+      p256dh: subJson.keys?.p256dh || "",
+      auth: subJson.keys?.auth || "",
+      user_agent: navigator.userAgent.slice(0, 200)
+    }, { onConflict: "user_id,endpoint" });
+
+    if (error) console.error("Push sub save error:", error);
+    else console.log("Push notifications registered successfully");
+    return true;
+  } catch (e) {
+    console.error("Push registration error:", e);
+    return false;
+  }
+}
+
+
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const niceDate = (d = new Date()) => d.toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
@@ -1446,7 +1497,7 @@ export default function PowerWorksApp() {
 
   useEffect(() => {
     if (!session?.user) return;
-    const load = async () => { const {data:profile} = await supabase.from("users").select("*").eq("id",session.user.id).single(); setCurrentUser(profile?{...session.user,...profile}:{...session.user,role:"employee"}); setAuthLoading(false); };
+    const load = async () => { const {data:profile} = await supabase.from("users").select("*").eq("id",session.user.id).single(); const user = profile?{...session.user,...profile}:{...session.user,role:"employee"}; setCurrentUser(user); setAuthLoading(false); registerPushNotifications(session.user.id); };
     load();
   }, [session]);
 
