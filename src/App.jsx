@@ -1316,7 +1316,23 @@ function HomeScreen({ go, clients, planList, followUps, quotes, setData, userId,
 
   if (view === "followups") return (
     <div className="space-y-5">
-      <Btn variant="outline" onClick={() => setView("main")}>← Back</Btn>
+      <button
+  type="button"
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setView("main");
+  }}
+  onTouchEnd={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setView("main");
+  }}
+  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-bold"
+  style={{ color: BRAND.primary, border: `1px solid ${BRAND.primary}` }}
+>
+  ← Back
+</button>
       <h1 className="text-2xl font-bold">My Follow-ups</h1>
       {followUps.length === 0 && <Empty title="No follow-ups yet" text="Create one from a client profile." />}
       {followUps.map(f => (<Card key={f.id} className="rounded-3xl shadow-sm"><CC className="space-y-3 p-4"><h2 className="text-lg font-bold">{f.client_name||"Follow-up"}</h2><Field label="Due date" type="date" value={f.due_date} onChange={v => updFU(f.id, "due_date", v)} /><Field label="Status" value={f.status} onChange={v => updFU(f.id, "status", v)} /><Field label="Outcome" multiline value={f.outcome} onChange={v => updFU(f.id, "outcome", v)} />{f.recurring&&<div className="rounded-2xl p-3 text-xs font-semibold text-white" style={{background:BRAND.primary}}>🔄 Recurring every {f.recurring_days} days</div>}<label className="flex items-center justify-between rounded-2xl bg-slate-50 p-4 text-sm font-semibold">Completed<input type="checkbox" checked={!!f.completed} onChange={e => updFU(f.id, "completed", e.target.checked)} className="h-5 w-5" /></label></CC></Card>))}
