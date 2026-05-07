@@ -95,10 +95,10 @@ async function registerPushNotifications(userId) {
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const todayISO = () => new Date().toISOString().slice(0, 10);
-const niceDate = (d = new Date()) => d.toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-const daysSince = (ds) => { if (!ds) return 999; return Math.max(0, Math.floor((new Date(`${todayISO()}T12:00:00`) - new Date(`${ds}T12:00:00`)) / 86400000)); };
-const workingDaysSince = (ds) => { if (!ds) return 0; let count = 0; let d = new Date(ds + "T12:00:00"); const today = new Date(todayISO() + "T12:00:00"); while (d < today) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) count++; } return count; };
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function niceDate(d) { if (!d) d = new Date(); return d.toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }); }
+function daysSince(ds) { if (!ds) return 999; return Math.max(0, Math.floor((new Date(todayISO() + "T12:00:00") - new Date(ds + "T12:00:00")) / 86400000)); }
+function workingDaysSince(ds) { if (!ds) return 0; var count = 0; var d = new Date(ds + "T12:00:00"); var today = new Date(todayISO() + "T12:00:00"); while (d < today) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) count++; } return count; }
 
 // ─── Smart date display ───────────────────────────────────────────────────────
 function smartDate(dateStr) {
@@ -114,12 +114,12 @@ function smartDate(dateStr) {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: diff < -365 || diff > 365 ? "numeric" : undefined });
 }
 
-const weekStart = () => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0, 10); };
-const weekEnd = () => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return d.toISOString().slice(0, 10); };
-const currentMonth = () => new Date().toISOString().slice(0, 7);
-const addDays = (ds, days) => { const d = new Date(ds + "T12:00:00"); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); };
-const formatBytes = (b) => { if (!b) return "0 B"; const k = 1024, s = ["B","KB","MB","GB"], i = Math.floor(Math.log(b)/Math.log(k)); return `${(b/Math.pow(k,i)).toFixed(1)} ${s[i]}`; };
-const formatCurrency = (v) => `R ${parseFloat(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`;
+function weekStart() { var d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0, 10); }
+function weekEnd() { var d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return d.toISOString().slice(0, 10); }
+function currentMonth() { return new Date().toISOString().slice(0, 7); }
+function addDays(ds, days) { var d = new Date(ds + "T12:00:00"); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); }
+function formatBytes(b) { if (!b) return "0 B"; var k = 1024, s = ["B","KB","MB","GB"], i = Math.floor(Math.log(b)/Math.log(k)); return (b/Math.pow(k,i)).toFixed(1) + " " + s[i]; }
+function formatCurrency(v) { return "R " + parseFloat(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 }); }
 
 // ─── Offline Queue ─────────────────────────────────────────────────────────────
 function getQueue() { try { return JSON.parse(localStorage.getItem(OFFLINE_KEY) || "[]"); } catch(e) { return []; } }
