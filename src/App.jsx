@@ -2,11 +2,11 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "./supabase";
 import {
-  Bell, Briefcase, Calendar, Camera, ChevronRight,
+  Bell, Briefcase, Calendar, Camera, ChevronRight, ChevronLeft,
   Clipboard, File, Home, LogOut, Mail, Mic, Phone,
-  Plus, Search, Shield, Trash2, Upload, Users, Wrench, X,
+  Plus, Search, Shield, Trash2, Upload, Users, Wrench,
   Eye, EyeOff, BarChart2, RefreshCw, WifiOff, Wifi,
-  ChevronLeft, Check, AlertTriangle, Settings,
+  Check, AlertTriangle, Settings, X,
 } from "lucide-react";
 
 // ─── Brand colours ────────────────────────────────────────────────────────────
