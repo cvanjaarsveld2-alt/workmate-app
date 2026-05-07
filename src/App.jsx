@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { supabase } from "./supabase";
 import {
   Bell, Briefcase, Calendar, Camera, ChevronRight, ChevronLeft,
-  Clipboard, File, Home, LogOut, Mail, Mic, Phone,
+  Clipboard, File as FileIcon, Home, LogOut, Mail, Mic, Phone,
   Plus, Search, Shield, Trash2, Upload, Users, Wrench,
   Eye, EyeOff, BarChart2, RefreshCw, WifiOff, Wifi,
   Check, AlertTriangle, Settings, X,
@@ -43,37 +43,41 @@ const VAPID_PUBLIC_KEY = "BMntC_yC4nVCfpLiAZAl-DclOBugaSqneMdcUqFu9km4GrhDkEiUKi
 
 // Register service worker and subscribe to push notifications
 async function registerPushNotifications(userId) {
+  // Push notifications need a real /public/service-worker.js file.
+  // This safe version prevents the whole app from failing when that file is missing.
   try {
     if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-      console.log("Push not supported on this browser");
       return false;
     }
 
-    // Register service worker
-    var reg = null;
-    try { reg = await navigator.serviceWorker.register('/service-worker.js'); } catch(swErr) { console.log('SW failed:', swErr); return false; }
-    if (!reg) return false;
+    const swUrl = "/service-worker.js";
+    try {
+      const check = await fetch(swUrl, { method: "HEAD", cache: "no-store" });
+      if (!check.ok) {
+        console.warn("Push disabled: /service-worker.js not found in public folder.");
+        return false;
+      }
+    } catch (e) {
+      console.warn("Push disabled: could not check service worker.");
+      return false;
+    }
+
+    const reg = await navigator.serviceWorker.register(swUrl);
     await navigator.serviceWorker.ready;
 
-    // Request permission
     let permission = Notification.permission;
-    if (permission === "default") {
-      try { permission = await Notification.requestPermission(); } catch(e) { return false; }
-    }
+    if (permission === "default") permission = await Notification.requestPermission();
     if (permission !== "granted") return false;
 
-    // Check if already subscribed
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
-      // Subscribe
-      const key = Uint8Array.from(atob(VAPID_PUBLIC_KEY.replace(/-/g,"+").replace(/_/g,"/")), c => c.charCodeAt(0));
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: key
-      });
+      const key = Uint8Array.from(
+        atob(VAPID_PUBLIC_KEY.replace(/-/g, "+").replace(/_/g, "/")),
+        c => c.charCodeAt(0)
+      );
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
     }
 
-    // Save subscription to Supabase
     const subJson = sub.toJSON();
     const { error } = await supabase.from("push_subscriptions").upsert({
       user_id: userId,
@@ -84,13 +88,13 @@ async function registerPushNotifications(userId) {
     }, { onConflict: "user_id,endpoint" });
 
     if (error) console.error("Push sub save error:", error);
-    else console.log("Push notifications registered successfully");
-    return true;
+    return !error;
   } catch (e) {
-    console.error("Push registration error:", e);
+    console.warn("Push registration skipped:", e);
     return false;
   }
 }
+
 
 
 
@@ -128,7 +132,7 @@ async function processOfflineQueue() { var queue = getQueue(); if (!queue.length
 
 // ─── Notifications ─────────────────────────────────────────────────────────────
 async function requestNotifPermission() { if (!("Notification" in window)) return false; if (Notification.permission === "granted") return true; try { return (await Notification.requestPermission()) === "granted"; } catch(e) { return false; } }
-function scheduleNotif(title, body, fireAt) { const delay = fireAt - Date.now(); if (delay <= 0) return null; return setTimeout(() => { if (Notification.permission === "granted") new Notification(title, { body, icon: "/icon-192.png" }); }, delay); };
+function scheduleNotif(title, body, fireAt) { const delay = fireAt - Date.now(); if (delay <= 0) return null; return setTimeout(() => { if (Notification.permission === "granted") new Notification(title, { body, icon: "/icons/icon-192.png" }); }, delay); };
 function scheduleItemNotifs(item, mins) { if (!item.date || !item.time) return []; const mt = new Date(`${item.date}T${item.time}:00`).getTime(); return mins.map(m => scheduleNotif("⏰ Power Works Reminder", `${item.title}${item.client ? ` — ${item.client}` : ""} in ${m === 60 ? "1 hour" : `${m} min`}`, mt - m * 60000)).filter(Boolean); };
 
 // ─── Upload ────────────────────────────────────────────────────────────────────
@@ -507,6 +511,95 @@ function LockScreen({ onUnlock }) {
   );
 }
 
+
+// ─── Basic UI Components (added fix) ─────────────────────────────────────────
+function Card({ children, className = "" }) {
+  return <div className={`bg-white ${className}`}>{children}</div>;
+}
+
+function CC({ children, className = "" }) {
+  return <div className={className}>{children}</div>;
+}
+
+function Btn({ children, onClick, disabled, variant = "solid", className = "", type = "button" }) {
+  const styles = {
+    solid: { background: BRAND.primary, color: "#fff" },
+    outline: { background: "#fff", color: BRAND.primary, border: `1px solid ${BRAND.primary}` },
+    danger: { background: "#dc2626", color: "#fff" },
+    secondary: { background: BRAND.light, color: BRAND.primary },
+  };
+  return (
+    <button type={type} onClick={onClick} disabled={disabled}
+      className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold transition disabled:opacity-50 ${className}`}
+      style={styles[variant] || styles.solid}>
+      {children}
+    </button>
+  );
+}
+
+function Field({ label, value, onChange, placeholder = "", type = "text", multiline = false }) {
+  return (
+    <div>
+      {label && <label className="mb-1 block text-sm font-semibold text-slate-800">{label}</label>}
+      {multiline ? (
+        <textarea value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={4}
+          className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-base outline-none" />
+      ) : (
+        <input type={type} value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+          className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-base outline-none" />
+      )}
+    </div>
+  );
+}
+
+function Empty({ title, text }) {
+  return <div className="rounded-3xl bg-white p-8 text-center shadow-sm"><p className="text-lg font-bold text-slate-900">{title}</p><p className="mt-2 text-sm text-slate-500">{text}</p></div>;
+}
+
+function ProgressBar({ value = 0, max = 100, color = BRAND.primary }) {
+  const pct = max > 0 ? Math.min(100, Math.round((Number(value || 0) / Number(max || 1)) * 100)) : 0;
+  return <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} /></div>;
+}
+
+function ShareModal({ title, text, onClose }) {
+  const share = async () => {
+    try {
+      if (navigator.share) await navigator.share({ title, text });
+      else { await navigator.clipboard.writeText(text || ""); alert("Copied to clipboard"); }
+    } catch (e) {}
+  };
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-lg">
+        <h2 className="text-lg font-bold">{title || "Share"}</h2>
+        <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">{text}</pre>
+        <div className="mt-4 grid grid-cols-2 gap-2"><Btn variant="outline" onClick={onClose}>Close</Btn><Btn onClick={share}>Share</Btn></div>
+      </div>
+    </div>
+  );
+}
+
+function NavTab({ icon: Icon, label, active, onClick, badge }) {
+  return <button onClick={onClick} className="relative flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-xs font-bold"><Icon size={20} style={{ color: active ? BRAND.primary : "#64748b" }} /><span style={{ color: active ? BRAND.primary : "#64748b" }}>{label}</span>{!!badge && <span className="absolute right-1 top-1 rounded-full bg-red-600 px-1.5 text-[10px] text-white">{badge}</span>}</button>;
+}
+
+function BigAction({ icon: Icon, title, text, onClick }) {
+  return <button onClick={onClick} className="w-full text-left"><Card className="rounded-3xl shadow-sm"><CC className="flex items-center gap-4 p-4"><div className="rounded-2xl p-3 text-white" style={{ background: BRAND.primary }}><Icon size={22} /></div><div className="flex-1"><p className="font-bold text-slate-900">{title}</p>{text && <p className="text-sm text-slate-500">{text}</p>}</div><ChevronRight size={18} className="text-slate-400" /></CC></Card></button>;
+}
+
+function SignaturePad({ onSave, onCancel, onChange }) {
+  const [name, setName] = useState("");
+  const save = () => { if (onSave) onSave(name); if (onChange) onChange(name); };
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-lg"><h2 className="text-lg font-bold">Client Signature</h2><p className="mt-1 text-sm text-slate-500">Type the client name as signature.</p><input value={name} onChange={e=>setName(e.target.value)} className="mt-4 w-full rounded-2xl border border-slate-200 p-4" placeholder="Client name" /><div className="mt-4 grid grid-cols-2 gap-2"><Btn variant="outline" onClick={onCancel}>Cancel</Btn><Btn onClick={save}>Save</Btn></div></div></div>;
+}
+
+function PhotoAnnotator({ src, file, onSave, onDone, onCancel }) {
+  const imageSrc = src || (file ? URL.createObjectURL(file) : "");
+  const save = () => { if (onSave) onSave(imageSrc); if (onDone) onDone(file); };
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-lg"><h2 className="mb-3 text-lg font-bold">Photo Preview</h2>{imageSrc && <img src={imageSrc} alt="Preview" className="max-h-80 w-full rounded-2xl object-contain" />}<p className="mt-3 text-xs text-slate-500">Annotation tools can be added later. This preview keeps the app loading correctly.</p><div className="mt-4 grid grid-cols-2 gap-2"><Btn variant="outline" onClick={onCancel}>Cancel</Btn><Btn onClick={save}>Use photo</Btn></div></div></div>;
+}
+
+
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 function AuthScreen() {
   const [mode, setMode] = useState("login");
@@ -768,7 +861,7 @@ function TargetScreen({ data, setData, userId, isOnline }) {
 
   const metrics = [
     { label: "Visits / Conversations", actual: (actuals && actuals.visits), target: (targets && targets.visits_target), color: "#3b82f6", icon: Users },
-    { label: "Quotes Sent", actual: (actuals && actuals.quotes), target: (targets && targets.quotes_target), color: BRAND.primary, icon: File },
+    { label: "Quotes Sent", actual: (actuals && actuals.quotes), target: (targets && targets.quotes_target), color: BRAND.primary, icon: FileIcon },
     { label: "New Clients", actual: (actuals && actuals.newClients), target: (targets && targets.new_clients_target), color: "#10b981", icon: Plus },
     { label: "Service Reports", actual: (actuals && actuals.serviceReports), target: (targets && targets.service_reports_target), color: "#8b5cf6", icon: Wrench },
   ];
@@ -884,7 +977,7 @@ function QuoteScreen({ data, setData, userId, isOnline }) {
   const pendingValue = quotes.filter(q => q.status === "Pending").reduce((s, q) => s + parseFloat(q.value || 0), 0);
   const acceptedValue = quotes.filter(q => q.status === "Accepted").reduce((s, q) => s + parseFloat(q.value || 0), 0);
 
-  const filtered = filterStatus === "All" ? quotes : filterStatus === "AlertTriangleged" ? quotes.filter(q => q.flagged && q.status === "Pending") : quotes.filter(q => q.status === filterStatus);
+  const filtered = filterStatus === "All" ? quotes : filterStatus === "Flagged" ? quotes.filter(q => q.flagged && q.status === "Pending") : quotes.filter(q => q.status === filterStatus);
 
   if (view === "add") return (
     <div className="space-y-5">
@@ -976,22 +1069,22 @@ function QuoteScreen({ data, setData, userId, isOnline }) {
         <Card className="rounded-3xl shadow-sm"><CC className="p-4"><p className="text-xs text-slate-500">Accepted value</p><p className="text-2xl font-black text-green-600">{formatCurrency(acceptedValue)}</p></CC></Card>
       </div>
 
-      {/* AlertTriangleged warning */}
+      {/* Flagged warning */}
       {flaggedCount > 0 && (
         <div className="flex items-center gap-3 rounded-2xl p-4" style={{ background: "#fff3f3", border: `1px solid ${BRAND.primary}30` }}>
           <AlertTriangle size={18} style={{ color: BRAND.primary }} />
           <div className="flex-1"><p className="text-sm font-bold" style={{ color: BRAND.primary }}>{flaggedCount} quote{flaggedCount !== 1 ? "s" : ""} waiting 7+ working days</p><p className="text-xs text-slate-500">Consider following up</p></div>
-          <button onClick={() => setFilterStatus("AlertTriangleged")} className="text-xs font-bold underline" style={{ color: BRAND.primary }}>View</button>
+          <button onClick={() => setFilterStatus("Flagged")} className="text-xs font-bold underline" style={{ color: BRAND.primary }}>View</button>
         </div>
       )}
 
       {/* Filter tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {["All", "Pending", "AlertTriangleged", "Accepted", "Rejected", "Expired"].map(s => (
+        {["All", "Pending", "Flagged", "Accepted", "Rejected", "Expired"].map(s => (
           <button key={s} onClick={() => setFilterStatus(s)}
             className="flex-shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold transition"
             style={{ background: filterStatus === s ? BRAND.primary : "#f1f5f9", color: filterStatus === s ? "#fff" : "#64748b" }}>
-            {s} {s === "AlertTriangleged" && flaggedCount > 0 ? `(${flaggedCount})` : ""}
+            {s} {s === "Flagged" && flaggedCount > 0 ? `(${flaggedCount})` : ""}
           </button>
         ))}
       </div>
@@ -1345,7 +1438,7 @@ function QuickAddScreen({ data, setData, go, userId, userName, isOnline }) {
         </div>
         {audioErr&&<div className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{audioErr}</div>}
         {audio&&<div className="rounded-2xl bg-slate-50 p-3"><div className="mb-2 flex justify-between"><p className="text-sm font-semibold">Voice note</p><button onClick={()=>setAudio("")} className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">Delete</button></div><audio controls src={audio} className="w-full" /></div>}
-        {files.length>0&&(<div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-3">{files.map((f,i)=>(<div key={i} className="rounded-2xl bg-white p-2">{f.type.startsWith("video/")?<video controls src={f.url} className="h-32 w-full rounded-xl object-cover" />:<img src={f.url} alt={f.name} className="h-32 w-full rounded-xl object-cover" />}<p className="mt-1 truncate text-xs text-slate-600">{f.name}</p><div className="mt-2 flex gap-1">{f.type.startsWith("image/")&&<button onClick={()=>setAnnotating({url:f.url,idx:i})} className="flex-1 rounded-xl py-1 text-xs font-semibold" style={{background:"#fffbeb",color:"#92400e"}}><File size={12} className="inline mr-1" />Annotate</button>}<button onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))} className="flex-1 rounded-xl bg-red-50 py-1 text-xs font-semibold text-red-700">Delete</button></div></div>))}</div>)}
+        {files.length>0&&(<div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-3">{files.map((f,i)=>(<div key={i} className="rounded-2xl bg-white p-2">{f.type.startsWith("video/")?<video controls src={f.url} className="h-32 w-full rounded-xl object-cover" />:<img src={f.url} alt={f.name} className="h-32 w-full rounded-xl object-cover" />}<p className="mt-1 truncate text-xs text-slate-600">{f.name}</p><div className="mt-2 flex gap-1">{f.type.startsWith("image/")&&<button onClick={()=>setAnnotating({url:f.url,idx:i})} className="flex-1 rounded-xl py-1 text-xs font-semibold" style={{background:"#fffbeb",color:"#92400e"}}><FileIcon size={12} className="inline mr-1" />Annotate</button>}<button onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))} className="flex-1 rounded-xl bg-red-50 py-1 text-xs font-semibold text-red-700">Delete</button></div></div>))}</div>)}
         <Btn className="w-full py-6 text-base" onClick={save}>Save conversation</Btn>
       </CC></Card>
     </div>
@@ -1494,7 +1587,7 @@ function ClientsScreen({ data, setData, go, userId, isOnline }) {
         <div><h2 className="mb-2 text-lg font-bold">Linked files</h2>
           {docs.length === 0 && <p className="text-sm text-slate-500">No files yet.</p>}
           <div className="grid grid-cols-2 gap-3">
-            {docs.map(d => { const isImg = (d.name && d.name.match)(/\.(jpg|jpeg|png|gif|webp)$/i); const isVid = (d.name && d.name.match)(/\.(mp4|mov|webm)$/i); return (<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg ? <img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" /> : isVid ? <video controls src={d.file_url} className="h-28 w-full rounded-xl" /> : <div className="flex h-28 items-center justify-center rounded-xl bg-white"><File /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>); })}
+            {docs.map(d => { const isImg = (d.name && d.name.match)(/\.(jpg|jpeg|png|gif|webp)$/i); const isVid = (d.name && d.name.match)(/\.(mp4|mov|webm)$/i); return (<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg ? <img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" /> : isVid ? <video controls src={d.file_url} className="h-28 w-full rounded-xl" /> : <div className="flex h-28 items-center justify-center rounded-xl bg-white"><FileIcon /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>); })}
           </div>
         </div>
       </CC></Card>
@@ -1568,7 +1661,7 @@ function ServiceScreen({ data, setData, userId, isOnline }) {
         <Field label="Work done" multiline value={rep.workDone} onChange={v=>setRep(r=>({...r,workDone:v}))} />
         <Field label="Parts used" multiline value={rep.partsUsed} onChange={v=>setRep(r=>({...r,partsUsed:v}))} />
         <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold ${uploading?"opacity-60 pointer-events-none":""}`}><Upload size={18} />{uploading?"Uploading…":"Add photos / files"}<input type="file" accept="image/*,video/*,.pdf,.doc,.docx" multiple className="hidden" onChange={handleFiles} disabled={uploading} /></label>
-        {files.map((f,i)=>(<div key={i} className="rounded-2xl bg-slate-50 p-3"><p className="text-sm font-semibold">{f.name}</p>{f.type.startsWith("image/")&&<img src={f.url} alt={f.name} className="mt-2 max-h-40 w-full rounded-xl object-cover" />}<div className="mt-2 flex gap-2">{f.type.startsWith("image/")&&<Btn variant="outline" className="flex-1 text-sm py-2" onClick={()=>setAnnotating({url:f.url,idx:i})}><File size={14} />Annotate</Btn>}<Btn variant="danger" className="flex-1 text-sm py-2" onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))}>Delete</Btn></div></div>))}
+        {files.map((f,i)=>(<div key={i} className="rounded-2xl bg-slate-50 p-3"><p className="text-sm font-semibold">{f.name}</p>{f.type.startsWith("image/")&&<img src={f.url} alt={f.name} className="mt-2 max-h-40 w-full rounded-xl object-cover" />}<div className="mt-2 flex gap-2">{f.type.startsWith("image/")&&<Btn variant="outline" className="flex-1 text-sm py-2" onClick={()=>setAnnotating({url:f.url,idx:i})}><FileIcon size={14} />Annotate</Btn>}<Btn variant="danger" className="flex-1 text-sm py-2" onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))}>Delete</Btn></div></div>))}
         <div className="rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between"><p className="text-sm font-semibold">Client signature</p><Btn variant="outline" className="text-sm py-2" onClick={()=>setShowSig(true)}>{signature?"Re-sign":"Get signature"}</Btn></div>{signature&&<img src={signature} alt="Signature" className="mt-3 h-20 w-full rounded-xl border border-slate-200 object-contain bg-white" />}</div>
         <Btn className="w-full py-6 text-base" onClick={save}>Save & create PDF</Btn>
       </CC></Card>
@@ -1590,7 +1683,7 @@ function DocumentsScreen({ data, setData, userId, isOnline }) {
         <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl py-6 font-semibold text-white ${uploading?"opacity-60 pointer-events-none":""}`} style={{background:BRAND.primary}}><Upload size={18} />{uploading?"Uploading…":"Upload photo, video or document"}<input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={handle} disabled={uploading} /></label>
       </CC></Card>
       {data.documents.length===0&&<Empty title="No documents" text="Upload your first file above." />}
-      <div className="space-y-3">{data.documents.map(doc=>{const client=data.clients.find(c=>c.id===doc.client_id);const isImg=(doc.name && doc.name.match)(/\.(jpg|jpeg|png|gif|webp)$/i);const isVid=(doc.name && doc.name.match)(/\.(mp4|mov|webm)$/i);return(<Card key={doc.id} className="rounded-3xl shadow-sm"><CC className="space-y-3 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><File size={22} /></div><div className="flex-1 min-w-0"><p className="truncate font-bold">{doc.name}</p><p className="text-sm text-slate-500">{client?client.company:"Global"}</p></div><button onClick={()=>del(doc.id)} className="rounded-xl bg-red-50 p-2 text-red-700"><X size={18} /></button></div>{isImg&&<img src={doc.file_url} alt={doc.name} className="max-h-64 w-full rounded-2xl object-cover" />}{isVid&&<video controls src={doc.file_url} className="max-h-64 w-full rounded-2xl" />}{!isImg&&!isVid&&<a href={doc.file_url} target="_blank" rel="noreferrer"><Btn className="w-full">Open document</Btn></a>}</CC></Card>);})}</div>
+      <div className="space-y-3">{data.documents.map(doc=>{const client=data.clients.find(c=>c.id===doc.client_id);const isImg=(doc.name && doc.name.match)(/\.(jpg|jpeg|png|gif|webp)$/i);const isVid=(doc.name && doc.name.match)(/\.(mp4|mov|webm)$/i);return(<Card key={doc.id} className="rounded-3xl shadow-sm"><CC className="space-y-3 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><FileIcon size={22} /></div><div className="flex-1 min-w-0"><p className="truncate font-bold">{doc.name}</p><p className="text-sm text-slate-500">{client?client.company:"Global"}</p></div><button onClick={()=>del(doc.id)} className="rounded-xl bg-red-50 p-2 text-red-700"><X size={18} /></button></div>{isImg&&<img src={doc.file_url} alt={doc.name} className="max-h-64 w-full rounded-2xl object-cover" />}{isVid&&<video controls src={doc.file_url} className="max-h-64 w-full rounded-2xl" />}{!isImg&&!isVid&&<a href={doc.file_url} target="_blank" rel="noreferrer"><Btn className="w-full">Open document</Btn></a>}</CC></Card>);})}</div>
     </div>
   );
 }
@@ -1662,7 +1755,7 @@ function NotesScreen({ data, setData, userId, isOnline }) {
         const delay = fireAt - Date.now();
         if (delay > 0) {
           const t = setTimeout(() => {
-            new Notification("📝 Power Works Reminder", { body: note.title, icon: "/icon-192.png" });
+            new Notification("📝 Power Works Reminder", { body: note.title, icon: "/icons/icon-192.png" });
           }, delay);
           timers.current.push(t);
         }
@@ -1685,7 +1778,7 @@ function NotesScreen({ data, setData, userId, isOnline }) {
           if (r.reminder_date && r.reminder_time && Notification && Notification.permission === "granted") {
             const fireAt = new Date(`${r.reminder_date}T${r.reminder_time}:00`).getTime();
             const delay = fireAt - Date.now();
-            if (delay > 0) setTimeout(() => new Notification("📝 Power Works Reminder", { body: r.title, icon: "/icon-192.png" }), delay);
+            if (delay > 0) setTimeout(() => new Notification("📝 Power Works Reminder", { body: r.title, icon: "/icons/icon-192.png" }), delay);
           }
         }
       } else {
