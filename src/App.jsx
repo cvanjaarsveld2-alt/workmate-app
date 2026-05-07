@@ -270,7 +270,7 @@ async function syncOfflinePhotos(userId, setData) {
         // Save to Supabase documents
         const { data: doc } = await supabase.from('documents').insert({
           user_id: userId,
-          client_id: photo.(metadata && metadata.clientId) || null,
+          client_id: (photo.metadata && photo.metadata.clientId) || null,
           file_url: url,
           name: photo.name
         }).select().single();
@@ -1237,7 +1237,7 @@ function GlobalSearchScreen({ data, go, setScreen }) {
   const [query, setQuery] = useState("");
   const inputRef = React.useRef(null);
 
-  useEffect(() => { setTimeout(() => inputRef.(current && current.focus)(), 100); }, []);
+  useEffect(() => { setTimeout(() => (inputRef.current && inputRef.current.focus)(), 100); }, []);
 
   const results = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -1308,7 +1308,7 @@ function GlobalSearchScreen({ data, go, setScreen }) {
             <button key={q.id} onClick={() => setScreen("Quotes")} className="w-full text-left">
               <Card className="rounded-2xl shadow-sm"><CC className="p-3">
                 <p className="font-bold text-slate-900">{q.client_name}</p>
-                <p className="text-xs text-slate-500">{q.quote_number} · {q.(description && description.slice)(0, 60)}</p>
+                <p className="text-xs text-slate-500">{q.quote_number} · {(q.description && q.description.slice)(0, 60)}</p>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-xl ${QUOTE_STATUS_COLORS[q.status]}`}>{q.status}</span>
               </CC></Card>
             </button>
@@ -1328,7 +1328,7 @@ function GlobalSearchScreen({ data, go, setScreen }) {
             <button key={r.id} onClick={() => setScreen("Service")} className="w-full text-left">
               <Card className="rounded-2xl shadow-sm"><CC className="p-3">
                 <p className="font-bold text-slate-900">{r.client_name || "No client"}</p>
-                <p className="text-xs text-slate-500">{r.machine} · {r.(fault && fault.slice)(0, 60)}</p>
+                <p className="text-xs text-slate-500">{r.machine} · {(r.fault && r.fault.slice)(0, 60)}</p>
                 <p className="text-xs text-slate-400">{smartDate(r.created_at && r.created_at.slice(0, 10))}</p>
               </CC></Card>
             </button>
@@ -1695,7 +1695,7 @@ function ClientsScreen({ data, setData, go, userId, isOnline }) {
         <div><h2 className="mb-2 text-lg font-bold">Linked files</h2>
           {docs.length === 0 && <p className="text-sm text-slate-500">No files yet.</p>}
           <div className="grid grid-cols-2 gap-3">
-            {docs.map(d => { const isImg = d.(name && name.match)(/\.(jpg|jpeg|png|gif|webp)$/i); const isVid = d.(name && name.match)(/\.(mp4|mov|webm)$/i); return (<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg ? <img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" /> : isVid ? <video controls src={d.file_url} className="h-28 w-full rounded-xl" /> : <div className="flex h-28 items-center justify-center rounded-xl bg-white"><File /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>); })}
+            {docs.map(d => { const isImg = (d.name && d.name.match)(/\.(jpg|jpeg|png|gif|webp)$/i); const isVid = (d.name && d.name.match)(/\.(mp4|mov|webm)$/i); return (<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg ? <img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" /> : isVid ? <video controls src={d.file_url} className="h-28 w-full rounded-xl" /> : <div className="flex h-28 items-center justify-center rounded-xl bg-white"><File /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>); })}
           </div>
         </div>
       </CC></Card>
@@ -1791,7 +1791,7 @@ function DocumentsScreen({ data, setData, userId, isOnline }) {
         <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl py-6 font-semibold text-white ${uploading?"opacity-60 pointer-events-none":""}`} style={{background:BRAND.primary}}><Upload size={18} />{uploading?"Uploading…":"Upload photo, video or document"}<input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={handle} disabled={uploading} /></label>
       </CC></Card>
       {data.documents.length===0&&<Empty title="No documents" text="Upload your first file above." />}
-      <div className="space-y-3">{data.documents.map(doc=>{const client=data.clients.find(c=>c.id===doc.client_id);const isImg=doc.(name && name.match)(/\.(jpg|jpeg|png|gif|webp)$/i);const isVid=doc.(name && name.match)(/\.(mp4|mov|webm)$/i);return(<Card key={doc.id} className="rounded-3xl shadow-sm"><CC className="space-y-3 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><File size={22} /></div><div className="flex-1 min-w-0"><p className="truncate font-bold">{doc.name}</p><p className="text-sm text-slate-500">{client?client.company:"Global"}</p></div><button onClick={()=>del(doc.id)} className="rounded-xl bg-red-50 p-2 text-red-700"><X size={18} /></button></div>{isImg&&<img src={doc.file_url} alt={doc.name} className="max-h-64 w-full rounded-2xl object-cover" />}{isVid&&<video controls src={doc.file_url} className="max-h-64 w-full rounded-2xl" />}{!isImg&&!isVid&&<a href={doc.file_url} target="_blank" rel="noreferrer"><Btn className="w-full">Open document</Btn></a>}</CC></Card>);})}</div>
+      <div className="space-y-3">{data.documents.map(doc=>{const client=data.clients.find(c=>c.id===doc.client_id);const isImg=(doc.name && doc.name.match)(/\.(jpg|jpeg|png|gif|webp)$/i);const isVid=(doc.name && doc.name.match)(/\.(mp4|mov|webm)$/i);return(<Card key={doc.id} className="rounded-3xl shadow-sm"><CC className="space-y-3 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><File size={22} /></div><div className="flex-1 min-w-0"><p className="truncate font-bold">{doc.name}</p><p className="text-sm text-slate-500">{client?client.company:"Global"}</p></div><button onClick={()=>del(doc.id)} className="rounded-xl bg-red-50 p-2 text-red-700"><X size={18} /></button></div>{isImg&&<img src={doc.file_url} alt={doc.name} className="max-h-64 w-full rounded-2xl object-cover" />}{isVid&&<video controls src={doc.file_url} className="max-h-64 w-full rounded-2xl" />}{!isImg&&!isVid&&<a href={doc.file_url} target="_blank" rel="noreferrer"><Btn className="w-full">Open document</Btn></a>}</CC></Card>);})}</div>
     </div>
   );
 }
@@ -2218,7 +2218,7 @@ export default function PowerWorksApp() {
     const clientsSub = supabase.channel('clients-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients', filter: `user_id=eq.${uid}` },
         (payload) => {
-          if (payload.eventType === 'INSERT') setData(c => ({ ...c, clients: [...c.clients.filter(x => x.id !== payload.new.id), payload.new].sort((a,b) => a.(company && company.localeCompare)(b.company)) }));
+          if (payload.eventType === 'INSERT') setData(c => ({ ...c, clients: [...c.clients.filter(x => x.id !== payload.new.id), payload.new].sort((a,b) => (a.company && a.company.localeCompare)(b.company)) }));
           if (payload.eventType === 'UPDATE') setData(c => ({ ...c, clients: c.clients.map(x => x.id === payload.new.id ? { ...x, ...payload.new } : x) }));
           if (payload.eventType === 'DELETE') setData(c => ({ ...c, clients: c.clients.filter(x => x.id !== payload.old.id) }));
         })
