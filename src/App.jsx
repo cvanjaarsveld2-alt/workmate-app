@@ -478,7 +478,10 @@ function LockScreen({ onUnlock }) {
     setLoading(false);
   };
 
-  useEffect(() => { unlock(); }, []);
+  useEffect(() => {
+  const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (!isiOS) unlock();
+}, []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6" style={{ background: BRAND.primary }}>
