@@ -1,72 +1,25 @@
-const DB_NAME = "powermate_offline_db";
-const DB_VERSION = 1;
+import { useEffect, useState } from "react";
 
-const STORES = [
-  "companies",
-  "branches",
-  "contacts",
-  "followups",
-  "notes",
-  "quotes",
-  "reports",
-  "equipment",
-  "files",
-  "sync_queue"
-];
+export function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-export function openOfflineDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+  useEffect(() => {
+    function handleOnline() {
+      setIsOnline(true);
+    }
 
-    request.onupgradeneeded = (event) => {
-      const db = event.target.result;
+    function handleOffline() {
+      setIsOnline(false);
+    }
 
-      STORES.forEach((storeName) => {
-        if (!db.objectStoreNames.contains(storeName)) {
-          db.createObjectStore(storeName, { keyPath: "id" });
-        }
-      });
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
+  }, []);
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-export async function offlinePut(storeName, item) {
-  const db = await openOfflineDb();
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readwrite");
-    tx.objectStore(storeName).put(item);
-    tx.oncomplete = () => resolve(item);
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-export async function offlineGetAll(storeName) {
-  const db = await openOfflineDb();
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readonly");
-    const request = tx.objectStore(storeName).getAll();
-
-    request.onsuccess = () => resolve(request.result || []);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-export async function offlineDelete(storeName, id) {
-  const db = await openOfflineDb();
-
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, "readwrite");
-    tx.objectStore(storeName).delete(id);
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = () => reject(tx.error);
-  });
-}
-
-export function makeOfflineId(prefix = "offline") {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  return isOnline;
 }
