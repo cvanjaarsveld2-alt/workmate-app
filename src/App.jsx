@@ -186,324 +186,112 @@ const IDB_NAME = 'powerworks-offline';
 const IDB_VERSION = 1;
 
 function openIDB() {
-  return new Promise((resolve, reject) => {
+  return new Promise(function(resolve, reject) {
     try {
       if (!window.indexedDB) { reject(new Error('IDB not supported')); return; }
-      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
-      req.onupgradeneeded = (e) => {
-        const db = e.target.result;
+      var req = indexedDB.open(IDB_NAME, IDB_VERSION);
+      req.onupgradeneeded = function(e) {
+        var db = e.target.result;
         if (!db.objectStoreNames.contains('offline_photos')) {
           db.createObjectStore('offline_photos', { keyPath: 'id' });
         }
-        if (!db.objectStoreNames.contains('offline_data')) {
-          db.createObjectStore('offline_data', { keyPath: 'id' });
-        }
       };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    } catch(e) {
-      reject(e);
-    }
+      req.onsuccess = function() { resolve(req.result); };
+      req.onerror = function() { reject(req.error); };
+    } catch(e) { reject(e); }
   });
 }
 
 async function savePhotoOffline(id, file, metadata) {
   try {
-    const db = await openIDB();
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const tx = db.transaction('offline_photos', 'readwrite');
+    var db = await openIDB();
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function() {
+        var tx = db.transaction('offline_photos', 'readwrite');
         tx.objectStore('offline_photos').put({
-          id,
-          dataUrl: reader.result,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          metadata,
-          savedAt: Date.now()
+          id: id, dataUrl: reader.result, name: file.name,
+          type: file.type, size: file.size, metadata: metadata, savedAt: Date.now()
         });
-        tx.oncomplete = () => resolve(reader.result);
-        tx.onerror = () => reject(tx.error);
+        tx.oncomplete = function() { resolve(reader.result); };
+        tx.onerror = function() { reject(tx.error); };
       };
       reader.readAsDataURL(file);
     });
-  } catch(e) {
-    console.error('savePhotoOffline error:', e);
-    return null;
-  }
+  } catch(e) { console.error('savePhotoOffline error:', e); return null; }
 }
 
 async function getOfflinePhotos() {
-  const db = await openIDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('offline_photos', 'readonly');
-    const req = tx.objectStore('offline_photos').getAll();
-    req.onsuccess = () => resolve(req.result || []);
-    req.onerror = () => reject(req.error);
-  });
+  try {
+    var db = await openIDB();
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction('offline_photos', 'readonly');
+      var req = tx.objectStore('offline_photos').getAll();
+      req.onsuccess = function() { resolve(req.result || []); };
+      req.onerror = function() { reject(req.error); };
+    });
+  } catch(e) { return []; }
 }
 
 async function deleteOfflinePhoto(id) {
-  const db = await openIDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction('offline_photos', 'readwrite');
-    tx.objectStore('offline_photos').delete(id);
-    tx.oncomplete = resolve;
-    tx.onerror = () => reject(tx.error);
-  });
+  try {
+    var db = await openIDB();
+    return new Promise(function(resolve, reject) {
+      var tx = db.transaction('offline_photos', 'readwrite');
+      tx.objectStore('offline_photos').delete(id);
+      tx.oncomplete = resolve;
+      tx.onerror = function() { reject(tx.error); };
+    });
+  } catch(e) { console.error('deleteOfflinePhoto error:', e); }
 }
 
-// Upload all offline photos when back online
 async function syncOfflinePhotos(userId, setData) {
-  const photos = await getOfflinePhotos();
-  if (photos.length === 0) return;
-  console.log(`Syncing ${photos.length} offline photos...`);
-  for (const photo of photos) {
-    try {
-      // Convert dataUrl back to file
-      const res = await fetch(photo.dataUrl);
-      const blob = await res.blob();
-      const file = new File([blob], photo.name, { type: photo.type });
-      const url = await uploadFile(file);
-      if (url) {
-        // Save to Supabase documents
-        const { data: doc } = await supabase.from('documents').insert({
-          user_id: userId,
-          client_id: (photo.metadata && photo.metadata.clientId) || null,
-          file_url: url,
-          name: photo.name
-        }).select().single();
-        if (doc) {
-          setData(c => ({ ...c, documents: [...c.documents, { ...doc, clientId: doc.client_id, dataUrl: doc.file_url }] }));
+  try {
+    var photos = await getOfflinePhotos();
+    if (!photos || photos.length === 0) return;
+    for (var i = 0; i < photos.length; i++) {
+      var photo = photos[i];
+      try {
+        var res = await fetch(photo.dataUrl);
+        var blob = await res.blob();
+        var file = new File([blob], photo.name, { type: photo.type });
+        var url = await uploadFile(file);
+        if (url) {
+          await supabase.from('documents').insert({
+            user_id: userId,
+            client_id: (photo.metadata && photo.metadata.clientId) || null,
+            file_url: url, name: photo.name
+          });
+          await deleteOfflinePhoto(photo.id);
         }
-        // Remove from offline store
-        await deleteOfflinePhoto(photo.id);
-        console.log(`Synced offline photo: ${photo.name}`);
-      }
-    } catch (e) {
-      console.error('Failed to sync photo:', photo.name, e);
+      } catch(photoErr) { console.error('Photo sync error:', photoErr); }
     }
-  }
+  } catch(e) { console.error('syncOfflinePhotos error:', e); }
 }
 
-// Enhanced file upload - saves offline if no internet
-async function uploadFileWithOfflineFallback(file, clientId = '', userId = '') {
-  const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+async function uploadFileWithOfflineFallback(file, clientId, userId) {
+  var online = typeof navigator !== 'undefined' ? navigator.onLine : true;
   if (online) {
-    const url = await uploadFile(file);
-    return url ? { url, offline: false } : null;
+    var url = await uploadFile(file);
+    return url ? { url: url, offline: false } : null;
   } else {
-    // Save to IndexedDB for later
-    const id = `offline_photo_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const dataUrl = await savePhotoOffline(id, file, { clientId, userId });
-    console.log(`Photo saved offline: ${file.name}`);
-    return { url: dataUrl, offline: true, offlineId: id };
+    var id = 'offline_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    var dataUrl = await savePhotoOffline(id, file, { clientId: clientId, userId: userId });
+    return dataUrl ? { url: dataUrl, offline: true, offlineId: id } : null;
   }
 }
 
-async function filesToStoredOffline(fileList, clientId = '', userId = '') {
-  const out = [];
-  for (let f of Array.from(fileList || [])) {
-    if (f.type.startsWith('image/')) {
-      f = await compressImage(f);
-    }
-    const result = await uploadFileWithOfflineFallback(f, clientId, userId);
-    if (result) {
-      out.push({
-        name: f.name,
-        type: f.type || 'File',
-        size: f.size,
-        url: result.url,
-        offline: result.offline || false,
-        offlineId: result.offlineId
-      });
-    }
+async function filesToStoredOffline(fileList, clientId, userId) {
+  var out = [];
+  var files = Array.from(fileList || []);
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    if (f.type.startsWith('image/')) { f = await compressImage(f); }
+    var result = await uploadFileWithOfflineFallback(f, clientId, userId);
+    if (result) out.push({ name: f.name, type: f.type || 'File', size: f.size, url: result.url, offline: result.offline || false });
   }
   return out;
 }
-
-
-
-// ─── Photo Annotator ───────────────────────────────────────────────────────────
-function PhotoAnnotator({ src, onSave, onCancel }) {
-  const canvasRef = useRef(null);
-  const [notes, setNotes] = useState([]);
-  const [newNote, setNewNote] = useState("");
-  const [notePos, setNotePos] = useState(null);
-  const [imgLoaded, setImgLoaded] = useState(false);
-
-  useEffect(() => {
-    if (!imgLoaded) return;
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    const img = new Image(); img.crossOrigin = "anonymous";
-    img.onload = () => { canvas.width = img.width; canvas.height = img.height; ctx.drawImage(img, 0, 0); notes.forEach(n => { ctx.fillStyle = "rgba(139,26,26,0.85)"; ctx.font = `bold ${Math.max(16, img.width/40)}px Arial`; const tw = ctx.measureText(n.text).width; const pad = 10; ctx.fillRect(n.x*img.width-pad, n.y*img.height-Math.max(16,img.width/40)-pad, tw+pad*2, Math.max(16,img.width/40)+pad*2); ctx.fillStyle = "#fff"; ctx.fillText(n.text, n.x*img.width, n.y*img.height); }); };
-    img.src = src;
-  }, [notes, imgLoaded, src]);
-
-  const handleClick = (e) => { const rect = e.currentTarget.getBoundingClientRect(); setNotePos({ x: (e.clientX-rect.left)/rect.width, y: (e.clientY-rect.top)/rect.height }); setNewNote(""); };
-  const addNote = () => { if (!newNote.trim() || !notePos) return; setNotes(n => [...n, { ...notePos, text: newNote.trim() }]); setNotePos(null); setNewNote(""); };
-  const save = () => { const canvas = canvasRef.current; if (canvas) onSave(canvas.toDataURL("image/jpeg", 0.85)); };
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: BRAND.charcoal }}>
-      <div className="flex items-center justify-between p-4">
-        <button onClick={onCancel} className="text-white"><ChevronLeft size={24} /></button>
-        <p className="font-bold text-white">Annotate Photo</p>
-        <button onClick={save} className="rounded-xl px-4 py-2 font-bold text-white" style={{ background: BRAND.primary }}>Save</button>
-      </div>
-      <div className="flex-1 overflow-auto p-2">
-        <div className="relative" onClick={handleClick}>
-          <img src={src} alt="annotate" className="w-full rounded-xl" onLoad={() => setImgLoaded(true)} style={{ display: "none" }} />
-          <canvas ref={canvasRef} className="w-full rounded-xl cursor-crosshair" />
-          <p className="mt-2 text-center text-xs text-slate-400">Tap anywhere on the photo to add a note</p>
-        </div>
-      </div>
-      {notePos && (
-        <div className="p-4" style={{ background: "#2a2a2a" }}>
-          <p className="mb-2 text-sm font-semibold text-white">Note text:</p>
-          <div className="flex gap-2">
-            <input value={newNote} onChange={e => setNewNote(e.target.value)} placeholder="Type your note…" className="flex-1 rounded-xl border border-slate-600 bg-slate-700 p-3 text-white outline-none" autoFocus />
-            <button onClick={addNote} className="rounded-xl px-4 font-bold text-white" style={{ background: BRAND.primary }}>Add</button>
-            <button onClick={() => setNotePos(null)} className="rounded-xl bg-slate-600 px-4 text-white">✕</button>
-          </div>
-        </div>
-      )}
-      {notes.length > 0 && (
-        <div className="p-4 border-t border-slate-700" style={{ background: "#2a2a2a" }}>
-          <p className="text-xs font-bold text-slate-400 mb-2">NOTES ({notes.length})</p>
-          {notes.map((n, i) => (<div key={i} className="flex items-center justify-between mb-1"><p className="text-sm text-white">{n.text}</p><button onClick={() => setNotes(ns => ns.filter((_,j)=>j!==i))} className="text-red-400 text-xs ml-3">Remove</button></div>))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Signature Pad ─────────────────────────────────────────────────────────────
-function SignaturePad({ onSave, onCancel }) {
-  const canvasRef = useRef(null); const drawing = useRef(false);
-  const getPos = (e, canvas) => { const rect = canvas.getBoundingClientRect(); const sx = canvas.width/rect.width; const sy = canvas.height/rect.height; const src = e.touches ? e.touches[0] : e; return { x: (src.clientX-rect.left)*sx, y: (src.clientY-rect.top)*sy }; };
-  const start = (e) => { e.preventDefault(); drawing.current = true; const canvas = canvasRef.current; const ctx = canvas.getContext("2d"); const pos = getPos(e, canvas); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); };
-  const draw = (e) => { e.preventDefault(); if (!drawing.current) return; const canvas = canvasRef.current; const ctx = canvas.getContext("2d"); const pos = getPos(e, canvas); ctx.lineWidth = 2; ctx.strokeStyle = BRAND.charcoal; ctx.lineTo(pos.x, pos.y); ctx.stroke(); };
-  const stop = () => { drawing.current = false; };
-  const clear = () => { const canvas = canvasRef.current; canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height); };
-  const save = () => { const canvas = canvasRef.current; onSave(canvas.toDataURL("image/png")); };
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
-      <div className="flex items-center justify-between p-4 border-b">
-        <button onClick={onCancel} className="text-slate-500"><ChevronLeft size={24} /></button>
-        <p className="font-bold text-slate-900">Client Signature</p>
-        <button onClick={save} className="rounded-xl px-4 py-2 font-bold text-white" style={{ background: BRAND.primary }}>Save</button>
-      </div>
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <p className="mb-4 text-sm text-slate-500">Sign below to confirm the service report</p>
-        <canvas ref={canvasRef} width={600} height={300} className="w-full max-w-lg rounded-2xl border-2 border-dashed border-slate-300 touch-none bg-slate-50 cursor-crosshair"
-          onMouseDown={start} onMouseMove={draw} onMouseUp={stop} onMouseLeave={stop}
-          onTouchStart={start} onTouchMove={draw} onTouchEnd={stop} />
-        <button onClick={clear} className="mt-4 rounded-xl bg-red-50 px-6 py-3 text-sm font-semibold text-red-700">Clear signature</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Share Modal ───────────────────────────────────────────────────────────────
-function ShareModal({ title, text, onClose }) {
-  const [copied, setCopied] = useState(false);
-  const whatsapp = () => window.open(`https://wa.me/?text=${encodeURIComponent(`${title}\n\n${text}`)}`);
-  const email = () => { window.location.href = `mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(text)}`; };
-  const copy = () => { navigator.clipboard.writeText(`${title}\n\n${text}`); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-50 flex items-end bg-black/40" onClick={onClose}>
-      <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="w-full rounded-t-3xl bg-white p-6 space-y-4" onClick={e => e.stopPropagation()}>
-        <h2 className="text-lg font-bold">Share</h2>
-        <p className="text-sm text-slate-500 truncate">{title}</p>
-        <div className="grid grid-cols-3 gap-3">
-          <button onClick={whatsapp} className="flex flex-col items-center gap-2 rounded-2xl bg-green-50 p-4"><Bell size={28} className="text-green-600" /><p className="text-xs font-semibold text-green-700">WhatsApp</p></button>
-          <button onClick={email} className="flex flex-col items-center gap-2 rounded-2xl bg-blue-50 p-4"><Mail size={28} className="text-blue-600" /><p className="text-xs font-semibold text-blue-700">Email</p></button>
-          <button onClick={copy} className="flex flex-col items-center gap-2 rounded-2xl bg-slate-50 p-4">{copied ? <Check size={28} className="text-green-600" /> : <Clipboard size={28} className="text-slate-600" />}<p className="text-xs font-semibold text-slate-700">{copied ? "Copied!" : "Clipboard"}</p></button>
-        </div>
-        <button onClick={onClose} className="w-full rounded-2xl bg-slate-100 py-3 font-semibold text-slate-700">Cancel</button>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ─── UI Primitives ─────────────────────────────────────────────────────────────
-const Card = ({ className = "", children }) => <div className={`bg-white ${className}`}>{children}</div>;
-const CC = ({ className = "", children }) => <div className={className}>{children}</div>;
-
-function Btn({ children, className = "", variant = "solid", onClick, type = "button", disabled = false }) {
-  const styles = {
-    solid: { background: BRAND.primary, color: "#fff", border: "none" },
-    outline: { background: "#fff", color: BRAND.charcoal, border: `1.5px solid #e2e8f0` },
-    danger: { background: "#fff1f1", color: "#b91c1c", border: "none" },
-    secondary: { background: BRAND.charcoal, color: "#fff", border: "none" },
-  };
-  return (
-    <button type={type} onClick={onClick} disabled={disabled} style={styles[variant] || styles.solid}
-      className={`inline-flex items-center justify-center gap-2 font-semibold transition active:scale-[0.98] disabled:opacity-50 px-4 py-3 rounded-2xl ${className}`}>
-      {children}
-    </button>
-  );
-}
-
-function Field({ label, value, onChange, placeholder = "", type = "text", multiline = false }) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-semibold text-slate-800">{label}</label>
-      {multiline
-        ? <textarea rows={3} value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-base outline-none" style={{ "--tw-ring-color": BRAND.primary }} />
-        : <input type={type} value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-base outline-none" />}
-    </div>
-  );
-}
-
-function BigAction({ icon: Icon, title, subtitle, onClick, badge }) {
-  return (
-    <button onClick={onClick} className="flex w-full items-center gap-4 rounded-3xl bg-white p-4 text-left shadow-sm transition hover:scale-[1.01] hover:shadow-md">
-      <div className="rounded-2xl p-4 text-white" style={{ background: BRAND.primary }}><Icon size={26} /></div>
-      <div className="flex-1"><p className="text-lg font-bold text-slate-900">{title}</p><p className="text-sm text-slate-500">{subtitle}</p></div>
-      {badge && <span className="rounded-xl px-2 py-1 text-xs font-bold text-white" style={{ background: BRAND.primary }}>{badge}</span>}
-      <ChevronRight className="text-slate-400" />
-    </button>
-  );
-}
-
-function NavTab({ icon: Icon, label, active, onClick, badge }) {
-  return (
-    <button onClick={onClick} className="relative flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-xs font-medium transition"
-      style={{ background: active ? BRAND.primary : "transparent", color: active ? "#fff" : "#64748b" }}>
-      <Icon size={20} />{label}
-      {badge > 0 && <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: "#dc2626", fontSize: "9px" }}>{badge}</span>}
-    </button>
-  );
-}
-
-function Empty({ title, text }) {
-  return <div className="rounded-3xl bg-white p-5 text-center shadow-sm"><p className="font-bold text-slate-900">{title}</p><p className="mt-1 text-sm text-slate-500">{text}</p></div>;
-}
-
-function Spinner() {
-  return (
-    <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BRAND.light }}>
-      <div style={{ width: 40, height: 40, borderRadius: "50%", border: "4px solid #e2e8f0", borderTopColor: BRAND.primary, animation: "spin 1s linear infinite" }} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  );
-}
-
-function ProgressBar({ value, max, color }) {
-  const pct = Math.min(100, max > 0 ? (value / max) * 100 : 0);
-  return (
-    <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
-      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color || BRAND.primary }} />
-    </div>
-  );
-}
-
-
 
 // ─── Local Data Cache ─────────────────────────────────────────────────────────
 const DATA_CACHE_KEY = 'powerworks_data_cache';
