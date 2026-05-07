@@ -2,12 +2,11 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "./supabase";
 import {
-  Bell, BriefcaseBusiness, CalendarDays, Camera, ChevronRight,
-  ClipboardList, FileText, Home, LogOut, Mail, Mic, Phone,
-  Plus, Search, ShieldCheck, Trash2, Upload, Users, Wrench, X,
+  Bell, Briefcase, Calendar, Camera, ChevronRight,
+  Clipboard, File, Home, LogOut, Mail, Mic, Phone,
+  Plus, Search, Shield, Trash2, Upload, Users, Wrench, X,
   Eye, EyeOff, BarChart2, RefreshCw, WifiOff, Wifi,
-  Copy, ChevronLeft, CheckCircle,
-  AlertTriangle, Cog, Flag, Clock,
+  ChevronLeft, Check, AlertTriangle, Settings,
 } from "lucide-react";
 
 // ─── Brand colours ────────────────────────────────────────────────────────────
@@ -408,7 +407,7 @@ function ShareModal({ title, text, onClose }) {
         <div className="grid grid-cols-3 gap-3">
           <button onClick={whatsapp} className="flex flex-col items-center gap-2 rounded-2xl bg-green-50 p-4"><Bell size={28} className="text-green-600" /><p className="text-xs font-semibold text-green-700">WhatsApp</p></button>
           <button onClick={email} className="flex flex-col items-center gap-2 rounded-2xl bg-blue-50 p-4"><Mail size={28} className="text-blue-600" /><p className="text-xs font-semibold text-blue-700">Email</p></button>
-          <button onClick={copy} className="flex flex-col items-center gap-2 rounded-2xl bg-slate-50 p-4">{copied ? <CheckCircle size={28} className="text-green-600" /> : <Copy size={28} className="text-slate-600" />}<p className="text-xs font-semibold text-slate-700">{copied ? "Copied!" : "Copy"}</p></button>
+          <button onClick={copy} className="flex flex-col items-center gap-2 rounded-2xl bg-slate-50 p-4">{copied ? <Check size={28} className="text-green-600" /> : <Clipboard size={28} className="text-slate-600" />}<p className="text-xs font-semibold text-slate-700">{copied ? "Copied!" : "Clipboard"}</p></button>
         </div>
         <button onClick={onClose} className="w-full rounded-2xl bg-slate-100 py-3 font-semibold text-slate-700">Cancel</button>
       </motion.div>
@@ -872,7 +871,7 @@ function EquipmentScreen({ data, setData, userId, isOnline }) {
                 <CC className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="rounded-2xl p-3 text-white" style={{ background: isOverdue(e) ? "#dc2626" : isDueSoon(e) ? "#d97706" : BRAND.primary }}><Cog size={22} /></div>
+                      <div className="rounded-2xl p-3 text-white" style={{ background: isOverdue(e) ? "#dc2626" : isDueSoon(e) ? "#d97706" : BRAND.primary }}><Settings size={22} /></div>
                       <div>
                         <p className="font-bold text-slate-900">{e.name}</p>
                         {e.model && <p className="text-xs text-slate-500">{e.model}</p>}
@@ -939,7 +938,7 @@ function TargetScreen({ data, setData, userId, isOnline }) {
 
   const metrics = [
     { label: "Visits / Conversations", actual: actuals?.visits, target: targets?.visits_target, color: "#3b82f6", icon: Users },
-    { label: "Quotes Sent", actual: actuals?.quotes, target: targets?.quotes_target, color: BRAND.primary, icon: FileText },
+    { label: "Quotes Sent", actual: actuals?.quotes, target: targets?.quotes_target, color: BRAND.primary, icon: File },
     { label: "New Clients", actual: actuals?.newClients, target: targets?.new_clients_target, color: "#10b981", icon: Plus },
     { label: "Service Reports", actual: actuals?.serviceReports, target: targets?.service_reports_target, color: "#8b5cf6", icon: Wrench },
   ];
@@ -1055,7 +1054,7 @@ function QuoteScreen({ data, setData, userId, isOnline }) {
   const pendingValue = quotes.filter(q => q.status === "Pending").reduce((s, q) => s + parseFloat(q.value || 0), 0);
   const acceptedValue = quotes.filter(q => q.status === "Accepted").reduce((s, q) => s + parseFloat(q.value || 0), 0);
 
-  const filtered = filterStatus === "All" ? quotes : filterStatus === "Flagged" ? quotes.filter(q => q.flagged && q.status === "Pending") : quotes.filter(q => q.status === filterStatus);
+  const filtered = filterStatus === "All" ? quotes : filterStatus === "AlertTriangleged" ? quotes.filter(q => q.flagged && q.status === "Pending") : quotes.filter(q => q.status === filterStatus);
 
   if (view === "add") return (
     <div className="space-y-5">
@@ -1095,7 +1094,7 @@ function QuoteScreen({ data, setData, userId, isOnline }) {
             </div>
             <div className="flex flex-col items-end gap-2">
               <span className={`rounded-xl px-3 py-1 text-xs font-bold ${QUOTE_STATUS_COLORS[sel.status]}`}>{sel.status}</span>
-              {sel.flagged && sel.status === "Pending" && <span className="rounded-xl bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 flex items-center gap-1"><Flag size={10} />7+ working days</span>}
+              {sel.flagged && sel.status === "Pending" && <span className="rounded-xl bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 flex items-center gap-1"><AlertTriangle size={10} />7+ working days</span>}
             </div>
           </div>
 
@@ -1147,22 +1146,22 @@ function QuoteScreen({ data, setData, userId, isOnline }) {
         <Card className="rounded-3xl shadow-sm"><CC className="p-4"><p className="text-xs text-slate-500">Accepted value</p><p className="text-2xl font-black text-green-600">{formatCurrency(acceptedValue)}</p></CC></Card>
       </div>
 
-      {/* Flagged warning */}
+      {/* AlertTriangleged warning */}
       {flaggedCount > 0 && (
         <div className="flex items-center gap-3 rounded-2xl p-4" style={{ background: "#fff3f3", border: `1px solid ${BRAND.primary}30` }}>
-          <Flag size={18} style={{ color: BRAND.primary }} />
+          <AlertTriangle size={18} style={{ color: BRAND.primary }} />
           <div className="flex-1"><p className="text-sm font-bold" style={{ color: BRAND.primary }}>{flaggedCount} quote{flaggedCount !== 1 ? "s" : ""} waiting 7+ working days</p><p className="text-xs text-slate-500">Consider following up</p></div>
-          <button onClick={() => setFilterStatus("Flagged")} className="text-xs font-bold underline" style={{ color: BRAND.primary }}>View</button>
+          <button onClick={() => setFilterStatus("AlertTriangleged")} className="text-xs font-bold underline" style={{ color: BRAND.primary }}>View</button>
         </div>
       )}
 
       {/* Filter tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {["All", "Pending", "Flagged", "Accepted", "Rejected", "Expired"].map(s => (
+        {["All", "Pending", "AlertTriangleged", "Accepted", "Rejected", "Expired"].map(s => (
           <button key={s} onClick={() => setFilterStatus(s)}
             className="flex-shrink-0 rounded-2xl px-4 py-2 text-sm font-semibold transition"
             style={{ background: filterStatus === s ? BRAND.primary : "#f1f5f9", color: filterStatus === s ? "#fff" : "#64748b" }}>
-            {s} {s === "Flagged" && flaggedCount > 0 ? `(${flaggedCount})` : ""}
+            {s} {s === "AlertTriangleged" && flaggedCount > 0 ? `(${flaggedCount})` : ""}
           </button>
         ))}
       </div>
@@ -1178,7 +1177,7 @@ function QuoteScreen({ data, setData, userId, isOnline }) {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-bold text-slate-900">{q.client_name || "Unknown client"}</p>
-                      {q.flagged && q.status === "Pending" && <Flag size={14} style={{ color: BRAND.primary }} />}
+                      {q.flagged && q.status === "Pending" && <AlertTriangle size={14} style={{ color: BRAND.primary }} />}
                     </div>
                     {q.quote_number && <p className="text-xs font-semibold" style={{ color: BRAND.primary }}>{q.quote_number}</p>}
                     <p className="text-sm text-slate-500 mt-1 line-clamp-1">{q.description}</p>
@@ -1417,11 +1416,11 @@ function HomeScreen({ go, clients, planList, followUps, quotes, setData, userId,
 
       <div className="space-y-3">
         <h2 className="text-lg font-bold">Quick actions</h2>
-        <BigAction icon={CalendarDays} title="Calendar" subtitle="Manage your schedule" onClick={() => go("Calendar")} />
+        <BigAction icon={Calendar} title="Calendar" subtitle="Manage your schedule" onClick={() => go("Calendar")} />
         <BigAction icon={Plus} title="Add conversation" subtitle="Log a visit, call or WhatsApp" onClick={() => go("QuickAdd")} />
         <BigAction icon={Wrench} title="Service report" subtitle="Fault, work done, parts and PDF" onClick={() => go("Service")} />
-        <BigAction icon={FileText} title="Quote tracker" subtitle="Log and track sent quotes" onClick={() => go("Quotes")} badge={flagged.length > 0 ? `${flagged.length} flagged` : null} />
-        <BigAction icon={Cog} title="Equipment register" subtitle="Track machinery and service dates" onClick={() => go("Equipment")} />
+        <BigAction icon={File} title="Quote tracker" subtitle="Log and track sent quotes" onClick={() => go("Quotes")} badge={flagged.length > 0 ? `${flagged.length} flagged` : null} />
+        <BigAction icon={Settings} title="Equipment register" subtitle="Track machinery and service dates" onClick={() => go("Equipment")} />
       </div>
     </div>
   );
@@ -1467,7 +1466,7 @@ function CalendarScreen({ data, setData, userId, isOnline }) {
             <div className="mb-3 flex items-center gap-3"><div className="rounded-2xl p-3 text-center min-w-[60px]" style={{ background: BRAND.light }}><p className="text-sm font-black" style={{ color: BRAND.primary }}>{item.time||"--:--"}</p><p className="text-xs text-slate-500">{item.type}</p></div><div className="flex-1"><p className="font-bold">{item.title}</p>{item.client&&<p className="text-sm text-slate-500">{item.client}</p>}{item.reminder&&<p className="mt-1 text-xs font-semibold" style={{ color: BRAND.accent }}>⏰ {item.reminder==="60"?"1 hour":`${item.reminder} min`} reminder</p>}</div></div>
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2"><Field label="Date" type="date" value={item.date} onChange={v => upd(item.id, "date", v)} /><Field label="Time" type="time" value={item.time} onChange={v => upd(item.id, "time", v)} /></div>
-              <a href={gcal(item)} target="_blank" rel="noreferrer"><Btn className="w-full"><CalendarDays size={18} />Google Calendar</Btn></a>
+              <a href={gcal(item)} target="_blank" rel="noreferrer"><Btn className="w-full"><Calendar size={18} />Google Calendar</Btn></a>
               <Btn variant="danger" className="w-full" onClick={() => del(item.id)}>Delete</Btn>
             </div>
           </CC></Card>))}
@@ -1516,7 +1515,7 @@ function QuickAddScreen({ data, setData, go, userId, userName, isOnline }) {
         </div>
         {audioErr&&<div className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{audioErr}</div>}
         {audio&&<div className="rounded-2xl bg-slate-50 p-3"><div className="mb-2 flex justify-between"><p className="text-sm font-semibold">Voice note</p><button onClick={()=>setAudio("")} className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">Delete</button></div><audio controls src={audio} className="w-full" /></div>}
-        {files.length>0&&(<div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-3">{files.map((f,i)=>(<div key={i} className="rounded-2xl bg-white p-2">{f.type.startsWith("video/")?<video controls src={f.url} className="h-32 w-full rounded-xl object-cover" />:<img src={f.url} alt={f.name} className="h-32 w-full rounded-xl object-cover" />}<p className="mt-1 truncate text-xs text-slate-600">{f.name}</p><div className="mt-2 flex gap-1">{f.type.startsWith("image/")&&<button onClick={()=>setAnnotating({url:f.url,idx:i})} className="flex-1 rounded-xl py-1 text-xs font-semibold" style={{background:"#fffbeb",color:"#92400e"}}><FileText size={12} className="inline mr-1" />Annotate</button>}<button onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))} className="flex-1 rounded-xl bg-red-50 py-1 text-xs font-semibold text-red-700">Delete</button></div></div>))}</div>)}
+        {files.length>0&&(<div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-3">{files.map((f,i)=>(<div key={i} className="rounded-2xl bg-white p-2">{f.type.startsWith("video/")?<video controls src={f.url} className="h-32 w-full rounded-xl object-cover" />:<img src={f.url} alt={f.name} className="h-32 w-full rounded-xl object-cover" />}<p className="mt-1 truncate text-xs text-slate-600">{f.name}</p><div className="mt-2 flex gap-1">{f.type.startsWith("image/")&&<button onClick={()=>setAnnotating({url:f.url,idx:i})} className="flex-1 rounded-xl py-1 text-xs font-semibold" style={{background:"#fffbeb",color:"#92400e"}}><File size={12} className="inline mr-1" />Annotate</button>}<button onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))} className="flex-1 rounded-xl bg-red-50 py-1 text-xs font-semibold text-red-700">Delete</button></div></div>))}</div>)}
         <Btn className="w-full py-6 text-base" onClick={save}>Save conversation</Btn>
       </CC></Card>
     </div>
@@ -1655,7 +1654,7 @@ function ClientsScreen({ data, setData, go, userId, isOnline }) {
         <Btn variant="danger" className="w-full" onClick={del}><Trash2 size={16} />Delete client</Btn>
         {clientEquipment.length > 0 && (
           <div><h2 className="mb-2 text-lg font-bold">Equipment at site</h2>
-            {clientEquipment.map(e => (<div key={e.id} className="mb-2 rounded-2xl bg-slate-50 p-3 flex items-center gap-3"><Cog size={18} style={{ color: BRAND.primary }} /><div className="flex-1"><p className="font-semibold">{e.name}</p>{e.next_service_date && <p className="text-xs text-slate-500">Next service: {e.next_service_date}</p>}</div></div>))}
+            {clientEquipment.map(e => (<div key={e.id} className="mb-2 rounded-2xl bg-slate-50 p-3 flex items-center gap-3"><Settings size={18} style={{ color: BRAND.primary }} /><div className="flex-1"><p className="font-semibold">{e.name}</p>{e.next_service_date && <p className="text-xs text-slate-500">Next service: {e.next_service_date}</p>}</div></div>))}
           </div>
         )}
         <div><h2 className="mb-2 text-lg font-bold">History</h2>
@@ -1665,7 +1664,7 @@ function ClientsScreen({ data, setData, go, userId, isOnline }) {
         <div><h2 className="mb-2 text-lg font-bold">Linked files</h2>
           {docs.length === 0 && <p className="text-sm text-slate-500">No files yet.</p>}
           <div className="grid grid-cols-2 gap-3">
-            {docs.map(d => { const isImg = d.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i); const isVid = d.name?.match(/\.(mp4|mov|webm)$/i); return (<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg ? <img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" /> : isVid ? <video controls src={d.file_url} className="h-28 w-full rounded-xl" /> : <div className="flex h-28 items-center justify-center rounded-xl bg-white"><FileText /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>); })}
+            {docs.map(d => { const isImg = d.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i); const isVid = d.name?.match(/\.(mp4|mov|webm)$/i); return (<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg ? <img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" /> : isVid ? <video controls src={d.file_url} className="h-28 w-full rounded-xl" /> : <div className="flex h-28 items-center justify-center rounded-xl bg-white"><File /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>); })}
           </div>
         </div>
       </CC></Card>
@@ -1739,7 +1738,7 @@ function ServiceScreen({ data, setData, userId, isOnline }) {
         <Field label="Work done" multiline value={rep.workDone} onChange={v=>setRep(r=>({...r,workDone:v}))} />
         <Field label="Parts used" multiline value={rep.partsUsed} onChange={v=>setRep(r=>({...r,partsUsed:v}))} />
         <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold ${uploading?"opacity-60 pointer-events-none":""}`}><Upload size={18} />{uploading?"Uploading…":"Add photos / files"}<input type="file" accept="image/*,video/*,.pdf,.doc,.docx" multiple className="hidden" onChange={handleFiles} disabled={uploading} /></label>
-        {files.map((f,i)=>(<div key={i} className="rounded-2xl bg-slate-50 p-3"><p className="text-sm font-semibold">{f.name}</p>{f.type.startsWith("image/")&&<img src={f.url} alt={f.name} className="mt-2 max-h-40 w-full rounded-xl object-cover" />}<div className="mt-2 flex gap-2">{f.type.startsWith("image/")&&<Btn variant="outline" className="flex-1 text-sm py-2" onClick={()=>setAnnotating({url:f.url,idx:i})}><FileText size={14} />Annotate</Btn>}<Btn variant="danger" className="flex-1 text-sm py-2" onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))}>Delete</Btn></div></div>))}
+        {files.map((f,i)=>(<div key={i} className="rounded-2xl bg-slate-50 p-3"><p className="text-sm font-semibold">{f.name}</p>{f.type.startsWith("image/")&&<img src={f.url} alt={f.name} className="mt-2 max-h-40 w-full rounded-xl object-cover" />}<div className="mt-2 flex gap-2">{f.type.startsWith("image/")&&<Btn variant="outline" className="flex-1 text-sm py-2" onClick={()=>setAnnotating({url:f.url,idx:i})}><File size={14} />Annotate</Btn>}<Btn variant="danger" className="flex-1 text-sm py-2" onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))}>Delete</Btn></div></div>))}
         <div className="rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between"><p className="text-sm font-semibold">Client signature</p><Btn variant="outline" className="text-sm py-2" onClick={()=>setShowSig(true)}>{signature?"Re-sign":"Get signature"}</Btn></div>{signature&&<img src={signature} alt="Signature" className="mt-3 h-20 w-full rounded-xl border border-slate-200 object-contain bg-white" />}</div>
         <Btn className="w-full py-6 text-base" onClick={save}>Save & create PDF</Btn>
       </CC></Card>
@@ -1761,7 +1760,7 @@ function DocumentsScreen({ data, setData, userId, isOnline }) {
         <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl py-6 font-semibold text-white ${uploading?"opacity-60 pointer-events-none":""}`} style={{background:BRAND.primary}}><Upload size={18} />{uploading?"Uploading…":"Upload photo, video or document"}<input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={handle} disabled={uploading} /></label>
       </CC></Card>
       {data.documents.length===0&&<Empty title="No documents" text="Upload your first file above." />}
-      <div className="space-y-3">{data.documents.map(doc=>{const client=data.clients.find(c=>c.id===doc.client_id);const isImg=doc.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);const isVid=doc.name?.match(/\.(mp4|mov|webm)$/i);return(<Card key={doc.id} className="rounded-3xl shadow-sm"><CC className="space-y-3 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><FileText size={22} /></div><div className="flex-1 min-w-0"><p className="truncate font-bold">{doc.name}</p><p className="text-sm text-slate-500">{client?client.company:"Global"}</p></div><button onClick={()=>del(doc.id)} className="rounded-xl bg-red-50 p-2 text-red-700"><X size={18} /></button></div>{isImg&&<img src={doc.file_url} alt={doc.name} className="max-h-64 w-full rounded-2xl object-cover" />}{isVid&&<video controls src={doc.file_url} className="max-h-64 w-full rounded-2xl" />}{!isImg&&!isVid&&<a href={doc.file_url} target="_blank" rel="noreferrer"><Btn className="w-full">Open document</Btn></a>}</CC></Card>);})}</div>
+      <div className="space-y-3">{data.documents.map(doc=>{const client=data.clients.find(c=>c.id===doc.client_id);const isImg=doc.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);const isVid=doc.name?.match(/\.(mp4|mov|webm)$/i);return(<Card key={doc.id} className="rounded-3xl shadow-sm"><CC className="space-y-3 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><File size={22} /></div><div className="flex-1 min-w-0"><p className="truncate font-bold">{doc.name}</p><p className="text-sm text-slate-500">{client?client.company:"Global"}</p></div><button onClick={()=>del(doc.id)} className="rounded-xl bg-red-50 p-2 text-red-700"><X size={18} /></button></div>{isImg&&<img src={doc.file_url} alt={doc.name} className="max-h-64 w-full rounded-2xl object-cover" />}{isVid&&<video controls src={doc.file_url} className="max-h-64 w-full rounded-2xl" />}{!isImg&&!isVid&&<a href={doc.file_url} target="_blank" rel="noreferrer"><Btn className="w-full">Open document</Btn></a>}</CC></Card>);})}</div>
     </div>
   );
 }
@@ -1799,12 +1798,12 @@ function MoreScreen({ go, data, setData, currentUser, onSignOut }) {
     <div className="space-y-5">
       <div><h1 className="text-2xl font-bold">More</h1><p className="text-sm text-slate-500">Reports and settings.</p></div>
       <div className="space-y-3">
-        {isAdmin&&<BigAction icon={ShieldCheck} title="Management Dashboard" subtitle="Team performance & weekly reports" onClick={()=>go("Admin")} />}
+        {isAdmin&&<BigAction icon={Shield} title="Management Dashboard" subtitle="Team performance & weekly reports" onClick={()=>go("Admin")} />}
         <BigAction icon={BarChart2} title="My Dashboard" subtitle="Charts and performance overview" onClick={()=>go("Dashboard")} />
-        <BigAction icon={FileText} title="Export Data" subtitle="Download clients, quotes and reports to Excel" onClick={()=>go("Export")} />
+        <BigAction icon={File} title="Export Data" subtitle="Download clients, quotes and reports to Excel" onClick={()=>go("Export")} />
         <BigAction icon={BarChart2} title="Target Tracker" subtitle="Monthly targets and progress" onClick={()=>go("Targets")} />
-        <BigAction icon={BriefcaseBusiness} title="My Sales Reports" subtitle="Log weekly visits, quotes and leads" onClick={()=>setSub("sales")} />
-        <BigAction icon={ClipboardList} title="Settings & Account" subtitle="Account info and sign out" onClick={()=>setSub("settings")} />
+        <BigAction icon={Briefcase} title="My Sales Reports" subtitle="Log weekly visits, quotes and leads" onClick={()=>setSub("sales")} />
+        <BigAction icon={Clipboard} title="Settings & Account" subtitle="Account info and sign out" onClick={()=>setSub("settings")} />
       </div>
     </div>
   );
@@ -1976,7 +1975,7 @@ function NotesScreen({ data, setData, userId, isOnline }) {
                 <button onClick={() => markDone(note.id)}
                   className="mt-3 w-full rounded-2xl py-3 text-sm font-bold text-white flex items-center justify-center gap-2"
                   style={{ background: BRAND.primary }}>
-                  <CheckCircle size={16} /> Mark as done
+                  <Check size={16} /> Mark as done
                 </button>
               )}
             </CC>
@@ -2403,9 +2402,9 @@ export default function PowerWorksApp() {
         <div className="mx-auto grid max-w-2xl grid-cols-5 gap-1">
           <NavTab icon={Home} label="Home" active={screen==="Home"} onClick={()=>setScreen("Home")} />
           <NavTab icon={Users} label="Clients" active={screen==="Clients"} onClick={()=>setScreen("Clients")} />
-          <NavTab icon={FileText} label="Quotes" active={screen==="Quotes"} onClick={()=>setScreen("Quotes")} badge={flaggedQuotes} />
-          <NavTab icon={FileText} label="Notes" active={screen==="Notes"} onClick={()=>setScreen("Notes")} badge={(data.notes||[]).filter(n=>!n.completed&&n.reminder_date&&n.reminder_date<=todayISO()).length||0} />
-          <NavTab icon={Cog} label="More" active={screen==="More"} onClick={()=>setScreen("More")} />
+          <NavTab icon={File} label="Quotes" active={screen==="Quotes"} onClick={()=>setScreen("Quotes")} badge={flaggedQuotes} />
+          <NavTab icon={File} label="Notes" active={screen==="Notes"} onClick={()=>setScreen("Notes")} badge={(data.notes||[]).filter(n=>!n.completed&&n.reminder_date&&n.reminder_date<=todayISO()).length||0} />
+          <NavTab icon={Settings} label="More" active={screen==="More"} onClick={()=>setScreen("More")} />
         </div>
       </nav>
     </div>
