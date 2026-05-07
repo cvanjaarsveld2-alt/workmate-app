@@ -114,7 +114,54 @@ const scheduleItemNotifs = (item, mins) => { if (!item.date || !item.time) retur
 
 // ─── Upload ────────────────────────────────────────────────────────────────────
 const uploadFile = async (file) => { try { const clean = file.name.replace(/[^a-zA-Z0-9._-]/g, "_"); const name = `${Date.now()}-${clean}`; const { error } = await supabase.storage.from("powermate-files").upload(name, file, { cacheControl: "3600", upsert: false }); if (error) { alert("Upload error: " + error.message); return null; } return supabase.storage.from("powermate-files").getPublicUrl(name).data.publicUrl; } catch (e) { alert("Upload failed: " + e.message); return null; } };
-const filesToStored = async (fileList) => { const out = []; for (const f of Array.from(fileList || [])) { const url = await uploadFile(f); if (url) out.push({ name: f.name, type: f.type || "File", size: f.size, url }); } return out; };
+
+// ─── Image Compression ────────────────────────────────────────────────────────
+async function compressImage(file, maxWidthPx = 1920, qualityVal = 0.75) {
+  // Only compress images
+  if (!file.type.startsWith('image/')) return file;
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      if (width > maxWidthPx) {
+        height = Math.round((height * maxWidthPx) / width);
+        width = maxWidthPx;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; }
+          const compressed = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
+          console.log(`Compressed: ${(file.size/1024).toFixed(0)}KB → ${(compressed.size/1024).toFixed(0)}KB`);
+          resolve(compressed);
+        },
+        'image/jpeg',
+        qualityVal
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
+const filesToStored = async (fileList) => {
+  const out = [];
+  for (let f of Array.from(fileList || [])) {
+    // Compress images before upload
+    if (f.type.startsWith('image/')) {
+      f = await compressImage(f);
+    }
+    const url = await uploadFile(f);
+    if (url) out.push({ name: f.name, type: f.type || "File", size: f.size, url });
+  }
+  return out;
+};
 
 // ─── Photo Annotator ───────────────────────────────────────────────────────────
 function PhotoAnnotator({ src, onSave, onCancel }) {
@@ -285,6 +332,83 @@ function ProgressBar({ value, max, color }) {
   return (
     <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
       <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color || BRAND.primary }} />
+    </div>
+  );
+}
+
+
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error('PowerMate error:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center" style={{ background: BRAND.light }}>
+          <div className="rounded-3xl bg-white p-8 shadow-sm max-w-sm w-full space-y-4">
+            <div className="rounded-2xl p-4 text-white text-2xl" style={{ background: BRAND.primary }}>⚠️</div>
+            <h2 className="text-xl font-bold text-slate-900">Something went wrong</h2>
+            <p className="text-sm text-slate-500">The app encountered an error. Please refresh and try again.</p>
+            <button
+              onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+              className="w-full rounded-2xl py-3 font-bold text-white"
+              style={{ background: BRAND.primary }}>
+              Reload app
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── Pull to Refresh ──────────────────────────────────────────────────────────
+function PullToRefresh({ onRefresh, children }) {
+  const [pulling, setPulling] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const startY = React.useRef(0);
+  const currentY = React.useRef(0);
+  const threshold = 80;
+
+  const onTouchStart = (e) => { startY.current = e.touches[0].clientY; };
+  const onTouchMove = (e) => {
+    currentY.current = e.touches[0].clientY;
+    const diff = currentY.current - startY.current;
+    if (diff > 20 && window.scrollY === 0) setPulling(true);
+    else setPulling(false);
+  };
+  const onTouchEnd = async () => {
+    const diff = currentY.current - startY.current;
+    if (diff > threshold && window.scrollY === 0) {
+      setRefreshing(true);
+      setPulling(false);
+      await onRefresh();
+      setRefreshing(false);
+    }
+    setPulling(false);
+  };
+
+  return (
+    <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+      {(pulling || refreshing) && (
+        <div className="flex items-center justify-center py-3 text-sm font-semibold" style={{ color: BRAND.primary }}>
+          {refreshing ? (
+            <><div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent mr-2" />Refreshing…</>
+          ) : (
+            '↓ Pull to refresh'
+          )}
+        </div>
+      )}
+      {children}
     </div>
   );
 }
@@ -1481,6 +1605,9 @@ export default function PowerWorksApp() {
   const [dataLoading, setDataLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [queueCount, setQueueCount] = useState(getQueue().length);
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   useEffect(() => {
     const goOnline = async () => { setIsOnline(true); await processOfflineQueue(); setQueueCount(getQueue().length); };
@@ -1525,7 +1652,88 @@ export default function PowerWorksApp() {
     load();
   }, [currentUser]);
 
-  // Auto-create recurring follow-ups
+  // ─── Real-time subscriptions ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser) return;
+    const uid = currentUser.id;
+
+    // Subscribe to changes in clients table
+    const clientsSub = supabase.channel('clients-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients', filter: `user_id=eq.${uid}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') setData(c => ({ ...c, clients: [...c.clients.filter(x => x.id !== payload.new.id), payload.new].sort((a,b) => a.company?.localeCompare(b.company)) }));
+          if (payload.eventType === 'UPDATE') setData(c => ({ ...c, clients: c.clients.map(x => x.id === payload.new.id ? { ...x, ...payload.new } : x) }));
+          if (payload.eventType === 'DELETE') setData(c => ({ ...c, clients: c.clients.filter(x => x.id !== payload.old.id) }));
+        })
+      .subscribe();
+
+    // Subscribe to follow_ups
+    const fuSub = supabase.channel('followups-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups', filter: `user_id=eq.${uid}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') setData(c => ({ ...c, followUps: [...c.followUps.filter(x => x.id !== payload.new.id), payload.new] }));
+          if (payload.eventType === 'UPDATE') setData(c => ({ ...c, followUps: c.followUps.map(x => x.id === payload.new.id ? { ...x, ...payload.new } : x) }));
+          if (payload.eventType === 'DELETE') setData(c => ({ ...c, followUps: c.followUps.filter(x => x.id !== payload.old.id) }));
+        })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(clientsSub);
+      supabase.removeChannel(fuSub);
+    };
+  }, [currentUser]);
+
+  // ─── Session refresh ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      if (error || !session) {
+        console.log('Session expired, refreshing...');
+        const { error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError) {
+          console.log('Session refresh failed, logging out');
+          await supabase.auth.signOut();
+        }
+      }
+    }, 10 * 60 * 1000); // Check every 10 minutes
+    return () => clearInterval(interval);
+  }, []);
+
+  // ─── Pull to refresh handler ─────────────────────────────────────────────────
+  const handleRefresh = async () => {
+    if (!currentUser) return;
+    const uid = currentUser.id;
+    const [clients, plans, fus, docs, convs, svcs, sales, equip, targets, quotes, noteRows] = await Promise.all([
+      supabase.from("clients").select("*").eq("user_id", uid).order("company"),
+      supabase.from("plan_items").select("*").eq("user_id", uid).order("date").order("time"),
+      supabase.from("follow_ups").select("*").eq("user_id", uid).order("due_date"),
+      supabase.from("documents").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
+      supabase.from("conversations").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
+      supabase.from("service_reports").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
+      supabase.from("sales_reports").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
+      supabase.from("equipment").select("*").eq("user_id", uid).order("name"),
+      supabase.from("targets").select("*").eq("user_id", uid),
+      supabase.from("quotes").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
+      supabase.from("notes").select("*").eq("user_id", uid).order("created_at", { ascending: false }),
+    ]);
+    setData({ clients: clients.data||[], planList: plans.data||[], followUps: fus.data||[], documents: docs.data||[], conversations: convs.data||[], serviceReports: svcs.data||[], salesReports: sales.data||[], equipment: equip.data||[], targets: targets.data||[], quotes: quotes.data||[], notes: noteRows.data||[] });
+    // Process offline queue if online
+    if (isOnline) { await processOfflineQueue(); setQueueCount(getQueue().length); }
+  };
+
+  // ─── Swipe back gesture ──────────────────────────────────────────────────────
+  const NAV_SCREENS_SET = new Set(["Home", "Clients", "Pipeline", "Equipment", "Quotes", "Notes", "More"]);
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; touchStartY.current = e.touches[0].clientY; };
+  const handleTouchEnd = (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+    // Swipe right (>80px horizontal, less than 50px vertical) to go back
+    if (dx > 80 && dy < 50 && !NAV_SCREENS_SET.has(screen)) {
+      goBack();
+    }
+  };
+
+  // ─── Auto-create recurring follow-ups
   useEffect(() => {
     if (!currentUser||!isOnline) return;
     data.followUps.filter(f=>f.completed&&f.recurring&&f.due_date).forEach(async fu => {
@@ -1574,7 +1782,9 @@ export default function PowerWorksApp() {
   const goBack = () => setScreen(backMap[screen] || "Home");
 
   return (
-    <div className="min-h-screen text-slate-900" style={{ background: BRAND.light }}>
+    <ErrorBoundary>
+    <div className="min-h-screen text-slate-900" style={{ background: BRAND.light }}
+      onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* Offline banner */}
       {(!isOnline||queueCount>0)&&(
         <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-2 py-2 text-sm font-semibold text-white"
@@ -1612,9 +1822,11 @@ export default function PowerWorksApp() {
           </div>
         </header>
 
-        <motion.main key={screen} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
-          {views[screen]}
-        </motion.main>
+        <PullToRefresh onRefresh={handleRefresh}>
+          <motion.main key={screen} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }}>
+            {views[screen]}
+          </motion.main>
+        </PullToRefresh>
       </div>
 
       {/* Bottom nav */}
@@ -1628,5 +1840,6 @@ export default function PowerWorksApp() {
         </div>
       </nav>
     </div>
+    </ErrorBoundary>
   );
 }
