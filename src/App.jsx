@@ -2239,6 +2239,16 @@ export default function PowerWorksApp() {
   const props = { data, setData, userId: uid, isOnline };
   const flaggedQuotes = (data.quotes||[]).filter(q=>q.flagged&&q.status==="Pending").length;
 
+  // Screen history for back button
+  const NAV_SCREENS = ["Home", "Clients", "Pipeline", "Equipment", "Quotes", "Notes", "More"];
+  const canGoBack = !NAV_SCREENS.includes(screen);
+  const backMap = {
+    QuickAdd: "Home", Calendar: "Home", Service: "Home", Documents: "Home",
+    Pipeline: "Home", Equipment: "Home", Quotes: "Home", Targets: "More",
+    Dashboard: "More", Admin: "More", Notes: "Home", Search: "Home", Export: "More",
+  };
+  const goBack = () => setScreen(backMap[screen] || "Home");
+
   const views = {
     Home: <HomeScreen go={setScreen} clients={data.clients} planList={data.planList} followUps={data.followUps} quotes={data.quotes} setData={setData} userId={uid} isOnline={isOnline} />,
     QuickAdd: <QuickAddScreen {...props} go={setScreen} userName={uname} />,
@@ -2257,16 +2267,6 @@ export default function PowerWorksApp() {
     Search: <GlobalSearchScreen data={data} go={goBack} setScreen={setScreen} />,
     Export: <ExportScreen data={data} currentUser={currentUser} />,
   };
-
-  // Screen history for back button
-  const NAV_SCREENS = ["Home", "Clients", "Pipeline", "Equipment", "Quotes", "Notes", "More"];
-  const canGoBack = !NAV_SCREENS.includes(screen);
-  const backMap = {
-    QuickAdd: "Home", Calendar: "Home", Service: "Home", Documents: "Home",
-    Pipeline: "Home", Equipment: "Home", Quotes: "Home", Targets: "More",
-    Dashboard: "More", Admin: "More", Notes: "Home", Search: "Home", Export: "More",
-  };
-  const goBack = () => setScreen(backMap[screen] || "Home");
 
   return (
     <ErrorBoundary>
