@@ -44,17 +44,21 @@ const VAPID_PUBLIC_KEY = "BMntC_yC4nVCfpLiAZAl-DclOBugaSqneMdcUqFu9km4GrhDkEiUKi
 // Register service worker and subscribe to push notifications
 async function registerPushNotifications(userId) {
   try {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      console.log("Push not supported");
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      console.log("Push not supported on this browser");
       return false;
     }
 
     // Register service worker
-    const reg = await navigator.serviceWorker.register("/sw.js");
+    const reg = await navigator.serviceWorker.register("/service-worker.js").catch(() => null);
+    if (!reg) return false;
     await navigator.serviceWorker.ready;
 
     // Request permission
-    const permission = await Notification.requestPermission();
+    let permission = Notification.permission;
+    if (permission === "default") {
+      try { permission = await Notification.requestPermission(); } catch(e) { return false; }
+    }
     if (permission !== "granted") return false;
 
     // Check if already subscribed
@@ -73,8 +77,8 @@ async function registerPushNotifications(userId) {
     const { error } = await supabase.from("push_subscriptions").upsert({
       user_id: userId,
       endpoint: subJson.endpoint,
-      p256dh: subJson.keys?.p256dh || "",
-      auth: subJson.keys?.auth || "",
+      p256dh: (subJson.keys && subJson.keys.p256dh) || "",
+      auth: (subJson.keys && subJson.keys.auth) || "",
       user_agent: navigator.userAgent.slice(0, 200)
     }, { onConflict: "user_id,endpoint" });
 
@@ -183,7 +187,9 @@ const IDB_VERSION = 1;
 
 function openIDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    try {
+      if (!window.indexedDB) { reject(new Error('IDB not supported')); return; }
+      const req = indexedDB.open(IDB_NAME, IDB_VERSION);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('offline_photos')) {
@@ -199,6 +205,7 @@ function openIDB() {
 }
 
 async function savePhotoOffline(id, file, metadata) {
+  try {
   const db = await openIDB();
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -275,7 +282,8 @@ async function syncOfflinePhotos(userId, setData) {
 
 // Enhanced file upload - saves offline if no internet
 async function uploadFileWithOfflineFallback(file, clientId = '', userId = '') {
-  if (navigator.onLine) {
+  const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+  if (online) {
     const url = await uploadFile(file);
     return url ? { url, offline: false } : null;
   } else {
@@ -471,7 +479,12 @@ function Empty({ title, text }) {
 }
 
 function Spinner() {
-  return <div className="flex min-h-screen items-center justify-center" style={{ background: BRAND.light }}><div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200" style={{ borderTopColor: BRAND.primary }} /></div>;
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BRAND.light }}>
+      <div style={{ width: 40, height: 40, borderRadius: "50%", border: "4px solid #e2e8f0", borderTopColor: BRAND.primary, animation: "spin 1s linear infinite" }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 }
 
 function ProgressBar({ value, max, color }) {
@@ -490,22 +503,31 @@ const DATA_CACHE_KEY = 'powerworks_data_cache';
 
 function saveDataCache(data) {
   try {
-    // Don't cache binary data (audio) to save space
+    if (typeof localStorage === "undefined") return;
     const cacheable = {
       ...data,
-      conversations: data.conversations.map(c => ({ ...c, audio_data_url: c.audio_data_url ? '[audio]' : null }))
+      conversations: (data.conversations || []).map(c => ({ ...c, audio_data_url: null })),
+      documents: (data.documents || []).slice(0, 100), // limit to 100 docs to save space
     };
-    localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(cacheable));
+    const str = JSON.stringify(cacheable);
+    // Only cache if under 4MB (iOS localStorage limit)
+    if (str.length < 4 * 1024 * 1024) {
+      localStorage.setItem(DATA_CACHE_KEY, str);
+    }
   } catch (e) {
-    console.log('Cache save failed (storage full?):', e);
+    console.log('Cache save failed:', e);
   }
 }
 
 function loadDataCache() {
   try {
+    if (typeof localStorage === "undefined") return null;
     const cached = localStorage.getItem(DATA_CACHE_KEY);
     if (!cached) return null;
-    return JSON.parse(cached);
+    const parsed = JSON.parse(cached);
+    // Validate it has the expected structure
+    if (!parsed || !Array.isArray(parsed.clients)) return null;
+    return parsed;
   } catch (e) {
     return null;
   }
@@ -603,14 +625,16 @@ function isLockRequired() {
 
 async function authenticateBiometric() {
   try {
-    // Use WebAuthn / device biometric
-    if (window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
+    // Use WebAuthn / device biometric - with full iOS Safari support
+    if (
+      window.PublicKeyCredential &&
+      typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function"
+    ) {
       const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
       if (available) {
-        // Create a simple credential request to trigger biometric
         const credential = await navigator.credentials.get({
           publicKey: {
-            challenge: new Uint8Array(32).map(() => Math.floor(Math.random() * 256)),
+            challenge: crypto.getRandomValues(new Uint8Array(32)),
             rpId: window.location.hostname,
             allowCredentials: [],
             userVerification: "required",
@@ -620,10 +644,10 @@ async function authenticateBiometric() {
         return !!credential;
       }
     }
-    return true; // If biometric not available, allow through
+    return true; // Biometric not available - allow through
   } catch (e) {
     if (e.name === "NotAllowedError") return false; // User cancelled
-    return true; // Other errors - allow through (biometric not set up)
+    return true; // Any other error - allow through
   }
 }
 
@@ -2099,7 +2123,7 @@ export default function PowerWorksApp() {
   const [screen, setScreen] = useState("Home");
   const [data, setData] = useState({ clients:[], planList:[], followUps:[], documents:[], conversations:[], serviceReports:[], salesReports:[], equipment:[], targets:[], quotes:[], notes:[] });
   const [dataLoading, setDataLoading] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [queueCount, setQueueCount] = useState(getQueue().length);
   const [refreshing, setRefreshing] = useState(false);
   const [locked, setLocked] = useState(false);
