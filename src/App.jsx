@@ -1,3 +1,5 @@
+import { useOnlineStatus } from "./hooks/useOnlineStatus";
+import SyncStatusBadge from "./components/SyncStatusBadge";
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "./supabase";
