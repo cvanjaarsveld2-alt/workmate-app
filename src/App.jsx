@@ -1342,7 +1342,7 @@ function HomeScreen({ go, clients, planList, followUps, quotes, setData, userId,
         <BigAction icon={Calendar} title="Calendar" subtitle="Manage your schedule" onClick={() => go("Calendar")} />
         <BigAction icon={Plus} title="Add conversation" subtitle="Log a visit, call or WhatsApp" onClick={() => go("QuickAdd")} />
         <BigAction icon={Wrench} title="Service report" subtitle="Fault, work done, parts and PDF" onClick={() => go("Service")} />
-        <BigAction icon={File} title="Quote tracker" subtitle="Log and track sent quotes" onClick={() => go("Quotes")} badge={flagged.length > 0 ? `${flagged.length} flagged` : null} />
+        <BigAction icon={FileIcon} title="Quote tracker" subtitle="Log and track sent quotes" onClick={() => go("Quotes")} badge={flagged.length > 0 ? `${flagged.length} flagged` : null} />
         <BigAction icon={Settings} title="Equipment register" subtitle="Track machinery and service dates" onClick={() => go("Equipment")} />
       </div>
     </div>
@@ -1723,7 +1723,7 @@ function MoreScreen({ go, data, setData, currentUser, onSignOut }) {
       <div className="space-y-3">
         {isAdmin&&<BigAction icon={Shield} title="Management Dashboard" subtitle="Team performance & weekly reports" onClick={()=>go("Admin")} />}
         <BigAction icon={BarChart2} title="My Dashboard" subtitle="Charts and performance overview" onClick={()=>go("Dashboard")} />
-        <BigAction icon={File} title="Export Data" subtitle="Download clients, quotes and reports to Excel" onClick={()=>go("Export")} />
+        <BigAction icon={FileIcon} title="Export Data" subtitle="Download clients, quotes and reports to Excel" onClick={()=>go("Export")} />
         <BigAction icon={BarChart2} title="Target Tracker" subtitle="Monthly targets and progress" onClick={()=>go("Targets")} />
         <BigAction icon={Briefcase} title="My Sales Reports" subtitle="Log weekly visits, quotes and leads" onClick={()=>setSub("sales")} />
         <BigAction icon={Clipboard} title="Settings & Account" subtitle="Account info and sign out" onClick={()=>setSub("settings")} />
@@ -2325,8 +2325,8 @@ export default function PowerWorksApp() {
         <div className="mx-auto grid max-w-2xl grid-cols-5 gap-1">
           <NavTab icon={Home} label="Home" active={screen==="Home"} onClick={()=>setScreen("Home")} />
           <NavTab icon={Users} label="Clients" active={screen==="Clients"} onClick={()=>setScreen("Clients")} />
-          <NavTab icon={File} label="Quotes" active={screen==="Quotes"} onClick={()=>setScreen("Quotes")} badge={flaggedQuotes} />
-          <NavTab icon={File} label="Notes" active={screen==="Notes"} onClick={()=>setScreen("Notes")} badge={(data.notes||[]).filter(n=>!n.completed&&n.reminder_date&&n.reminder_date<=todayISO()).length||0} />
+          <NavTab icon={FileIcon} label="Quotes" active={screen==="Quotes"} onClick={()=>setScreen("Quotes")} badge={flaggedQuotes} />
+          <NavTab icon={FileIcon} label="Notes" active={screen==="Notes"} onClick={()=>setScreen("Notes")} badge={(data.notes||[]).filter(n=>!n.completed&&n.reminder_date&&n.reminder_date<=todayISO()).length||0} />
           <NavTab icon={Settings} label="More" active={screen==="More"} onClick={()=>setScreen("More")} />
         </div>
       </nav>
