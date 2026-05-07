@@ -2039,6 +2039,7 @@ function ExportScreen({ data, currentUser }) {
 
 // ─── Root ──────────────────────────────────────────────────────────────────────
 export default function PowerWorksApp() {
+  const onlineStatus = useOnlineStatus();
   const [session, setSession] = useState(null); const [currentUser, setCurrentUser] = useState(null); const [authLoading, setAuthLoading] = useState(true);
   const [screen, setScreen] = useState("Home");
   const [data, setData] = useState({ clients:[], planList:[], followUps:[], documents:[], conversations:[], serviceReports:[], salesReports:[], equipment:[], targets:[], quotes:[], notes:[] });
@@ -2349,9 +2350,14 @@ export default function PowerWorksApp() {
           <NavTab icon={FileIcon} label="Quotes" active={screen==="Quotes"} onClick={()=>setScreen("Quotes")} badge={flaggedQuotes} />
           <NavTab icon={FileIcon} label="Notes" active={screen==="Notes"} onClick={()=>setScreen("Notes")} badge={(data.notes||[]).filter(n=>!n.completed&&n.reminder_date&&n.reminder_date<=todayISO()).length||0} />
           <NavTab icon={Settings} label="More" active={screen==="More"} onClick={()=>setScreen("More")} />
-        </div>
-      </nav>
-    </div>
-    </ErrorBoundary>
+        </nav>
+
+<SyncStatusBadge
+  isOnline={onlineStatus}
+  pendingCount={queueCount}
+/>
+
+</div>
+</ErrorBoundary>
   );
 }
