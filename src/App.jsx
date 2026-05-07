@@ -122,17 +122,17 @@ const formatBytes = (b) => { if (!b) return "0 B"; const k = 1024, s = ["B","KB"
 const formatCurrency = (v) => `R ${parseFloat(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}`;
 
 // ─── Offline Queue ─────────────────────────────────────────────────────────────
-const getQueue = () => { try { return JSON.parse(localStorage.getItem(OFFLINE_KEY) || "[]"); } catch { return []; } };
-const addToQueue = (op) => { const q = getQueue(); q.push({ ...op, id: Date.now() }); localStorage.setItem(OFFLINE_KEY, JSON.stringify(q)); };
-const processOfflineQueue = async () => { const queue = getQueue(); if (!queue.length) return; const failed = []; for (const op of queue) { try { if (op.type === "insert") await supabase.from(op.table).insert(op.data); else if (op.type === "update") await supabase.from(op.table).update(op.data).eq("id", op.id); else if (op.type === "delete") await supabase.from(op.table).delete().eq("id", op.id); } catch { failed.push(op); } } if (failed.length) localStorage.setItem(OFFLINE_KEY, JSON.stringify(failed)); else localStorage.removeItem(OFFLINE_KEY); };
+function getQueue() { try { return JSON.parse(localStorage.getItem(OFFLINE_KEY) || "[]"); } catch(e) { return []; } }
+function addToQueue(op) { var q = getQueue(); q.push(Object.assign({}, op, { id: Date.now() })); localStorage.setItem(OFFLINE_KEY, JSON.stringify(q)); }
+async function processOfflineQueue() { var queue = getQueue(); if (!queue.length) return; var failed = []; for (var i = 0; i < queue.length; i++) { var op = queue[i]; try { if (op.type === "insert") await supabase.from(op.table).insert(op.data); else if (op.type === "update") await supabase.from(op.table).update(op.data).eq("id", op.id); else if (op.type === "delete") await supabase.from(op.table).delete().eq("id", op.id); } catch(e) { failed.push(op); } } if (failed.length) localStorage.setItem(OFFLINE_KEY, JSON.stringify(failed)); else localStorage.removeItem(OFFLINE_KEY); }
 
 // ─── Notifications ─────────────────────────────────────────────────────────────
-const requestNotifPermission = async () => { if (!("Notification" in window)) return false; if (Notification.permission === "granted") return true; return (await Notification.requestPermission()) === "granted"; };
-const scheduleNotif = (title, body, fireAt) => { const delay = fireAt - Date.now(); if (delay <= 0) return null; return setTimeout(() => { if (Notification.permission === "granted") new Notification(title, { body, icon: "/icon-192.png" }); }, delay); };
-const scheduleItemNotifs = (item, mins) => { if (!item.date || !item.time) return []; const mt = new Date(`${item.date}T${item.time}:00`).getTime(); return mins.map(m => scheduleNotif("⏰ Power Works Reminder", `${item.title}${item.client ? ` — ${item.client}` : ""} in ${m === 60 ? "1 hour" : `${m} min`}`, mt - m * 60000)).filter(Boolean); };
+async function requestNotifPermission() { if (!("Notification" in window)) return false; if (Notification.permission === "granted") return true; try { return (await Notification.requestPermission()) === "granted"; } catch(e) { return false; } }
+function scheduleNotif(title, body, fireAt) { const delay = fireAt - Date.now(); if (delay <= 0) return null; return setTimeout(() => { if (Notification.permission === "granted") new Notification(title, { body, icon: "/icon-192.png" }); }, delay); };
+function scheduleItemNotifs(item, mins) { if (!item.date || !item.time) return []; const mt = new Date(`${item.date}T${item.time}:00`).getTime(); return mins.map(m => scheduleNotif("⏰ Power Works Reminder", `${item.title}${item.client ? ` — ${item.client}` : ""} in ${m === 60 ? "1 hour" : `${m} min`}`, mt - m * 60000)).filter(Boolean); };
 
 // ─── Upload ────────────────────────────────────────────────────────────────────
-const uploadFile = async (file) => { try { const clean = file.name.replace(/[^a-zA-Z0-9._-]/g, "_"); const name = `${Date.now()}-${clean}`; const { error } = await supabase.storage.from("powermate-files").upload(name, file, { cacheControl: "3600", upsert: false }); if (error) { alert("Upload error: " + error.message); return null; } return supabase.storage.from("powermate-files").getPublicUrl(name).data.publicUrl; } catch (e) { alert("Upload failed: " + e.message); return null; } };
+async function uploadFile(file) { try { const clean = file.name.replace(/[^a-zA-Z0-9._-]/g, "_"); const name = `${Date.now()}-${clean}`; const { error } = await supabase.storage.from("powermate-files").upload(name, file, { cacheControl: "3600", upsert: false }); if (error) { alert("Upload error: " + error.message); return null; } return supabase.storage.from("powermate-files").getPublicUrl(name).data.publicUrl; } catch (e) { alert("Upload failed: " + e.message); return null; } };
 
 // ─── Image Compression ────────────────────────────────────────────────────────
 async function compressImage(file, maxWidthPx = 1920, qualityVal = 0.75) {
@@ -169,18 +169,17 @@ async function compressImage(file, maxWidthPx = 1920, qualityVal = 0.75) {
   });
 }
 
-const filesToStored = async (fileList) => {
-  const out = [];
-  for (let f of Array.from(fileList || [])) {
-    // Compress images before upload
-    if (f.type.startsWith('image/')) {
-      f = await compressImage(f);
-    }
-    const url = await uploadFile(f);
-    if (url) out.push({ name: f.name, type: f.type || "File", size: f.size, url });
+async function filesToStored(fileList) {
+  var out = [];
+  var files = Array.from(fileList || []);
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    if (f.type && f.type.startsWith('image/')) { f = await compressImage(f); }
+    var url = await uploadFile(f);
+    if (url) out.push({ name: f.name, type: f.type || "File", size: f.size, url: url });
   }
   return out;
-};
+}
 
 // ─── IndexedDB for offline photo storage ──────────────────────────────────────
 const IDB_NAME = 'powerworks-offline';
