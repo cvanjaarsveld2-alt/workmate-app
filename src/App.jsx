@@ -50,7 +50,8 @@ async function registerPushNotifications(userId) {
     }
 
     // Register service worker
-    const reg = await navigator.serviceWorker.register("/service-worker.js").catch(() => null);
+    var reg = null;
+    try { reg = await navigator.serviceWorker.register('/service-worker.js'); } catch(swErr) { console.log('SW failed:', swErr); return false; }
     if (!reg) return false;
     await navigator.serviceWorker.ready;
 
@@ -326,6 +327,17 @@ function loadDataCache() {
   } catch (e) {
     return null;
   }
+}
+
+
+// ─── Spinner ──────────────────────────────────────────────────────────────────
+function Spinner() {
+  return (
+    <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: BRAND.light }}>
+      <div style={{ width: 40, height: 40, borderRadius: "50%", border: "4px solid #e2e8f0", borderTopColor: BRAND.primary, animation: "spin 1s linear infinite" }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 }
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
