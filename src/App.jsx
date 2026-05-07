@@ -95,6 +95,21 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 const niceDate = (d = new Date()) => d.toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
 const daysSince = (ds) => { if (!ds) return 999; return Math.max(0, Math.floor((new Date(`${todayISO()}T12:00:00`) - new Date(`${ds}T12:00:00`)) / 86400000)); };
 const workingDaysSince = (ds) => { if (!ds) return 0; let count = 0; let d = new Date(ds + "T12:00:00"); const today = new Date(todayISO() + "T12:00:00"); while (d < today) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) count++; } return count; };
+
+// ─── Smart date display ───────────────────────────────────────────────────────
+function smartDate(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr + "T12:00:00");
+  const today = new Date(todayISO() + "T12:00:00");
+  const diff = Math.round((date - today) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  if (diff === -1) return "Yesterday";
+  if (diff > 1 && diff <= 7) return date.toLocaleDateString("en-GB", { weekday: "long" });
+  if (diff < -1 && diff >= -7) return `${Math.abs(diff)} days ago`;
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: diff < -365 || diff > 365 ? "numeric" : undefined });
+}
+
 const weekStart = () => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().slice(0, 10); };
 const weekEnd = () => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return d.toISOString().slice(0, 10); };
 const currentMonth = () => new Date().toISOString().slice(0, 7);
@@ -413,6 +428,96 @@ function PullToRefresh({ onRefresh, children }) {
   );
 }
 
+
+// ─── Biometric / App Lock ─────────────────────────────────────────────────────
+const LOCK_KEY = "powerworks_last_active";
+const LOCK_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+function updateLastActive() {
+  localStorage.setItem(LOCK_KEY, Date.now().toString());
+}
+
+function isLockRequired() {
+  const last = parseInt(localStorage.getItem(LOCK_KEY) || "0");
+  return Date.now() - last > LOCK_TIMEOUT;
+}
+
+async function authenticateBiometric() {
+  try {
+    // Use WebAuthn / device biometric
+    if (window.PublicKeyCredential && PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
+      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (available) {
+        // Create a simple credential request to trigger biometric
+        const credential = await navigator.credentials.get({
+          publicKey: {
+            challenge: new Uint8Array(32).map(() => Math.floor(Math.random() * 256)),
+            rpId: window.location.hostname,
+            allowCredentials: [],
+            userVerification: "required",
+            timeout: 60000,
+          }
+        });
+        return !!credential;
+      }
+    }
+    return true; // If biometric not available, allow through
+  } catch (e) {
+    if (e.name === "NotAllowedError") return false; // User cancelled
+    return true; // Other errors - allow through (biometric not set up)
+  }
+}
+
+function LockScreen({ onUnlock }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const unlock = async () => {
+    setLoading(true);
+    setError("");
+    const ok = await authenticateBiometric();
+    if (ok) {
+      updateLastActive();
+      onUnlock();
+    } else {
+      setError("Authentication failed. Please try again.");
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { unlock(); }, []);
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center px-6" style={{ background: BRAND.primary }}>
+      <div className="w-full max-w-sm text-center space-y-6">
+        <img src={BRAND.logo} alt="Power Works" className="h-12 object-contain mx-auto" onError={e => { e.target.style.display = "none"; }} />
+        <div>
+          <h1 className="text-2xl font-black text-white">PowerMate</h1>
+          <p className="text-sm mt-1" style={{ color: "rgba(255,255,255,0.7)" }}>Power Works Field Service App</p>
+        </div>
+        <div className="rounded-3xl bg-white p-8 space-y-5">
+          <div className="flex flex-col items-center gap-3">
+            <div className="rounded-full p-5" style={{ background: BRAND.light }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={BRAND.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+            <p className="text-slate-700 font-semibold">App Locked</p>
+            <p className="text-sm text-slate-500 text-center">Use your fingerprint or Face ID to unlock</p>
+          </div>
+          {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+          <button onClick={unlock} disabled={loading}
+            className="w-full rounded-2xl py-4 font-bold text-white disabled:opacity-60"
+            style={{ background: BRAND.primary }}>
+            {loading ? "Verifying…" : "🔓 Unlock with Biometric"}
+          </button>
+        </div>
+        <p className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>© 2026 Power Works (Pty) Ltd</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Auth ──────────────────────────────────────────────────────────────────────
 function AuthScreen() {
   const [mode, setMode] = useState("login");
@@ -437,13 +542,13 @@ function AuthScreen() {
         <Card className="rounded-3xl shadow-sm">
           <CC className="space-y-4 p-6">
             {mode === "resetpw" && (<><h2 className="text-xl font-bold">Set new password</h2><div><label className="mb-1 block text-sm font-semibold text-slate-800">New password</label><div className="relative"><input type={showPw ? "text" : "password"} value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="New password" className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-base outline-none pr-12" /><button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">{showPw ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div><Field label="Confirm password" type="password" value={confirmPw} onChange={setConfirmPw} placeholder="Confirm new password" />{msg.text && <div className={`rounded-2xl p-3 text-sm font-medium ${msg.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.text}</div>}<Btn className="w-full py-4" onClick={resetPw} disabled={loading}>{loading ? "Updating…" : "Set new password"}</Btn></>)}
-            {mode === "forgot" && (<><div><h2 className="text-xl font-bold">Reset password</h2><p className="mt-1 text-sm text-slate-500">We'll send you a reset link.</p></div><Field label="Email" value={email} onChange={setEmail} placeholder="you@powerworks.co.za" type="email" />{msg.text && <div className={`rounded-2xl p-3 text-sm font-medium ${msg.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.text}</div>}<Btn className="w-full py-4" onClick={forgotPw} disabled={loading}>{loading ? "Sending…" : "Send reset email"}</Btn><button onClick={() => { setMode("login"); setMsg({ text: "" }); }} className="w-full text-center text-sm text-slate-500 underline">← Back to login</button></>)}
+            {mode === "forgot" && (<><div><h2 className="text-xl font-bold">Reset password</h2><p className="mt-1 text-sm text-slate-500">We'll send you a reset link.</p></div><Field label="Email" value={email} onChange={setEmail} placeholder="you@pwrstart.com" type="email" />{msg.text && <div className={`rounded-2xl p-3 text-sm font-medium ${msg.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.text}</div>}<Btn className="w-full py-4" onClick={forgotPw} disabled={loading}>{loading ? "Sending…" : "Send reset email"}</Btn><button onClick={() => { setMode("login"); setMsg({ text: "" }); }} className="w-full text-center text-sm text-slate-500 underline">← Back to login</button></>)}
             {(mode === "login" || mode === "signup") && (<>
               <div className="flex rounded-2xl p-1" style={{ background: BRAND.light }}>
                 {["login", "signup"].map(m => (<button key={m} onClick={() => { setMode(m); setMsg({ text: "" }); }} className="flex-1 rounded-xl py-2 text-sm font-semibold transition" style={{ background: mode === m ? "#fff" : "transparent", color: mode === m ? BRAND.primary : "#64748b", boxShadow: mode === m ? "0 1px 4px #0001" : "none" }}>{m === "login" ? "Log in" : "Sign up"}</button>))}
               </div>
               {mode === "signup" && <Field label="Full name" value={name} onChange={setName} placeholder="Your name" />}
-              <Field label="Email" value={email} onChange={setEmail} placeholder="you@powerworks.co.za" type="email" />
+              <Field label="Email" value={email} onChange={setEmail} placeholder="you@pwrstart.com" type="email" />
               <div><label className="mb-1 block text-sm font-semibold text-slate-800">Password</label><div className="relative"><input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-base outline-none pr-12" /><button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400">{showPw ? <EyeOff size={18} /> : <Eye size={18} />}</button></div></div>
               {mode === "login" && <button onClick={() => { setMode("forgot"); setMsg({ text: "" }); }} className="text-sm underline text-left" style={{ color: BRAND.primary }}>Forgot password?</button>}
               {msg.text && <div className={`rounded-2xl p-3 text-sm font-medium ${msg.type === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>{msg.text}</div>}
@@ -936,6 +1041,124 @@ function QuoteScreen({ data, setData, userId, isOnline }) {
   );
 }
 
+
+// ─── Global Search ────────────────────────────────────────────────────────────
+function GlobalSearchScreen({ data, go, setScreen }) {
+  const [query, setQuery] = useState("");
+  const inputRef = React.useRef(null);
+
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
+
+  const results = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    if (!q || q.length < 2) return { clients: [], quotes: [], equipment: [], serviceReports: [], notes: [] };
+    return {
+      clients: data.clients.filter(c => `${c.company} ${c.division} ${c.contact} ${c.phone} ${c.email} ${c.location}`.toLowerCase().includes(q)).slice(0, 5),
+      quotes: (data.quotes || []).filter(q2 => `${q2.client_name} ${q2.quote_number} ${q2.description}`.toLowerCase().includes(q)).slice(0, 5),
+      equipment: (data.equipment || []).filter(e => `${e.name} ${e.model} ${e.serial_number}`.toLowerCase().includes(q)).slice(0, 5),
+      serviceReports: (data.serviceReports || []).filter(r => `${r.client_name} ${r.machine} ${r.fault} ${r.technician}`.toLowerCase().includes(q)).slice(0, 5),
+      notes: (data.notes || []).filter(n => `${n.title} ${n.body}`.toLowerCase().includes(q)).slice(0, 5),
+    };
+  }, [query, data]);
+
+  const total = Object.values(results).reduce((s, arr) => s + arr.length, 0);
+
+  const Section = ({ title, icon, items, renderItem }) => {
+    if (!items.length) return null;
+    return (
+      <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-slate-400 px-1">{icon} {title}</p>
+        {items.map(renderItem)}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="flex flex-1 items-center gap-2 rounded-3xl bg-white px-4 py-3 shadow-sm">
+          <Search size={20} className="text-slate-400 flex-shrink-0" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search everything…"
+            className="flex-1 bg-transparent text-base outline-none"
+          />
+          {query && <button onClick={() => setQuery("")} className="text-slate-400"><X size={18} /></button>}
+        </div>
+        <Btn variant="outline" onClick={() => setScreen("Home")}>Cancel</Btn>
+      </div>
+
+      {query.length < 2 && (
+        <div className="rounded-3xl bg-white p-6 text-center shadow-sm">
+          <p className="text-2xl mb-2">🔍</p>
+          <p className="font-bold text-slate-900">Search everything</p>
+          <p className="text-sm text-slate-500 mt-1">Clients, quotes, equipment, service reports and notes</p>
+        </div>
+      )}
+
+      {query.length >= 2 && total === 0 && (
+        <Empty title="No results found" text={`Nothing matched "${query}"`} />
+      )}
+
+      {total > 0 && (
+        <div className="space-y-5">
+          <Section title="Clients" icon="👥" items={results.clients} renderItem={c => (
+            <button key={c.id} onClick={() => { setScreen("Clients"); }} className="w-full text-left">
+              <Card className="rounded-2xl shadow-sm"><CC className="p-3">
+                <p className="font-bold text-slate-900">{c.company}</p>
+                <p className="text-xs text-slate-500">{c.division || ""} {c.contact ? `· ${c.contact}` : ""}</p>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-xl ${STAGE_COLORS[c.pipeline_status || "New Lead"]}`}>{c.pipeline_status || "New Lead"}</span>
+              </CC></Card>
+            </button>
+          )} />
+
+          <Section title="Quotes" icon="📄" items={results.quotes} renderItem={q => (
+            <button key={q.id} onClick={() => setScreen("Quotes")} className="w-full text-left">
+              <Card className="rounded-2xl shadow-sm"><CC className="p-3">
+                <p className="font-bold text-slate-900">{q.client_name}</p>
+                <p className="text-xs text-slate-500">{q.quote_number} · {q.description?.slice(0, 60)}</p>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-xl ${QUOTE_STATUS_COLORS[q.status]}`}>{q.status}</span>
+              </CC></Card>
+            </button>
+          )} />
+
+          <Section title="Equipment" icon="⚙️" items={results.equipment} renderItem={e => (
+            <button key={e.id} onClick={() => setScreen("Equipment")} className="w-full text-left">
+              <Card className="rounded-2xl shadow-sm"><CC className="p-3">
+                <p className="font-bold text-slate-900">{e.name}</p>
+                <p className="text-xs text-slate-500">{e.model ? `Model: ${e.model}` : ""} {e.serial_number ? `· S/N: ${e.serial_number}` : ""}</p>
+                {e.next_service_date && <p className="text-xs font-semibold mt-1" style={{ color: BRAND.primary }}>Next service: {smartDate(e.next_service_date)}</p>}
+              </CC></Card>
+            </button>
+          )} />
+
+          <Section title="Service Reports" icon="🔧" items={results.serviceReports} renderItem={r => (
+            <button key={r.id} onClick={() => setScreen("Service")} className="w-full text-left">
+              <Card className="rounded-2xl shadow-sm"><CC className="p-3">
+                <p className="font-bold text-slate-900">{r.client_name || "No client"}</p>
+                <p className="text-xs text-slate-500">{r.machine} · {r.fault?.slice(0, 60)}</p>
+                <p className="text-xs text-slate-400">{smartDate(r.created_at?.slice(0, 10))}</p>
+              </CC></Card>
+            </button>
+          )} />
+
+          <Section title="Notes" icon="📝" items={results.notes} renderItem={n => (
+            <button key={n.id} onClick={() => setScreen("Notes")} className="w-full text-left">
+              <Card className="rounded-2xl shadow-sm"><CC className="p-3">
+                <p className="font-bold text-slate-900">{n.title}</p>
+                {n.body && <p className="text-xs text-slate-500">{n.body.slice(0, 80)}</p>}
+                {n.reminder_date && <p className="text-xs font-semibold mt-1" style={{ color: BRAND.primary }}>Reminder: {smartDate(n.reminder_date)}</p>}
+              </CC></Card>
+            </button>
+          )} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Pipeline ──────────────────────────────────────────────────────────────────
 function PipelineScreen({ data, setData, userId, isOnline }) {
   const [shareModal, setShareModal] = useState(null);
@@ -1051,7 +1274,13 @@ function CalendarScreen({ data, setData, userId, isOnline }) {
   const timers = useRef([]);
   const enableNotifs = async () => { const g = await requestNotifPermission(); setNotifGranted(g); };
   const add = async () => { if (!ni.date||!ni.time||!ni.title) { alert("Please add a date, time and title."); return; } const payload = { user_id: userId, ...ni }; let item; if (isOnline) { const { data: r } = await supabase.from("plan_items").insert(payload).select().single(); item = r; } else { item = { ...payload, id: `offline_${Date.now()}` }; addToQueue({ type: "insert", table: "plan_items", data: payload }); } if (item) { setData(c => ({ ...c, planList: [...c.planList, item] })); if (notifGranted) { const t = scheduleItemNotifs(item, [parseInt(ni.reminder)]); timers.current.push(...t); } } setNi({ date: todayISO(), time: "", title: "", client: "", location: "", type: "Follow-up", reminder: "30" }); };
-  const upd = async (id, field, val) => { if (isOnline) await supabase.from("plan_items").update({ [field]: val }).eq("id", id).eq("user_id", userId); else addToQueue({ type: "update", table: "plan_items", id, data: { [field]: val } }); setData(c => ({ ...c, planList: c.planList.map(i => i.id === id ? { ...i, [field]: val } : i) })); };
+  const upd = async (id, field, val) => {
+    // If time or date is changed, reset reminder_sent so notification fires again
+    const extra = (field === "time" || field === "date") ? { reminder_sent: false } : {};
+    if (isOnline) await supabase.from("plan_items").update({ [field]: val, ...extra }).eq("id", id).eq("user_id", userId);
+    else addToQueue({ type: "update", table: "plan_items", id, data: { [field]: val, ...extra } });
+    setData(c => ({ ...c, planList: c.planList.map(i => i.id === id ? { ...i, [field]: val, ...extra } : i) }));
+  };
   const del = async id => { if (isOnline) await supabase.from("plan_items").delete().eq("id", id).eq("user_id", userId); else addToQueue({ type: "delete", table: "plan_items", id }); setData(c => ({ ...c, planList: c.planList.filter(i => i.id !== id) })); };
   const grouped = useMemo(() => { const g = {}; [...data.planList].sort((a,b)=>`${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)).forEach(item => { const d = item.date||"No date"; if (!g[d]) g[d]=[]; g[d].push(item); }); return g; }, [data.planList]);
   const gcal = item => `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(item.title||"")}&location=${encodeURIComponent(item.location||"")}&details=${encodeURIComponent(item.client||"")}`;
@@ -1123,7 +1352,7 @@ function QuickAddScreen({ data, setData, go, userId, userName, isOnline }) {
         {nextFU&&(<div className="rounded-2xl bg-slate-50 p-3 space-y-3"><label className="flex items-center justify-between text-sm font-semibold"><span className="flex items-center gap-2"><RefreshCw size={15} />Recurring follow-up</span><input type="checkbox" checked={recurring} onChange={e=>setRecurring(e.target.checked)} className="h-5 w-5" /></label>{recurring&&(<div><label className="mb-1 block text-sm font-semibold">Repeat every</label><div className="grid grid-cols-3 gap-2">{[["7","7 days"],["14","14 days"],["30","30 days"]].map(([val,label])=>(<button key={val} onClick={()=>setRecurringDays(val)} className="rounded-2xl border py-2 text-sm font-semibold" style={{background:recurringDays===val?BRAND.primary:"#fff",color:recurringDays===val?"#fff":"#374151"}}>{label}</button>))}</div></div>)}</div>)}
         <div className="grid grid-cols-2 gap-3">
           <Btn variant="outline" className={rec?"border-red-300 bg-red-100 text-red-700":""} onClick={rec?stopRec:startRec}><Mic size={18} />{rec?"Stop":"Voice note"}</Btn>
-          <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 font-semibold ${uploading?"opacity-60 pointer-events-none":""}`}><Camera size={18} />{uploading?"Uploading…":"Add photo/video"}<input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFiles} disabled={uploading} /></label>
+          <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 font-semibold ${uploading?"opacity-60 pointer-events-none":""}`}><Camera size={18} />{uploading?"Uploading…":"Add photo/video"}<input type="file" accept="image/*,video/*" multiple capture="environment" className="hidden" onChange={handleFiles} disabled={uploading} /></label>
         </div>
         {audioErr&&<div className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{audioErr}</div>}
         {audio&&<div className="rounded-2xl bg-slate-50 p-3"><div className="mb-2 flex justify-between"><p className="text-sm font-semibold">Voice note</p><button onClick={()=>setAudio("")} className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">Delete</button></div><audio controls src={audio} className="w-full" /></div>}
@@ -1412,6 +1641,7 @@ function MoreScreen({ go, data, setData, currentUser, onSignOut }) {
       <div className="space-y-3">
         {isAdmin&&<BigAction icon={ShieldCheck} title="Management Dashboard" subtitle="Team performance & weekly reports" onClick={()=>go("Admin")} />}
         <BigAction icon={BarChart2} title="My Dashboard" subtitle="Charts and performance overview" onClick={()=>go("Dashboard")} />
+        <BigAction icon={FileText} title="Export Data" subtitle="Download clients, quotes and reports to Excel" onClick={()=>go("Export")} />
         <BigAction icon={Target} title="Target Tracker" subtitle="Monthly targets and progress" onClick={()=>go("Targets")} />
         <BigAction icon={BriefcaseBusiness} title="My Sales Reports" subtitle="Log weekly visits, quotes and leads" onClick={()=>setSub("sales")} />
         <BigAction icon={ClipboardList} title="Settings & Account" subtitle="Account info and sign out" onClick={()=>setSub("settings")} />
@@ -1597,6 +1827,113 @@ function NotesScreen({ data, setData, userId, isOnline }) {
   );
 }
 
+
+// ─── Export to Excel ─────────────────────────────────────────────────────────
+function exportToCSV(rows, headers, filename) {
+  const escape = v => {
+    const s = String(v || "").replace(/"/g, '""');
+    return s.includes(",") || s.includes("\n") || s.includes('"') ? `"${s}"` : s;
+  };
+  const csv = [
+    headers.map(escape).join(","),
+    ...rows.map(row => row.map(escape).join(","))
+  ].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${filename}-${todayISO()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function ExportScreen({ data, currentUser }) {
+  const [exporting, setExporting] = useState(null);
+
+  const doExport = (type) => {
+    setExporting(type);
+    try {
+      if (type === "clients") {
+        exportToCSV(
+          data.clients.map(c => [c.company, c.division, c.contact, c.phone, c.email, c.location, c.pipeline_status || "New Lead", c.notes]),
+          ["Company", "Division", "Contact", "Phone", "Email", "Location", "Pipeline Stage", "Notes"],
+          "powerworks-clients"
+        );
+      }
+      if (type === "quotes") {
+        exportToCSV(
+          (data.quotes || []).map(q => [q.client_name, q.quote_number, q.description, q.value, q.status, q.sent_date, q.follow_up_date, workingDaysSince(q.sent_date) + " working days", q.notes]),
+          ["Client", "Quote Number", "Description", "Value (R)", "Status", "Date Sent", "Follow-up Date", "Days Waiting", "Notes"],
+          "powerworks-quotes"
+        );
+      }
+      if (type === "equipment") {
+        exportToCSV(
+          (data.equipment || []).map(e => {
+            const client = data.clients.find(c => c.id === e.client_id);
+            return [e.name, e.model, e.serial_number, client?.company || "", e.install_date, e.last_service_date, e.next_service_date, e.warranty_expiry, e.notes];
+          }),
+          ["Equipment Name", "Model", "Serial Number", "Client", "Install Date", "Last Service", "Next Service", "Warranty Expiry", "Notes"],
+          "powerworks-equipment"
+        );
+      }
+      if (type === "service_reports") {
+        exportToCSV(
+          (data.serviceReports || []).map(r => [r.client_name, r.machine, r.technician, r.fault, r.work_done, r.parts_used, r.created_at?.slice(0, 10)]),
+          ["Client", "Machine", "Technician", "Fault", "Work Done", "Parts Used", "Date"],
+          "powerworks-service-reports"
+        );
+      }
+      if (type === "follow_ups") {
+        exportToCSV(
+          data.followUps.map(f => [f.client_name, f.due_date, f.status, f.completed ? "Yes" : "No", f.outcome]),
+          ["Client", "Due Date", "Status", "Completed", "Outcome"],
+          "powerworks-follow-ups"
+        );
+      }
+    } catch(e) {
+      alert("Export failed: " + e.message);
+    }
+    setTimeout(() => setExporting(null), 1000);
+  };
+
+  const exports = [
+    { key: "clients", label: "Clients", icon: "👥", desc: `${data.clients.length} clients` },
+    { key: "quotes", label: "Quotes", icon: "📄", desc: `${(data.quotes||[]).length} quotes` },
+    { key: "equipment", label: "Equipment", icon: "⚙️", desc: `${(data.equipment||[]).length} items` },
+    { key: "service_reports", label: "Service Reports", icon: "🔧", desc: `${(data.serviceReports||[]).length} reports` },
+    { key: "follow_ups", label: "Follow-ups", icon: "📅", desc: `${data.followUps.length} follow-ups` },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold">Export Data</h1>
+        <p className="text-sm text-slate-500">Download your data as CSV (opens in Excel)</p>
+      </div>
+      <div className="rounded-2xl bg-blue-50 p-4 text-sm text-blue-800">
+        Files download as CSV which opens directly in Excel or Google Sheets.
+      </div>
+      <div className="space-y-3">
+        {exports.map(({ key, label, icon, desc }) => (
+          <Card key={key} className="rounded-3xl shadow-sm">
+            <CC className="flex items-center gap-4 p-4">
+              <div className="rounded-2xl p-3 text-2xl" style={{ background: BRAND.light }}>{icon}</div>
+              <div className="flex-1">
+                <p className="font-bold text-slate-900">{label}</p>
+                <p className="text-sm text-slate-500">{desc}</p>
+              </div>
+              <Btn onClick={() => doExport(key)} disabled={exporting === key} className="rounded-2xl">
+                {exporting === key ? "Exporting…" : "Export"}
+              </Btn>
+            </CC>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Root ──────────────────────────────────────────────────────────────────────
 export default function PowerWorksApp() {
   const [session, setSession] = useState(null); const [currentUser, setCurrentUser] = useState(null); const [authLoading, setAuthLoading] = useState(true);
@@ -1606,8 +1943,10 @@ export default function PowerWorksApp() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [queueCount, setQueueCount] = useState(getQueue().length);
   const [refreshing, setRefreshing] = useState(false);
+  const [locked, setLocked] = useState(false);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
+  const lastActiveRef = useRef(Date.now());
 
   useEffect(() => {
     const goOnline = async () => { setIsOnline(true); await processOfflineQueue(); setQueueCount(getQueue().length); };
@@ -1745,9 +2084,34 @@ export default function PowerWorksApp() {
 
   const signOut = async () => { await supabase.auth.signOut(); setScreen("Home"); };
 
+  // ─── App lock on visibility change (when app is fully closed/reopened) ───────
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        lastActiveRef.current = Date.now();
+      } else if (document.visibilityState === "visible") {
+        const elapsed = Date.now() - lastActiveRef.current;
+        if (elapsed > 30 * 60 * 1000 && currentUser) { // 30 minutes
+          setLocked(true);
+        }
+      }
+    };
+    // Track user activity to reset inactivity timer
+    const resetTimer = () => { lastActiveRef.current = Date.now(); if (locked) {} };
+    document.addEventListener("visibilitychange", handleVisibility);
+    document.addEventListener("touchstart", resetTimer);
+    document.addEventListener("click", resetTimer);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      document.removeEventListener("touchstart", resetTimer);
+      document.removeEventListener("click", resetTimer);
+    };
+  }, [currentUser, locked]);
+
   if (authLoading) return <Spinner />;
   if (!session||!currentUser) return <AuthScreen />;
   if (dataLoading) return <Spinner />;
+  if (locked) return <LockScreen onUnlock={() => { setLocked(false); updateLastActive(); }} />;
 
   const uid = currentUser.id;
   const uname = currentUser.full_name || currentUser.email;
@@ -1769,6 +2133,8 @@ export default function PowerWorksApp() {
     Notes: <NotesScreen {...props} />,
     More: <MoreScreen go={setScreen} data={data} setData={setData} currentUser={currentUser} onSignOut={signOut} />,
     Admin: <AdminDashboard />,
+    Search: <GlobalSearchScreen data={data} go={goBack} setScreen={setScreen} />,
+    Export: <ExportScreen data={data} currentUser={currentUser} />,
   };
 
   // Screen history for back button
@@ -1777,7 +2143,7 @@ export default function PowerWorksApp() {
   const backMap = {
     QuickAdd: "Home", Calendar: "Home", Service: "Home", Documents: "Home",
     Pipeline: "Home", Equipment: "Home", Quotes: "Home", Targets: "More",
-    Dashboard: "More", Admin: "More", Notes: "Home",
+    Dashboard: "More", Admin: "More", Notes: "Home", Search: "Home", Export: "More",
   };
   const goBack = () => setScreen(backMap[screen] || "Home");
 
@@ -1803,6 +2169,7 @@ export default function PowerWorksApp() {
               onError={e=>{e.target.style.display="none";}} />
             <div className="flex items-center gap-2">
               {!isOnline&&<WifiOff size={18} className="text-amber-500" />}
+              <Btn variant="outline" onClick={() => setScreen("Search")} className="py-2 px-3"><Search size={18} /></Btn>
               <Btn onClick={() => setScreen("QuickAdd")} className="py-2 px-3"><Plus size={18} /></Btn>
             </div>
           </div>
