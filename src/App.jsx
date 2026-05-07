@@ -7,7 +7,7 @@ import {
   Plus, Search, ShieldCheck, Trash2, Upload, Users, Wrench, X,
   Eye, EyeOff, BarChart2, RefreshCw, WifiOff, Wifi, Share2,
   MessageCircle, Copy, PenLine, ChevronLeft, CheckCircle,
-  AlertTriangle, Target, Cog, TrendingUp, Flag, Clock, StickyNote, AlarmClock,
+  AlertTriangle, Target, Cog, Flag, Clock,
 } from "lucide-react";
 
 // ─── Brand colours ────────────────────────────────────────────────────────────
@@ -177,6 +177,139 @@ const filesToStored = async (fileList) => {
   }
   return out;
 };
+
+// ─── IndexedDB for offline photo storage ──────────────────────────────────────
+const IDB_NAME = 'powerworks-offline';
+const IDB_VERSION = 1;
+
+function openIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('offline_photos')) {
+        db.createObjectStore('offline_photos', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('offline_data')) {
+        db.createObjectStore('offline_data', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function savePhotoOffline(id, file, metadata) {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const tx = db.transaction('offline_photos', 'readwrite');
+      tx.objectStore('offline_photos').put({
+        id,
+        dataUrl: reader.result,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        metadata,
+        savedAt: Date.now()
+      });
+      tx.oncomplete = () => resolve(reader.result);
+      tx.onerror = () => reject(tx.error);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function getOfflinePhotos() {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('offline_photos', 'readonly');
+    const req = tx.objectStore('offline_photos').getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function deleteOfflinePhoto(id) {
+  const db = await openIDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('offline_photos', 'readwrite');
+    tx.objectStore('offline_photos').delete(id);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Upload all offline photos when back online
+async function syncOfflinePhotos(userId, setData) {
+  const photos = await getOfflinePhotos();
+  if (photos.length === 0) return;
+  console.log(`Syncing ${photos.length} offline photos...`);
+  for (const photo of photos) {
+    try {
+      // Convert dataUrl back to file
+      const res = await fetch(photo.dataUrl);
+      const blob = await res.blob();
+      const file = new File([blob], photo.name, { type: photo.type });
+      const url = await uploadFile(file);
+      if (url) {
+        // Save to Supabase documents
+        const { data: doc } = await supabase.from('documents').insert({
+          user_id: userId,
+          client_id: photo.metadata?.clientId || null,
+          file_url: url,
+          name: photo.name
+        }).select().single();
+        if (doc) {
+          setData(c => ({ ...c, documents: [...c.documents, { ...doc, clientId: doc.client_id, dataUrl: doc.file_url }] }));
+        }
+        // Remove from offline store
+        await deleteOfflinePhoto(photo.id);
+        console.log(`Synced offline photo: ${photo.name}`);
+      }
+    } catch (e) {
+      console.error('Failed to sync photo:', photo.name, e);
+    }
+  }
+}
+
+// Enhanced file upload - saves offline if no internet
+async function uploadFileWithOfflineFallback(file, clientId = '', userId = '') {
+  if (navigator.onLine) {
+    const url = await uploadFile(file);
+    return url ? { url, offline: false } : null;
+  } else {
+    // Save to IndexedDB for later
+    const id = `offline_photo_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const dataUrl = await savePhotoOffline(id, file, { clientId, userId });
+    console.log(`Photo saved offline: ${file.name}`);
+    return { url: dataUrl, offline: true, offlineId: id };
+  }
+}
+
+async function filesToStoredOffline(fileList, clientId = '', userId = '') {
+  const out = [];
+  for (let f of Array.from(fileList || [])) {
+    if (f.type.startsWith('image/')) {
+      f = await compressImage(f);
+    }
+    const result = await uploadFileWithOfflineFallback(f, clientId, userId);
+    if (result) {
+      out.push({
+        name: f.name,
+        type: f.type || 'File',
+        size: f.size,
+        url: result.url,
+        offline: result.offline || false,
+        offlineId: result.offlineId
+      });
+    }
+  }
+  return out;
+}
+
+
 
 // ─── Photo Annotator ───────────────────────────────────────────────────────────
 function PhotoAnnotator({ src, onSave, onCancel }) {
@@ -351,6 +484,33 @@ function ProgressBar({ value, max, color }) {
   );
 }
 
+
+
+// ─── Local Data Cache ─────────────────────────────────────────────────────────
+const DATA_CACHE_KEY = 'powerworks_data_cache';
+
+function saveDataCache(data) {
+  try {
+    // Don't cache binary data (audio) to save space
+    const cacheable = {
+      ...data,
+      conversations: data.conversations.map(c => ({ ...c, audio_data_url: c.audio_data_url ? '[audio]' : null }))
+    };
+    localStorage.setItem(DATA_CACHE_KEY, JSON.stringify(cacheable));
+  } catch (e) {
+    console.log('Cache save failed (storage full?):', e);
+  }
+}
+
+function loadDataCache() {
+  try {
+    const cached = localStorage.getItem(DATA_CACHE_KEY);
+    if (!cached) return null;
+    return JSON.parse(cached);
+  } catch (e) {
+    return null;
+  }
+}
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
@@ -1799,7 +1959,7 @@ function NotesScreen({ data, setData, userId, isOnline }) {
                   {note.body && <p className="mt-1 text-sm text-slate-600 whitespace-pre-wrap">{note.body}</p>}
                   {note.reminder_date && (
                     <div className="mt-2 flex items-center gap-1">
-                      <AlarmClock size={13} style={{ color: isOverdue(note) ? "#dc2626" : isDueToday(note) ? "#f59e0b" : BRAND.primary }} />
+                      <Bell size={13} style={{ color: isOverdue(note) ? "#dc2626" : isDueToday(note) ? "#f59e0b" : BRAND.primary }} />
                       <p className="text-xs font-semibold" style={{ color: isOverdue(note) ? "#dc2626" : isDueToday(note) ? "#f59e0b" : BRAND.primary }}>
                         {isOverdue(note) && !note.completed ? "OVERDUE · " : isDueToday(note) ? "TODAY · " : ""}
                         {note.reminder_date}{note.reminder_time ? ` at ${note.reminder_time}` : ""}
@@ -1949,7 +2109,18 @@ export default function PowerWorksApp() {
   const lastActiveRef = useRef(Date.now());
 
   useEffect(() => {
-    const goOnline = async () => { setIsOnline(true); await processOfflineQueue(); setQueueCount(getQueue().length); };
+    const goOnline = async () => {
+      setIsOnline(true);
+      await processOfflineQueue();
+      setQueueCount(getQueue().length);
+      // Sync offline photos
+      if (currentUser) await syncOfflinePhotos(currentUser.id, setData);
+      // Register background sync
+      if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        const reg = await navigator.serviceWorker.ready;
+        try { await reg.sync.register('sync-offline-data'); } catch(e) {}
+      }
+    };
     const goOffline = () => { setIsOnline(false); setQueueCount(getQueue().length); };
     window.addEventListener("online", goOnline); window.addEventListener("offline", goOffline);
     return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); };
@@ -1972,6 +2143,21 @@ export default function PowerWorksApp() {
     const uid = currentUser.id;
     const load = async () => {
       setDataLoading(true);
+
+      // Load from local cache first so app shows data immediately
+      const cached = loadDataCache();
+      if (cached) {
+        setData(cached);
+        setDataLoading(false); // Show cached data right away
+      }
+
+      // Then fetch fresh data from Supabase (if online)
+      if (!navigator.onLine) {
+        console.log('Offline: using cached data');
+        setDataLoading(false);
+        return;
+      }
+
       const [clients,plans,fus,docs,convs,svcs,sales,equip,targets,quotes,noteRows] = await Promise.all([
         supabase.from("clients").select("*").eq("user_id",uid).order("company"),
         supabase.from("plan_items").select("*").eq("user_id",uid).order("date").order("time"),
@@ -1985,7 +2171,9 @@ export default function PowerWorksApp() {
         supabase.from("quotes").select("*").eq("user_id",uid).order("created_at",{ascending:false}),
         supabase.from("notes").select("*").eq("user_id",uid).order("created_at",{ascending:false}),
       ]);
-      setData({ clients:clients.data||[], planList:plans.data||[], followUps:fus.data||[], documents:docs.data||[], conversations:convs.data||[], serviceReports:svcs.data||[], salesReports:sales.data||[], equipment:equip.data||[], targets:targets.data||[], quotes:quotes.data||[], notes:noteRows.data||[] });
+      const freshData = { clients:clients.data||[], planList:plans.data||[], followUps:fus.data||[], documents:docs.data||[], conversations:convs.data||[], serviceReports:svcs.data||[], salesReports:sales.data||[], equipment:equip.data||[], targets:targets.data||[], quotes:quotes.data||[], notes:noteRows.data||[] };
+      setData(freshData);
+      saveDataCache(freshData); // Update local cache
       setDataLoading(false);
     };
     load();
@@ -2082,7 +2270,18 @@ export default function PowerWorksApp() {
     });
   }, [data.followUps, currentUser, isOnline]);
 
-  const signOut = async () => { await supabase.auth.signOut(); setScreen("Home"); };
+  // Save cache whenever data changes
+  useEffect(() => {
+    if (data.clients.length > 0 || data.serviceReports.length > 0) {
+      saveDataCache(data);
+    }
+  }, [data]);
+
+  const signOut = async () => {
+    localStorage.removeItem(DATA_CACHE_KEY);
+    await supabase.auth.signOut();
+    setScreen("Home");
+  };
 
   // ─── App lock on visibility change (when app is fully closed/reopened) ───────
   useEffect(() => {
@@ -2155,7 +2354,10 @@ export default function PowerWorksApp() {
       {(!isOnline||queueCount>0)&&(
         <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-center gap-2 py-2 text-sm font-semibold text-white"
           style={{background:isOnline?BRAND.primary:"#d97706"}}>
-          {isOnline?<><Wifi size={16} />Back online — syncing {queueCount} item{queueCount!==1?"s":""}…</>:<><WifiOff size={16} />Offline — changes saved locally</>}
+          {isOnline
+            ? <><Wifi size={16} />Back online — syncing {queueCount} item{queueCount!==1?"s":""}…</>
+            : <><WifiOff size={16} />Offline mode — all data available, changes saved locally</>
+          }
         </div>
       )}
 
@@ -2202,7 +2404,7 @@ export default function PowerWorksApp() {
           <NavTab icon={Home} label="Home" active={screen==="Home"} onClick={()=>setScreen("Home")} />
           <NavTab icon={Users} label="Clients" active={screen==="Clients"} onClick={()=>setScreen("Clients")} />
           <NavTab icon={FileText} label="Quotes" active={screen==="Quotes"} onClick={()=>setScreen("Quotes")} badge={flaggedQuotes} />
-          <NavTab icon={StickyNote} label="Notes" active={screen==="Notes"} onClick={()=>setScreen("Notes")} badge={(data.notes||[]).filter(n=>!n.completed&&n.reminder_date&&n.reminder_date<=todayISO()).length||0} />
+          <NavTab icon={FileText} label="Notes" active={screen==="Notes"} onClick={()=>setScreen("Notes")} badge={(data.notes||[]).filter(n=>!n.completed&&n.reminder_date&&n.reminder_date<=todayISO()).length||0} />
           <NavTab icon={Cog} label="More" active={screen==="More"} onClick={()=>setScreen("More")} />
         </div>
       </nav>
