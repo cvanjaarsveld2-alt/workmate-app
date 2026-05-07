@@ -1,19 +1,91 @@
-// Power Works - Service Worker for Push Notifications
-// Place this file at: public/sw.js
+// Power Works - Service Worker
+// Handles push notifications AND full offline caching
 
-const CACHE_NAME = 'powerworks-v1';
+const CACHE_NAME = 'powerworks-v2';
+const DB_NAME = 'powerworks-offline';
+const DB_VERSION = 1;
 
-// Install event
+// App shell files to cache for offline use
+const APP_SHELL = [
+  '/',
+  '/index.html',
+  '/manifest.webmanifest',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/service-worker.js',
+];
+
+// ─── Install: cache app shell ─────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(APP_SHELL).catch(err => {
+        console.log('Cache addAll error (non-fatal):', err);
+      });
+    }).then(() => self.skipWaiting())
+  );
 });
 
-// Activate event
+// ─── Activate: clean old caches ───────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    ).then(() => clients.claim())
+  );
 });
 
-// Push event - fires when a push notification is received
+// ─── Fetch: serve from cache, fallback to network ─────────────────────────────
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // Don't cache Supabase API calls or external services
+  if (
+    url.hostname.includes('supabase.co') ||
+    url.hostname.includes('supabase.in') ||
+    url.pathname.includes('/rest/v1/') ||
+    url.pathname.includes('/auth/v1/') ||
+    url.pathname.includes('/storage/v1/') ||
+    url.pathname.includes('/functions/v1/') ||
+    event.request.method !== 'GET'
+  ) {
+    return; // Let these go to network normally
+  }
+
+  // For navigation requests (opening the app) - serve index.html from cache
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        caches.match('/index.html').then(r => r || caches.match('/'))
+      )
+    );
+    return;
+  }
+
+  // For JS/CSS/assets - cache first, fallback to network
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(response => {
+        // Cache successful responses for app assets
+        if (response.ok && (
+          url.pathname.endsWith('.js') ||
+          url.pathname.endsWith('.css') ||
+          url.pathname.endsWith('.png') ||
+          url.pathname.endsWith('.jpg') ||
+          url.pathname.endsWith('.svg') ||
+          url.pathname.endsWith('.woff2')
+        )) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => cached || new Response('Offline', { status: 503 }));
+    })
+  );
+});
+
+// ─── Push notifications ───────────────────────────────────────────────────────
 self.addEventListener('push', (event) => {
   let data = {};
   try {
@@ -36,43 +108,31 @@ self.addEventListener('push', (event) => {
     ]
   };
 
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// Notification click event
+// ─── Notification click ───────────────────────────────────────────────────────
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-
   if (event.action === 'dismiss') return;
-
   const urlToOpen = event.notification.data?.url || '/';
-
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // If app is already open, focus it
       for (const client of windowClients) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
-          return client.focus();
-        }
+        if (client.url.includes(self.location.origin) && 'focus' in client) return client.focus();
       }
-      // Otherwise open the app
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
+      if (clients.openWindow) return clients.openWindow(urlToOpen);
     })
   );
 });
 
-// Background sync (optional - for offline support)
+// ─── Background sync ──────────────────────────────────────────────────────────
 self.addEventListener('sync', (event) => {
-  if (event.tag === 'sync-data') {
-    event.waitUntil(syncOfflineData());
+  if (event.tag === 'sync-offline-data') {
+    event.waitUntil(
+      self.clients.matchAll().then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'SYNC_REQUESTED' }));
+      })
+    );
   }
 });
-
-async function syncOfflineData() {
-  // Handled by the app itself on reconnect
-  console.log('Power Works: Background sync triggered');
-}
