@@ -5,9 +5,9 @@ import {
   Bell, BriefcaseBusiness, CalendarDays, Camera, ChevronRight,
   ClipboardList, FileText, Home, LogOut, Mail, Mic, Phone,
   Plus, Search, ShieldCheck, Trash2, Upload, Users, Wrench, X,
-  Eye, EyeOff, BarChart2, RefreshCw, WifiOff, Wifi, Share2,
-  MessageCircle, Copy, PenLine, ChevronLeft, CheckCircle,
-  AlertTriangle, Target, Cog, Flag, Clock,
+  Eye, EyeOff, BarChart2, RefreshCw, WifiOff, Wifi,
+  Copy, ChevronLeft, CheckCircle,
+  AlertTriangle, Cog, Flag, Clock,
 } from "lucide-react";
 
 // ─── Brand colours ────────────────────────────────────────────────────────────
@@ -406,7 +406,7 @@ function ShareModal({ title, text, onClose }) {
         <h2 className="text-lg font-bold">Share</h2>
         <p className="text-sm text-slate-500 truncate">{title}</p>
         <div className="grid grid-cols-3 gap-3">
-          <button onClick={whatsapp} className="flex flex-col items-center gap-2 rounded-2xl bg-green-50 p-4"><MessageCircle size={28} className="text-green-600" /><p className="text-xs font-semibold text-green-700">WhatsApp</p></button>
+          <button onClick={whatsapp} className="flex flex-col items-center gap-2 rounded-2xl bg-green-50 p-4"><Bell size={28} className="text-green-600" /><p className="text-xs font-semibold text-green-700">WhatsApp</p></button>
           <button onClick={email} className="flex flex-col items-center gap-2 rounded-2xl bg-blue-50 p-4"><Mail size={28} className="text-blue-600" /><p className="text-xs font-semibold text-blue-700">Email</p></button>
           <button onClick={copy} className="flex flex-col items-center gap-2 rounded-2xl bg-slate-50 p-4">{copied ? <CheckCircle size={28} className="text-green-600" /> : <Copy size={28} className="text-slate-600" />}<p className="text-xs font-semibold text-slate-700">{copied ? "Copied!" : "Copy"}</p></button>
         </div>
@@ -839,7 +839,7 @@ function EquipmentScreen({ data, setData, userId, isOnline }) {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <Btn variant="outline" onClick={() => setShareModal({ title: sel.name, text: `Equipment: ${sel.name}\nModel: ${sel.model || "-"}\nSerial: ${sel.serial_number || "-"}\nNext Service: ${sel.next_service_date || "Not set"}\nWarranty: ${sel.warranty_expiry || "Not set"}` })}><Share2 size={16} />Share</Btn>
+            <Btn variant="outline" onClick={() => setShareModal({ title: sel.name, text: `Equipment: ${sel.name}\nModel: ${sel.model || "-"}\nSerial: ${sel.serial_number || "-"}\nNext Service: ${sel.next_service_date || "Not set"}\nWarranty: ${sel.warranty_expiry || "Not set"}` })}><Upload size={16} />Share</Btn>
             <Btn variant="danger" onClick={() => del(sel.id)}><Trash2 size={16} />Delete</Btn>
           </div>
         </CC>
@@ -1126,7 +1126,7 @@ function QuoteScreen({ data, setData, userId, isOnline }) {
           )}
 
           <div className="grid grid-cols-2 gap-2">
-            <Btn variant="outline" onClick={() => setShareModal({ title: `Quote ${sel.quote_number || ""} — ${sel.client_name}`, text: `Quote: ${sel.quote_number || "—"}\nClient: ${sel.client_name}\nDescription: ${sel.description}\nValue: ${formatCurrency(sel.value)}\nStatus: ${sel.status}\nSent: ${sel.sent_date}\nWaiting: ${workingDaysSince(sel.sent_date)} working days` })}><Share2 size={16} />Share</Btn>
+            <Btn variant="outline" onClick={() => setShareModal({ title: `Quote ${sel.quote_number || ""} — ${sel.client_name}`, text: `Quote: ${sel.quote_number || "—"}\nClient: ${sel.client_name}\nDescription: ${sel.description}\nValue: ${formatCurrency(sel.value)}\nStatus: ${sel.status}\nSent: ${sel.sent_date}\nWaiting: ${workingDaysSince(sel.sent_date)} working days` })}><Upload size={16} />Share</Btn>
             <Btn variant="danger" onClick={() => del(sel.id)}><Trash2 size={16} />Delete</Btn>
           </div>
         </CC>
@@ -1516,7 +1516,7 @@ function QuickAddScreen({ data, setData, go, userId, userName, isOnline }) {
         </div>
         {audioErr&&<div className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{audioErr}</div>}
         {audio&&<div className="rounded-2xl bg-slate-50 p-3"><div className="mb-2 flex justify-between"><p className="text-sm font-semibold">Voice note</p><button onClick={()=>setAudio("")} className="rounded-xl bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">Delete</button></div><audio controls src={audio} className="w-full" /></div>}
-        {files.length>0&&(<div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-3">{files.map((f,i)=>(<div key={i} className="rounded-2xl bg-white p-2">{f.type.startsWith("video/")?<video controls src={f.url} className="h-32 w-full rounded-xl object-cover" />:<img src={f.url} alt={f.name} className="h-32 w-full rounded-xl object-cover" />}<p className="mt-1 truncate text-xs text-slate-600">{f.name}</p><div className="mt-2 flex gap-1">{f.type.startsWith("image/")&&<button onClick={()=>setAnnotating({url:f.url,idx:i})} className="flex-1 rounded-xl py-1 text-xs font-semibold" style={{background:"#fffbeb",color:"#92400e"}}><PenLine size={12} className="inline mr-1" />Annotate</button>}<button onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))} className="flex-1 rounded-xl bg-red-50 py-1 text-xs font-semibold text-red-700">Delete</button></div></div>))}</div>)}
+        {files.length>0&&(<div className="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-3">{files.map((f,i)=>(<div key={i} className="rounded-2xl bg-white p-2">{f.type.startsWith("video/")?<video controls src={f.url} className="h-32 w-full rounded-xl object-cover" />:<img src={f.url} alt={f.name} className="h-32 w-full rounded-xl object-cover" />}<p className="mt-1 truncate text-xs text-slate-600">{f.name}</p><div className="mt-2 flex gap-1">{f.type.startsWith("image/")&&<button onClick={()=>setAnnotating({url:f.url,idx:i})} className="flex-1 rounded-xl py-1 text-xs font-semibold" style={{background:"#fffbeb",color:"#92400e"}}><FileText size={12} className="inline mr-1" />Annotate</button>}<button onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))} className="flex-1 rounded-xl bg-red-50 py-1 text-xs font-semibold text-red-700">Delete</button></div></div>))}</div>)}
         <Btn className="w-full py-6 text-base" onClick={save}>Save conversation</Btn>
       </CC></Card>
     </div>
@@ -1650,7 +1650,7 @@ function ClientsScreen({ data, setData, go, userId, isOnline }) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Btn variant="outline" onClick={addFU}>Add follow-up</Btn>
-          <Btn variant="outline" onClick={() => setShareModal({ title: sel.company, text: `Client: ${sel.company}\nContact: ${sel.contact || "-"}\nPhone: ${sel.phone || "-"}\nEmail: ${sel.email || "-"}\nLocation: ${sel.location || "-"}\nStage: ${sel.pipeline_status || "New Lead"}` })}><Share2 size={16} />Share</Btn>
+          <Btn variant="outline" onClick={() => setShareModal({ title: sel.company, text: `Client: ${sel.company}\nContact: ${sel.contact || "-"}\nPhone: ${sel.phone || "-"}\nEmail: ${sel.email || "-"}\nLocation: ${sel.location || "-"}\nStage: ${sel.pipeline_status || "New Lead"}` })}><Upload size={16} />Share</Btn>
         </div>
         <Btn variant="danger" className="w-full" onClick={del}><Trash2 size={16} />Delete client</Btn>
         {clientEquipment.length > 0 && (
@@ -1739,7 +1739,7 @@ function ServiceScreen({ data, setData, userId, isOnline }) {
         <Field label="Work done" multiline value={rep.workDone} onChange={v=>setRep(r=>({...r,workDone:v}))} />
         <Field label="Parts used" multiline value={rep.partsUsed} onChange={v=>setRep(r=>({...r,partsUsed:v}))} />
         <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-6 font-semibold ${uploading?"opacity-60 pointer-events-none":""}`}><Upload size={18} />{uploading?"Uploading…":"Add photos / files"}<input type="file" accept="image/*,video/*,.pdf,.doc,.docx" multiple className="hidden" onChange={handleFiles} disabled={uploading} /></label>
-        {files.map((f,i)=>(<div key={i} className="rounded-2xl bg-slate-50 p-3"><p className="text-sm font-semibold">{f.name}</p>{f.type.startsWith("image/")&&<img src={f.url} alt={f.name} className="mt-2 max-h-40 w-full rounded-xl object-cover" />}<div className="mt-2 flex gap-2">{f.type.startsWith("image/")&&<Btn variant="outline" className="flex-1 text-sm py-2" onClick={()=>setAnnotating({url:f.url,idx:i})}><PenLine size={14} />Annotate</Btn>}<Btn variant="danger" className="flex-1 text-sm py-2" onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))}>Delete</Btn></div></div>))}
+        {files.map((f,i)=>(<div key={i} className="rounded-2xl bg-slate-50 p-3"><p className="text-sm font-semibold">{f.name}</p>{f.type.startsWith("image/")&&<img src={f.url} alt={f.name} className="mt-2 max-h-40 w-full rounded-xl object-cover" />}<div className="mt-2 flex gap-2">{f.type.startsWith("image/")&&<Btn variant="outline" className="flex-1 text-sm py-2" onClick={()=>setAnnotating({url:f.url,idx:i})}><FileText size={14} />Annotate</Btn>}<Btn variant="danger" className="flex-1 text-sm py-2" onClick={()=>setFiles(c=>c.filter((_,j)=>j!==i))}>Delete</Btn></div></div>))}
         <div className="rounded-2xl bg-slate-50 p-4"><div className="flex items-center justify-between"><p className="text-sm font-semibold">Client signature</p><Btn variant="outline" className="text-sm py-2" onClick={()=>setShowSig(true)}>{signature?"Re-sign":"Get signature"}</Btn></div>{signature&&<img src={signature} alt="Signature" className="mt-3 h-20 w-full rounded-xl border border-slate-200 object-contain bg-white" />}</div>
         <Btn className="w-full py-6 text-base" onClick={save}>Save & create PDF</Btn>
       </CC></Card>
@@ -1802,7 +1802,7 @@ function MoreScreen({ go, data, setData, currentUser, onSignOut }) {
         {isAdmin&&<BigAction icon={ShieldCheck} title="Management Dashboard" subtitle="Team performance & weekly reports" onClick={()=>go("Admin")} />}
         <BigAction icon={BarChart2} title="My Dashboard" subtitle="Charts and performance overview" onClick={()=>go("Dashboard")} />
         <BigAction icon={FileText} title="Export Data" subtitle="Download clients, quotes and reports to Excel" onClick={()=>go("Export")} />
-        <BigAction icon={Target} title="Target Tracker" subtitle="Monthly targets and progress" onClick={()=>go("Targets")} />
+        <BigAction icon={BarChart2} title="Target Tracker" subtitle="Monthly targets and progress" onClick={()=>go("Targets")} />
         <BigAction icon={BriefcaseBusiness} title="My Sales Reports" subtitle="Log weekly visits, quotes and leads" onClick={()=>setSub("sales")} />
         <BigAction icon={ClipboardList} title="Settings & Account" subtitle="Account info and sign out" onClick={()=>setSub("settings")} />
       </div>
