@@ -190,41 +190,48 @@ function openIDB() {
     try {
       if (!window.indexedDB) { reject(new Error('IDB not supported')); return; }
       const req = indexedDB.open(IDB_NAME, IDB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('offline_photos')) {
-        db.createObjectStore('offline_photos', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('offline_data')) {
-        db.createObjectStore('offline_data', { keyPath: 'id' });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('offline_photos')) {
+          db.createObjectStore('offline_photos', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('offline_data')) {
+          db.createObjectStore('offline_data', { keyPath: 'id' });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    } catch(e) {
+      reject(e);
+    }
   });
 }
 
 async function savePhotoOffline(id, file, metadata) {
   try {
-  const db = await openIDB();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const tx = db.transaction('offline_photos', 'readwrite');
-      tx.objectStore('offline_photos').put({
-        id,
-        dataUrl: reader.result,
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        metadata,
-        savedAt: Date.now()
-      });
-      tx.oncomplete = () => resolve(reader.result);
-      tx.onerror = () => reject(tx.error);
-    };
-    reader.readAsDataURL(file);
-  });
+    const db = await openIDB();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const tx = db.transaction('offline_photos', 'readwrite');
+        tx.objectStore('offline_photos').put({
+          id,
+          dataUrl: reader.result,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          metadata,
+          savedAt: Date.now()
+        });
+        tx.oncomplete = () => resolve(reader.result);
+        tx.onerror = () => reject(tx.error);
+      };
+      reader.readAsDataURL(file);
+    });
+  } catch(e) {
+    console.error('savePhotoOffline error:', e);
+    return null;
+  }
 }
 
 async function getOfflinePhotos() {
@@ -263,7 +270,7 @@ async function syncOfflinePhotos(userId, setData) {
         // Save to Supabase documents
         const { data: doc } = await supabase.from('documents').insert({
           user_id: userId,
-          client_id: photo.metadata?.clientId || null,
+          client_id: photo.(metadata && metadata.clientId) || null,
           file_url: url,
           name: photo.name
         }).select().single();
@@ -853,7 +860,7 @@ function EquipmentScreen({ data, setData, userId, isOnline }) {
               const reports = (data.serviceReports || []).filter(r => r.machine && r.machine.toLowerCase().includes(sel.name.toLowerCase()));
               return reports.length === 0 ? <p className="text-sm text-slate-500">No linked service reports yet.</p> : reports.map(r => (
                 <div key={r.id} className="mb-2 rounded-2xl bg-slate-50 p-3">
-                  <p className="text-xs font-bold text-slate-500">{r.created_at?.slice(0, 10)}</p>
+                  <p className="text-xs font-bold text-slate-500">{r.created_at && r.created_at.slice(0, 10)}</p>
                   <p className="text-sm text-slate-700 mt-1">{r.fault}</p>
                   <p className="text-xs text-slate-400">{r.technician}</p>
                 </div>
@@ -961,10 +968,10 @@ function TargetScreen({ data, setData, userId, isOnline }) {
   }, [targets]);
 
   const metrics = [
-    { label: "Visits / Conversations", actual: actuals?.visits, target: targets?.visits_target, color: "#3b82f6", icon: Users },
-    { label: "Quotes Sent", actual: actuals?.quotes, target: targets?.quotes_target, color: BRAND.primary, icon: File },
-    { label: "New Clients", actual: actuals?.newClients, target: targets?.new_clients_target, color: "#10b981", icon: Plus },
-    { label: "Service Reports", actual: actuals?.serviceReports, target: targets?.service_reports_target, color: "#8b5cf6", icon: Wrench },
+    { label: "Visits / Conversations", actual: (actuals && actuals.visits), target: (targets && targets.visits_target), color: "#3b82f6", icon: Users },
+    { label: "Quotes Sent", actual: (actuals && actuals.quotes), target: (targets && targets.quotes_target), color: BRAND.primary, icon: File },
+    { label: "New Clients", actual: (actuals && actuals.newClients), target: (targets && targets.new_clients_target), color: "#10b981", icon: Plus },
+    { label: "Service Reports", actual: (actuals && actuals.serviceReports), target: (targets && targets.service_reports_target), color: "#8b5cf6", icon: Wrench },
   ];
 
   return (
@@ -1053,7 +1060,7 @@ function QuoteScreen({ data, setData, userId, isOnline }) {
   const save = async () => {
     if (!form.description.trim()) { alert("Please enter a description."); return; }
     const client = data.clients.find(c => c.id === form.clientId);
-    const payload = { user_id: userId, client_id: form.clientId || null, client_name: client?.company || form.client_name, quote_number: form.quote_number, description: form.description, value: parseFloat(form.value) || 0, status: "Pending", sent_date: form.sent_date, follow_up_date: form.follow_up_date, flagged: false, notes: form.notes };
+    const payload = { user_id: userId, client_id: form.clientId || null, client_name: (client && client.company) || form.client_name, quote_number: form.quote_number, description: form.description, value: parseFloat(form.value) || 0, status: "Pending", sent_date: form.sent_date, follow_up_date: form.follow_up_date, flagged: false, notes: form.notes };
     if (isOnline) { const { data: r } = await supabase.from("quotes").insert(payload).select().single(); if (r) setData(c => ({ ...c, quotes: [r, ...(c.quotes || [])] })); }
     else { addToQueue({ type: "insert", table: "quotes", data: payload }); setData(c => ({ ...c, quotes: [{ ...payload, id: `offline_${Date.now()}`, created_at: new Date().toISOString() }, ...(c.quotes || [])] })); }
     setForm({ clientId: "", client_name: "", quote_number: "", description: "", value: "", sent_date: todayISO(), follow_up_date: "", notes: "" });
@@ -1230,7 +1237,7 @@ function GlobalSearchScreen({ data, go, setScreen }) {
   const [query, setQuery] = useState("");
   const inputRef = React.useRef(null);
 
-  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
+  useEffect(() => { setTimeout(() => inputRef.(current && current.focus)(), 100); }, []);
 
   const results = useMemo(() => {
     const q = query.toLowerCase().trim();
@@ -1301,7 +1308,7 @@ function GlobalSearchScreen({ data, go, setScreen }) {
             <button key={q.id} onClick={() => setScreen("Quotes")} className="w-full text-left">
               <Card className="rounded-2xl shadow-sm"><CC className="p-3">
                 <p className="font-bold text-slate-900">{q.client_name}</p>
-                <p className="text-xs text-slate-500">{q.quote_number} · {q.description?.slice(0, 60)}</p>
+                <p className="text-xs text-slate-500">{q.quote_number} · {q.(description && description.slice)(0, 60)}</p>
                 <span className={`text-xs font-bold px-2 py-0.5 rounded-xl ${QUOTE_STATUS_COLORS[q.status]}`}>{q.status}</span>
               </CC></Card>
             </button>
@@ -1321,8 +1328,8 @@ function GlobalSearchScreen({ data, go, setScreen }) {
             <button key={r.id} onClick={() => setScreen("Service")} className="w-full text-left">
               <Card className="rounded-2xl shadow-sm"><CC className="p-3">
                 <p className="font-bold text-slate-900">{r.client_name || "No client"}</p>
-                <p className="text-xs text-slate-500">{r.machine} · {r.fault?.slice(0, 60)}</p>
-                <p className="text-xs text-slate-400">{smartDate(r.created_at?.slice(0, 10))}</p>
+                <p className="text-xs text-slate-500">{r.machine} · {r.(fault && fault.slice)(0, 60)}</p>
+                <p className="text-xs text-slate-400">{smartDate(r.created_at && r.created_at.slice(0, 10))}</p>
               </CC></Card>
             </button>
           )} />
@@ -1453,7 +1460,7 @@ function HomeScreen({ go, clients, planList, followUps, quotes, setData, userId,
 // ─── Calendar ──────────────────────────────────────────────────────────────────
 function CalendarScreen({ data, setData, userId, isOnline }) {
   const [ni, setNi] = useState({ date: todayISO(), time: "", title: "", client: "", location: "", type: "Follow-up", reminder: "30" });
-  const [notifGranted, setNotifGranted] = useState(Notification?.permission === "granted");
+  const [notifGranted, setNotifGranted] = useState(Notification && Notification.permission === "granted");
   const timers = useRef([]);
   const enableNotifs = async () => { const g = await requestNotifPermission(); setNotifGranted(g); };
   const add = async () => { if (!ni.date||!ni.time||!ni.title) { alert("Please add a date, time and title."); return; } const payload = { user_id: userId, ...ni }; let item; if (isOnline) { const { data: r } = await supabase.from("plan_items").insert(payload).select().single(); item = r; } else { item = { ...payload, id: `offline_${Date.now()}` }; addToQueue({ type: "insert", table: "plan_items", data: payload }); } if (item) { setData(c => ({ ...c, planList: [...c.planList, item] })); if (notifGranted) { const t = scheduleItemNotifs(item, [parseInt(ni.reminder)]); timers.current.push(...t); } } setNi({ date: todayISO(), time: "", title: "", client: "", location: "", type: "Follow-up", reminder: "30" }); };
@@ -1507,7 +1514,7 @@ function QuickAddScreen({ data, setData, go, userId, userName, isOnline }) {
   const [rec, setRec] = useState(false); const [mr, setMr] = useState(null); const [audio, setAudio] = useState(""); const [audioErr, setAudioErr] = useState("");
   const [files, setFiles] = useState([]); const [uploading, setUploading] = useState(false); const [annotating, setAnnotating] = useState(null);
   const sel = data.clients.find(c => c.id === selId);
-  const startRec = async () => { try { setAudioErr(""); const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const recorder = new MediaRecorder(stream); const chunks = []; recorder.ondataavailable = e => e.data?.size>0&&chunks.push(e.data); recorder.onstop = () => { const blob = new Blob(chunks,{type:recorder.mimeType||"audio/webm"}); const r = new FileReader(); r.onload = () => setAudio(r.result); r.readAsDataURL(blob); stream.getTracks().forEach(t=>t.stop()); }; recorder.start(); setMr(recorder); setRec(true); } catch { setAudioErr("Microphone permission blocked."); } };
+  const startRec = async () => { try { setAudioErr(""); const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const recorder = new MediaRecorder(stream); const chunks = []; recorder.ondataavailable = e => e.data && e.data.size>0&&chunks.push(e.data); recorder.onstop = () => { const blob = new Blob(chunks,{type:recorder.mimeType||"audio/webm"}); const r = new FileReader(); r.onload = () => setAudio(r.result); r.readAsDataURL(blob); stream.getTracks().forEach(t=>t.stop()); }; recorder.start(); setMr(recorder); setRec(true); } catch { setAudioErr("Microphone permission blocked."); } };
   const stopRec = () => { if (!mr||!rec) return; mr.stop(); setRec(false); setMr(null); };
   const handleFiles = async e => { setUploading(true); const s = await filesToStored(e.target.files); setFiles(c => [...c,...s]); e.target.value=""; setUploading(false); };
   const save = async () => {
@@ -1518,7 +1525,7 @@ function QuickAddScreen({ data, setData, go, userId, userName, isOnline }) {
     const convPayload = { user_id:userId, client_id:cid, note, audio_data_url:audio, created_by_name:userName };
     if (isOnline) { const {data:conv} = await supabase.from("conversations").insert(convPayload).select().single(); if (conv) setData(c=>({...c,conversations:[conv,...c.conversations]})); } else { addToQueue({type:"insert",table:"conversations",data:convPayload}); setData(c=>({...c,conversations:[{...convPayload,id:`offline_${Date.now()}`,created_at:new Date().toISOString()},...c.conversations]})); }
     for (const f of files) { if (isOnline) { const {data:doc} = await supabase.from("documents").insert({user_id:userId,client_id:cid,file_url:f.url,name:f.name}).select().single(); if (doc) setData(c=>({...c,documents:[...c.documents,doc]})); } }
-    if (nextFU) { const client = data.clients.find(c=>c.id===cid); const fuPayload = { user_id:userId, client_id:cid, client_name:client?.company||nc.company, due_date:nextFU, status:"Open", outcome:note, completed:false, recurring, recurring_days:parseInt(recurringDays) }; if (isOnline) { const {data:fu} = await supabase.from("follow_ups").insert(fuPayload).select().single(); if (fu) setData(c=>({...c,followUps:[...c.followUps,fu]})); } else { addToQueue({type:"insert",table:"follow_ups",data:fuPayload}); setData(c=>({...c,followUps:[...c.followUps,{...fuPayload,id:`offline_${Date.now()}`}]})); } }
+    if (nextFU) { const client = data.clients.find(c=>c.id===cid); const fuPayload = { user_id:userId, client_id:cid, client_name:(client && client.company)||nc.company, due_date:nextFU, status:"Open", outcome:note, completed:false, recurring, recurring_days:parseInt(recurringDays) }; if (isOnline) { const {data:fu} = await supabase.from("follow_ups").insert(fuPayload).select().single(); if (fu) setData(c=>({...c,followUps:[...c.followUps,fu]})); } else { addToQueue({type:"insert",table:"follow_ups",data:fuPayload}); setData(c=>({...c,followUps:[...c.followUps,{...fuPayload,id:`offline_${Date.now()}`}]})); } }
     setSelId(""); setNc({company:"",division:"",contact:"",phone:"",email:"",location:""}); setNote(""); setNextFU(""); setAudio(""); setFiles([]); setRecurring(false);
     alert("Conversation saved!"); go("Clients");
   };
@@ -1683,12 +1690,12 @@ function ClientsScreen({ data, setData, go, userId, isOnline }) {
         )}
         <div><h2 className="mb-2 text-lg font-bold">History</h2>
           {convs.length === 0 && <p className="text-sm text-slate-500">No history yet.</p>}
-          {convs.map(e => (<div key={e.id} className="mb-2 rounded-2xl bg-slate-50 p-3"><div className="flex justify-between"><p className="text-xs font-bold text-slate-500">{e.created_at?.slice(0, 10)}</p><p className="text-xs text-slate-400">{e.created_by_name}</p></div><p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{e.note}</p>{e.audio_data_url && <audio controls src={e.audio_data_url} className="mt-2 w-full" />}</div>))}
+          {convs.map(e => (<div key={e.id} className="mb-2 rounded-2xl bg-slate-50 p-3"><div className="flex justify-between"><p className="text-xs font-bold text-slate-500">{e.created_at && e.created_at.slice(0, 10)}</p><p className="text-xs text-slate-400">{e.created_by_name}</p></div><p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{e.note}</p>{e.audio_data_url && <audio controls src={e.audio_data_url} className="mt-2 w-full" />}</div>))}
         </div>
         <div><h2 className="mb-2 text-lg font-bold">Linked files</h2>
           {docs.length === 0 && <p className="text-sm text-slate-500">No files yet.</p>}
           <div className="grid grid-cols-2 gap-3">
-            {docs.map(d => { const isImg = d.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i); const isVid = d.name?.match(/\.(mp4|mov|webm)$/i); return (<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg ? <img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" /> : isVid ? <video controls src={d.file_url} className="h-28 w-full rounded-xl" /> : <div className="flex h-28 items-center justify-center rounded-xl bg-white"><File /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>); })}
+            {docs.map(d => { const isImg = d.(name && name.match)(/\.(jpg|jpeg|png|gif|webp)$/i); const isVid = d.(name && name.match)(/\.(mp4|mov|webm)$/i); return (<div key={d.id} className="rounded-2xl bg-slate-50 p-2">{isImg ? <img src={d.file_url} alt={d.name} className="h-28 w-full rounded-xl object-cover" /> : isVid ? <video controls src={d.file_url} className="h-28 w-full rounded-xl" /> : <div className="flex h-28 items-center justify-center rounded-xl bg-white"><File /></div>}<p className="mt-2 truncate text-xs text-slate-600">{d.name}</p></div>); })}
           </div>
         </div>
       </CC></Card>
@@ -1743,8 +1750,8 @@ function ServiceScreen({ data, setData, userId, isOnline }) {
     if (isOnline) { const {data:r} = await supabase.from("service_reports").insert(payload).select().single(); if (r) setData(c=>({...c,serviceReports:[r,...c.serviceReports]})); } else { addToQueue({type:"insert",table:"service_reports",data:payload}); setData(c=>({...c,serviceReports:[{...payload,id:`offline_${Date.now()}`,created_at:new Date().toISOString()},...c.serviceReports]})); }
     for (const f of files) { if (isOnline&&rep.clientId) { const {data:doc} = await supabase.from("documents").insert({user_id:userId,client_id:rep.clientId,file_url:f.url,name:f.name}).select().single(); if (doc) setData(c=>({...c,documents:[...c.documents,doc]})); } }
     const pw = window.open("","_blank");
-    if (pw) { const esc=v=>String(v||"").replace(/[&<>'"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"}[m])); pw.document.write(`<html><head><title>Power Works Service Report</title><style>body{font-family:Arial,sans-serif;padding:30px;color:#1C1C1C}h1{border-bottom:3px solid #8B1A1A;padding-bottom:8px;color:#8B1A1A}.logo{max-height:60px;margin-bottom:16px}.s{margin-bottom:14px}.l{font-weight:bold;color:#8B1A1A}img{max-width:100%;margin-top:8px;border-radius:8px}.sig{border:1px solid #ccc;border-radius:8px;margin-top:8px}.footer{margin-top:40px;font-size:12px;color:#888;border-top:1px solid #eee;padding-top:16px}</style></head><body><img src="${BRAND.logo}" class="logo" alt="Power Works"/><h1>Service Report</h1><div class="s"><span class="l">Client:</span> ${esc(sel?.company)}</div><div class="s"><span class="l">Machine:</span> ${esc(rep.machine)}</div><div class="s"><span class="l">Technician:</span> ${esc(rep.technician)}</div><div class="s"><span class="l">Date:</span> ${new Date().toLocaleDateString("en-GB")}</div><div class="s"><span class="l">Fault Found:</span><br/>${esc(rep.fault).replace(/\n/g,"<br/>")}</div><div class="s"><span class="l">Work Done:</span><br/>${esc(rep.workDone).replace(/\n/g,"<br/>")}</div><div class="s"><span class="l">Parts Used:</span><br/>${esc(rep.partsUsed).replace(/\n/g,"<br/>")}</div><h2>Photos</h2>${files.map(f=>f.type.startsWith("image/")?`<img src="${f.url}"/>`:`<p>${esc(f.name)}</p>`).join("")}${signature?`<h2>Client Signature</h2><img src="${signature}" class="sig" style="max-width:300px"/>`:""}  <div class="footer">Power Works (Pty) Ltd · power-works.co.za</div><script>window.onload=function(){window.print()}<\/script></body></html>`); pw.document.close(); }
-    setShareModal({ title: `Service Report — ${sel?.company || ""}`, text: `Power Works Service Report\nClient: ${sel?.company||"—"}\nMachine: ${rep.machine}\nTechnician: ${rep.technician}\nFault: ${rep.fault}\nWork Done: ${rep.workDone}` });
+    if (pw) { const esc=v=>String(v||"").replace(/[&<>'"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':"&quot;"}[m])); pw.document.write(`<html><head><title>Power Works Service Report</title><style>body{font-family:Arial,sans-serif;padding:30px;color:#1C1C1C}h1{border-bottom:3px solid #8B1A1A;padding-bottom:8px;color:#8B1A1A}.logo{max-height:60px;margin-bottom:16px}.s{margin-bottom:14px}.l{font-weight:bold;color:#8B1A1A}img{max-width:100%;margin-top:8px;border-radius:8px}.sig{border:1px solid #ccc;border-radius:8px;margin-top:8px}.footer{margin-top:40px;font-size:12px;color:#888;border-top:1px solid #eee;padding-top:16px}</style></head><body><img src="${BRAND.logo}" class="logo" alt="Power Works"/><h1>Service Report</h1><div class="s"><span class="l">Client:</span> ${esc((sel && sel.company))}</div><div class="s"><span class="l">Machine:</span> ${esc(rep.machine)}</div><div class="s"><span class="l">Technician:</span> ${esc(rep.technician)}</div><div class="s"><span class="l">Date:</span> ${new Date().toLocaleDateString("en-GB")}</div><div class="s"><span class="l">Fault Found:</span><br/>${esc(rep.fault).replace(/\n/g,"<br/>")}</div><div class="s"><span class="l">Work Done:</span><br/>${esc(rep.workDone).replace(/\n/g,"<br/>")}</div><div class="s"><span class="l">Parts Used:</span><br/>${esc(rep.partsUsed).replace(/\n/g,"<br/>")}</div><h2>Photos</h2>${files.map(f=>f.type.startsWith("image/")?`<img src="${f.url}"/>`:`<p>${esc(f.name)}</p>`).join("")}${signature?`<h2>Client Signature</h2><img src="${signature}" class="sig" style="max-width:300px"/>`:""}  <div class="footer">Power Works (Pty) Ltd · power-works.co.za</div><script>window.onload=function(){window.print()}<\/script></body></html>`); pw.document.close(); }
+    setShareModal({ title: `Service Report — ${(sel && sel.company) || ""}`, text: `Power Works Service Report\nClient: ${(sel && sel.company)||"—"}\nMachine: ${rep.machine}\nTechnician: ${rep.technician}\nFault: ${rep.fault}\nWork Done: ${rep.workDone}` });
     setRep({clientId:"",machine:"",fault:"",workDone:"",partsUsed:"",technician:""}); setFiles([]); setSignature(null);
   };
 
@@ -1784,7 +1791,7 @@ function DocumentsScreen({ data, setData, userId, isOnline }) {
         <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-2xl py-6 font-semibold text-white ${uploading?"opacity-60 pointer-events-none":""}`} style={{background:BRAND.primary}}><Upload size={18} />{uploading?"Uploading…":"Upload photo, video or document"}<input type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx" multiple className="hidden" onChange={handle} disabled={uploading} /></label>
       </CC></Card>
       {data.documents.length===0&&<Empty title="No documents" text="Upload your first file above." />}
-      <div className="space-y-3">{data.documents.map(doc=>{const client=data.clients.find(c=>c.id===doc.client_id);const isImg=doc.name?.match(/\.(jpg|jpeg|png|gif|webp)$/i);const isVid=doc.name?.match(/\.(mp4|mov|webm)$/i);return(<Card key={doc.id} className="rounded-3xl shadow-sm"><CC className="space-y-3 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><File size={22} /></div><div className="flex-1 min-w-0"><p className="truncate font-bold">{doc.name}</p><p className="text-sm text-slate-500">{client?client.company:"Global"}</p></div><button onClick={()=>del(doc.id)} className="rounded-xl bg-red-50 p-2 text-red-700"><X size={18} /></button></div>{isImg&&<img src={doc.file_url} alt={doc.name} className="max-h-64 w-full rounded-2xl object-cover" />}{isVid&&<video controls src={doc.file_url} className="max-h-64 w-full rounded-2xl" />}{!isImg&&!isVid&&<a href={doc.file_url} target="_blank" rel="noreferrer"><Btn className="w-full">Open document</Btn></a>}</CC></Card>);})}</div>
+      <div className="space-y-3">{data.documents.map(doc=>{const client=data.clients.find(c=>c.id===doc.client_id);const isImg=doc.(name && name.match)(/\.(jpg|jpeg|png|gif|webp)$/i);const isVid=doc.(name && name.match)(/\.(mp4|mov|webm)$/i);return(<Card key={doc.id} className="rounded-3xl shadow-sm"><CC className="space-y-3 p-4"><div className="flex items-center gap-3"><div className="rounded-2xl bg-slate-100 p-3 text-slate-700"><File size={22} /></div><div className="flex-1 min-w-0"><p className="truncate font-bold">{doc.name}</p><p className="text-sm text-slate-500">{client?client.company:"Global"}</p></div><button onClick={()=>del(doc.id)} className="rounded-xl bg-red-50 p-2 text-red-700"><X size={18} /></button></div>{isImg&&<img src={doc.file_url} alt={doc.name} className="max-h-64 w-full rounded-2xl object-cover" />}{isVid&&<video controls src={doc.file_url} className="max-h-64 w-full rounded-2xl" />}{!isImg&&!isVid&&<a href={doc.file_url} target="_blank" rel="noreferrer"><Btn className="w-full">Open document</Btn></a>}</CC></Card>);})}</div>
     </div>
   );
 }
@@ -1814,10 +1821,10 @@ function AdminDashboard() {
 // ─── More ──────────────────────────────────────────────────────────────────────
 function MoreScreen({ go, data, setData, currentUser, onSignOut }) {
   const [sub, setSub] = useState("main"); const [sr, setSr] = useState({ week:"",visits:"",quotes:"",followUps:"",newLeads:"",summary:"" });
-  const isAdmin = currentUser?.role === "admin";
+  const isAdmin = (currentUser && currentUser.role) === "admin";
   const saveSR = async () => { const {data:r} = await supabase.from("sales_reports").insert({user_id:currentUser.id,week:sr.week,visits:sr.visits,quotes:sr.quotes,follow_ups:sr.followUps,new_leads:sr.newLeads,summary:sr.summary}).select().single(); if (r) setData(c=>({...c,salesReports:[r,...c.salesReports]})); setSr({week:"",visits:"",quotes:"",followUps:"",newLeads:"",summary:""}); alert("Sales report saved."); };
-  if (sub==="sales") return (<div className="space-y-5"><Btn variant="outline" onClick={()=>setSub("main")}>← Back</Btn><h1 className="text-2xl font-bold">My Sales Reports</h1><Card className="rounded-3xl shadow-sm"><CC className="space-y-4 p-4"><Field label="Week / Date" value={sr.week} onChange={v=>setSr(r=>({...r,week:v}))} placeholder="e.g. Week 18 / 05 May 2026" /><Field label="Total visits" value={sr.visits} onChange={v=>setSr(r=>({...r,visits:v}))} /><Field label="Quotes sent" value={sr.quotes} onChange={v=>setSr(r=>({...r,quotes:v}))} /><Field label="Follow-ups completed" value={sr.followUps} onChange={v=>setSr(r=>({...r,followUps:v}))} /><Field label="New leads" value={sr.newLeads} onChange={v=>setSr(r=>({...r,newLeads:v}))} /><Field label="Weekly summary" multiline value={sr.summary} onChange={v=>setSr(r=>({...r,summary:v}))} /><Btn className="w-full py-6" onClick={saveSR}>Save sales report</Btn></CC></Card>{data.salesReports.map(r=><Card key={r.id} className="rounded-3xl shadow-sm"><CC className="p-4"><p className="font-bold">{r.week||r.created_at?.slice(0,10)}</p><p className="mt-1 text-sm text-slate-600">{r.summary}</p></CC></Card>)}</div>);
-  if (sub==="settings") return (<div className="space-y-5"><Btn variant="outline" onClick={()=>setSub("main")}>← Back</Btn><h1 className="text-2xl font-bold">Settings</h1><Card className="rounded-3xl shadow-sm"><CC className="space-y-4 p-4"><div className="flex items-center gap-3 mb-2"><img src={BRAND.logo} alt="Power Works" className="h-10 object-contain" onError={e=>{e.target.style.display="none";}} /><div><p className="font-bold" style={{color:BRAND.primary}}>Power Works (Pty) Ltd</p><p className="text-xs text-slate-500">power-works.co.za</p></div></div><div className="rounded-2xl p-4 space-y-1" style={{background:BRAND.light}}><p className="text-sm font-bold">Logged in as</p><p className="text-sm text-slate-700">{currentUser?.full_name||"No name"}</p><p className="text-xs text-slate-500">{currentUser?.email}</p><p className="text-xs font-semibold capitalize" style={{color:BRAND.primary}}>Role: {currentUser?.role||"employee"}</p></div><Btn variant="danger" className="w-full py-4" onClick={onSignOut}><LogOut size={16} />Sign out</Btn></CC></Card></div>);
+  if (sub==="sales") return (<div className="space-y-5"><Btn variant="outline" onClick={()=>setSub("main")}>← Back</Btn><h1 className="text-2xl font-bold">My Sales Reports</h1><Card className="rounded-3xl shadow-sm"><CC className="space-y-4 p-4"><Field label="Week / Date" value={sr.week} onChange={v=>setSr(r=>({...r,week:v}))} placeholder="e.g. Week 18 / 05 May 2026" /><Field label="Total visits" value={sr.visits} onChange={v=>setSr(r=>({...r,visits:v}))} /><Field label="Quotes sent" value={sr.quotes} onChange={v=>setSr(r=>({...r,quotes:v}))} /><Field label="Follow-ups completed" value={sr.followUps} onChange={v=>setSr(r=>({...r,followUps:v}))} /><Field label="New leads" value={sr.newLeads} onChange={v=>setSr(r=>({...r,newLeads:v}))} /><Field label="Weekly summary" multiline value={sr.summary} onChange={v=>setSr(r=>({...r,summary:v}))} /><Btn className="w-full py-6" onClick={saveSR}>Save sales report</Btn></CC></Card>{data.salesReports.map(r=><Card key={r.id} className="rounded-3xl shadow-sm"><CC className="p-4"><p className="font-bold">{r.week||r.created_at && r.created_at.slice(0,10)}</p><p className="mt-1 text-sm text-slate-600">{r.summary}</p></CC></Card>)}</div>);
+  if (sub==="settings") return (<div className="space-y-5"><Btn variant="outline" onClick={()=>setSub("main")}>← Back</Btn><h1 className="text-2xl font-bold">Settings</h1><Card className="rounded-3xl shadow-sm"><CC className="space-y-4 p-4"><div className="flex items-center gap-3 mb-2"><img src={BRAND.logo} alt="Power Works" className="h-10 object-contain" onError={e=>{e.target.style.display="none";}} /><div><p className="font-bold" style={{color:BRAND.primary}}>Power Works (Pty) Ltd</p><p className="text-xs text-slate-500">power-works.co.za</p></div></div><div className="rounded-2xl p-4 space-y-1" style={{background:BRAND.light}}><p className="text-sm font-bold">Logged in as</p><p className="text-sm text-slate-700">{(currentUser && currentUser.full_name)||"No name"}</p><p className="text-xs text-slate-500">{(currentUser && currentUser.email)}</p><p className="text-xs font-semibold capitalize" style={{color:BRAND.primary}}>Role: {(currentUser && currentUser.role)||"employee"}</p></div><Btn variant="danger" className="w-full py-4" onClick={onSignOut}><LogOut size={16} />Sign out</Btn></CC></Card></div>);
   return (
     <div className="space-y-5">
       <div><h1 className="text-2xl font-bold">More</h1><p className="text-sm text-slate-500">Reports and settings.</p></div>
@@ -1849,7 +1856,7 @@ function NotesScreen({ data, setData, userId, isOnline }) {
 
   // Schedule notifications for notes with reminders on load
   useEffect(() => {
-    if (Notification?.permission !== "granted") return;
+    if (Notification && Notification.permission !== "granted") return;
     activeNotes.forEach(note => {
       if (note.reminder_date && note.reminder_time) {
         const fireAt = new Date(`${note.reminder_date}T${note.reminder_time}:00`).getTime();
@@ -1876,7 +1883,7 @@ function NotesScreen({ data, setData, userId, isOnline }) {
         if (r) {
           setData(c => ({ ...c, notes: [r, ...(c.notes || [])] }));
           // Schedule notification
-          if (r.reminder_date && r.reminder_time && Notification?.permission === "granted") {
+          if (r.reminder_date && r.reminder_time && Notification && Notification.permission === "granted") {
             const fireAt = new Date(`${r.reminder_date}T${r.reminder_time}:00`).getTime();
             const delay = fireAt - Date.now();
             if (delay > 0) setTimeout(() => new Notification("📝 Power Works Reminder", { body: r.title, icon: "/icon-192.png" }), delay);
@@ -1947,7 +1954,7 @@ function NotesScreen({ data, setData, userId, isOnline }) {
       </div>
 
       {/* Notification prompt */}
-      {Notification?.permission !== "granted" && (
+      {Notification && Notification.permission !== "granted" && (
         <div className="flex items-center justify-between rounded-2xl p-4" style={{ background: "#fffbeb", border: "1px solid #fcd34d" }}>
           <div className="flex items-center gap-2">
             <Bell size={18} className="text-amber-600" />
@@ -1989,7 +1996,7 @@ function NotesScreen({ data, setData, userId, isOnline }) {
                       </p>
                     </div>
                   )}
-                  <p className="mt-1 text-xs text-slate-400">{note.created_at?.slice(0, 10)}</p>
+                  <p className="mt-1 text-xs text-slate-400">{note.created_at && e.created_at.slice(0, 10)}</p>
                 </div>
                 <button onClick={() => deleteNote(note.id)} className="rounded-xl bg-red-50 p-2 text-red-600">
                   <Trash2 size={16} />
@@ -2054,7 +2061,7 @@ function ExportScreen({ data, currentUser }) {
         exportToCSV(
           (data.equipment || []).map(e => {
             const client = data.clients.find(c => c.id === e.client_id);
-            return [e.name, e.model, e.serial_number, client?.company || "", e.install_date, e.last_service_date, e.next_service_date, e.warranty_expiry, e.notes];
+            return [e.name, e.model, e.serial_number, (client && client.company) || "", e.install_date, e.last_service_date, e.next_service_date, e.warranty_expiry, e.notes];
           }),
           ["Equipment Name", "Model", "Serial Number", "Client", "Install Date", "Last Service", "Next Service", "Warranty Expiry", "Notes"],
           "powerworks-equipment"
@@ -2062,7 +2069,7 @@ function ExportScreen({ data, currentUser }) {
       }
       if (type === "service_reports") {
         exportToCSV(
-          (data.serviceReports || []).map(r => [r.client_name, r.machine, r.technician, r.fault, r.work_done, r.parts_used, r.created_at?.slice(0, 10)]),
+          (data.serviceReports || []).map(r => [r.client_name, r.machine, r.technician, r.fault, r.work_done, r.parts_used, r.created_at && r.created_at.slice(0, 10)]),
           ["Client", "Machine", "Technician", "Fault", "Work Done", "Parts Used", "Date"],
           "powerworks-service-reports"
         );
@@ -2156,7 +2163,7 @@ export default function PowerWorksApp() {
   }, []);
 
   useEffect(() => {
-    if (!session?.user) return;
+    if (!(session && session.user)) return;
     const load = async () => { const {data:profile} = await supabase.from("users").select("*").eq("id",session.user.id).single(); const user = profile?{...session.user,...profile}:{...session.user,role:"employee"}; setCurrentUser(user); setAuthLoading(false); registerPushNotifications(session.user.id); };
     load();
   }, [session]);
@@ -2211,7 +2218,7 @@ export default function PowerWorksApp() {
     const clientsSub = supabase.channel('clients-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients', filter: `user_id=eq.${uid}` },
         (payload) => {
-          if (payload.eventType === 'INSERT') setData(c => ({ ...c, clients: [...c.clients.filter(x => x.id !== payload.new.id), payload.new].sort((a,b) => a.company?.localeCompare(b.company)) }));
+          if (payload.eventType === 'INSERT') setData(c => ({ ...c, clients: [...c.clients.filter(x => x.id !== payload.new.id), payload.new].sort((a,b) => a.(company && company.localeCompare)(b.company)) }));
           if (payload.eventType === 'UPDATE') setData(c => ({ ...c, clients: c.clients.map(x => x.id === payload.new.id ? { ...x, ...payload.new } : x) }));
           if (payload.eventType === 'DELETE') setData(c => ({ ...c, clients: c.clients.filter(x => x.id !== payload.old.id) }));
         })
