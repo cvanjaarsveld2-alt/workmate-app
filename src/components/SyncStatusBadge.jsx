@@ -30,7 +30,7 @@ export default function SyncStatusBadge({
         borderRadius: "999px",
         fontSize: 12,
         fontWeight: 700,
-        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
       }}
     >
       {text}
