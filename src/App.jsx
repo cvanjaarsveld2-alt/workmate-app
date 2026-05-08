@@ -6,7 +6,7 @@ import { offlineSave, offlineGetAll } from "./offline/offlineDb";
 import SyncStatusBadge from "./components/SyncStatusBadge";
 
 import {
-  Bell, Calendar, ChevronRight, Clipboard, File as FileIcon,
+  Bell, Calendar, ChevronRight, ChevronLeft, Clipboard, File as FileIcon,
   Home, LogOut, Plus, Search, Shield, Trash2, Users,
   Eye, EyeOff, RefreshCw, Check, AlertCircle,
   Settings, X, TrendingUp, Edit2, Save, Target,
@@ -730,77 +730,359 @@ function ClientsScreen({ data, setData, userId }) {
 
 // ─── Follow-ups ───────────────────────────────────────────────────────────────
 function FollowupsScreen({ data, setData, userId }) {
-  const [showForm,setShowForm]=useState(false);
-  const [search,setSearch]=useState("");
-  const [filter,setFilter]=useState("All");
-  const [form,setForm]=useState({title:"",client:"",date:todayISO(),time:"09:00"});
-  const followups=data.followups||[];
-  const today=todayISO();
+  const [showForm, setShowForm] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [view, setView] = useState("list"); // "list" | "calendar"
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(new Date().getMonth()); // 0-indexed
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [form, setForm] = useState({ title: "", client: "", date: todayISO(), time: "09:00", reminder: "on_time" });
+  const followups = data.followups || [];
+  const today = todayISO();
 
-  async function addFollowup(){
-    if(!form.title.trim()){alert("Please enter a title.");return;}
-    const item={id:genId(),user_id:userId,...form,completed:false,created_at:new Date().toISOString(),sync_status:"pending"};
-    setData(d=>({...d,followups:[item,...(d.followups||[])],syncQueue:[{id:genId(),table:"followups",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
-    await offlineSave("followups",item);
-    setForm({title:"",client:"",date:todayISO(),time:"09:00"});setShowForm(false);
+  // Reminder options
+  const REMINDER_OPTIONS = [
+    { value: "on_time",    label: "At time of follow-up" },
+    { value: "15_before",  label: "15 minutes before" },
+    { value: "30_before",  label: "30 minutes before" },
+    { value: "1h_before",  label: "1 hour before" },
+    { value: "1d_before",  label: "1 day before (9am)" },
+    { value: "morning",    label: "Day-of morning (7am)" },
+    { value: "none",       label: "No reminder" },
+  ];
+
+  function getReminderFireTime(date, time, reminder) {
+    const base = new Date(`${date}T${time || "09:00"}:00`);
+    switch (reminder) {
+      case "15_before": return new Date(base.getTime() - 15 * 60000);
+      case "30_before": return new Date(base.getTime() - 30 * 60000);
+      case "1h_before": return new Date(base.getTime() - 60 * 60000);
+      case "1d_before": { const d = new Date(date + "T09:00:00"); d.setDate(d.getDate() - 1); return d; }
+      case "morning":   return new Date(date + "T07:00:00");
+      case "none":      return null;
+      default:          return base; // on_time
+    }
   }
 
-  async function toggleDone(id){
-    const t=followups.find(f=>f.id===id);
-    const up={...t,completed:!t.completed,sync_status:"pending"};
-    setData(d=>({...d,followups:(d.followups||[]).map(f=>f.id===id?up:f)}));
-    await offlineSave("followups",up);
+  async function addFollowup() {
+    if (!form.title.trim()) { alert("Please enter a title."); return; }
+    const item = {
+      id: genId(), user_id: userId, ...form,
+      completed: false, created_at: new Date().toISOString(), sync_status: "pending",
+    };
+    setData(d => ({
+      ...d,
+      followups: [item, ...(d.followups || [])],
+      syncQueue: [{ id: genId(), table: "followups", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    await offlineSave("followups", item);
+    // Schedule notification for this specific followup
+    if (Notification.permission === "granted" && form.reminder !== "none") {
+      const fireAt = getReminderFireTime(form.date, form.time, form.reminder);
+      if (fireAt && fireAt > new Date()) {
+        scheduleNotificationsViaSW([{
+          id: "fu_" + item.id,
+          title: "🔔 Follow-up: " + item.title,
+          body: item.client ? `Client: ${item.client}` : "Tap to view.",
+          fireAt: fireAt.toISOString(),
+          tag: "fu_" + item.id,
+        }]);
+      }
+    }
+    setForm({ title: "", client: "", date: todayISO(), time: "09:00", reminder: "on_time" });
+    setShowForm(false);
   }
 
-  async function deleteFollowup(id){if(!window.confirm("Delete?"))return;setData(d=>({...d,followups:(d.followups||[]).filter(f=>f.id!==id)}));}
+  async function toggleDone(id) {
+    const t = followups.find(f => f.id === id);
+    const up = { ...t, completed: !t.completed, sync_status: "pending" };
+    setData(d => ({ ...d, followups: (d.followups || []).map(f => f.id === id ? up : f) }));
+    await offlineSave("followups", up);
+  }
 
-  const filtered=followups
-    .filter(f=>!search||[f.title,f.client].some(x=>x?.toLowerCase().includes(search.toLowerCase())))
-    .filter(f=>{
-      if(filter==="Today") return f.date===today&&!f.completed;
-      if(filter==="Overdue") return f.date<today&&!f.completed;
-      if(filter==="Done") return f.completed;
+  async function deleteFollowup(id) {
+    if (!window.confirm("Delete?")) return;
+    setData(d => ({ ...d, followups: (d.followups || []).filter(f => f.id !== id) }));
+  }
+
+  // ── Calendar helpers ──
+  function calDays() {
+    const first = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+    // Start week on Monday: shift Sunday(0) to 6
+    const startPad = (first + 6) % 7;
+    return { startPad, daysInMonth };
+  }
+
+  function dateStr(day) {
+    return `${calYear}-${String(calMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
+
+  function followupsOnDay(day) {
+    const ds = dateStr(day);
+    return followups.filter(f => f.date === ds);
+  }
+
+  const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+  function prevMonth() {
+    if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); }
+    else setCalMonth(m => m - 1);
+    setSelectedDay(null);
+  }
+  function nextMonth() {
+    if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); }
+    else setCalMonth(m => m + 1);
+    setSelectedDay(null);
+  }
+
+  const { startPad, daysInMonth } = calDays();
+  const calCells = [...Array(startPad).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  // Pad to complete last row
+  while (calCells.length % 7 !== 0) calCells.push(null);
+
+  const selectedDayFollowups = selectedDay ? followupsOnDay(selectedDay) : [];
+
+  // ── List view filtered ──
+  const filtered = followups
+    .filter(f => !search || [f.title, f.client].some(x => x?.toLowerCase().includes(search.toLowerCase())))
+    .filter(f => {
+      if (filter === "Today") return f.date === today && !f.completed;
+      if (filter === "Overdue") return f.date < today && !f.completed;
+      if (filter === "Done") return f.completed;
       return true;
     })
-    .sort((a,b)=>a.completed-b.completed||a.date.localeCompare(b.date));
+    .sort((a, b) => a.completed - b.completed || a.date.localeCompare(b.date));
+
+  const pendingCount = followups.filter(f => !f.completed).length;
+  const overdueCount = followups.filter(f => f.date < today && !f.completed).length;
 
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <PageHeader title="Follow-ups" subtitle={`${followups.filter(f=>!f.completed).length} pending`}/>
-        <Btn size="sm" onClick={()=>setShowForm(!showForm)}>{showForm?<X size={14}/>:<Plus size={14}/>}{showForm?"Cancel":"Add"}</Btn>
+        <PageHeader title="Follow-ups" subtitle={`${pendingCount} pending${overdueCount > 0 ? ` · ${overdueCount} overdue` : ""}`} />
+        <div className="flex gap-2">
+          {/* View toggle */}
+          <div className="flex rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <button onClick={() => setView("list")}
+              className={`px-3 py-2 text-xs font-bold transition-all ${view === "list" ? "text-white" : "text-slate-400"}`}
+              style={view === "list" ? { background: BRAND.primary } : {}}>
+              ☰
+            </button>
+            <button onClick={() => setView("calendar")}
+              className={`px-3 py-2 text-xs font-bold transition-all ${view === "calendar" ? "text-white" : "text-slate-400"}`}
+              style={view === "calendar" ? { background: BRAND.primary } : {}}>
+              📅
+            </button>
+          </div>
+          <Btn size="sm" onClick={() => setShowForm(!showForm)}>
+            {showForm ? <X size={14} /> : <Plus size={14} />}{showForm ? "Cancel" : "Add"}
+          </Btn>
+        </div>
       </div>
+
+      {/* Add form */}
       <AnimatePresence>
-        {showForm&&(
-          <motion.div initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}>
+        {showForm && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
             <Card className="p-4 space-y-3">
-              <Field label="Follow-up" value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="e.g. Call mine buyer" required/>
-              <Field label="Client" value={form.client} onChange={v=>setForm(f=>({...f,client:v}))} placeholder="Company / branch"/>
+              <p className="text-sm font-black text-slate-800">New Follow-up</p>
+              <Field label="Title" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Call mine buyer" required />
+              <Field label="Client" value={form.client} onChange={v => setForm(f => ({ ...f, client: v }))} placeholder="Company / branch" />
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Date" type="date" value={form.date} onChange={v=>setForm(f=>({...f,date:v}))}/>
-                <Field label="Time" type="time" value={form.time} onChange={v=>setForm(f=>({...f,time:v}))}/>
+                <Field label="Date" type="date" value={form.date} onChange={v => setForm(f => ({ ...f, date: v }))} />
+                <Field label="Time" type="time" value={form.time} onChange={v => setForm(f => ({ ...f, time: v }))} />
               </div>
-              <Btn className="w-full" onClick={addFollowup}><Plus size={14}/>Add Follow-up</Btn>
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  🔔 Reminder
+                </label>
+                <select value={form.reminder} onChange={e => setForm(f => ({ ...f, reminder: e.target.value }))}
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-red-300 focus:bg-white transition-colors">
+                  {REMINDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                {Notification.permission !== "granted" && (
+                  <p className="mt-1.5 text-xs text-amber-600 font-medium">⚠️ Enable notifications in Settings to receive reminders.</p>
+                )}
+              </div>
+              <Btn className="w-full" onClick={addFollowup}><Plus size={14} />Add Follow-up</Btn>
             </Card>
           </motion.div>
         )}
       </AnimatePresence>
-      <SearchBar value={search} onChange={setSearch} placeholder="Search follow-ups…"/>
-      <FilterPills options={["All","Today","Overdue","Done"]} value={filter} onChange={setFilter} dangerValue="Overdue"/>
-      {filtered.length===0&&<Empty title="No follow-ups" text="Add a follow-up or change filters." icon={Calendar}/>}
-      <div className="space-y-2">
-        {filtered.map(f=>(
-          <Card key={f.id} className="flex items-center gap-3 p-3">
-            <button onClick={()=>toggleDone(f.id)} className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${f.completed?"bg-green-100 text-green-600":f.date<today?"bg-red-100 text-red-500":"bg-slate-100 text-slate-400"}`}><Check size={15}/></button>
-            <div className="flex-1 min-w-0">
-              <p className={`text-sm font-bold truncate ${f.completed?"line-through text-slate-400":"text-slate-900"}`}>{f.title}</p>
-              <p className="text-xs text-slate-400">{f.client||"No client"} · {smartDate(f.date)}{f.time?` at ${f.time}`:""}</p>
+
+      {/* Calendar View */}
+      <AnimatePresence mode="wait">
+        {view === "calendar" && (
+          <motion.div key="cal" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
+            <Card className="p-4">
+              {/* Month nav */}
+              <div className="flex items-center justify-between mb-4">
+                <button onClick={prevMonth} className="p-2 rounded-xl bg-slate-50 text-slate-500 hover:bg-slate-100 transition-colors">
+                  <ChevronLeft size={16} />
+                </button>
+                <p className="text-sm font-black text-slate-900">{MONTH_NAMES[calMonth]} {calYear}</p>
+                <button onClick={nextMonth} className="p-2 rounded-xl bg-slate-50 text-slate500 hover:bg-slate-100 transition-colors">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+
+              {/* Day headers */}
+              <div className="grid grid-cols-7 mb-1">
+                {DAY_NAMES.map(d => (
+                  <div key={d} className="text-center text-[10px] font-bold text-slate-400 py-1">{d}</div>
+                ))}
+              </div>
+
+              {/* Calendar grid */}
+              <div className="grid grid-cols-7 gap-1">
+                {calCells.map((day, i) => {
+                  if (!day) return <div key={`pad-${i}`} />;
+                  const ds = dateStr(day);
+                  const dayFUs = followupsOnDay(day);
+                  const isToday = ds === today;
+                  const isSelected = selectedDay === day;
+                  const hasOverdue = dayFUs.some(f => !f.completed && ds < today);
+                  const hasPending = dayFUs.some(f => !f.completed && ds >= today);
+                  const allDone = dayFUs.length > 0 && dayFUs.every(f => f.completed);
+
+                  return (
+                    <button key={day} onClick={() => setSelectedDay(isSelected ? null : day)}
+                      className={`relative flex flex-col items-center justify-start rounded-xl p-1 min-h-[44px] transition-all ${isSelected ? "ring-2" : ""}`}
+                      style={{
+                        background: isSelected ? BRAND.light : isToday ? "#FFF1F2" : "transparent",
+                        ringColor: BRAND.primary,
+                      }}>
+                      <span className={`text-xs font-bold leading-none ${isToday ? "text-red-700" : isSelected ? "text-red-800" : "text-slate-700"}`}>
+                        {day}
+                      </span>
+                      {dayFUs.length > 0 && (
+                        <div className="flex flex-wrap justify-center gap-0.5 mt-1">
+                          {dayFUs.slice(0, 3).map((f, idx) => (
+                            <span key={idx} className="w-1.5 h-1.5 rounded-full"
+                              style={{ background: f.completed ? "#86EFAC" : ds < today ? "#F87171" : BRAND.primary }} />
+                          ))}
+                          {dayFUs.length > 3 && <span className="text-[8px] text-slate-400 font-bold">+{dayFUs.length - 3}</span>}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Legend */}
+              <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-100">
+                {[
+                  { color: BRAND.primary, label: "Upcoming" },
+                  { color: "#F87171", label: "Overdue" },
+                  { color: "#86EFAC", label: "Done" },
+                ].map(({ color, label }) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+                    <span className="text-[10px] text-slate-400 font-medium">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Selected day followups */}
+            {selectedDay && (
+              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 mb-2">
+                  {MONTH_NAMES[calMonth]} {selectedDay} — {selectedDayFollowups.length} item{selectedDayFollowups.length !== 1 ? "s" : ""}
+                </p>
+                {selectedDayFollowups.length === 0 ? (
+                  <Card className="p-6 text-center">
+                    <p className="text-sm text-slate-400">No follow-ups on this day</p>
+                    <Btn size="sm" className="mt-3" onClick={() => {
+                      setForm(f => ({ ...f, date: dateStr(selectedDay) }));
+                      setShowForm(true);
+                    }}><Plus size={13} />Add for this day</Btn>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedDayFollowups.map(f => (
+                      <Card key={f.id} className="flex items-center gap-3 p-3">
+                        <button onClick={() => toggleDone(f.id)}
+                          className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${f.completed ? "bg-green-100 text-green-600" : f.date < today ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
+                          <Check size={15} />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-bold truncate ${f.completed ? "line-through text-slate-400" : "text-slate-900"}`}>{f.title}</p>
+                          <p className="text-xs text-slate-400">{f.client || "No client"}{f.time ? ` · ${f.time}` : ""}</p>
+                          {f.reminder && f.reminder !== "none" && (
+                            <p className="text-xs text-blue-400">🔔 {REMINDER_OPTIONS.find(o => o.value === f.reminder)?.label || f.reminder}</p>
+                          )}
+                        </div>
+                        <button onClick={() => deleteFollowup(f.id)} className="shrink-0 p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* Upcoming this month summary */}
+            {!selectedDay && (() => {
+              const monthStr = `${calYear}-${String(calMonth + 1).padStart(2, "0")}`;
+              const thisMonthFUs = followups.filter(f => f.date.startsWith(monthStr) && !f.completed);
+              if (!thisMonthFUs.length) return null;
+              return (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1 mb-2">This month — {thisMonthFUs.length} pending</p>
+                  <div className="space-y-2">
+                    {thisMonthFUs.sort((a,b) => a.date.localeCompare(b.date)).slice(0, 5).map(f => (
+                      <Card key={f.id} className="flex items-center gap-3 p-3">
+                        <button onClick={() => toggleDone(f.id)}
+                          className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${f.date < today ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
+                          <Check size={15} />
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-900 truncate">{f.title}</p>
+                          <p className="text-xs text-slate-400">{f.client || "No client"} · {smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
+                        </div>
+                        {f.date < today && <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">Overdue</span>}
+                      </Card>
+                    ))}
+                    {thisMonthFUs.length > 5 && <p className="text-center text-xs text-slate-400">+{thisMonthFUs.length - 5} more — tap a day to see all</p>}
+                  </div>
+                </div>
+              );
+            })()}
+          </motion.div>
+        )}
+
+        {/* List View */}
+        {view === "list" && (
+          <motion.div key="list" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-3">
+            <SearchBar value={search} onChange={setSearch} placeholder="Search follow-ups…" />
+            <FilterPills options={["All", "Today", "Overdue", "Done"]} value={filter} onChange={setFilter} dangerValue="Overdue" />
+            {filtered.length === 0 && <Empty title="No follow-ups" text="Add a follow-up or switch to calendar view." icon={Calendar} />}
+            <div className="space-y-2">
+              {filtered.map(f => (
+                <Card key={f.id} className="flex items-center gap-3 p-3">
+                  <button onClick={() => toggleDone(f.id)}
+                    className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${f.completed ? "bg-green-100 text-green-600" : f.date < today ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
+                    <Check size={15} />
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-bold truncate ${f.completed ? "line-through text-slate-400" : "text-slate-900"}`}>{f.title}</p>
+                    <p className="text-xs text-slate-400">{f.client || "No client"} · {smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
+                    {f.reminder && f.reminder !== "none" && !f.completed && (
+                      <p className="text-xs text-blue-400">🔔 {REMINDER_OPTIONS.find(o => o.value === f.reminder)?.label || f.reminder}</p>
+                    )}
+                  </div>
+                  {f.date < today && !f.completed && <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">Overdue</span>}
+                  <button onClick={() => deleteFollowup(f.id)} className="shrink-0 p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
+                </Card>
+              ))}
             </div>
-            {f.date<today&&!f.completed&&<span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">Overdue</span>}
-            <button onClick={()=>deleteFollowup(f.id)} className="shrink-0 p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={13}/></button>
-          </Card>
-        ))}
-      </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
