@@ -10,7 +10,7 @@ import {
   Home, LogOut, Plus, Search, Shield, Trash2, Users,
   Eye, EyeOff, RefreshCw, Check, AlertCircle,
   Settings, X, TrendingUp, Edit2, Save, Target,
-  Wrench, Clock, MapPin, Hash,
+  Wrench, Clock, MapPin, Hash, Camera, Image, Video, Paperclip,
 } from "lucide-react";
 
 // ─── Brand ────────────────────────────────────────────────────────────────────
@@ -138,6 +138,131 @@ function formatCurrency(v) {
 }
 
 function genId() { return `local_${Date.now()}_${Math.random().toString(36).slice(2,7)}`; }
+
+// ─── Photo / Media Helpers ────────────────────────────────────────────────────
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function compressImage(file, maxWidth = 1200, quality = 0.75) {
+  // Videos: just convert to base64 without compression
+  if (file.type.startsWith("video/")) return fileToBase64(file);
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(fileToBase64(file)); };
+    img.src = url;
+  });
+}
+
+async function uploadPhotoToSupabase(base64, path) {
+  try {
+    const res = await fetch(base64);
+    const blob = await res.blob();
+    const { error } = await supabase.storage.from("powermate-media").upload(path, blob, { upsert: true, contentType: blob.type });
+    if (error) throw error;
+    const { data } = supabase.storage.from("powermate-media").getPublicUrl(path);
+    return data.publicUrl;
+  } catch (e) {
+    console.warn("Photo upload failed:", e);
+    return null;
+  }
+}
+
+// ─── Media Picker Component ───────────────────────────────────────────────────
+function MediaPicker({ onAdd, disabled = false }) {
+  const cameraRef = useRef(null);
+  const galleryRef = useRef(null);
+
+  async function handleFiles(files) {
+    for (const file of Array.from(files)) {
+      const base64 = await compressImage(file);
+      const isVideo = file.type.startsWith("video/");
+      onAdd({ id: genId(), base64, isVideo, name: file.name, type: file.type, uploadStatus: "pending" });
+    }
+  }
+
+  return (
+    <div className="flex gap-2">
+      <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment" className="hidden"
+        onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }} />
+      <input ref={galleryRef} type="file" accept="image/*,video/*" multiple className="hidden"
+        onChange={e => { if (e.target.files?.length) handleFiles(e.target.files); e.target.value = ""; }} />
+      <button type="button" onClick={() => cameraRef.current?.click()} disabled={disabled}
+        className="flex-1 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-3 text-xs font-bold text-slate-500 hover:border-red-300 hover:text-red-600 transition-colors disabled:opacity-40">
+        <Camera size={15} /> Camera
+      </button>
+      <button type="button" onClick={() => galleryRef.current?.click()} disabled={disabled}
+        className="flex-1 flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-3 text-xs font-bold text-slate-500 hover:border-red-300 hover:text-red-600 transition-colors disabled:opacity-40">
+        <Image size={15} /> Gallery
+      </button>
+    </div>
+  );
+}
+
+// ─── Media Gallery Component ──────────────────────────────────────────────────
+function MediaGallery({ media = [], onDelete, readonly = false }) {
+  const [lightbox, setLightbox] = useState(null);
+  if (!media.length) return null;
+  return (
+    <>
+      <div className="flex flex-wrap gap-2 mt-2">
+        {media.map((m, i) => (
+          <div key={m.id || i} className="relative group">
+            {m.isVideo
+              ? (
+                <div className="w-20 h-20 rounded-xl bg-slate-900 flex items-center justify-center cursor-pointer border-2 border-slate-200"
+                  onClick={() => setLightbox(m)}>
+                  <Video size={22} className="text-white" />
+                </div>
+              ) : (
+                <img src={m.url || m.base64} alt="attachment" onClick={() => setLightbox(m)}
+                  className="w-20 h-20 rounded-xl object-cover cursor-pointer border-2 border-slate-100 hover:border-red-300 transition-colors" />
+              )
+            }
+            {m.uploadStatus === "pending" && (
+              <span className="absolute bottom-1 left-1 rounded-full bg-amber-500 w-2 h-2" title="Not uploaded" />
+            )}
+            {!readonly && onDelete && (
+              <button onClick={() => onDelete(m.id)} className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <X size={10} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Lightbox */}
+      <AnimatePresence>
+        {lightbox && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setLightbox(null)}>
+            <button className="absolute top-4 right-4 text-white p-2"><X size={24} /></button>
+            {lightbox.isVideo
+              ? <video src={lightbox.url || lightbox.base64} controls className="max-w-full max-h-full rounded-xl" onClick={e => e.stopPropagation()} />
+              : <img src={lightbox.url || lightbox.base64} alt="full" className="max-w-full max-h-full rounded-xl object-contain" />
+            }
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
 
 // ─── UI ───────────────────────────────────────────────────────────────────────
 function Card({ children, className="", onClick }) {
@@ -768,18 +893,41 @@ function QuotesScreen({ data, setData, userId }) {
 }
 
 // ─── Notes ────────────────────────────────────────────────────────────────────
-function NotesScreen({ data, setData, userId }) {
+function NotesScreen({ data, setData, userId, isOnline }) {
   const [showForm,setShowForm]=useState(false);
   const [search,setSearch]=useState("");
   const [form,setForm]=useState({client:"",note:""});
+  const [pendingMedia,setPendingMedia]=useState([]);
   const notes=data.notes||[];
+
+  function addMedia(m){ setPendingMedia(pm=>[...pm,m]); }
+  function removeMedia(id){ setPendingMedia(pm=>pm.filter(m=>m.id!==id)); }
 
   async function addNote(){
     if(!form.note.trim()){alert("Please enter a note.");return;}
-    const item={id:genId(),user_id:userId,...form,created_at:new Date().toISOString(),sync_status:"pending"};
+    const item={id:genId(),user_id:userId,...form,media:pendingMedia,created_at:new Date().toISOString(),sync_status:"pending"};
     setData(d=>({...d,notes:[item,...(d.notes||[])],syncQueue:[{id:genId(),table:"notes",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
     await offlineSave("notes",item);
-    setForm({client:"",note:""});setShowForm(false);
+    // Try upload media if online
+    if(isOnline && pendingMedia.length>0){
+      const uploaded = await Promise.all(pendingMedia.map(async m=>{
+        const path=`notes/${item.id}/${m.id}`;
+        const url=await uploadPhotoToSupabase(m.base64,path);
+        return url?{...m,url,uploadStatus:"done"}:m;
+      }));
+      const updatedItem={...item,media:uploaded};
+      setData(d=>({...d,notes:(d.notes||[]).map(n=>n.id===item.id?updatedItem:n)}));
+      await offlineSave("notes",updatedItem);
+    }
+    setForm({client:"",note:""});setPendingMedia([]);setShowForm(false);
+  }
+
+  async function deleteNoteMedia(noteId, mediaId){
+    const note=notes.find(n=>n.id===noteId);
+    if(!note) return;
+    const updated={...note,media:(note.media||[]).filter(m=>m.id!==mediaId)};
+    setData(d=>({...d,notes:(d.notes||[]).map(n=>n.id===noteId?updated:n)}));
+    await offlineSave("notes",updated);
   }
 
   async function deleteNote(id){if(!window.confirm("Delete this note?"))return;setData(d=>({...d,notes:(d.notes||[]).filter(n=>n.id!==id)}));}
@@ -798,7 +946,12 @@ function NotesScreen({ data, setData, userId }) {
             <Card className="p-4 space-y-3">
               <Field label="Client / Branch" value={form.client} onChange={v=>setForm(f=>({...f,client:v}))} placeholder="Client name"/>
               <Field label="Note" value={form.note} onChange={v=>setForm(f=>({...f,note:v}))} placeholder="Type your visit note…" multiline required/>
-              <Btn className="w-full" onClick={addNote}><Plus size={14}/>Add Note</Btn>
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase tracking-wider">Attach Photos / Videos</label>
+                <MediaPicker onAdd={addMedia}/>
+                <MediaGallery media={pendingMedia} onDelete={removeMedia}/>
+              </div>
+              <Btn className="w-full" onClick={addNote}><Plus size={14}/>Add Note{pendingMedia.length>0?` + ${pendingMedia.length} file${pendingMedia.length!==1?"s":""}`:""}</Btn>
             </Card>
           </motion.div>
         )}
@@ -812,6 +965,12 @@ function NotesScreen({ data, setData, userId }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-slate-900">{n.client||"General Note"}</p>
                 <p className="mt-1 text-sm text-slate-600 leading-relaxed">{n.note}</p>
+                {(n.media||[]).length>0&&(
+                  <div className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+                    <Paperclip size={11}/>{n.media.length} attachment{n.media.length!==1?"s":""}
+                  </div>
+                )}
+                <MediaGallery media={n.media||[]} onDelete={mid=>deleteNoteMedia(n.id,mid)}/>
                 <p className="mt-1.5 text-xs text-slate-400">{n.created_at?new Date(n.created_at).toLocaleString("en-GB",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):""}</p>
                 {n.sync_status==="pending"&&<span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Not synced</span>}
               </div>
@@ -825,13 +984,198 @@ function NotesScreen({ data, setData, userId }) {
 }
 
 // ─── Equipment ────────────────────────────────────────────────────────────────
-function EquipmentScreen({ data, setData, userId }) {
+function EquipmentScreen({ data, setData, userId, isOnline }) {
   const [showForm,setShowForm]=useState(false);
   const [search,setSearch]=useState("");
   const [filter,setFilter]=useState("All");
   const [editId,setEditId]=useState(null);
   const [form,setForm]=useState({name:"",type:"",make:"",model:"",serial:"",location:"",client:"",service_due:"",notes:""});
+  const [pendingMedia,setPendingMedia]=useState([]);
   const equipment=data.equipment||[];
+
+  function resetForm(){setForm({name:"",type:"",make:"",model:"",serial:"",location:"",client:"",service_due:"",notes:""});setEditId(null);setShowForm(false);setPendingMedia([]);}
+
+  function addMedia(m){ setPendingMedia(pm=>[...pm,m]); }
+  function removeMedia(id){ setPendingMedia(pm=>pm.filter(m=>m.id!==id)); }
+
+  async function saveEquipment(){
+    if(!form.name.trim()){alert("Equipment name is required.");return;}
+    if(editId){
+      const existing=equipment.find(e=>e.id===editId);
+      const allMedia=[...(existing?.media||[]),...pendingMedia];
+      const updated={...existing,...form,media:allMedia,sync_status:"pending"};
+      setData(d=>({...d,equipment:(d.equipment||[]).map(e=>e.id===editId?updated:e)}));
+      await offlineSave("equipment",updated);
+      // Upload new media if online
+      if(isOnline && pendingMedia.length>0){
+        const uploaded=await Promise.all(pendingMedia.map(async m=>{
+          const path=`equipment/${editId}/${m.id}`;
+          const url=await uploadPhotoToSupabase(m.base64,path);
+          return url?{...m,url,uploadStatus:"done"}:m;
+        }));
+        const finalItem={...updated,media:[...(existing?.media||[]),...uploaded]};
+        setData(d=>({...d,equipment:(d.equipment||[]).map(e=>e.id===editId?finalItem:e)}));
+        await offlineSave("equipment",finalItem);
+      }
+    } else {
+      const item={id:genId(),user_id:userId,...form,media:pendingMedia,created_at:new Date().toISOString(),sync_status:"pending"};
+      setData(d=>({...d,equipment:[item,...(d.equipment||[])],syncQueue:[{id:genId(),table:"equipment",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
+      await offlineSave("equipment",item);
+      if(isOnline && pendingMedia.length>0){
+        const uploaded=await Promise.all(pendingMedia.map(async m=>{
+          const path=`equipment/${item.id}/${m.id}`;
+          const url=await uploadPhotoToSupabase(m.base64,path);
+          return url?{...m,url,uploadStatus:"done"}:m;
+        }));
+        const finalItem={...item,media:uploaded};
+        setData(d=>({...d,equipment:(d.equipment||[]).map(e=>e.id===item.id?finalItem:e)}));
+        await offlineSave("equipment",finalItem);
+      }
+    }
+    resetForm();
+  }
+
+  async function deleteEquipMedia(equipId, mediaId){
+    const eq=equipment.find(e=>e.id===equipId);
+    if(!eq) return;
+    const updated={...eq,media:(eq.media||[]).filter(m=>m.id!==mediaId)};
+    setData(d=>({...d,equipment:(d.equipment||[]).map(e=>e.id===equipId?updated:e)}));
+    await offlineSave("equipment",updated);
+  }
+
+  async function deleteEquipment(id){if(!window.confirm("Delete this equipment record?"))return;setData(d=>({...d,equipment:(d.equipment||[]).filter(e=>e.id!==id)}));}
+
+  function startEdit(e){
+    setForm({name:e.name||"",type:e.type||"",make:e.make||"",model:e.model||"",serial:e.serial||"",location:e.location||"",client:e.client||"",service_due:e.service_due||"",notes:e.notes||""});
+    setPendingMedia([]);
+    setEditId(e.id);setShowForm(true);
+  }
+
+  const filtered=equipment
+    .filter(e=>{
+      const d=e.service_due?daysDiff(e.service_due):null;
+      if(filter==="Overdue") return d!==null&&d<0;
+      if(filter==="Due Soon") return d!==null&&d>=0&&d<=14;
+      if(filter==="OK") return d===null||d>14;
+      return true;
+    })
+    .filter(e=>!search||[e.name,e.type,e.make,e.model,e.serial,e.location,e.client].some(x=>x?.toLowerCase().includes(search.toLowerCase())));
+
+  const overdueCount=equipment.filter(e=>e.service_due&&daysDiff(e.service_due)!==null&&daysDiff(e.service_due)<0).length;
+  const dueSoonCount=equipment.filter(e=>e.service_due&&daysDiff(e.service_due)!==null&&daysDiff(e.service_due)>=0&&daysDiff(e.service_due)<=14).length;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <PageHeader title="Equipment" subtitle={`${equipment.length} registered · ${overdueCount} overdue`}/>
+        <Btn size="sm" onClick={()=>setShowForm(!showForm)}>{showForm?<X size={14}/>:<Plus size={14}/>}{showForm?"Cancel":"Add"}</Btn>
+      </div>
+
+      {(overdueCount>0||dueSoonCount>0)&&(
+        <div className="grid grid-cols-2 gap-3">
+          {overdueCount>0&&<div className="rounded-2xl bg-red-50 border border-red-200 p-3 text-center"><p className="text-2xl font-black text-red-700">{overdueCount}</p><p className="text-xs font-bold text-red-500">Overdue Service</p></div>}
+          {dueSoonCount>0&&<div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-center"><p className="text-2xl font-black text-amber-700">{dueSoonCount}</p><p className="text-xs font-bold text-amber-500">Due in 14 Days</p></div>}
+        </div>
+      )}
+
+      <AnimatePresence>
+        {showForm&&(
+          <motion.div initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}>
+            <Card className="p-4 space-y-3">
+              <p className="text-sm font-black text-slate-800">{editId?"Edit Equipment":"Register Equipment"}</p>
+              <Field label="Equipment Name" value={form.name} onChange={v=>setForm(f=>({...f,name:v}))} placeholder="e.g. Main Compressor Unit" required/>
+              <Field label="Type / Category" value={form.type} onChange={v=>setForm(f=>({...f,type:v}))} placeholder="e.g. Compressor, Generator, Pump…"/>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Make / Brand" value={form.make} onChange={v=>setForm(f=>({...f,make:v}))} placeholder="e.g. Atlas Copco"/>
+                <Field label="Model" value={form.model} onChange={v=>setForm(f=>({...f,model:v}))} placeholder="e.g. GA110"/>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase tracking-wider">Serial Number</label>
+                <div className="relative">
+                  <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+                  <input value={form.serial} onChange={e=>setForm(f=>({...f,serial:e.target.value}))} placeholder="Serial / Asset number"
+                    className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 pl-8 text-sm outline-none focus:border-red-300 focus:bg-white transition-colors font-mono"/>
+                </div>
+              </div>
+              <Field label="Location / Site" value={form.location} onChange={v=>setForm(f=>({...f,location:v}))} placeholder="e.g. Pump Room B, Level 3"/>
+              <Field label="Client / Site" value={form.client} onChange={v=>setForm(f=>({...f,client:v}))} placeholder="Linked client or site"/>
+              <Field label="Next Service Due" type="date" value={form.service_due} onChange={v=>setForm(f=>({...f,service_due:v}))}/>
+              <Field label="Notes" value={form.notes} onChange={v=>setForm(f=>({...f,notes:v}))} placeholder="Additional notes…" multiline/>
+
+              <div>
+                <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase tracking-wider">Photos / Videos</label>
+                <MediaPicker onAdd={addMedia}/>
+                {pendingMedia.length>0&&(
+                  <>
+                    <p className="mt-2 text-xs text-slate-400">{pendingMedia.length} file{pendingMedia.length!==1?"s":""} ready to attach</p>
+                    <MediaGallery media={pendingMedia} onDelete={removeMedia}/>
+                  </>
+                )}
+                {editId&&(equipment.find(e=>e.id===editId)?.media||[]).length>0&&(
+                  <>
+                    <p className="mt-2 text-xs font-bold text-slate-500">Existing photos:</p>
+                    <MediaGallery media={equipment.find(e=>e.id===editId)?.media||[]} onDelete={mid=>deleteEquipMedia(editId,mid)}/>
+                  </>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Btn className="flex-1" onClick={saveEquipment}><Save size={14}/>{editId?"Update":"Register"}</Btn>
+                <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <SearchBar value={search} onChange={setSearch} placeholder="Search name, serial, location…"/>
+      <FilterPills options={["All","Overdue","Due Soon","OK"]} value={filter} onChange={setFilter} dangerValue="Overdue"/>
+      {filtered.length===0&&<Empty title="No equipment found" text="Register your first piece of equipment." icon={Wrench}/>}
+
+      <div className="space-y-2">
+        {filtered.map(eq=>(
+          <Card key={eq.id} className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <p className="text-sm font-black text-slate-900">{eq.name}</p>
+                  {eq.type&&<span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">{eq.type}</span>}
+                  {eq.service_due&&<ServiceBadge dueDate={eq.service_due}/>}
+                </div>
+                {(eq.make||eq.model)&&<p className="text-xs text-slate-500">{[eq.make,eq.model].filter(Boolean).join(" · ")}</p>}
+                {eq.serial&&(
+                  <div className="mt-1 inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1">
+                    <Hash size={10} className="text-slate-400"/>
+                    <span className="text-xs font-mono font-bold text-slate-600">{eq.serial}</span>
+                  </div>
+                )}
+                <div className="mt-1.5 flex flex-wrap gap-3">
+                  {eq.location&&<span className="inline-flex items-center gap-1 text-xs text-slate-400"><MapPin size={10}/>{eq.location}</span>}
+                  {eq.client&&<span className="inline-flex items-center gap-1 text-xs text-slate-400"><Users size={10}/>{eq.client}</span>}
+                </div>
+                {eq.service_due&&<p className="mt-1 text-xs text-slate-400">Service due: {smartDate(eq.service_due)}</p>}
+                {eq.notes&&<p className="mt-1 text-xs text-slate-500 italic">{eq.notes}</p>}
+                {(eq.media||[]).length>0&&(
+                  <>
+                    <div className="mt-1 flex items-center gap-1 text-xs text-slate-400">
+                      <Paperclip size={11}/>{eq.media.length} photo{eq.media.length!==1?"s":""}
+                    </div>
+                    <MediaGallery media={eq.media||[]} onDelete={mid=>deleteEquipMedia(eq.id,mid)}/>
+                  </>
+                )}
+                {eq.sync_status==="pending"&&<span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Not synced</span>}
+              </div>
+              <div className="flex flex-col gap-1 shrink-0">
+                <button onClick={()=>startEdit(eq)} className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors"><Edit2 size={13}/></button>
+                <button onClick={()=>deleteEquipment(eq.id)} className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors"><Trash2 size={13}/></button>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
 
   function resetForm(){setForm({name:"",type:"",make:"",model:"",serial:"",location:"",client:"",service_due:"",notes:""});setEditId(null);setShowForm(false);}
 
@@ -1123,8 +1467,8 @@ export default function PowerWorksApp() {
     Clients:   <ClientsScreen data={data} setData={setData} userId={session.user.id}/>,
     Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id}/>,
     Quotes:    <QuotesScreen data={data} setData={setData} userId={session.user.id}/>,
-    Notes:     <NotesScreen data={data} setData={setData} userId={session.user.id}/>,
-    Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id}/>,
+    Notes:     <NotesScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline}/>,
+    Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline}/>,
     More:      <MoreScreen data={data} onLogout={logout} onSyncNow={handleSyncNow} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif}/>,
   };
 
