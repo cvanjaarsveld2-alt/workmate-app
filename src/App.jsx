@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
@@ -9,7 +9,7 @@ import {
   Bell, Calendar, ChevronRight, ChevronLeft, Clipboard, File as FileIcon,
   Home, LogOut, Plus, Search, Shield, Trash2, Users,
   Eye, EyeOff, RefreshCw, Check, AlertCircle,
-  Settings, X, TrendingUp, Edit2, Save, Target,
+  Settings, X, TrendingUp, Edit2, Save,
   Wrench, Clock, MapPin, Hash, Camera, Image, Video, Paperclip,
 } from "lucide-react";
 
@@ -71,6 +71,7 @@ function buildNotificationItems(followups = [], equipment = []) {
   const items = [];
   const todayStr = todayISO();
 
+  // Morning summary at 7am for today's follow-ups
   const todayFollowups = followups.filter(f => f.date === todayStr && !f.completed);
   if (todayFollowups.length > 0) {
     const fireAt = new Date(todayStr + "T07:00:00");
@@ -85,8 +86,20 @@ function buildNotificationItems(followups = [], equipment = []) {
     }
   }
 
+  // Per-followup reminders — respect the reminder field if set
   followups.filter(f => f.date >= todayStr && !f.completed).forEach(f => {
-    const fireAt = new Date(f.date + "T" + (f.time || "09:00") + ":00");
+    if (f.reminder === "none") return;
+    const baseTime = f.date + "T" + (f.time || "09:00") + ":00";
+    const base = new Date(baseTime);
+    let fireAt = base;
+    switch (f.reminder) {
+      case "15_before": fireAt = new Date(base.getTime() - 15 * 60000); break;
+      case "30_before": fireAt = new Date(base.getTime() - 30 * 60000); break;
+      case "1h_before": fireAt = new Date(base.getTime() - 60 * 60000); break;
+      case "1d_before": { const d = new Date(f.date + "T09:00:00"); d.setDate(d.getDate() - 1); fireAt = d; break; }
+      case "morning":   fireAt = new Date(f.date + "T07:00:00"); break;
+      default:          fireAt = base; break; // on_time or undefined
+    }
     if (fireAt > new Date()) {
       items.push({
         id: "fu_" + f.id,
@@ -98,6 +111,7 @@ function buildNotificationItems(followups = [], equipment = []) {
     }
   });
 
+  // Equipment service reminders
   equipment.filter(e => e.service_due).forEach(eq => {
     const due = new Date(eq.service_due + "T09:00:00");
     const warn = new Date(due); warn.setDate(warn.getDate() - 3);
@@ -601,7 +615,7 @@ function HomeScreen({ data, setScreen }) {
         <StatCard label="Today's Tasks" value={todayFU.length} sub="follow-ups due" color={BRAND.primary} icon={Calendar}/>
         <StatCard label="Pending Quotes" value={pendingQ.length} sub="awaiting response" color="#B45309" icon={FileIcon}/>
         <StatCard label="Won Revenue" value={`R${Math.round(wonRev/1000)}k`} sub="accepted quotes" color="#16A34A" icon={TrendingUp}/>
-        <StatCard label="Equipment" value={equipment.length} sub={`${overdueEquip.length} overdue`} color="#7C3AED" icon={Wrench}/>
+        <StatCard label="Win Rate" value={`${convRate}%`} sub={`${wonC} of ${clients.length} clients`} color="#7C3AED" icon={Wrench}/>
       </div>
 
       {/* Pipeline */}
@@ -648,6 +662,7 @@ function ClientsScreen({ data, setData, userId }) {
   const [search,setSearch]=useState("");
   const [filterStage,setFilterStage]=useState("All");
   const [editId,setEditId]=useState(null);
+  const [toast,setToast]=useState("");
   const [form,setForm]=useState({company:"",branch:"",contact:"",phone:"",stage:"New Lead"});
   const clients=data.clients||[];
 
@@ -656,12 +671,19 @@ function ClientsScreen({ data, setData, userId }) {
   async function saveClient(){
     if(!form.company.trim()){alert("Company name is required.");return;}
     if(editId){
-      setData(d=>({...d,clients:(d.clients||[]).map(c=>c.id===editId?{...c,...form,sync_status:"pending"}:c)}));
-      await offlineSave("companies",{...clients.find(c=>c.id===editId),...form,sync_status:"pending"});
+      const existing = clients.find(c=>c.id===editId);
+      const updated = {...existing,...form,sync_status:"pending"};
+      setData(d=>({...d,
+        clients:(d.clients||[]).map(c=>c.id===editId?updated:c),
+        syncQueue:[{id:genId(),table:"companies",action:"update",data:updated,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])],
+      }));
+      await offlineSave("companies",updated);
+      setToast("Client updated");
     } else {
       const item={id:genId(),user_id:userId,...form,created_at:new Date().toISOString(),sync_status:"pending"};
       setData(d=>({...d,clients:[item,...(d.clients||[])],syncQueue:[{id:genId(),table:"companies",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
       await offlineSave("companies",item);
+      setToast("Client added");
     }
     resetForm();
   }
@@ -676,6 +698,7 @@ function ClientsScreen({ data, setData, userId }) {
 
   return (
     <div className="space-y-4">
+      <AnimatePresence>{toast&&<Toast message={toast} onDone={()=>setToast("")}/>}</AnimatePresence>
       <div className="flex items-center justify-between">
         <PageHeader title="Clients" subtitle={`${clients.length} total`}/>
         <Btn size="sm" onClick={()=>setShowForm(!showForm)}>{showForm?<X size={14}/>:<Plus size={14}/>}{showForm?"Cancel":"Add"}</Btn>
@@ -728,28 +751,41 @@ function ClientsScreen({ data, setData, userId }) {
   );
 }
 
+// ─── Toast notification ───────────────────────────────────────────────────────
+function Toast({ message, onDone }) {
+  useEffect(() => { const t = setTimeout(onDone, 2200); return () => clearTimeout(t); }, []);
+  return (
+    <motion.div initial={{opacity:0,y:40}} animate={{opacity:1,y:0}} exit={{opacity:0,y:40}}
+      className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 rounded-2xl px-5 py-3 text-sm font-bold text-white shadow-lg"
+      style={{background:BRAND.primary,whiteSpace:"nowrap"}}>
+      ✓ {message}
+    </motion.div>
+  );
+}
+
 // ─── Follow-ups ───────────────────────────────────────────────────────────────
 function FollowupsScreen({ data, setData, userId }) {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
-  const [view, setView] = useState("list"); // "list" | "calendar"
+  const [view, setView] = useState("list");
   const [calYear, setCalYear] = useState(new Date().getFullYear());
-  const [calMonth, setCalMonth] = useState(new Date().getMonth()); // 0-indexed
+  const [calMonth, setCalMonth] = useState(new Date().getMonth());
   const [selectedDay, setSelectedDay] = useState(null);
+  const [editId, setEditId] = useState(null);
+  const [toast, setToast] = useState("");
   const [form, setForm] = useState({ title: "", client: "", date: todayISO(), time: "09:00", reminder: "on_time" });
   const followups = data.followups || [];
   const today = todayISO();
 
-  // Reminder options
   const REMINDER_OPTIONS = [
-    { value: "on_time",    label: "At time of follow-up" },
-    { value: "15_before",  label: "15 minutes before" },
-    { value: "30_before",  label: "30 minutes before" },
-    { value: "1h_before",  label: "1 hour before" },
-    { value: "1d_before",  label: "1 day before (9am)" },
-    { value: "morning",    label: "Day-of morning (7am)" },
-    { value: "none",       label: "No reminder" },
+    { value: "on_time",   label: "At time of follow-up" },
+    { value: "15_before", label: "15 minutes before" },
+    { value: "30_before", label: "30 minutes before" },
+    { value: "1h_before", label: "1 hour before" },
+    { value: "1d_before", label: "1 day before (9am)" },
+    { value: "morning",   label: "Day-of morning (7am)" },
+    { value: "none",      label: "No reminder" },
   ];
 
   function getReminderFireTime(date, time, reminder) {
@@ -761,49 +797,59 @@ function FollowupsScreen({ data, setData, userId }) {
       case "1d_before": { const d = new Date(date + "T09:00:00"); d.setDate(d.getDate() - 1); return d; }
       case "morning":   return new Date(date + "T07:00:00");
       case "none":      return null;
-      default:          return base; // on_time
+      default:          return base;
     }
   }
 
-  async function addFollowup() {
+  function resetForm() { setForm({ title: "", client: "", date: todayISO(), time: "09:00", reminder: "on_time" }); setEditId(null); setShowForm(false); }
+
+  function startEdit(f) {
+    setForm({ title: f.title||"", client: f.client||"", date: f.date||todayISO(), time: f.time||"09:00", reminder: f.reminder||"on_time" });
+    setEditId(f.id);
+    setShowForm(true);
+  }
+
+  async function saveFollowup() {
     if (!form.title.trim()) { alert("Please enter a title."); return; }
-    const item = {
-      id: genId(), user_id: userId, ...form,
-      completed: false, created_at: new Date().toISOString(), sync_status: "pending",
-    };
-    setData(d => ({
-      ...d,
-      followups: [item, ...(d.followups || [])],
-      syncQueue: [{ id: genId(), table: "followups", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-    }));
-    await offlineSave("followups", item);
-    // Schedule notification for this specific followup
-    if (Notification.permission === "granted" && form.reminder !== "none") {
-      const fireAt = getReminderFireTime(form.date, form.time, form.reminder);
-      if (fireAt && fireAt > new Date()) {
-        scheduleNotificationsViaSW([{
-          id: "fu_" + item.id,
-          title: "🔔 Follow-up: " + item.title,
-          body: item.client ? `Client: ${item.client}` : "Tap to view.",
-          fireAt: fireAt.toISOString(),
-          tag: "fu_" + item.id,
-        }]);
+    if (editId) {
+      const existing = followups.find(f => f.id === editId);
+      const updated = { ...existing, ...form, sync_status: "pending" };
+      setData(d => ({
+        ...d,
+        followups: (d.followups||[]).map(f => f.id === editId ? updated : f),
+        syncQueue: [{ id: genId(), table: "followups", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue||[])],
+      }));
+      await offlineSave("followups", updated);
+      setToast("Follow-up updated");
+    } else {
+      const item = { id: genId(), user_id: userId, ...form, completed: false, created_at: new Date().toISOString(), sync_status: "pending" };
+      setData(d => ({
+        ...d,
+        followups: [item, ...(d.followups||[])],
+        syncQueue: [{ id: genId(), table: "followups", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue||[])],
+      }));
+      await offlineSave("followups", item);
+      if (Notification.permission === "granted" && form.reminder !== "none") {
+        const fireAt = getReminderFireTime(form.date, form.time, form.reminder);
+        if (fireAt && fireAt > new Date()) {
+          scheduleNotificationsViaSW([{ id: "fu_" + item.id, title: "🔔 Follow-up: " + item.title, body: item.client ? `Client: ${item.client}` : "Tap to view.", fireAt: fireAt.toISOString(), tag: "fu_" + item.id }]);
+        }
       }
+      setToast("Follow-up added");
     }
-    setForm({ title: "", client: "", date: todayISO(), time: "09:00", reminder: "on_time" });
-    setShowForm(false);
+    resetForm();
   }
 
   async function toggleDone(id) {
     const t = followups.find(f => f.id === id);
     const up = { ...t, completed: !t.completed, sync_status: "pending" };
-    setData(d => ({ ...d, followups: (d.followups || []).map(f => f.id === id ? up : f) }));
+    setData(d => ({ ...d, followups: (d.followups||[]).map(f => f.id === id ? up : f) }));
     await offlineSave("followups", up);
   }
 
   async function deleteFollowup(id) {
     if (!window.confirm("Delete?")) return;
-    setData(d => ({ ...d, followups: (d.followups || []).filter(f => f.id !== id) }));
+    setData(d => ({ ...d, followups: (d.followups||[]).filter(f => f.id !== id) }));
   }
 
   // ── Calendar helpers ──
@@ -861,35 +907,34 @@ function FollowupsScreen({ data, setData, userId }) {
 
   return (
     <div className="space-y-4">
+      <AnimatePresence>
+        {toast && <Toast message={toast} onDone={() => setToast("")} />}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <PageHeader title="Follow-ups" subtitle={`${pendingCount} pending${overdueCount > 0 ? ` · ${overdueCount} overdue` : ""}`} />
         <div className="flex gap-2">
-          {/* View toggle */}
           <div className="flex rounded-xl border border-slate-200 overflow-hidden bg-white">
             <button onClick={() => setView("list")}
               className={`px-3 py-2 text-xs font-bold transition-all ${view === "list" ? "text-white" : "text-slate-400"}`}
-              style={view === "list" ? { background: BRAND.primary } : {}}>
-              ☰
-            </button>
+              style={view === "list" ? { background: BRAND.primary } : {}}>☰</button>
             <button onClick={() => setView("calendar")}
               className={`px-3 py-2 text-xs font-bold transition-all ${view === "calendar" ? "text-white" : "text-slate-400"}`}
-              style={view === "calendar" ? { background: BRAND.primary } : {}}>
-              📅
-            </button>
+              style={view === "calendar" ? { background: BRAND.primary } : {}}>📅</button>
           </div>
-          <Btn size="sm" onClick={() => setShowForm(!showForm)}>
+          <Btn size="sm" onClick={() => { if (showForm && editId) resetForm(); else setShowForm(!showForm); }}>
             {showForm ? <X size={14} /> : <Plus size={14} />}{showForm ? "Cancel" : "Add"}
           </Btn>
         </div>
       </div>
 
-      {/* Add form */}
+      {/* Form */}
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
             <Card className="p-4 space-y-3">
-              <p className="text-sm font-black text-slate-800">New Follow-up</p>
+              <p className="text-sm font-black text-slate-800">{editId ? "Edit Follow-up" : "New Follow-up"}</p>
               <Field label="Title" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Call mine buyer" required />
               <Field label="Client" value={form.client} onChange={v => setForm(f => ({ ...f, client: v }))} placeholder="Company / branch" />
               <div className="grid grid-cols-2 gap-3">
@@ -897,9 +942,7 @@ function FollowupsScreen({ data, setData, userId }) {
                 <Field label="Time" type="time" value={form.time} onChange={v => setForm(f => ({ ...f, time: v }))} />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase tracking-wider">
-                  🔔 Reminder
-                </label>
+                <label className="mb-1.5 block text-xs font-bold text-slate-500 uppercase tracking-wider">🔔 Reminder</label>
                 <select value={form.reminder} onChange={e => setForm(f => ({ ...f, reminder: e.target.value }))}
                   className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-red-300 focus:bg-white transition-colors">
                   {REMINDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -908,7 +951,10 @@ function FollowupsScreen({ data, setData, userId }) {
                   <p className="mt-1.5 text-xs text-amber-600 font-medium">⚠️ Enable notifications in Settings to receive reminders.</p>
                 )}
               </div>
-              <Btn className="w-full" onClick={addFollowup}><Plus size={14} />Add Follow-up</Btn>
+              <div className="flex gap-2">
+                <Btn className="flex-1" onClick={saveFollowup}><Save size={14} />{editId ? "Update" : "Add Follow-up"}</Btn>
+                <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
+              </div>
             </Card>
           </motion.div>
         )}
@@ -1076,6 +1122,7 @@ function FollowupsScreen({ data, setData, userId }) {
                     )}
                   </div>
                   {f.date < today && !f.completed && <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">Overdue</span>}
+                  <button onClick={() => startEdit(f)} className="shrink-0 p-1.5 text-slate-300 hover:text-blue-500 transition-colors"><Edit2 size={13} /></button>
                   <button onClick={() => deleteFollowup(f.id)} className="shrink-0 p-1.5 text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={13} /></button>
                 </Card>
               ))}
@@ -1093,6 +1140,7 @@ function QuotesScreen({ data, setData, userId }) {
   const [search,setSearch]=useState("");
   const [filterStatus,setFilterStatus]=useState("All");
   const [editId,setEditId]=useState(null);
+  const [toast,setToast]=useState("");
   const [form,setForm]=useState({client_name:"",description:"",value:"",status:"Pending"});
   const quotes=data.quotes||[];
 
@@ -1101,12 +1149,19 @@ function QuotesScreen({ data, setData, userId }) {
   async function saveQuote(){
     if(!form.description.trim()){alert("Please enter a description.");return;}
     if(editId){
-      setData(d=>({...d,quotes:(d.quotes||[]).map(q=>q.id===editId?{...q,...form,value:parseFloat(form.value||0),sync_status:"pending"}:q)}));
-      await offlineSave("quotes",{...quotes.find(q=>q.id===editId),...form,value:parseFloat(form.value||0),sync_status:"pending"});
+      const existing = quotes.find(q=>q.id===editId);
+      const updated = {...existing,...form,value:parseFloat(form.value||0),sync_status:"pending"};
+      setData(d=>({...d,
+        quotes:(d.quotes||[]).map(q=>q.id===editId?updated:q),
+        syncQueue:[{id:genId(),table:"quotes",action:"update",data:updated,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])],
+      }));
+      await offlineSave("quotes",updated);
+      setToast("Quote updated");
     } else {
       const item={id:genId(),user_id:userId,...form,value:parseFloat(form.value||0),sent_date:todayISO(),created_at:new Date().toISOString(),sync_status:"pending"};
       setData(d=>({...d,quotes:[item,...(d.quotes||[])],syncQueue:[{id:genId(),table:"quotes",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
       await offlineSave("quotes",item);
+      setToast("Quote added");
     }
     resetForm();
   }
@@ -1125,6 +1180,7 @@ function QuotesScreen({ data, setData, userId }) {
         <PageHeader title="Quotes" subtitle={`${quotes.length} total · ${formatCurrency(totalValue)}`}/>
         <Btn size="sm" onClick={()=>setShowForm(!showForm)}>{showForm?<X size={14}/>:<Plus size={14}/>}{showForm?"Cancel":"Add"}</Btn>
       </div>
+      <AnimatePresence>{toast&&<Toast message={toast} onDone={()=>setToast("")}/>}</AnimatePresence>
       <AnimatePresence>
         {showForm&&(
           <motion.div initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}>
@@ -1178,6 +1234,7 @@ function QuotesScreen({ data, setData, userId }) {
 function NotesScreen({ data, setData, userId, isOnline }) {
   const [showForm,setShowForm]=useState(false);
   const [search,setSearch]=useState("");
+  const [toast,setToast]=useState("");
   const [form,setForm]=useState({client:"",note:""});
   const [pendingMedia,setPendingMedia]=useState([]);
   const notes=data.notes||[];
@@ -1195,13 +1252,14 @@ function NotesScreen({ data, setData, userId, isOnline }) {
       const uploaded = await Promise.all(pendingMedia.map(async m=>{
         const path=`notes/${item.id}/${m.id}`;
         const url=await uploadPhotoToSupabase(m.base64,path);
-        return url?{...m,url,uploadStatus:"done"}:m;
+        return url?{...m,url,base64:undefined,uploadStatus:"done"}:m;
       }));
       const updatedItem={...item,media:uploaded};
       setData(d=>({...d,notes:(d.notes||[]).map(n=>n.id===item.id?updatedItem:n)}));
       await offlineSave("notes",updatedItem);
     }
     setForm({client:"",note:""});setPendingMedia([]);setShowForm(false);
+    setToast("Note saved");
   }
 
   async function deleteNoteMedia(noteId, mediaId){
@@ -1218,6 +1276,7 @@ function NotesScreen({ data, setData, userId, isOnline }) {
 
   return (
     <div className="space-y-4">
+      <AnimatePresence>{toast&&<Toast message={toast} onDone={()=>setToast("")}/>}</AnimatePresence>
       <div className="flex items-center justify-between">
         <PageHeader title="Field Notes" subtitle={`${notes.length} notes`}/>
         <Btn size="sm" onClick={()=>setShowForm(!showForm)}>{showForm?<X size={14}/>:<Plus size={14}/>}{showForm?"Cancel":"Add"}</Btn>
@@ -1585,12 +1644,44 @@ export default function PowerWorksApp() {
     catch(e){console.warn("Could not load local data",e);}
   },[]);
 
+  // Save to localStorage - strip base64 media to avoid 5MB quota crash
   useEffect(()=>{
-    try{localStorage.setItem("powermate_v2_data",JSON.stringify(data));}
+    try{
+      const safeData = {
+        ...data,
+        notes: (data.notes||[]).map(n => ({...n, media: (n.media||[]).map(m => ({...m, base64: m.url ? undefined : m.base64?.slice(0,100)+"[truncated]"}))})),
+        equipment: (data.equipment||[]).map(e => ({...e, media: (e.media||[]).map(m => ({...m, base64: m.url ? undefined : m.base64?.slice(0,100)+"[truncated]"}))})),
+      };
+      localStorage.setItem("powermate_v2_data", JSON.stringify(safeData));
+    }
     catch(e){console.warn("Could not save local data",e);}
   },[data]);
 
-  // Re-schedule notifications when data changes
+  // Pull data from Supabase on login
+  useEffect(()=>{
+    if(!session||!isOnline) return;
+    async function pullFromSupabase(){
+      try {
+        const uid = session.user.id;
+        const [clientsRes, followupsRes, quotesRes, notesRes, equipRes] = await Promise.all([
+          supabase.from("clients").select("*").eq("user_id", uid),
+          supabase.from("followups").select("*").eq("user_id", uid),
+          supabase.from("quotes").select("*").eq("user_id", uid),
+          supabase.from("notes").select("*").eq("user_id", uid),
+          supabase.from("equipment").select("*").eq("user_id", uid),
+        ]);
+        setData(d => ({
+          ...d,
+          clients:   clientsRes.data?.length   ? clientsRes.data   : d.clients,
+          followups: followupsRes.data?.length  ? followupsRes.data : d.followups,
+          quotes:    quotesRes.data?.length     ? quotesRes.data    : d.quotes,
+          notes:     notesRes.data?.length      ? notesRes.data     : d.notes,
+          equipment: equipRes.data?.length      ? equipRes.data     : d.equipment,
+        }));
+      } catch(e){ console.warn("Supabase pull failed:", e); }
+    }
+    pullFromSupabase();
+  },[session?.user?.id, isOnline]);
   useEffect(()=>{
     if(notifPermission!=="granted") return;
     scheduleNotificationsViaSW(buildNotificationItems(data.followups,data.equipment));
@@ -1637,12 +1728,13 @@ export default function PowerWorksApp() {
   };
 
   const NAV=[
-    {icon:Home,     label:"Home",    key:"Home"},
-    {icon:Users,    label:"Clients", key:"Clients"},
-    {icon:Calendar, label:"Follow",  key:"Followups"},
-    {icon:FileIcon, label:"Quotes",  key:"Quotes",    badge:flaggedQuotes||undefined},
-    {icon:Wrench,   label:"Equip",   key:"Equipment", badge:overdueEquip||undefined},
-    {icon:Settings, label:"More",    key:"More",      badge:pendingCount||undefined},
+    {icon:Home,      label:"Home",    key:"Home"},
+    {icon:Users,     label:"Clients", key:"Clients"},
+    {icon:Calendar,  label:"Follow",  key:"Followups"},
+    {icon:FileIcon,  label:"Quotes",  key:"Quotes",    badge:flaggedQuotes||undefined},
+    {icon:Clipboard, label:"Notes",   key:"Notes"},
+    {icon:Wrench,    label:"Equip",   key:"Equipment", badge:overdueEquip||undefined},
+    {icon:Settings,  label:"More",    key:"More",      badge:pendingCount||undefined},
   ];
 
   return (
@@ -1657,7 +1749,7 @@ export default function PowerWorksApp() {
         </main>
 
         <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-100 bg-white/95 backdrop-blur-md px-1 pt-1 pb-safe shadow-lg">
-          <div className="mx-auto grid max-w-2xl grid-cols-6 gap-0.5">
+          <div className="mx-auto grid max-w-2xl grid-cols-7 gap-0.5">
             {NAV.map(({icon,label,key,badge})=>(
               <NavTab key={key} icon={icon} label={label} active={screen===key} onClick={()=>setScreen(key)} badge={badge}/>
             ))}
