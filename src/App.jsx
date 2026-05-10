@@ -49,6 +49,10 @@ const URGENCY_ESCALATION = { Normal: "Urgent", Urgent: "Critical", Critical: "Cr
 // ─── PIN ──────────────────────────────────────────────────────────────────────
 const PIN_KEY = "powermate_pin_hash";
 const PIN_UNLOCKED_KEY = "powermate_pin_unlocked";
+const PIN_ATTEMPTS_KEY = "powermate_pin_attempts";
+const PIN_LOCKOUT_KEY = "powermate_pin_lockout_until";
+const PIN_MAX_ATTEMPTS = 5;
+const PIN_LOCKOUT_MS = 5 * 60 * 1000; // 5 minutes
 
 async function hashPIN(pin) {
   const data = new TextEncoder().encode(pin + "powerworks_salt_2026");
@@ -58,6 +62,29 @@ async function hashPIN(pin) {
 const getPINHash = () => localStorage.getItem(PIN_KEY);
 const isSessionUnlocked = () => sessionStorage.getItem(PIN_UNLOCKED_KEY) === "true";
 const setSessionUnlocked = () => sessionStorage.setItem(PIN_UNLOCKED_KEY, "true");
+
+// PIN lockout helpers
+function getPINAttempts() { return parseInt(localStorage.getItem(PIN_ATTEMPTS_KEY) || "0", 10); }
+function incrementPINAttempts() { const n = getPINAttempts() + 1; localStorage.setItem(PIN_ATTEMPTS_KEY, String(n)); return n; }
+function resetPINAttempts() { localStorage.removeItem(PIN_ATTEMPTS_KEY); localStorage.removeItem(PIN_LOCKOUT_KEY); }
+function getLockoutRemaining() {
+  const until = parseInt(localStorage.getItem(PIN_LOCKOUT_KEY) || "0", 10);
+  return until > Date.now() ? until - Date.now() : 0;
+}
+function setLockout() { localStorage.setItem(PIN_LOCKOUT_KEY, String(Date.now() + PIN_LOCKOUT_MS)); }
+
+// ─── Telemetry / Error Logging ────────────────────────────────────────────────
+async function logEvent(name, data = {}) {
+  const payload = { name, data, timestamp: new Date().toISOString(), user_agent: navigator.userAgent };
+  console.log("[PowerMate]", name, data);
+  if (!navigator.onLine) return; // queue locally? for now just console-log
+  try {
+    await supabase.from("events").insert(payload);
+  } catch (e) {
+    // Don't crash the app if telemetry fails
+    console.warn("[PowerMate] Telemetry failed:", e?.message || e);
+  }
+}
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 async function requestNotificationPermission() {
@@ -220,15 +247,25 @@ async function uploadPhotoToSupabase(base64, path) {
 }
 
 // ─── Media Picker Component ───────────────────────────────────────────────────
+const MAX_FILE_SIZE_MB = 50;
 function MediaPicker({ onAdd, disabled = false }) {
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
 
   async function handleFiles(files) {
     for (const file of Array.from(files)) {
-      const base64 = await compressImage(file);
-      const isVideo = file.type.startsWith("video/");
-      onAdd({ id: genId(), base64, isVideo, name: file.name, type: file.type, uploadStatus: "pending" });
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        alert(`"${file.name}" is too large (${(file.size/1024/1024).toFixed(1)}MB). Max ${MAX_FILE_SIZE_MB}MB.`);
+        continue;
+      }
+      try {
+        const base64 = await compressImage(file);
+        const isVideo = file.type.startsWith("video/");
+        onAdd({ id: genId(), base64, isVideo, name: file.name, type: file.type, uploadStatus: "pending" });
+      } catch (e) {
+        console.warn("Could not process file:", e);
+        alert(`Could not process "${file.name}".`);
+      }
     }
   }
 
@@ -427,7 +464,10 @@ function FilterPills({ options, value, onChange, dangerValue }) {
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state={hasError:false}; }
   static getDerivedStateFromError() { return {hasError:true}; }
-  componentDidCatch(e,i) { console.error("PowerMate:",e,i); }
+  componentDidCatch(e,i) {
+    console.error("PowerMate:",e,i);
+    try { logEvent("app_crashed", { message: e?.message, stack: (e?.stack || "").slice(0,500) }); } catch(_){}
+  }
   render() {
     if (this.state.hasError) return (
       <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center" style={{background:BRAND.light}}>
@@ -509,28 +549,61 @@ function PINLockScreen({ onUnlock, onForgot }) {
   const [pin, setPIN] = useState("");
   const [error, setError] = useState("");
   const [shake, setShake] = useState(false);
+  const [lockoutMs, setLockoutMs] = useState(getLockoutRemaining());
+
+  // Tick down the lockout countdown every second
+  useEffect(() => {
+    if (lockoutMs <= 0) return;
+    const t = setInterval(() => {
+      const r = getLockoutRemaining();
+      setLockoutMs(r);
+      if (r <= 0) { setError(""); resetPINAttempts(); }
+    }, 1000);
+    return () => clearInterval(t);
+  }, [lockoutMs]);
 
   async function handleDigit(d) {
-    const next=(pin+d).slice(0,6); setPIN(next);
-    if(next.length===6){
-      if(await hashPIN(next)===getPINHash()){setSessionUnlocked();onUnlock();}
-      else{setError("Incorrect PIN");setShake(true);setTimeout(()=>{setShake(false);setPIN("");setError("");},700);}
+    if (lockoutMs > 0) return;
+    const next = (pin + d).slice(0, 6); setPIN(next);
+    if (next.length === 6) {
+      if (await hashPIN(next) === getPINHash()) {
+        resetPINAttempts();
+        setSessionUnlocked();
+        onUnlock();
+      } else {
+        const attempts = incrementPINAttempts();
+        if (attempts >= PIN_MAX_ATTEMPTS) {
+          setLockout();
+          setLockoutMs(PIN_LOCKOUT_MS);
+          setError(`Too many attempts. Locked for 5 minutes.`);
+          logEvent("pin_locked_out", { attempts });
+        } else {
+          setError(`Incorrect PIN — ${PIN_MAX_ATTEMPTS - attempts} attempts left`);
+        }
+        setShake(true);
+        setTimeout(() => { setShake(false); setPIN(""); }, 700);
+      }
     }
   }
 
+  const lockedOut = lockoutMs > 0;
+  const minutes = Math.ceil(lockoutMs / 60000);
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6" style={{background:BRAND.light}}>
-      <motion.div initial={{opacity:0}} animate={{opacity:1}} className="w-full max-w-xs">
+    <div className="flex min-h-screen flex-col items-center justify-center px-6" style={{ background: BRAND.light }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-xs">
         <div className="mb-8 text-center">
-          <img src={BRAND.logo} alt="PW" className="mx-auto mb-4 h-12 object-contain" onError={e=>e.target.style.display="none"}/>
-          <h1 className="text-xl font-black text-slate-900">Enter PIN</h1>
-          <p className="mt-1 text-sm text-slate-500">Unlock PowerMate</p>
+          <img src={BRAND.logo} alt="PW" className="mx-auto mb-4 h-12 object-contain" onError={e => e.target.style.display = "none"} />
+          <h1 className="text-xl font-black text-slate-900">{lockedOut ? "Locked Out" : "Enter PIN"}</h1>
+          <p className="mt-1 text-sm text-slate-500">{lockedOut ? `Try again in ${minutes} minute${minutes !== 1 ? "s" : ""}` : "Unlock PowerMate"}</p>
         </div>
-        <motion.div animate={shake?{x:[-8,8,-8,8,0]}:{}} transition={{duration:0.4}}>
+        <motion.div animate={shake ? { x: [-8, 8, -8, 8, 0] } : {}} transition={{ duration: 0.4 }}>
           {error && <div className="mb-4 rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-700">{error}</div>}
-          <PINKeypad pin={pin} onDigit={handleDigit} onBack={()=>setPIN(p=>p.slice(0,-1))}/>
+          <PINKeypad pin={pin} onDigit={handleDigit} onBack={() => !lockedOut && setPIN(p => p.slice(0, -1))} />
         </motion.div>
-        <button onClick={onForgot} className="mt-6 w-full text-center text-sm font-bold text-slate-400 hover:text-red-600 transition-colors">Forgot PIN? Sign in again</button>
+        <button onClick={onForgot} className="mt-6 w-full text-center text-sm font-bold text-slate-400 hover:text-red-600 transition-colors">
+          Forgot PIN? Sign in again
+        </button>
       </motion.div>
     </div>
   );
@@ -1777,27 +1850,81 @@ function MoreScreen({ data, onLogout, onSyncNow, syncing, isOnline, notifPermiss
 }
 
 // ─── Supabase Sync ────────────────────────────────────────────────────────────
+// Sync queue lock to prevent concurrent pushes
+let _syncInProgress = false;
+
 async function pushSyncQueue(syncQueue, setData) {
-  const pending=(syncQueue||[]).filter(i=>i.status==="pending");
-  if(pending.length===0) return;
-  const TABLE_MAP={companies:"clients",followups:"followups",notes:"notes",quotes:"quotes",equipment:"equipment"};
-  const results=await Promise.allSettled(pending.map(async item=>{
-    const table=TABLE_MAP[item.table]||item.table;
-    if(item.action==="insert"||item.action==="upsert"){const{error}=await supabase.from(table).upsert(item.data,{onConflict:"id"});if(error)throw error;}
-    else if(item.action==="update"){const{error}=await supabase.from(table).update(item.data).eq("id",item.data.id);if(error)throw error;}
-    else if(item.action==="delete"){const{error}=await supabase.from(table).delete().eq("id",item.data.id);if(error)throw error;}
-    return item.id;
-  }));
-  const ok=results.filter(r=>r.status==="fulfilled").map(r=>r.value);
-  setData(d=>({
-    ...d,
-    syncQueue:(d.syncQueue||[]).filter(i=>!ok.includes(i.id)),
-    clients:(d.clients||[]).map(c=>ok.includes(c.id)?{...c,sync_status:"synced"}:c),
-    quotes:(d.quotes||[]).map(q=>ok.includes(q.id)?{...q,sync_status:"synced"}:q),
-    followups:(d.followups||[]).map(f=>ok.includes(f.id)?{...f,sync_status:"synced"}:f),
-    notes:(d.notes||[]).map(n=>ok.includes(n.id)?{...n,sync_status:"synced"}:n),
-    equipment:(d.equipment||[]).map(e=>ok.includes(e.id)?{...e,sync_status:"synced"}:e),
-  }));
+  if (_syncInProgress) return; // race guard
+  _syncInProgress = true;
+  try {
+    const all = syncQueue || [];
+    const pending = all.filter(i => i.status === "pending");
+    if (pending.length === 0) return;
+
+    // Dedup: keep only the latest entry per (table, data.id) — collapses repeated edits
+    const seen = new Map();
+    const deduped = [];
+    for (let i = pending.length - 1; i >= 0; i--) {
+      const item = pending[i];
+      const key = `${item.table}:${item.data?.id}:${item.action}`;
+      if (seen.has(key)) continue;
+      seen.set(key, true);
+      deduped.unshift(item);
+    }
+
+    const TABLE_MAP = { companies: "clients", followups: "followups", notes: "notes", quotes: "quotes", equipment: "equipment" };
+    const results = await Promise.allSettled(deduped.map(async item => {
+      const table = TABLE_MAP[item.table] || item.table;
+      // Strip large base64 media before pushing — only URLs go to DB
+      let payload = item.data;
+      if (payload?.media) {
+        payload = { ...payload, media: payload.media.map(m => ({ ...m, base64: undefined })) };
+      }
+      if (item.action === "insert" || item.action === "upsert") {
+        const { error } = await supabase.from(table).upsert(payload, { onConflict: "id" });
+        if (error) throw error;
+      } else if (item.action === "update") {
+        const { error } = await supabase.from(table).update(payload).eq("id", payload.id);
+        if (error) throw error;
+      } else if (item.action === "delete") {
+        const { error } = await supabase.from(table).delete().eq("id", payload.id);
+        if (error) throw error;
+      }
+      return item.id;
+    }));
+
+    const ok = results.filter(r => r.status === "fulfilled").map(r => r.value);
+    const failed = results.filter(r => r.status === "rejected");
+    if (failed.length > 0) {
+      console.warn("[PowerMate] Sync failures:", failed.length, failed.map(f => f.reason?.message));
+      logEvent("sync_failed", { count: failed.length, errors: failed.slice(0, 3).map(f => f.reason?.message || "unknown") });
+    }
+    if (ok.length > 0) logEvent("sync_succeeded", { count: ok.length });
+
+    // Build set of all id's that are in deduped entries that succeeded — these are entity ids
+    const succeededEntityIds = deduped
+      .filter(item => ok.includes(item.id))
+      .map(item => item.data?.id)
+      .filter(Boolean);
+
+    // Remove succeeded queue items + any duplicates of the same entity that were collapsed
+    const succeededQueueIds = new Set();
+    pending.forEach(item => {
+      if (succeededEntityIds.includes(item.data?.id)) succeededQueueIds.add(item.id);
+    });
+
+    setData(d => ({
+      ...d,
+      syncQueue: (d.syncQueue || []).filter(i => !succeededQueueIds.has(i.id)),
+      clients:   (d.clients || []).map(c   => succeededEntityIds.includes(c.id) ? { ...c, sync_status: "synced" } : c),
+      quotes:    (d.quotes || []).map(q    => succeededEntityIds.includes(q.id) ? { ...q, sync_status: "synced" } : q),
+      followups: (d.followups || []).map(f => succeededEntityIds.includes(f.id) ? { ...f, sync_status: "synced" } : f),
+      notes:     (d.notes || []).map(n     => succeededEntityIds.includes(n.id) ? { ...n, sync_status: "synced" } : n),
+      equipment: (d.equipment || []).map(e => succeededEntityIds.includes(e.id) ? { ...e, sync_status: "synced" } : e),
+    }));
+  } finally {
+    _syncInProgress = false;
+  }
 }
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
@@ -1830,31 +1957,45 @@ export default function PowerWorksApp() {
     catch(e){console.warn("Could not load local data",e);}
   },[]);
 
-  // Save to localStorage - strip base64 media to avoid 5MB quota crash
+  // Save to localStorage (debounced 500ms) - strip base64 to avoid quota crash
   useEffect(()=>{
-    try{
-      const safeData = {
-        ...data,
-        notes: (data.notes||[]).map(n => ({...n, media: (n.media||[]).map(m => ({...m, base64: m.url ? undefined : m.base64?.slice(0,100)+"[truncated]"}))})),
-        equipment: (data.equipment||[]).map(e => ({...e, media: (e.media||[]).map(m => ({...m, base64: m.url ? undefined : m.base64?.slice(0,100)+"[truncated]"}))})),
-      };
-      localStorage.setItem("powermate_v2_data", JSON.stringify(safeData));
-    }
-    catch(e){console.warn("Could not save local data",e);}
+    const t = setTimeout(() => {
+      try{
+        const safeData = {
+          ...data,
+          notes: (data.notes||[]).map(n => ({...n, media: (n.media||[]).map(m => ({...m, base64: m.url ? undefined : m.base64?.slice(0,100)+"[truncated]"}))})),
+          equipment: (data.equipment||[]).map(e => ({...e, media: (e.media||[]).map(m => ({...m, base64: m.url ? undefined : m.base64?.slice(0,100)+"[truncated]"}))})),
+        };
+        localStorage.setItem("powermate_v2_data", JSON.stringify(safeData));
+      }
+      catch(e){
+        console.warn("Could not save local data",e);
+        if (e.name === "QuotaExceededError") {
+          logEvent("localStorage_quota_exceeded", { message: e.message });
+        }
+      }
+    }, 500);
+    return () => clearTimeout(t);
   },[data]);
 
   // Auto-escalate note urgency on app open when resolve_by has passed
+  // Only escalates once per resolve_by date (tracked via last_escalated)
   useEffect(()=>{
     const today = todayISO();
     const notes = data.notes || [];
+    let didChange = false;
     const escalated = notes.map(n => {
       if (n.resolved || !n.resolve_by || n.resolve_by >= today) return n;
+      if (n.last_escalated === n.resolve_by) return n; // already escalated for this deadline
       const next = URGENCY_ESCALATION[n.urgency || "Normal"];
-      if (next === (n.urgency || "Normal")) return n;
-      return { ...n, urgency: next, sync_status: "pending" };
+      if (next === (n.urgency || "Normal")) return { ...n, last_escalated: n.resolve_by };
+      didChange = true;
+      return { ...n, urgency: next, last_escalated: n.resolve_by, sync_status: "pending" };
     });
-    if (escalated.some((n,i) => n.urgency !== notes[i]?.urgency))
+    if (didChange) {
+      logEvent("notes_auto_escalated", { count: escalated.filter((n,i) => n.urgency !== notes[i]?.urgency).length });
       setData(d => ({ ...d, notes: escalated }));
+    }
   },[]); // eslint-disable-line
 
   // Pull data from Supabase on login
@@ -1904,8 +2045,20 @@ export default function PowerWorksApp() {
     if(granted) scheduleNotificationsViaSW(buildNotificationItems(data.followups,data.equipment,data.notes));
   }
 
-  async function logout(){localStorage.removeItem(PIN_KEY);sessionStorage.removeItem(PIN_UNLOCKED_KEY);await supabase.auth.signOut();setSession(null);}
-  async function forgotPIN(){localStorage.removeItem(PIN_KEY);sessionStorage.removeItem(PIN_UNLOCKED_KEY);await supabase.auth.signOut();setSession(null);}
+  async function logout(){
+    localStorage.removeItem(PIN_KEY);
+    sessionStorage.removeItem(PIN_UNLOCKED_KEY);
+    resetPINAttempts();
+    try { await supabase.auth.signOut(); } catch(e) { console.warn("Sign out failed:", e); }
+    setSession(null);
+  }
+  async function forgotPIN(){
+    localStorage.removeItem(PIN_KEY);
+    sessionStorage.removeItem(PIN_UNLOCKED_KEY);
+    resetPINAttempts();
+    try { await supabase.auth.signOut(); } catch(e) { console.warn("Sign out failed:", e); }
+    setSession(null);
+  }
 
   const pendingCount=(data.syncQueue||[]).filter(i=>i.status==="pending").length;
   const flaggedQuotes=(data.quotes||[]).filter(q=>q.status==="Pending").length;
