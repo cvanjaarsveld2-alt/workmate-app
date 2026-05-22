@@ -4,6 +4,7 @@ import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import { offlineSave, offlineGetAll } from "./offline/offlineDb";
 import SyncStatusBadge from "./components/SyncStatusBadge";
+import ReportExport from "./ReportExport";
 
 import {
   Bell, Calendar, ChevronRight, ChevronLeft, Clipboard, File as FileIcon,
@@ -382,15 +383,18 @@ function Btn({ children, onClick, disabled, variant="solid", className="", type=
   );
 }
 
-function Field({ label, value, onChange, placeholder="", type="text", multiline=false, required=false }) {
+function Field({ label, value, onChange, placeholder="", type="text", multiline=false, required=false, maxLength }) {
   const cls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors";
   return (
     <div>
       {label && <label className="mb-1.5 block text-sm font-bold text-slate-500">{label}{required&&<span className="text-red-500 ml-1">*</span>}</label>}
       {multiline
-        ? <textarea value={value||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={4} className={cls+" resize-none"}/>
-        : <input type={type} value={value||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder} className={cls}/>
+        ? <textarea value={value||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={4} maxLength={maxLength||5000} className={cls+" resize-none"}/>
+        : <input type={type} value={value||""} onChange={e=>onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength||500} className={cls}/>
       }
+      {maxLength && (value||"").length > maxLength*0.85 && (
+        <p className="mt-1 text-xs text-slate-400 text-right">{(value||"").length}/{maxLength}</p>
+      )}
     </div>
   );
 }
@@ -538,6 +542,43 @@ function Spinner() {
         <div className="w-10 h-10 rounded-full border-4 border-slate-200 animate-spin" style={{borderTopColor:BRAND.primary}}/>
         <p className="text-sm font-bold text-slate-400">Loading PowerMate…</p>
       </div>
+    </div>
+  );
+}
+
+function DataLoadingScreen() {
+  return (
+    <div className="min-h-screen pb-28" style={{background:BRAND.light}}>
+      <main className="mx-auto max-w-2xl px-4 pt-4 space-y-4">
+        <div className="flex items-start justify-between mb-5">
+          <div className="space-y-2">
+            <div className="h-7 w-32 rounded-xl bg-slate-200 animate-pulse"/>
+            <div className="h-4 w-48 rounded-xl bg-slate-100 animate-pulse"/>
+          </div>
+          <div className="h-8 w-16 rounded-xl bg-slate-200 animate-pulse"/>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {[1,2,3,4].map(i=>(
+            <div key={i} className="bg-white rounded-2xl p-4 border border-slate-100">
+              <div className="h-4 w-20 rounded-lg bg-slate-100 animate-pulse mb-2"/>
+              <div className="h-8 w-12 rounded-lg bg-slate-200 animate-pulse mb-1"/>
+              <div className="h-3 w-24 rounded-lg bg-slate-100 animate-pulse"/>
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-100 space-y-3">
+          {[1,2,3,4].map(i=>(
+            <div key={i} className="flex items-center gap-3">
+              <div className="h-4 w-16 rounded-lg bg-slate-100 animate-pulse"/>
+              <div className="flex-1 h-2.5 rounded-full bg-slate-100 animate-pulse"/>
+              <div className="h-4 w-6 rounded-lg bg-slate-100 animate-pulse"/>
+            </div>
+          ))}
+        </div>
+        <div className="text-center pt-4">
+          <p className="text-xs text-slate-400">Syncing your data…</p>
+        </div>
+      </main>
     </div>
   );
 }
@@ -727,7 +768,14 @@ function AuthScreen() {
     if(!email||!password){setMsg({text:"Please enter your email and password.",type:"error"});return;}
     setLoading(true);
     const {error}=await supabase.auth.signInWithPassword({email,password});
-    if(error) setMsg({text:"Incorrect email or password. Please try again.",type:"error"});
+    if(error) {
+      const msg = error.message?.includes("Invalid login") || error.message?.includes("invalid")
+        ? "Incorrect email or password. Please try again."
+        : error.message?.includes("network") || error.message?.includes("fetch")
+        ? "No internet connection. Please check your network and try again."
+        : "Sign in failed. Please try again.";
+      setMsg({text: msg, type:"error"});
+    }
     setLoading(false);
   }
 
@@ -1931,17 +1979,29 @@ function MoreScreen({ data, onLogout, onSyncNow, syncing, isOnline, notifPermiss
       <PageHeader title="Settings" subtitle="Sync, security & account"/>
 
       <Card className="p-4 space-y-3">
-        <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Sync</p>
+        <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Sync Status</p>
         <div className="flex items-center justify-between">
-          <div><p className="text-base font-bold text-slate-800">{pendingCount} item{pendingCount!==1?"s":""} pending</p><p className="text-sm text-slate-400">{isOnline?"Connected":"Offline — syncs when connected"}</p></div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className={`w-2.5 h-2.5 rounded-full ${isOnline?"bg-green-500":"bg-slate-300"}`}/>
+              <p className="text-base font-bold text-slate-800">{isOnline?"Online":"Offline"}</p>
+            </div>
+            <p className="text-sm text-slate-400 mt-0.5">{isOnline?"Connected to cloud":"Changes saved locally, will sync when back online"}</p>
+          </div>
           <Btn size="sm" variant={isOnline?"solid":"secondary"} onClick={onSyncNow} disabled={!isOnline||syncing||pendingCount===0}>
             <RefreshCw size={14} className={syncing?"animate-spin":""}/>
             {syncing?"Syncing…":"Sync Now"}
           </Btn>
         </div>
         {pendingCount>0
-          ?<div className="rounded-xl bg-amber-50 p-3.5"><p className="text-sm font-bold text-amber-700">⚠️ {pendingCount} items not yet synced to cloud</p></div>
-          :<div className="rounded-xl bg-green-50 p-3.5"><p className="text-sm font-bold text-green-700">✓ All data synced</p></div>
+          ?<div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5">
+            <p className="text-sm font-bold text-amber-700">⚠️ {pendingCount} change{pendingCount!==1?"s":""} waiting to sync</p>
+            <p className="text-xs text-amber-600 mt-0.5">{isOnline?"Tap Sync Now or wait — syncs automatically":"Will sync automatically when you reconnect"}</p>
+          </div>
+          :<div className="rounded-xl bg-green-50 border border-green-200 p-3.5">
+            <p className="text-sm font-bold text-green-700">✓ All data synced to cloud</p>
+            <p className="text-xs text-green-600 mt-0.5">Your data is safe and visible on all devices</p>
+          </div>
         }
       </Card>
 
@@ -1986,6 +2046,8 @@ function MoreScreen({ data, onLogout, onSyncNow, syncing, isOnline, notifPermiss
           </div>
         ))}
       </Card>
+
+      <ReportExport data={data} />
 
       <Btn variant="danger" className="w-full" size="lg" onClick={handleLogout}><LogOut size={16}/>Sign Out</Btn>
       <p className="text-center text-xs text-slate-300">PowerMate v2.2 · Power Works (Pty) Ltd</p>
@@ -2036,6 +2098,10 @@ async function pushSyncQueue(syncQueue, setData) {
     if(failed.length>0) {
       console.warn("[PowerMate] Sync failures:",failed.length);
       logEvent("sync_failed",{count:failed.length,errors:failed.slice(0,3).map(f=>f.reason?.message||"unknown")});
+      // Dispatch a custom event so the UI can show a toast — visible failure is better than silent
+      window.dispatchEvent(new CustomEvent("powermate:sync_failed", {
+        detail: { count: failed.length, message: failed[0]?.reason?.message || "Unknown error" }
+      }));
     }
     if(ok.length>0) logEvent("sync_succeeded",{count:ok.length});
 
@@ -2064,9 +2130,21 @@ export default function PowerWorksApp() {
   const [loading,setLoading]=useState(true);
   const [screen,setScreen]=useState("Home");
   const [syncing,setSyncing]=useState(false);
+  const [syncError,setSyncError]=useState("");
+
+  // Listen for sync failures from the sync engine and show user-visible toast
+  useEffect(()=>{
+    function handleSyncFail(e) {
+      setSyncError(`Sync failed: ${e.detail?.message || "Check your connection"}`);
+      setTimeout(()=>setSyncError(""),5000);
+    }
+    window.addEventListener("powermate:sync_failed", handleSyncFail);
+    return ()=>window.removeEventListener("powermate:sync_failed", handleSyncFail);
+  },[]);
   const [pinState,setPinState]=useState("checking");
   const [notifPermission,setNotifPermission]=useState("Notification" in window?Notification.permission:"denied");
   const [data,setData]=useState({clients:[],followups:[],quotes:[],notes:[],equipment:[],syncQueue:[]});
+  const [dataLoading,setDataLoading]=useState(true);
 
   useEffect(()=>{
     let mounted=true;
@@ -2083,20 +2161,54 @@ export default function PowerWorksApp() {
   },[session]);
 
   useEffect(()=>{
-    try{const saved=localStorage.getItem("powermate_v2_data");if(saved)setData(d=>({...d,...JSON.parse(saved)}));}
-    catch(e){console.warn("Could not load local data",e);}
+    // Load from localStorage first (instant), then IndexedDB (fuller offline data)
+    async function loadLocalData() {
+      // 1. Try localStorage first — fast, available immediately
+      try {
+        const saved = localStorage.getItem("powermate_v2_data");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setData(d => ({ ...d, ...parsed }));
+        }
+      } catch(e) { console.warn("localStorage load failed:", e); }
+
+      // 2. Then try IndexedDB — may have newer offline data not yet in localStorage
+      try {
+        const tables = ["clients", "followups", "quotes", "notes", "equipment"];
+        const results = await Promise.all(tables.map(t => offlineGetAll(t)));
+        const [clients, followups, quotes, notes, equipment] = results;
+        setData(d => ({
+          ...d,
+          ...(clients?.length   ? { clients }   : {}),
+          ...(followups?.length ? { followups } : {}),
+          ...(quotes?.length    ? { quotes }    : {}),
+          ...(notes?.length     ? { notes }     : {}),
+          ...(equipment?.length ? { equipment } : {}),
+        }));
+      } catch(e) { console.warn("IndexedDB load failed:", e); }
+    }
+    loadLocalData();
   },[]);
 
   // Save to localStorage — strip base64 to avoid quota crash
   useEffect(()=>{
     const t=setTimeout(()=>{
       try{
+        // Strip base64 ONLY if we have a real URL (uploaded to Supabase)
+        // Keep base64 if no URL — this is unsaved offline media the user needs
         const safeData={
           ...data,
-          notes:(data.notes||[]).map(n=>({...n,media:(n.media||[]).map(m=>({...m,base64:m.url?undefined:m.base64}))})),
-          equipment:(data.equipment||[]).map(e=>({...e,media:(e.media||[]).map(m=>({...m,base64:m.url?undefined:m.base64}))})),
+          notes:(data.notes||[]).map(n=>({...n,media:(n.media||[]).map(m=>m.url?{...m,base64:undefined}:m)})),
+          equipment:(data.equipment||[]).map(e=>({...e,media:(e.media||[]).map(m=>m.url?{...m,base64:undefined}:m)})),
         };
-        localStorage.setItem("powermate_v2_data",JSON.stringify(safeData));
+        // Check size before saving — warn user if approaching limit
+        const serialized = JSON.stringify(safeData);
+        const sizeMB = (serialized.length / 1024 / 1024).toFixed(1);
+        if (parseFloat(sizeMB) > 4) {
+          console.warn(`[PowerMate] localStorage approaching limit: ${sizeMB}MB`);
+          logEvent("localStorage_size_warning", { sizeMB });
+        }
+        localStorage.setItem("powermate_v2_data", serialized);
       } catch(e){
         console.warn("Could not save local data",e);
         if(e.name==="QuotaExceededError") logEvent("localStorage_quota_exceeded",{message:e.message});
@@ -2121,44 +2233,83 @@ export default function PowerWorksApp() {
     if(didChange) setData(d=>({...d,notes:escalated}));
   },[]);
 
-  // Pull from Supabase — always prefer server data when online
-  useEffect(()=>{
-    if(!session||!isOnline) return;
-    async function pull(){
-      try{
-        const uid=session.user.id;
-        const [a,b,c,d,e]=await Promise.all([
-          supabase.from("clients").select("*").eq("user_id",uid),
-          supabase.from("followups").select("*").eq("user_id",uid),
-          supabase.from("quotes").select("*").eq("user_id",uid),
-          supabase.from("notes").select("*").eq("user_id",uid),
-          supabase.from("equipment").select("*").eq("user_id",uid),
+  // Pull from Supabase + real-time subscriptions for cross-device sync
+  useEffect(() => {
+    if (!session) return;
+    if (!isOnline) { setDataLoading(false); return; }
+    const uid = session.user.id;
+
+    // Initial pull — always prefer server data when online
+    async function pull() {
+      try {
+        const [a, b, c, d, e] = await Promise.all([
+          supabase.from("clients").select("id,user_id,company,division,contact,phone,email,location,branch,stage,pipeline_status,sync_status,auto_created,source,notes,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
+          supabase.from("followups").select("id,user_id,client_id,client,branch,title,date,time,reminder,notes,completed,sync_status,auto_generated,created_at").eq("user_id", uid).order("date", { ascending: false }).limit(500),
+          supabase.from("quotes").select("id,user_id,client_name,description,value,status,sent_date,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
+          supabase.from("notes").select("id,user_id,client,note,urgency,resolve_by,resolved,resolved_at,last_escalated,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
+          supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
         ]);
-        // Always use server data when online (fixed bug: was skipping on empty array)
-        setData(prev=>({
+        setData(prev => ({
           ...prev,
-          clients:   a.error ? prev.clients   : (a.data||[]),
-          followups: b.error ? prev.followups : (b.data||[]),
-          quotes:    c.error ? prev.quotes    : (c.data||[]),
-          notes:     d.error ? prev.notes     : (d.data||[]),
-          equipment: e.error ? prev.equipment : (e.data||[]),
+          clients:   a.error ? prev.clients   : (a.data || []),
+          followups: b.error ? prev.followups : (b.data || []),
+          quotes:    c.error ? prev.quotes    : (c.data || []),
+          notes:     d.error ? prev.notes     : (d.data || []),
+          equipment: e.error ? prev.equipment : (e.data || []),
         }));
-      } catch(e){console.warn("Supabase pull failed:",e);}
+      } catch (e) {
+        console.warn("Supabase pull failed:", e);
+        // If online pull fails, make sure we show whatever we have locally
+        // (already loaded from localStorage/IndexedDB above)
+      } finally {
+        setDataLoading(false);
+      }
     }
     pull();
-  },[session?.user?.id,isOnline]);
+
+    // Real-time listeners — any change on any device updates all others instantly
+    const tables = ["clients", "followups", "quotes", "notes", "equipment"];
+    const channels = tables.map(table =>
+      supabase.channel(`realtime_${table}_${uid}`)
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table,
+          filter: `user_id=eq.${uid}`,
+        }, payload => {
+          setData(prev => {
+            const current = prev[table] || [];
+            if (payload.eventType === "INSERT") {
+              const exists = current.find(r => r.id === payload.new.id);
+              return exists ? prev : { ...prev, [table]: [payload.new, ...current] };
+            }
+            if (payload.eventType === "UPDATE") {
+              return { ...prev, [table]: current.map(r => r.id === payload.new.id ? payload.new : r) };
+            }
+            if (payload.eventType === "DELETE") {
+              return { ...prev, [table]: current.filter(r => r.id !== payload.old.id) };
+            }
+            return prev;
+          });
+        })
+        .subscribe()
+    );
+
+    // Cleanup on unmount
+    return () => { channels.forEach(ch => supabase.removeChannel(ch)); };
+  }, [session?.user?.id, isOnline]);
 
   useEffect(()=>{
     if(notifPermission!=="granted") return;
     scheduleNotificationsViaSW(buildNotificationItems(data.followups,data.equipment,data.notes));
   },[data.followups,data.equipment,notifPermission]);
 
-  // Auto-sync pending items 3s after any change
+  // Auto-sync pending items — 5s debounce to batch multiple rapid changes
   useEffect(()=>{
     if(!isOnline||!session) return;
     const pending=(data.syncQueue||[]).filter(i=>i.status==="pending");
     if(pending.length===0) return;
-    const t=setTimeout(()=>pushSyncQueue(data.syncQueue,setData),3000);
+    const t=setTimeout(()=>pushSyncQueue(data.syncQueue,setData),5000);
     return()=>clearTimeout(t);
   },[isOnline,session,data.syncQueue?.length]);
 
@@ -2196,6 +2347,7 @@ export default function PowerWorksApp() {
   if(pinState==="checking") return <Spinner/>;
   if(pinState==="setup") return <PINSetupScreen onComplete={()=>setPinState("unlocked")}/>;
   if(pinState==="locked") return <PINLockScreen onUnlock={()=>setPinState("unlocked")} onForgot={forgotPIN}/>;
+  if(dataLoading) return <DataLoadingScreen/>;
 
   const screens={
     Home:      <HomeScreen data={data} setScreen={setScreen}/>,
@@ -2237,6 +2389,9 @@ export default function PowerWorksApp() {
         </nav>
 
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing}/>
+        <AnimatePresence>
+          {syncError && <Toast message={syncError} type="error" onDone={()=>setSyncError("")}/>}
+        </AnimatePresence>
       </div>
     </ErrorBoundary>
   );
