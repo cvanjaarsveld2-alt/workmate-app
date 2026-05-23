@@ -28,8 +28,9 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
   async function addNote() {
     if (!form.note.trim()) { setToast("Please enter a note"); return; }
     const cleanForm = { ...form, resolve_by: form.resolve_by || null };
-    const item = { id: genId(), user_id: userId, ...cleanForm, media: pendingMedia, resolved: false, created_at: new Date().toISOString(), sync_status: "pending" };
-    setData(d => ({ ...d, notes: [item, ...(d.notes || [])], syncQueue: [{ id: genId(), table: "notes", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
+    const noteQueueId = genId();
+    const item = { id: genId(), user_id: userId, ...cleanForm, media: [], resolved: false, created_at: new Date().toISOString(), sync_status: "pending" };
+    setData(d => ({ ...d, notes: [item, ...(d.notes || [])], syncQueue: [{ id: noteQueueId, table: "notes", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
     await offlineSave("notes", item);
     if (form.resolve_by && Notification.permission === "granted") {
       const fireAt = new Date(form.resolve_by + "T09:00:00");
@@ -41,8 +42,12 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
     }
     if (isOnline && pendingMedia.length > 0) {
       const uploaded = await Promise.all(pendingMedia.map(async m => { const path = "notes/" + item.id + "/" + m.id; const url = await uploadPhotoToSupabase(m.base64, path); return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : m; }));
-      const updatedItem = { ...item, media: uploaded };
-      setData(d => ({ ...d, notes: (d.notes || []).map(n => n.id === item.id ? updatedItem : n) }));
+      const updatedItem = { ...item, media: uploaded, sync_status: "pending" };
+      setData(d => ({
+        ...d,
+        notes: (d.notes || []).map(n => n.id === item.id ? updatedItem : n),
+        syncQueue: (d.syncQueue || []).map(q => q.id === noteQueueId ? { ...q, data: updatedItem } : q),
+      }));
       await offlineSave("notes", updatedItem);
     }
     setForm({ client: "", note: "", urgency: "Normal", resolve_by: "" });
