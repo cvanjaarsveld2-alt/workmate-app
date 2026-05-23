@@ -10,13 +10,13 @@ import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { EmailButton } from "../components/EmailButton";
-const STAGE_PRIORITY = { Active: 0, Quoted: 1, Contacted: 2, "New Lead": 3, Won: 4, Lost: 5 };
-import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import {
   Card, Btn, Field, SelectField, SearchBar,
   FilterPills, Toast, Empty, StagePill, PageHeader, useConfirm,
 } from "../components/ui";
+
+const STAGE_PRIORITY = { Active: 0, Quoted: 1, Contacted: 2, "New Lead": 3, Won: 4, Lost: 5 };
 
 // ─── Inline follow-up form (inside client card) ───────────────────────────────
 function InlineFollowupForm({ client, userId, setData, onDone }) {
