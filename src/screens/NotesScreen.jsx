@@ -27,7 +27,8 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
 
   async function addNote() {
     if (!form.note.trim()) { setToast("Please enter a note"); return; }
-    const item = { id: genId(), user_id: userId, ...form, media: pendingMedia, resolved: false, created_at: new Date().toISOString(), sync_status: "pending" };
+    const cleanForm = { ...form, resolve_by: form.resolve_by || null };
+    const item = { id: genId(), user_id: userId, ...cleanForm, media: pendingMedia, resolved: false, created_at: new Date().toISOString(), sync_status: "pending" };
     setData(d => ({ ...d, notes: [item, ...(d.notes || [])], syncQueue: [{ id: genId(), table: "notes", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
     await offlineSave("notes", item);
     if (form.resolve_by && Notification.permission === "granted") {
