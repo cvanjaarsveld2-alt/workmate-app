@@ -5,6 +5,7 @@ import { Plus, X, Check, Trash2, Clipboard, Paperclip } from "lucide-react";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
+import { triggerImmediateSync } from "../lib/sync";
 import { scheduleNotificationsViaSW } from "../lib/notifications";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, UrgencyBadge, useConfirm } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
@@ -45,6 +46,7 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
     }
     setForm({ client: "", note: "", urgency: "Normal", resolve_by: "" });
     setPendingMedia([]); setShowForm(false); setToast("Note saved");
+    triggerImmediateSync();
   }
 
   async function resolveNote(id) {
@@ -52,6 +54,7 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
     const updated = { ...n, resolved: true, resolved_at: new Date().toISOString(), sync_status: "pending" };
     setData(d => ({ ...d, notes: (d.notes || []).map(x => x.id === id ? updated : x), syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
     await offlineSave("notes", updated); setToast("Note resolved");
+    triggerImmediateSync();
   }
 
   async function unresolveNote(id) {
@@ -71,8 +74,9 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
   async function deleteNote(id) {
     const ok = await confirm("Delete this note?", { confirmLabel: "Delete" });
     if (!ok) return;
-    setData(d => ({ ...d, notes: (d.notes || []).filter(n => n.id !== id) }));
+    setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "notes", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], notes: (d.notes || []).filter(n => n.id !== id) }));
     setToast("Note deleted");
+    triggerImmediateSync();
   }
 
   async function deleteNoteMedia(noteId, mediaId) {
