@@ -79,38 +79,40 @@ import { supabase } from "../supabase";
 
 export async function uploadPhotoToSupabase(base64, path) {
   try {
-    // Convert base64 data URL to blob — robust method that works on iPhone Safari
-    let blob;
-    if (base64.startsWith("data:")) {
-      const parts      = base64.split(",");
-      const mimeMatch  = parts[0].match(/:(.*?);/);
-      const mimeType   = mimeMatch ? mimeMatch[1] : "image/jpeg";
-      const byteString = atob(parts[1]);
-      const byteArray  = new Uint8Array(byteString.length);
-      for (let i = 0; i < byteString.length; i++) {
-        byteArray[i] = byteString.charCodeAt(i);
-      }
-      blob = new Blob([byteArray], { type: mimeType });
-    } else {
-      // Fallback: try fetch method
-      const res = await fetch(base64);
-      blob = await res.blob();
+    console.log("[Photo] Starting upload to path:", path);
+
+    if (!base64 || !base64.startsWith("data:")) {
+      console.warn("[Photo] Invalid base64 data — skipping upload");
+      return null;
     }
 
-    const mimeType = blob.type || "image/jpeg";
+    // Convert base64 data URL to blob — robust method that works on iPhone Safari
+    const parts      = base64.split(",");
+    const mimeMatch  = parts[0].match(/:(.*?);/);
+    const mimeType   = mimeMatch ? mimeMatch[1] : "image/jpeg";
+    const byteString = atob(parts[1]);
+    const byteArray  = new Uint8Array(byteString.length);
+    for (let i = 0; i < byteString.length; i++) {
+      byteArray[i] = byteString.charCodeAt(i);
+    }
+    const blob = new Blob([byteArray], { type: mimeType });
+
+    console.log("[Photo] Blob created:", blob.size, "bytes,", mimeType);
+
     const { error } = await supabase.storage
       .from("powermate-media")
       .upload(path, blob, { upsert: true, contentType: mimeType });
 
     if (error) {
-      console.warn("Photo upload error:", error.message, error);
-      throw error;
+      console.error("[Photo] Upload error:", error.message, error.statusCode, error);
+      return null;
     }
 
     const { data } = supabase.storage.from("powermate-media").getPublicUrl(path);
+    console.log("[Photo] Upload success! URL:", data.publicUrl);
     return data.publicUrl;
   } catch (e) {
-    console.warn("Photo upload failed:", e?.message || e);
+    console.error("[Photo] Upload exception:", e?.message || e);
     return null;
   }
 }
