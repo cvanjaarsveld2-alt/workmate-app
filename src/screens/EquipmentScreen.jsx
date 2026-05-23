@@ -65,7 +65,13 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
         uploadedMedia = await Promise.all(pendingMedia.map(async m => {
           const path = `equipment/${itemId}/${m.id}`;
           const url = await uploadPhotoToSupabase(m.base64, path);
-          return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
+          if (url) {
+            setToast("Photo uploaded ✓");
+            return { ...m, url, base64: undefined, uploadStatus: "done" };
+          } else {
+            setToast("Photo upload failed — check connection");
+            return { ...m, uploadStatus: "failed" };
+          }
         }));
       } else {
         // Offline: keep base64 for now, mark as pending upload
