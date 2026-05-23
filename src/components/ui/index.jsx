@@ -5,8 +5,8 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Users, ChevronDown } from "lucide-react";
-import { BRAND, STAGE_COLORS, NOTE_URGENCY } from "../lib/constants";
-import { daysDiff, smartDate } from "../lib/helpers";
+import { BRAND, STAGE_COLORS, NOTE_URGENCY } from "../../lib/constants";
+import { daysDiff, smartDate } from "../../lib/helpers";
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 export function Card({ children, className = "", onClick }) {
