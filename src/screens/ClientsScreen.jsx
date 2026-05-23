@@ -10,6 +10,8 @@ import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { EmailButton } from "../components/EmailButton";
+const STAGE_PRIORITY = { Active: 0, Quoted: 1, Contacted: 2, "New Lead": 3, Won: 4, Lost: 5 };
+import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import {
   Card, Btn, Field, SelectField, SearchBar,
@@ -90,7 +92,7 @@ function ClientFollowupRow({ followup: f, setData }) {
   }
 
   const [expanded, setExpanded] = useState(false);
-  const isLong = f.title && f.title.length > 60;
+  const isLong = f.title && f.title.length > 80;
 
   return (
     <div className={`rounded-xl p-2.5 ${isOverdue ? "bg-red-50" : f.completed ? "bg-slate-50" : "bg-white border border-slate-100"}`}>
@@ -100,7 +102,7 @@ function ClientFollowupRow({ followup: f, setData }) {
           <Check size={15} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-bold ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"} ${!expanded && isLong ? "line-clamp-2" : ""}`}>
+          <p className={`text-sm font-bold ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"} ${!expanded && isLong ? "line-clamp-3" : ""}`}>
             {f.title}
           </p>
           {isLong && (
@@ -276,7 +278,17 @@ export function ClientsScreen({ data, setData, userId }) {
               </button>
 
               <div className="divide-y divide-slate-50">
-                {branches.map(c => {
+                {[...branches].sort((a, b) => {
+                  // Overdue follow-ups first
+                  const aOverdue = companyFU.some(f => f.client_id === a.id && !f.completed && f.date < today);
+                  const bOverdue = companyFU.some(f => f.client_id === b.id && !f.completed && f.date < today);
+                  if (aOverdue && !bOverdue) return -1;
+                  if (!aOverdue && bOverdue) return 1;
+                  // Then by stage priority
+                  const aPri = STAGE_PRIORITY[a.stage || "New Lead"] ?? 3;
+                  const bPri = STAGE_PRIORITY[b.stage || "New Lead"] ?? 3;
+                  return aPri - bPri;
+                }).map(c => {
                   const clientFU      = getClientFollowups(c.id);
                   const clientOverdue = clientFU.filter(f => !f.completed && f.date < today).length;
                   const clientPending = clientFU.filter(f => !f.completed).length;
