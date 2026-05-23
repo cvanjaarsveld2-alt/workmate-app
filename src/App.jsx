@@ -21,9 +21,9 @@ import { offlineSave, offlineGetAll } from "./offline/offlineDb";
 // Lib
 import { todayISO, logEvent, genId }                    from "./lib/helpers";
 import { LOCAL_STORAGE_KEY, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY } from "./lib/constants";
-import { pushSyncQueue }                                 from "./lib/sync";
+import { pushSyncQueue, pullFromSupabase, setupRealtimeSync, registerSyncHandlers, triggerImmediateSync } from "./lib/sync";
 import { requestNotificationPermission, scheduleNotificationsViaSW, buildNotificationItems } from "./lib/notifications";
-import { getPINHash, isSessionUnlocked, resetPINAttempts } from "./lib/pinHelpers";
+import { getPINHash, loadPINHash, isSessionUnlocked, resetPINAttempts } from "./lib/pinHelpers";
 
 // Auth & PIN
 import { AuthScreen }    from "./auth/AuthScreen";
@@ -96,12 +96,21 @@ export default function PowerWorksApp() {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  // ── PIN ──
+  // ── Register sync handlers so screens can trigger immediate sync ──
+  useEffect(() => {
+    registerSyncHandlers(setData, () => data.syncQueue);
+  }, [data.syncQueue]);
+
+  // ── PIN — loads from localStorage or Supabase user metadata ──
   useEffect(() => {
     if (!session) return;
-    if (!getPINHash())        { setPinState("setup");    return; }
-    if (isSessionUnlocked())  { setPinState("unlocked"); return; }
-    setPinState("locked");
+    async function checkPIN() {
+      if (isSessionUnlocked()) { setPinState("unlocked"); return; }
+      const hash = await loadPINHash(); // checks local then Supabase
+      if (!hash) { setPinState("setup"); return; }
+      setPinState("locked");
+    }
+    checkPIN();
   }, [session]);
 
   // ── Load local data (IndexedDB + localStorage) ──
@@ -172,51 +181,12 @@ export default function PowerWorksApp() {
     if (!isOnline) { setDataLoading(false); return; }
     const uid = session.user.id;
 
-    async function pull() {
-      try {
-        const [a, b, c, d, e] = await Promise.all([
-          supabase.from("clients").select("id,user_id,company,division,contact,phone,email,location,branch,stage,pipeline_status,sync_status,auto_created,source,notes,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-          supabase.from("followups").select("id,user_id,client_id,client,branch,title,date,time,reminder,notes,completed,sync_status,auto_generated,created_at").eq("user_id", uid).order("date", { ascending: false }).limit(500),
-          supabase.from("quotes").select("id,user_id,client_name,description,value,status,sent_date,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-          supabase.from("notes").select("id,user_id,client,note,urgency,resolve_by,resolved,resolved_at,last_escalated,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-          supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-        ]);
-        setData(prev => ({
-          ...prev,
-          clients:   a.error ? prev.clients   : (a.data || []),
-          followups: b.error ? prev.followups : (b.data || []),
-          quotes:    c.error ? prev.quotes    : (c.data || []),
-          notes:     d.error ? prev.notes     : (d.data || []),
-          equipment: e.error ? prev.equipment : (e.data || []),
-        }));
-      } catch (e) {
-        console.warn("Supabase pull failed:", e);
-      } finally {
-        setDataLoading(false);
-      }
-    }
-    pull();
+    // Pull fresh data (merges with any local pending changes)
+    pullFromSupabase(uid, setData).finally(() => setDataLoading(false));
 
-    // Real-time listeners
-    const tables   = ["clients", "followups", "quotes", "notes", "equipment"];
-    const channels = tables.map(table =>
-      supabase.channel(`realtime_${table}_${uid}`)
-        .on("postgres_changes", { event: "*", schema: "public", table, filter: `user_id=eq.${uid}` }, payload => {
-          setData(prev => {
-            const current = prev[table] || [];
-            if (payload.eventType === "INSERT") {
-              const exists = current.find(r => r.id === payload.new.id);
-              return exists ? prev : { ...prev, [table]: [payload.new, ...current] };
-            }
-            if (payload.eventType === "UPDATE") return { ...prev, [table]: current.map(r => r.id === payload.new.id ? payload.new : r) };
-            if (payload.eventType === "DELETE") return { ...prev, [table]: current.filter(r => r.id !== payload.old.id) };
-            return prev;
-          });
-        })
-        .subscribe()
-    );
-
-    return () => { channels.forEach(ch => supabase.removeChannel(ch)); };
+    // Set up real-time sync for all tables
+    const cleanup = setupRealtimeSync(uid, setData);
+    return cleanup;
   }, [session?.user?.id, isOnline]);
 
   // ── Sync error listener ──
@@ -235,14 +205,29 @@ export default function PowerWorksApp() {
     scheduleNotificationsViaSW(buildNotificationItems(data.followups, data.equipment, data.notes));
   }, [data.followups, data.equipment, notifPermission]);
 
-  // ── Auto-sync pending items (5s debounce) ──
+  // ── Auto-sync: retry pending items when online, immediately on reconnect ──
   useEffect(() => {
     if (!isOnline || !session) return;
     const pending = (data.syncQueue || []).filter(i => i.status === "pending");
     if (pending.length === 0) return;
-    const t = setTimeout(() => pushSyncQueue(data.syncQueue, setData), 5000);
+    // Immediate retry when coming back online, 3s debounce otherwise
+    const t = setTimeout(() => pushSyncQueue(data.syncQueue, setData), 3000);
     return () => clearTimeout(t);
   }, [isOnline, session, data.syncQueue?.length]);
+
+  // ── Re-pull when coming back online after being offline ──
+  const prevOnlineRef = React.useRef(isOnline);
+  useEffect(() => {
+    const wasOffline = !prevOnlineRef.current;
+    prevOnlineRef.current = isOnline;
+    if (isOnline && wasOffline && session) {
+      // Just came back online — pull fresh data and flush queue
+      pullFromSupabase(session.user.id, setData);
+      if ((data.syncQueue || []).some(i => i.status === "pending")) {
+        pushSyncQueue(data.syncQueue, setData);
+      }
+    }
+  }, [isOnline]);
 
   // ── Handlers ──
   async function handleSyncNow() { setSyncing(true); await pushSyncQueue(data.syncQueue, setData); setSyncing(false); }
