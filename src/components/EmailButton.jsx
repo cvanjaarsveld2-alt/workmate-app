@@ -60,12 +60,7 @@ export const EMAIL_TEMPLATES = [
 ];
 
 // ─── Email Button ──────────────────────────────────────────────────────────────
-export function EmailButton({
-  email,
-  contactName,
-  clientName,
-  size = "sm",
-}) {
+export function EmailButton({ email, contactName, clientName, size = "sm" }) {
   const [showTemplates, setShowTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [customSubject, setCustomSubject] = useState("");
@@ -82,12 +77,10 @@ export function EmailButton({
   }
 
   function sendEmail() {
-    const subject = encodeURIComponent(customSubject);
-    const body = encodeURIComponent(customBody.replace(/\\n/g, "\n"));
-    const mailto = `mailto:${email}?subject=${subject}&body=${body}`;
-
+    const subject  = encodeURIComponent(customSubject);
+    const body     = encodeURIComponent(customBody.replace(/\\n/g, "\n"));
+    const mailto   = `mailto:${email}?subject=${subject}&body=${body}`;
     window.location.href = mailto;
-
     setShowTemplates(false);
     setEditing(false);
     setSelectedTemplate(null);
@@ -97,14 +90,9 @@ export function EmailButton({
     <>
       <button
         onClick={() => setShowTemplates(true)}
-        className={`inline-flex items-center gap-1.5 rounded-xl font-bold transition-all active:scale-95 ${
-          size === "sm"
-            ? "px-3 py-1.5 text-xs min-h-[36px]"
-            : "px-4 py-2.5 text-sm min-h-[44px]"
-        }`}
+        className={`inline-flex items-center gap-1.5 rounded-xl font-bold transition-all active:scale-95 ${size === "sm" ? "px-3 py-1.5 text-xs min-h-[36px]" : "px-4 py-2.5 text-sm min-h-[44px]"}`}
         style={{ background: "#0078D4", color: "#fff" }}
-        title="Send email"
-      >
+        title="Send email">
         <Mail size={13} />
         Email
       </button>
@@ -112,50 +100,27 @@ export function EmailButton({
       <AnimatePresence>
         {showTemplates && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 px-4 pb-6"
-            onClick={() => {
-              setShowTemplates(false);
-              setEditing(false);
-            }}
-          >
+            onClick={() => { setShowTemplates(false); setEditing(false); }}>
             <motion.div
-              initial={{ y: 100 }}
-              animate={{ y: 0 }}
-              exit={{ y: 100 }}
+              initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }}
               className="w-full max-w-sm bg-white rounded-2xl overflow-hidden shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
+              onClick={e => e.stopPropagation()}>
+
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center"
-                    style={{ background: "#0078D4" }}
-                  >
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: "#0078D4" }}>
                     <Mail size={15} color="white" />
                   </div>
-
                   <div>
-                    <p className="text-sm font-black text-slate-900">
-                      Email
-                    </p>
-
-                    <p className="text-xs text-slate-400">
-                      {contactName || clientName} · {email}
-                    </p>
+                    <p className="text-sm font-black text-slate-900">Email</p>
+                    <p className="text-xs text-slate-400">{contactName || clientName} · {email}</p>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => {
-                    setShowTemplates(false);
-                    setEditing(false);
-                  }}
-                  className="p-2 rounded-xl bg-slate-50 text-slate-400"
-                >
+                <button onClick={() => { setShowTemplates(false); setEditing(false); }}
+                  className="p-2 rounded-xl bg-slate-50 text-slate-400">
                   <X size={16} />
                 </button>
               </div>
@@ -163,66 +128,36 @@ export function EmailButton({
               {/* Template list or editor */}
               {!editing ? (
                 <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-                    Choose a template
-                  </p>
-
-                  {EMAIL_TEMPLATES.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => selectTemplate(t)}
-                      className="w-full text-left rounded-xl p-3 hover:bg-slate-50 transition-colors border border-slate-100 active:scale-[0.98]"
-                    >
-                      <p className="text-sm font-bold text-slate-800">
-                        {t.emoji} {t.label}
-                      </p>
-
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {t.subject(clientName)}
-                      </p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Choose a template</p>
+                  {EMAIL_TEMPLATES.map(t => (
+                    <button key={t.id} onClick={() => selectTemplate(t)}
+                      className="w-full text-left rounded-xl p-3 hover:bg-slate-50 transition-colors border border-slate-100 active:scale-[0.98]">
+                      <p className="text-sm font-bold text-slate-800">{t.emoji} {t.label}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{t.subject(clientName)}</p>
                     </button>
                   ))}
                 </div>
               ) : (
                 <div className="p-4 space-y-3">
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">
-                      Subject
-                    </label>
-
-                    <input
-                      value={customSubject}
-                      onChange={(e) => setCustomSubject(e.target.value)}
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300"
-                    />
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Subject</label>
+                    <input value={customSubject} onChange={e => setCustomSubject(e.target.value)}
+                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300" />
                   </div>
-
                   <div>
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">
-                      Message — edit if needed
-                    </label>
-
-                    <textarea
-                      value={customBody}
-                      onChange={(e) => setCustomBody(e.target.value)}
+                    <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Message — edit if needed</label>
+                    <textarea value={customBody} onChange={e => setCustomBody(e.target.value)}
                       rows={8}
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 resize-none"
-                    />
+                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 resize-none" />
                   </div>
-
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditing(false)}
-                      className="flex-1 rounded-xl border-2 border-slate-200 py-3 text-sm font-bold text-slate-600"
-                    >
+                    <button onClick={() => setEditing(false)}
+                      className="flex-1 rounded-xl border-2 border-slate-200 py-3 text-sm font-bold text-slate-600">
                       ← Templates
                     </button>
-
-                    <button
-                      onClick={sendEmail}
+                    <button onClick={sendEmail}
                       className="flex-1 rounded-xl py-3 text-sm font-bold text-white"
-                      style={{ background: "#0078D4" }}
-                    >
+                      style={{ background: "#0078D4" }}>
                       Open Outlook →
                     </button>
                   </div>
