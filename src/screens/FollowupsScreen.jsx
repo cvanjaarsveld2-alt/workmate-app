@@ -5,6 +5,7 @@ import { Plus, X, Save, Edit2, Trash2, Check, Calendar } from "lucide-react";
 import { BRAND, REMINDER_OPTIONS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
+import { triggerImmediateSync } from "../lib/sync";
 import {
   Card, Btn, Field, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
@@ -79,6 +80,7 @@ export function FollowupsScreen({ data, setData, userId }) {
       }));
       await offlineSave("followups", updated);
       setToast("Follow-up updated");
+    triggerImmediateSync();
     } else {
       const item = {
         id: genId(), user_id: userId, ...form,
@@ -92,6 +94,7 @@ export function FollowupsScreen({ data, setData, userId }) {
       }));
       await offlineSave("followups", item);
       setToast("Follow-up added");
+    triggerImmediateSync();
     }
     resetForm();
   }
@@ -101,13 +104,15 @@ export function FollowupsScreen({ data, setData, userId }) {
     const up = { ...t, completed: !t.completed, sync_status: "pending" };
     setData(d => ({ ...d, followups: (d.followups || []).map(f => f.id === id ? up : f) }));
     await offlineSave("followups", up);
+    triggerImmediateSync();
   }
 
   async function deleteFollowup(id) {
     const ok = await confirm("Delete this follow-up?", { confirmLabel: "Delete" });
     if (!ok) return;
-    setData(d => ({ ...d, followups: (d.followups || []).filter(f => f.id !== id) }));
+    setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "followups", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], followups: (d.followups || []).filter(f => f.id !== id) }));
     setToast("Follow-up deleted");
+    triggerImmediateSync();
   }
 
   const filtered = followups.filter(f => {
@@ -115,8 +120,19 @@ export function FollowupsScreen({ data, setData, userId }) {
     if (filter === "Today")      return f.date === today && !f.completed;
     if (filter === "This week")  return f.date > today && f.date <= nextWeekStr && !f.completed;
     if (filter === "Done")       return f.completed;
+    if (filter === "By Client")  return !f.completed;
     return !f.completed;
   }).sort((a, b) => a.completed - b.completed || a.date.localeCompare(b.date));
+
+  // Group by client alphabetically for "By Client" view
+  const byClient = filter === "By Client"
+    ? filtered.reduce((acc, f) => {
+        const key = f.client || "No Client";
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(f);
+        return acc;
+      }, {})
+    : null;
 
   const overdueCount = followups.filter(f => f.date < today && !f.completed).length;
   const todayCount   = followups.filter(f => f.date === today && !f.completed).length;
@@ -190,11 +206,24 @@ export function FollowupsScreen({ data, setData, userId }) {
         )}
       </AnimatePresence>
 
-      <FilterPills options={["Upcoming", "Overdue", "Today", "This week", "Done"]} value={filter} onChange={setFilter} dangerValue="Overdue" />
+      <FilterPills options={["Upcoming", "By Client", "Overdue", "Today", "This week", "Done"]} value={filter} onChange={setFilter} dangerValue="Overdue" />
 
       {filtered.length === 0 && <Empty title={filter === "Done" ? "No completed follow-ups" : "All clear!"} text="No follow-ups in this category." icon={Calendar} />}
 
-      {grouped ? (
+      {byClient ? (
+        <div className="space-y-4">
+          {Object.entries(byClient).sort(([a],[b]) => a.localeCompare(b)).map(([clientName, fus]) => (
+            <div key={clientName}>
+              <p className="text-sm font-bold text-slate-700 px-1 mb-2 uppercase tracking-wider">{clientName} ({fus.length})</p>
+              <div className="space-y-2">
+                {fus.sort((a,b) => a.date.localeCompare(b.date)).map(f => (
+                  <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : grouped ? (
         <div className="space-y-4">
           {bucketOrder.filter(b => grouped[b]?.length > 0).map(bucket => (
             <div key={bucket}>
