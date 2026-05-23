@@ -13,20 +13,32 @@ import {
 } from "../components/ui";
 
 function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
+  const [expanded, setExpanded] = useState(false);
   const isOverdue = !f.completed && f.date < today;
   const reminder  = REMINDER_OPTIONS.find(o => o.value === f.reminder);
+  const isLong    = f.title && f.title.length > 80;
+
   return (
     <Card className={`p-3.5 ${isOverdue ? "border-l-4 border-l-red-400" : ""}`}>
       <div className="flex items-start gap-3">
         <button onClick={onToggle}
-          className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all ${f.completed ? "bg-green-100 text-green-600" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
+          className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all mt-0.5 ${f.completed ? "bg-green-100 text-green-600" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
           <Check size={16} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-base font-bold ${f.completed ? "line-through text-slate-400" : "text-slate-900"}`}>{f.title}</p>
-          {(f.client || f.branch) && <p className="text-sm text-slate-500 mt-0.5">{f.client}{f.branch ? ` — ${f.branch}` : ""}</p>}
+          <p className={`text-base font-bold ${f.completed ? "line-through text-slate-400" : "text-slate-900"} ${!expanded && isLong ? "line-clamp-3" : ""}`}>
+            {f.title}
+          </p>
+          {isLong && (
+            <button onClick={() => setExpanded(!expanded)}
+              className="text-xs font-bold mt-1 px-2 py-0.5 rounded-full"
+              style={{background:"#FEF3C7", color:"#92400E", border:"1px solid #FCD34D"}}>
+              {expanded ? "▲ Show less" : "▼ Read more"}
+            </button>
+          )}
+          {(f.client || f.branch) && <p className="text-sm text-slate-500 mt-1">{f.client}{f.branch ? ` — ${f.branch}` : ""}</p>}
           <p className="text-sm text-slate-400 mt-0.5">{smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
-          {f.notes && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{f.notes}</p>}
+          {f.notes && <p className="text-xs text-slate-400 mt-1">{f.notes}</p>}
           {reminder && reminder.value !== "none" && !f.completed && <p className="text-xs text-blue-400 mt-0.5">🔔 {reminder.label}</p>}
           {f.clientPhone && !f.completed && (
             <div className="mt-2">
@@ -34,8 +46,8 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
             </div>
           )}
         </div>
-        <div className="flex gap-1 shrink-0 flex-wrap justify-end">
-          {isOverdue && <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-600 self-start">Overdue</span>}
+        <div className="flex flex-col gap-1 shrink-0">
+          {isOverdue && <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-600 whitespace-nowrap">Overdue</span>}
           <button onClick={onEdit} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={14} /></button>
           <button onClick={onDelete} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={14} /></button>
         </div>
@@ -217,17 +229,39 @@ export function FollowupsScreen({ data, setData, userId }) {
       {filtered.length === 0 && <Empty title={filter === "Done" ? "No completed follow-ups" : "All clear!"} text="No follow-ups in this category." icon={Calendar} />}
 
       {byClient ? (
-        <div className="space-y-4">
-          {Object.entries(byClient).sort(([a],[b]) => a.localeCompare(b)).map(([clientName, fus]) => (
-            <div key={clientName}>
-              <p className="text-sm font-bold text-slate-700 px-1 mb-2 uppercase tracking-wider">{clientName} ({fus.length})</p>
-              <div className="space-y-2">
-                {fus.sort((a,b) => a.date.localeCompare(b.date)).map(f => (
-                  <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)} />
-                ))}
+        <div className="space-y-5">
+          {Object.entries(byClient).sort(([a],[b]) => a.localeCompare(b)).map(([clientName, fus]) => {
+            const overdueFUs = fus.filter(f => f.date < today && !f.completed);
+            return (
+              <div key={clientName}>
+                {/* Company header */}
+                <div className="flex items-center gap-2 px-1 mb-2">
+                  <p className="text-sm font-black text-slate-800 uppercase tracking-wide">{clientName}</p>
+                  <span className="text-xs text-slate-400">({fus.length})</span>
+                  {overdueFUs.length > 0 && (
+                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600">
+                      ⚠️ {overdueFUs.length} overdue
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {fus
+                    .sort((a, b) => {
+                      // Overdue first
+                      const aOverdue = a.date < today && !a.completed;
+                      const bOverdue = b.date < today && !b.completed;
+                      if (aOverdue && !bOverdue) return -1;
+                      if (!aOverdue && bOverdue) return 1;
+                      // Then by date
+                      return a.date.localeCompare(b.date);
+                    })
+                    .map(f => (
+                      <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)} />
+                    ))}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : grouped ? (
         <div className="space-y-4">
