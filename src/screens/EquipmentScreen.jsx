@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip } from "lucide-react";
 import { smartDate, genId, uploadPhotoToSupabase, daysDiff } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
+import { triggerImmediateSync } from "../lib/sync";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, ServiceBadge, useConfirm } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 
@@ -37,6 +38,7 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
         await offlineSave("equipment", finalItem);
       }
       setToast("Equipment updated");
+    triggerImmediateSync();
     } else {
       const item = { id: genId(), user_id: userId, ...form, media: pendingMedia, created_at: new Date().toISOString(), sync_status: "pending" };
       setData(d => ({ ...d, equipment: [item, ...(d.equipment || [])], syncQueue: [{ id: genId(), table: "equipment", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
@@ -48,6 +50,7 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
         await offlineSave("equipment", finalItem);
       }
       setToast("Equipment added");
+    triggerImmediateSync();
     }
     resetForm();
   }
@@ -62,8 +65,9 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
   async function deleteEquipment(id, name) {
     const ok = await confirm(`Delete ${name}?`, { confirmLabel: "Delete" });
     if (!ok) return;
-    setData(d => ({ ...d, equipment: (d.equipment || []).filter(e => e.id !== id) }));
+    setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "equipment", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], equipment: (d.equipment || []).filter(e => e.id !== id) }));
     setToast("Equipment deleted");
+    triggerImmediateSync();
   }
 
   function startEdit(e) {
