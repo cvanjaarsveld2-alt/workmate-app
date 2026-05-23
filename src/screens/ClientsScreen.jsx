@@ -8,6 +8,8 @@ import {
 import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
+import { WhatsAppButton } from "../components/WhatsAppButton";
+import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import {
   Card, Btn, Field, SelectField, SearchBar,
@@ -102,8 +104,10 @@ function ClientFollowupRow({ followup: f, setData }) {
             {f.title}
           </p>
           {isLong && (
-            <button onClick={() => setExpanded(!expanded)} className="text-xs font-bold mt-0.5" style={{color:"#8B1A1A"}}>
-              {expanded ? "Show less" : "Read more"}
+            <button onClick={() => setExpanded(!expanded)}
+              className="text-xs font-bold mt-1 px-2 py-0.5 rounded-full"
+              style={{background:"#FEF3C7", color:"#92400E", border:"1px solid #FCD34D"}}>
+              {expanded ? "▲ Show less" : "▼ Read more"}
             </button>
           )}
           <p className="text-xs text-slate-400 mt-0.5">{smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
@@ -291,6 +295,26 @@ export function ClientsScreen({ data, setData, userId }) {
                               <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1 text-sm text-blue-600 font-medium" onClick={e => e.stopPropagation()}>
                                 <Phone size={12} />{c.phone}
                               </a>
+                            )}
+                            {c.phone && (
+                              <span onClick={e => e.stopPropagation()}>
+                                <WhatsAppButton
+                                  phone={c.phone}
+                                  contactName={c.contact}
+                                  clientName={c.company}
+                                  size="sm"
+                                />
+                              </span>
+                            )}
+                            {c.email && (
+                              <span onClick={e => e.stopPropagation()}>
+                                <EmailButton
+                                  email={c.email}
+                                  contactName={c.contact}
+                                  clientName={c.company}
+                                  size="sm"
+                                />
+                              </span>
                             )}
                             {c.email && (
                               <a href={`mailto:${c.email}`} className="text-sm text-blue-600 truncate max-w-[160px]" onClick={e => e.stopPropagation()}>
