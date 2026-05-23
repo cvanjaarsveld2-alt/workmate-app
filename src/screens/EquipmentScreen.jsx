@@ -29,45 +29,67 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
       const existing = equipment.find(e => e.id === editId);
       const allMedia = [...(existing?.media || []), ...pendingMedia];
       const cleanForm = { ...form, service_due: form.service_due || null };
-      const updateQueueId = genId();
-      const updated  = { ...existing, ...cleanForm, media: existing?.media || [], sync_status: "pending" };
+      // Step 1: Upload new photos FIRST
+      let newUploaded = [];
+      if (isOnline && pendingMedia.length > 0) {
+        newUploaded = await Promise.all(pendingMedia.map(async m => {
+          const path = `equipment/${editId}/${m.id}`;
+          const url = await uploadPhotoToSupabase(m.base64, path);
+          return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
+        }));
+      } else {
+        newUploaded = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
+      }
+
+      // Step 2: Build final record with all media (existing + new uploads)
+      const allMedia = [...(existing?.media || []), ...newUploaded];
+      const updated = { ...existing, ...cleanForm, media: allMedia, sync_status: "pending" };
+
+      // Step 3: Save with photos already included
       setData(d => ({
         ...d,
         equipment: (d.equipment || []).map(e => e.id === editId ? updated : e),
-        syncQueue: [{ id: updateQueueId, table: "equipment", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+        syncQueue: [{ id: genId(), table: "equipment", action: "update", data: { ...updated, media: updated.media.map(m => ({ ...m, base64: undefined })) }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
       }));
       await offlineSave("equipment", updated);
-      if (isOnline && pendingMedia.length > 0) {
-        const uploaded = await Promise.all(pendingMedia.map(async m => { const path = `equipment/${editId}/${m.id}`; const url = await uploadPhotoToSupabase(m.base64, path); return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : m; }));
-        const finalItem = { ...updated, media: [...(existing?.media || []), ...uploaded], sync_status: "pending" };
-        // Update both state AND the syncQueue entry with the uploaded URLs
-        setData(d => ({
-          ...d,
-          equipment: (d.equipment || []).map(e => e.id === editId ? finalItem : e),
-          syncQueue: (d.syncQueue || []).map(q => q.id === updateQueueId ? { ...q, data: finalItem } : q),
-        }));
-        await offlineSave("equipment", finalItem);
-      }
       setToast("Equipment updated");
     triggerImmediateSync();
     } else {
       // Convert empty date strings to null — Supabase date columns reject empty strings
       const cleanForm = { ...form, service_due: form.service_due || null };
-      const queueId = genId();
-      const item = { id: genId(), user_id: userId, ...cleanForm, media: [], created_at: new Date().toISOString(), sync_status: "pending" };
-      setData(d => ({ ...d, equipment: [item, ...(d.equipment || [])], syncQueue: [{ id: queueId, table: "equipment", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
-      await offlineSave("equipment", item);
+      // Generate ID first so we can use it for photo paths
+      const itemId = genId();
+
+      // Step 1: Upload photos FIRST (before creating the record)
+      let uploadedMedia = [];
       if (isOnline && pendingMedia.length > 0) {
-        const uploaded = await Promise.all(pendingMedia.map(async m => { const path = `equipment/${item.id}/${m.id}`; const url = await uploadPhotoToSupabase(m.base64, path); return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : m; }));
-        const finalItem = { ...item, media: uploaded, sync_status: "pending" };
-        // Update both state AND the syncQueue entry with the uploaded URLs
-        setData(d => ({
-          ...d,
-          equipment: (d.equipment || []).map(e => e.id === item.id ? finalItem : e),
-          syncQueue: (d.syncQueue || []).map(q => q.id === queueId ? { ...q, data: finalItem } : q),
+        uploadedMedia = await Promise.all(pendingMedia.map(async m => {
+          const path = `equipment/${itemId}/${m.id}`;
+          const url = await uploadPhotoToSupabase(m.base64, path);
+          return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
         }));
-        await offlineSave("equipment", finalItem);
+      } else {
+        // Offline: keep base64 for now, mark as pending upload
+        uploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
       }
+
+      // Step 2: Create record with photos already included
+      const item = {
+        id: itemId,
+        user_id: userId,
+        ...cleanForm,
+        media: uploadedMedia,
+        created_at: new Date().toISOString(),
+        sync_status: "pending",
+      };
+
+      // Step 3: Save locally and queue for sync (with photos already in the record)
+      setData(d => ({
+        ...d,
+        equipment: [item, ...(d.equipment || [])],
+        syncQueue: [{ id: genId(), table: "equipment", action: "insert", data: { ...item, media: item.media.map(m => ({ ...m, base64: undefined })) }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+      }));
+      await offlineSave("equipment", item);
       setToast("Equipment added");
     triggerImmediateSync();
     }
