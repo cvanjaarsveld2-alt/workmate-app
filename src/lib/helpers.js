@@ -79,16 +79,38 @@ import { supabase } from "../supabase";
 
 export async function uploadPhotoToSupabase(base64, path) {
   try {
-    const res  = await fetch(base64);
-    const blob = await res.blob();
+    // Convert base64 data URL to blob — robust method that works on iPhone Safari
+    let blob;
+    if (base64.startsWith("data:")) {
+      const parts      = base64.split(",");
+      const mimeMatch  = parts[0].match(/:(.*?);/);
+      const mimeType   = mimeMatch ? mimeMatch[1] : "image/jpeg";
+      const byteString = atob(parts[1]);
+      const byteArray  = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) {
+        byteArray[i] = byteString.charCodeAt(i);
+      }
+      blob = new Blob([byteArray], { type: mimeType });
+    } else {
+      // Fallback: try fetch method
+      const res = await fetch(base64);
+      blob = await res.blob();
+    }
+
+    const mimeType = blob.type || "image/jpeg";
     const { error } = await supabase.storage
       .from("powermate-media")
-      .upload(path, blob, { upsert: true, contentType: blob.type });
-    if (error) throw error;
+      .upload(path, blob, { upsert: true, contentType: mimeType });
+
+    if (error) {
+      console.warn("Photo upload error:", error.message, error);
+      throw error;
+    }
+
     const { data } = supabase.storage.from("powermate-media").getPublicUrl(path);
     return data.publicUrl;
   } catch (e) {
-    console.warn("Photo upload failed:", e);
+    console.warn("Photo upload failed:", e?.message || e);
     return null;
   }
 }
