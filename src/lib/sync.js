@@ -31,10 +31,12 @@ export async function pushItem(item) {
     }
 
     if (item.action === "insert" || item.action === "upsert") {
-      const { error } = await supabase.from(table).upsert(payload, { onConflict: "id" });
+      const syncedPayload = { ...payload, sync_status: "synced" };
+      const { error } = await supabase.from(table).upsert(syncedPayload, { onConflict: "id" });
       if (error) throw error;
     } else if (item.action === "update") {
-      const { error } = await supabase.from(table).update(payload).eq("id", payload.id);
+      const syncedPayload = { ...payload, sync_status: "synced" };
+      const { error } = await supabase.from(table).update(syncedPayload).eq("id", payload.id);
       if (error) throw error;
     } else if (item.action === "delete") {
       const { error } = await supabase.from(table).delete().eq("id", payload.id);
@@ -111,15 +113,23 @@ export async function pushSyncQueue(syncQueue, setData) {
     if (pending.length === 0) return;
 
     // Deduplicate — for same entity, keep only the latest action
-    const seen    = new Map();
-    const deduped = [];
-    for (let i = pending.length - 1; i >= 0; i--) {
-      const item = pending[i];
-      const key  = `${item.table}:${item.data?.id}`;
-      if (seen.has(key)) continue;
-      seen.set(key, true);
-      deduped.unshift(item);
+    // When deduplicating, prefer the version with MORE media (has uploaded photos)
+    const bestByKey = new Map();
+    for (const item of pending) {
+      const key = `${item.table}:${item.data?.id}`;
+      const existing = bestByKey.get(key);
+      if (!existing) {
+        bestByKey.set(key, item);
+      } else {
+        // Keep the version with more media items (has uploaded URLs)
+        const existingMediaCount = (existing.data?.media || []).filter(m => m.url).length;
+        const newMediaCount = (item.data?.media || []).filter(m => m.url).length;
+        if (newMediaCount >= existingMediaCount) {
+          bestByKey.set(key, item);
+        }
+      }
     }
+    const deduped = Array.from(bestByKey.values());
 
     const results = await Promise.allSettled(
       deduped.map(async item => {
