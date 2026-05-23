@@ -29,17 +29,23 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
       const existing = equipment.find(e => e.id === editId);
       const allMedia = [...(existing?.media || []), ...pendingMedia];
       const cleanForm = { ...form, service_due: form.service_due || null };
-      const updated  = { ...existing, ...cleanForm, media: allMedia, sync_status: "pending" };
+      const updateQueueId = genId();
+      const updated  = { ...existing, ...cleanForm, media: existing?.media || [], sync_status: "pending" };
       setData(d => ({
         ...d,
         equipment: (d.equipment || []).map(e => e.id === editId ? updated : e),
-        syncQueue: [{ id: genId(), table: "equipment", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+        syncQueue: [{ id: updateQueueId, table: "equipment", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
       }));
       await offlineSave("equipment", updated);
       if (isOnline && pendingMedia.length > 0) {
-        const uploaded = await Promise.all(pendingMedia.map(async m => { const path = `equipment/${editId}/${m.id}`; const url = await uploadPhotoToSupabase(m.base64, path); return url ? { ...m, url, uploadStatus: "done" } : m; }));
-        const finalItem = { ...updated, media: [...(existing?.media || []), ...uploaded] };
-        setData(d => ({ ...d, equipment: (d.equipment || []).map(e => e.id === editId ? finalItem : e) }));
+        const uploaded = await Promise.all(pendingMedia.map(async m => { const path = `equipment/${editId}/${m.id}`; const url = await uploadPhotoToSupabase(m.base64, path); return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : m; }));
+        const finalItem = { ...updated, media: [...(existing?.media || []), ...uploaded], sync_status: "pending" };
+        // Update both state AND the syncQueue entry with the uploaded URLs
+        setData(d => ({
+          ...d,
+          equipment: (d.equipment || []).map(e => e.id === editId ? finalItem : e),
+          syncQueue: (d.syncQueue || []).map(q => q.id === updateQueueId ? { ...q, data: finalItem } : q),
+        }));
         await offlineSave("equipment", finalItem);
       }
       setToast("Equipment updated");
@@ -47,13 +53,19 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
     } else {
       // Convert empty date strings to null — Supabase date columns reject empty strings
       const cleanForm = { ...form, service_due: form.service_due || null };
-      const item = { id: genId(), user_id: userId, ...cleanForm, media: pendingMedia, created_at: new Date().toISOString(), sync_status: "pending" };
-      setData(d => ({ ...d, equipment: [item, ...(d.equipment || [])], syncQueue: [{ id: genId(), table: "equipment", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
+      const queueId = genId();
+      const item = { id: genId(), user_id: userId, ...cleanForm, media: [], created_at: new Date().toISOString(), sync_status: "pending" };
+      setData(d => ({ ...d, equipment: [item, ...(d.equipment || [])], syncQueue: [{ id: queueId, table: "equipment", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
       await offlineSave("equipment", item);
       if (isOnline && pendingMedia.length > 0) {
-        const uploaded = await Promise.all(pendingMedia.map(async m => { const path = `equipment/${item.id}/${m.id}`; const url = await uploadPhotoToSupabase(m.base64, path); return url ? { ...m, url, uploadStatus: "done" } : m; }));
-        const finalItem = { ...item, media: uploaded };
-        setData(d => ({ ...d, equipment: (d.equipment || []).map(e => e.id === item.id ? finalItem : e) }));
+        const uploaded = await Promise.all(pendingMedia.map(async m => { const path = `equipment/${item.id}/${m.id}`; const url = await uploadPhotoToSupabase(m.base64, path); return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : m; }));
+        const finalItem = { ...item, media: uploaded, sync_status: "pending" };
+        // Update both state AND the syncQueue entry with the uploaded URLs
+        setData(d => ({
+          ...d,
+          equipment: (d.equipment || []).map(e => e.id === item.id ? finalItem : e),
+          syncQueue: (d.syncQueue || []).map(q => q.id === queueId ? { ...q, data: finalItem } : q),
+        }));
         await offlineSave("equipment", finalItem);
       }
       setToast("Equipment added");
