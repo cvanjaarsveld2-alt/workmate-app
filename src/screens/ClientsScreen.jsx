@@ -8,6 +8,7 @@ import {
 import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
+import { triggerImmediateSync } from "../lib/sync";
 import {
   Card, Btn, Field, SelectField, SearchBar,
   FilterPills, Toast, Empty, StagePill, PageHeader, useConfirm,
@@ -79,26 +80,39 @@ function ClientFollowupRow({ followup: f, setData }) {
     const up = { ...f, completed: !f.completed, sync_status: "pending" };
     setData(d => ({ ...d, followups: (d.followups || []).map(x => x.id === f.id ? up : x) }));
     await offlineSave("followups", up);
+    triggerImmediateSync();
   }
 
   async function deleteIt() {
     setData(d => ({ ...d, followups: (d.followups || []).filter(x => x.id !== f.id) }));
   }
 
+  const [expanded, setExpanded] = useState(false);
+  const isLong = f.title && f.title.length > 60;
+
   return (
-    <div className={`flex items-center gap-2.5 rounded-xl p-2.5 ${isOverdue ? "bg-red-50" : f.completed ? "bg-slate-50" : "bg-white border border-slate-100"}`}>
-      <button onClick={toggleDone}
-        className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all ${f.completed ? "bg-green-100 text-green-600" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
-        <Check size={15} />
-      </button>
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-bold truncate ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"}`}>{f.title}</p>
-        <p className="text-xs text-slate-400">{smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
+    <div className={`rounded-xl p-2.5 ${isOverdue ? "bg-red-50" : f.completed ? "bg-slate-50" : "bg-white border border-slate-100"}`}>
+      <div className="flex items-start gap-2.5">
+        <button onClick={toggleDone}
+          className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all mt-0.5 ${f.completed ? "bg-green-100 text-green-600" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
+          <Check size={15} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-bold ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"} ${!expanded && isLong ? "line-clamp-2" : ""}`}>
+            {f.title}
+          </p>
+          {isLong && (
+            <button onClick={() => setExpanded(!expanded)} className="text-xs font-bold mt-0.5" style={{color:"#8B1A1A"}}>
+              {expanded ? "Show less" : "Read more"}
+            </button>
+          )}
+          <p className="text-xs text-slate-400 mt-0.5">{smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
+        </div>
+        {isOverdue && <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600">Overdue</span>}
+        <button onClick={deleteIt} className="shrink-0 p-2 rounded-xl text-slate-300 hover:text-red-500 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center">
+          <Trash2 size={13} />
+        </button>
       </div>
-      {isOverdue && <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600">Overdue</span>}
-      <button onClick={deleteIt} className="shrink-0 p-2 rounded-xl text-slate-300 hover:text-red-500 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center">
-        <Trash2 size={13} />
-      </button>
     </div>
   );
 }
@@ -137,6 +151,7 @@ export function ClientsScreen({ data, setData, userId }) {
       }));
       await offlineSave("clients", updated);
       setToast("Client updated");
+    triggerImmediateSync();
     } else {
       const item = { id: genId(), user_id: userId, ...form, created_at: new Date().toISOString(), sync_status: "pending" };
       setData(d => ({
@@ -146,6 +161,7 @@ export function ClientsScreen({ data, setData, userId }) {
       }));
       await offlineSave("clients", item);
       setToast("Client added");
+    triggerImmediateSync();
     }
     resetForm();
   }
@@ -153,8 +169,16 @@ export function ClientsScreen({ data, setData, userId }) {
   async function deleteClient(id, companyName) {
     const ok = await confirm(`Delete ${companyName}? This cannot be undone.`, { confirmLabel: "Delete" });
     if (!ok) return;
-    setData(d => ({ ...d, clients: (d.clients || []).filter(c => c.id !== id) }));
+    // Queue delete for Supabase sync
+    setData(d => ({
+      ...d,
+      clients: (d.clients || []).filter(c => c.id !== id),
+      syncQueue: [{ id: genId(), table: "clients", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    // Also delete linked followups locally
+    setData(d => ({ ...d, followups: (d.followups || []).filter(f => f.client_id !== id) }));
     setToast("Client deleted");
+    triggerImmediateSync();
   }
 
   function startEdit(c) {
@@ -222,7 +246,7 @@ export function ClientsScreen({ data, setData, userId }) {
       {Object.keys(grouped).length === 0 && <Empty title="No clients found" text="Add your first client." />}
 
       <div className="space-y-3">
-        {Object.entries(grouped).map(([cn, branches]) => {
+        {Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([cn, branches]) => {
           const isExpanded    = expandedClient === cn;
           const allBranchIds  = branches.map(b => b.id);
           const companyFU     = followups.filter(f => allBranchIds.includes(f.client_id));
