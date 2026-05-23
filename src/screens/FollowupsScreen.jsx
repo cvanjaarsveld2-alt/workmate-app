@@ -5,6 +5,7 @@ import { Plus, X, Save, Edit2, Trash2, Check, Calendar } from "lucide-react";
 import { BRAND, REMINDER_OPTIONS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
+import { WhatsAppButton } from "../components/WhatsAppButton";
 import { triggerImmediateSync } from "../lib/sync";
 import {
   Card, Btn, Field, SearchBar, FilterPills,
@@ -27,8 +28,13 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
           <p className="text-sm text-slate-400 mt-0.5">{smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
           {f.notes && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{f.notes}</p>}
           {reminder && reminder.value !== "none" && !f.completed && <p className="text-xs text-blue-400 mt-0.5">🔔 {reminder.label}</p>}
+          {f.clientPhone && !f.completed && (
+            <div className="mt-2">
+              <WhatsAppButton phone={f.clientPhone} contactName={f.clientContact} clientName={f.client} followupTitle={f.title} size="sm" />
+            </div>
+          )}
         </div>
-        <div className="flex gap-1 shrink-0">
+        <div className="flex gap-1 shrink-0 flex-wrap justify-end">
           {isOverdue && <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-600 self-start">Overdue</span>}
           <button onClick={onEdit} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={14} /></button>
           <button onClick={onDelete} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={14} /></button>
