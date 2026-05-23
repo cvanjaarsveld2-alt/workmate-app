@@ -28,8 +28,13 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
     if (editId) {
       const existing = equipment.find(e => e.id === editId);
       const allMedia = [...(existing?.media || []), ...pendingMedia];
-      const updated  = { ...existing, ...form, media: allMedia, sync_status: "pending" };
-      setData(d => ({ ...d, equipment: (d.equipment || []).map(e => e.id === editId ? updated : e) }));
+      const cleanForm = { ...form, service_due: form.service_due || null };
+      const updated  = { ...existing, ...cleanForm, media: allMedia, sync_status: "pending" };
+      setData(d => ({
+        ...d,
+        equipment: (d.equipment || []).map(e => e.id === editId ? updated : e),
+        syncQueue: [{ id: genId(), table: "equipment", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+      }));
       await offlineSave("equipment", updated);
       if (isOnline && pendingMedia.length > 0) {
         const uploaded = await Promise.all(pendingMedia.map(async m => { const path = `equipment/${editId}/${m.id}`; const url = await uploadPhotoToSupabase(m.base64, path); return url ? { ...m, url, uploadStatus: "done" } : m; }));
@@ -40,7 +45,9 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
       setToast("Equipment updated");
     triggerImmediateSync();
     } else {
-      const item = { id: genId(), user_id: userId, ...form, media: pendingMedia, created_at: new Date().toISOString(), sync_status: "pending" };
+      // Convert empty date strings to null — Supabase date columns reject empty strings
+      const cleanForm = { ...form, service_due: form.service_due || null };
+      const item = { id: genId(), user_id: userId, ...cleanForm, media: pendingMedia, created_at: new Date().toISOString(), sync_status: "pending" };
       setData(d => ({ ...d, equipment: [item, ...(d.equipment || [])], syncQueue: [{ id: genId(), table: "equipment", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
       await offlineSave("equipment", item);
       if (isOnline && pendingMedia.length > 0) {
