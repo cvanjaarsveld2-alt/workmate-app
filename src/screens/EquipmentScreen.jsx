@@ -27,7 +27,6 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
     if (!form.name.trim()) { setToast("Equipment name is required"); return; }
     if (editId) {
       const existing = equipment.find(e => e.id === editId);
-      const allMedia = [...(existing?.media || []), ...pendingMedia];
       const cleanForm = { ...form, service_due: form.service_due || null };
       // Step 1: Upload new photos FIRST
       let newUploaded = [];
