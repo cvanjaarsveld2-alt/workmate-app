@@ -194,8 +194,8 @@ export async function pullFromSupabase(uid, setData) {
       supabase.from("clients").select("id,user_id,company,division,contact,phone,email,location,branch,stage,pipeline_status,sync_status,auto_created,source,notes,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("followups").select("id,user_id,client_id,client,branch,title,date,time,reminder,notes,completed,sync_status,auto_generated,created_at").eq("user_id", uid).order("date", { ascending: false }).limit(500),
       supabase.from("quotes").select("id,user_id,client_name,description,value,status,sent_date,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-      supabase.from("notes").select("id,user_id,client,note,urgency,resolve_by,resolved,resolved_at,last_escalated,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-      supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
+      supabase.from("notes").select("id,user_id,client,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
+      supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
     ]);
 
     setData(prev => {
