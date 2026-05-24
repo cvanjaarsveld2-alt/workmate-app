@@ -1,11 +1,31 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { RefreshCw, Shield, Bell, LogOut } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
 import ReportExport from "../ReportExport";
 
-export function MoreScreen({ data, onLogout, onSyncNow, syncing, isOnline, notifPermission, onRequestNotif }) {
+function PhotoDebugPanel() {
+  const [logs, setLogs] = useState([]);
+  useEffect(() => {
+    function handler(e) {
+      setLogs(prev => [`${new Date().toLocaleTimeString()}: ${e.detail}`, ...prev].slice(0, 10));
+    }
+    window.addEventListener("powermate:photo_log", handler);
+    return () => window.removeEventListener("powermate:photo_log", handler);
+  }, []);
+  if (logs.length === 0) return null;
+  return (
+    <div className="bg-slate-900 rounded-2xl p-4 space-y-1">
+      <p className="text-xs font-bold text-slate-400 mb-2">📸 Photo Upload Log</p>
+      {logs.map((log, i) => (
+        <p key={i} className={`text-xs font-mono ${log.includes("ERROR") || log.includes("EXCEPTION") ? "text-red-400" : log.includes("✓") ? "text-green-400" : "text-slate-300"}`}>{log}</p>
+      ))}
+    </div>
+  );
+}
+
+export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif }) {
   const { confirm, dialog } = useConfirm();
   const pendingCount = (data.syncQueue || []).filter(i => i.status === "pending").length;
 
@@ -45,6 +65,24 @@ export function MoreScreen({ data, onLogout, onSyncNow, syncing, isOnline, notif
           ? <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5">
               <p className="text-sm font-bold text-amber-700">⚠️ {pendingCount} change{pendingCount !== 1 ? "s" : ""} waiting to sync</p>
               <p className="text-xs text-amber-600 mt-0.5">{isOnline ? "Tap Sync Now or wait — syncs automatically" : "Will sync automatically when you reconnect"}</p>
+              <button
+                onClick={() => {
+                  // Clear stuck sync items that have no chance of succeeding
+                  const cleared = (data.syncQueue || []).filter(q => {
+                    if (q.table === 'equipment' && q.data?.service_due === '') return false;
+                    if (q.table === 'notes' && q.data?.resolve_by === '') return false;
+                    if (q.data?.media && q.data.media.length > 0 && !q.data.media.some(m => m.url)) return false;
+                    return true;
+                  });
+                  if (cleared.length < (data.syncQueue || []).length) {
+                    onClearQueue(cleared);
+                  } else {
+                    onClearQueue([]);
+                  }
+                }}
+                className="mt-2 w-full rounded-xl border border-amber-300 py-2 text-xs font-bold text-amber-700 bg-white">
+                Clear Stuck Items
+              </button>
             </div>
           : <div className="rounded-xl bg-green-50 border border-green-200 p-3.5">
               <p className="text-sm font-bold text-green-700">✓ All data synced to cloud</p>
@@ -103,6 +141,8 @@ export function MoreScreen({ data, onLogout, onSyncNow, syncing, isOnline, notif
 
       {/* Report Export */}
       <ReportExport data={data} />
+
+      <PhotoDebugPanel />
 
       <Btn variant="danger" className="w-full" size="lg" onClick={handleLogout}>
         <LogOut size={16} />Sign Out
