@@ -44,6 +44,7 @@ function InlineFollowupForm({ client, userId, setData, onDone }) {
       syncQueue: [{ id: genId(), table: "followups", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
     }));
     await offlineSave("followups", item);
+    triggerImmediateSync();
     setSaving(false);
     onDone();
   }
@@ -79,24 +80,38 @@ function InlineFollowupForm({ client, userId, setData, onDone }) {
 function ClientFollowupRow({ followup: f, setData }) {
   const today    = todayISO();
   const isOverdue = !f.completed && f.date < today;
-
-  async function toggleDone() {
-    const up = { ...f, completed: !f.completed, sync_status: "pending" };
-    setData(d => ({ ...d, followups: (d.followups || []).map(x => x.id === f.id ? up : x) }));
-    await offlineSave("followups", up);
-    triggerImmediateSync();
-  }
-
-  async function deleteIt() {
-    setData(d => ({ ...d, followups: (d.followups || []).filter(x => x.id !== f.id) }));
-  }
-
   const [expanded, setExpanded] = useState(false);
   const LIMIT = 80;
   const isLong = f.title && f.title.length > LIMIT;
   const displayText = isLong && !expanded
     ? f.title.slice(0, LIMIT).trimEnd() + "…"
     : f.title;
+
+  async function toggleDone() {
+    const up = { ...f, completed: !f.completed, sync_status: "pending" };
+    setData(d => ({
+      ...d,
+      followups: (d.followups || []).map(x => x.id === f.id ? up : x),
+      syncQueue: [{ id: genId(), table: "followups", action: "update", data: up, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    await offlineSave("followups", up);
+    triggerImmediateSync();
+  }
+
+  async function deleteIt() {
+    setData(d => ({
+      ...d,
+      followups: (d.followups || []).filter(x => x.id !== f.id),
+      syncQueue: [{ id: genId(), table: "followups", action: "delete", data: { id: f.id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    triggerImmediateSync();
+  }
+
+  function handleExpandToggle(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpanded(v => !v);
+  }
 
   return (
     <div className={`rounded-xl p-2.5 ${isOverdue ? "bg-red-50" : f.completed ? "bg-slate-50" : "bg-white border border-slate-100"}`}>
@@ -106,16 +121,18 @@ function ClientFollowupRow({ followup: f, setData }) {
           <Check size={15} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-bold ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"}`}>
+          <p className={`text-sm font-bold break-words ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"}`}>
             {displayText}
-            {isLong && (
-              <button onClick={() => setExpanded(!expanded)}
-                className="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full align-middle"
-                style={{background:"#FEF3C7", color:"#92400E", border:"1px solid #FCD34D"}}>
-                {expanded ? "less" : "more"}
-              </button>
-            )}
           </p>
+          {isLong && (
+            <button
+              type="button"
+              onClick={handleExpandToggle}
+              className="mt-1.5 inline-block text-xs font-bold px-2 py-1 rounded-full"
+              style={{background:"#FEF3C7", color:"#92400E", border:"1px solid #FCD34D"}}>
+              {expanded ? "▲ Show less" : "▼ Show more"}
+            </button>
+          )}
           <p className="text-xs text-slate-400 mt-0.5">{smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
         </div>
         {isOverdue && <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600">Overdue</span>}
