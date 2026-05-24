@@ -26,7 +26,8 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
           <Check size={16} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-base font-bold ${f.completed ? "line-through text-slate-400" : "text-slate-900"} ${!expanded && isLong ? "line-clamp-3" : ""}`}>
+          <p className={`text-base font-bold ${f.completed ? "line-through text-slate-400" : "text-slate-900"}`}
+            style={!expanded && isLong ? {display:"-webkit-box", WebkitLineClamp:3, WebkitBoxOrient:"vertical", overflow:"hidden"} : {}}>
             {f.title}
           </p>
           {isLong && (
@@ -58,7 +59,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
 
 export function FollowupsScreen({ data, setData, userId }) {
   const [showForm, setShowForm] = useState(false);
-  const [filter, setFilter]     = useState("Upcoming");
+  const [filter, setFilter]     = useState("By Client");
   const [editId, setEditId]     = useState(null);
   const [toast, setToast]       = useState("");
   const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "" });
@@ -229,30 +230,38 @@ export function FollowupsScreen({ data, setData, userId }) {
       {filtered.length === 0 && <Empty title={filter === "Done" ? "No completed follow-ups" : "All clear!"} text="No follow-ups in this category." icon={Calendar} />}
 
       {byClient ? (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {Object.entries(byClient).sort(([a],[b]) => a.localeCompare(b)).map(([clientName, fus]) => {
             const overdueFUs = fus.filter(f => f.date < today && !f.completed);
+            const pendingFUs = fus.filter(f => !f.completed);
             return (
-              <div key={clientName}>
-                {/* Company header */}
-                <div className="flex items-center gap-2 px-1 mb-2">
-                  <p className="text-sm font-black text-slate-800 uppercase tracking-wide">{clientName}</p>
-                  <span className="text-xs text-slate-400">({fus.length})</span>
-                  {overdueFUs.length > 0 && (
-                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600">
-                      ⚠️ {overdueFUs.length} overdue
-                    </span>
-                  )}
+              <div key={clientName} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                {/* Company name header - prominently at top */}
+                <div className="px-4 py-3 border-b border-slate-100" style={{background:"#F7F3F3"}}>
+                  <div className="flex items-center justify-between">
+                    <p className="text-base font-black text-slate-900">{clientName}</p>
+                    <div className="flex items-center gap-2">
+                      {overdueFUs.length > 0 && (
+                        <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">
+                          ⚠️ {overdueFUs.length} overdue
+                        </span>
+                      )}
+                      <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600">
+                        {pendingFUs.length} pending
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-2">
+                {/* Follow-ups under the company */}
+                <div className="divide-y divide-slate-50 px-3 py-2 space-y-2">
                   {fus
                     .sort((a, b) => {
-                      // Overdue first
                       const aOverdue = a.date < today && !a.completed;
                       const bOverdue = b.date < today && !b.completed;
                       if (aOverdue && !bOverdue) return -1;
                       if (!aOverdue && bOverdue) return 1;
-                      // Then by date
+                      if (a.completed && !b.completed) return 1;
+                      if (!a.completed && b.completed) return -1;
                       return a.date.localeCompare(b.date);
                     })
                     .map(f => (
