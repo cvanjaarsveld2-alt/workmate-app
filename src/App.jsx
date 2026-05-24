@@ -301,7 +301,7 @@ export default function PowerWorksApp() {
     Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} />,
     Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} />,
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} />,
-    More:      <MoreScreen      data={data} onLogout={logout}  onSyncNow={handleSyncNow} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} />,
+    More:      <MoreScreen      data={data} onLogout={logout}  onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} />,
   };
 
   const NAV = [
