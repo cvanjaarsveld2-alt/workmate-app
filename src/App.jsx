@@ -146,6 +146,18 @@ export default function PowerWorksApp() {
           ...data,
           notes:     (data.notes     || []).map(n => ({ ...n, media: (n.media     || []).map(m => m.url ? { ...m, base64: undefined } : m) })),
           equipment: (data.equipment || []).map(e => ({ ...e, media: (e.media     || []).map(m => m.url ? { ...m, base64: undefined } : m) })),
+          // Strip base64 from syncQueue to prevent localStorage bloat
+          // and prevent old base64 versions from overwriting synced URLs
+          syncQueue: (data.syncQueue || []).map(q => {
+            if (!q.data?.media) return q;
+            return {
+              ...q,
+              data: {
+                ...q.data,
+                media: q.data.media.map(m => ({ ...m, base64: undefined })),
+              },
+            };
+          }),
         };
         const serialized = JSON.stringify(safeData);
         const sizeMB     = (serialized.length / 1024 / 1024).toFixed(1);
@@ -181,8 +193,21 @@ export default function PowerWorksApp() {
     if (!isOnline) { setDataLoading(false); return; }
     const uid = session.user.id;
 
-    // Pull fresh data (merges with any local pending changes)
-    pullFromSupabase(uid, setData).finally(() => setDataLoading(false));
+    // Pull fresh data then clean up any bad syncQueue entries
+    pullFromSupabase(uid, setData).then(() => {
+      // After pull, remove any syncQueue entries where media has no URLs
+      // These are stale entries that would overwrite good data
+      setData(d => ({
+        ...d,
+        syncQueue: (d.syncQueue || []).filter(q => {
+          if (!q.data?.media) return true; // no media field, keep it
+          const hasUrls = q.data.media.some(m => m.url);
+          const hasMedia = q.data.media.length > 0;
+          if (hasMedia && !hasUrls) return false; // has media but no URLs = bad entry, remove
+          return true;
+        }),
+      }));
+    }).finally(() => setDataLoading(false));
 
     // Set up real-time sync for all tables
     const cleanup = setupRealtimeSync(uid, setData);
