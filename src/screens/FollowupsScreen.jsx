@@ -16,12 +16,17 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const isOverdue = !f.completed && f.date < today;
   const reminder  = REMINDER_OPTIONS.find(o => o.value === f.reminder);
-  // Show first 80 chars then truncate — simple and reliable cross-platform
   const LIMIT = 80;
   const isLong = f.title && f.title.length > LIMIT;
   const displayText = isLong && !expanded
     ? f.title.slice(0, LIMIT).trimEnd() + "…"
     : f.title;
+
+  function handleExpandToggle(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpanded(v => !v);
+  }
 
   return (
     <Card className={`p-3.5 ${isOverdue ? "border-l-4 border-l-red-400" : ""}`}>
@@ -31,16 +36,18 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
           <Check size={16} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-bold ${f.completed ? "line-through text-slate-400" : "text-slate-900"}`}>
+          <p className={`text-sm font-bold break-words ${f.completed ? "line-through text-slate-400" : "text-slate-900"}`}>
             {displayText}
-            {isLong && (
-              <button onClick={() => setExpanded(!expanded)}
-                className="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full align-middle"
-                style={{background:"#FEF3C7", color:"#92400E", border:"1px solid #FCD34D"}}>
-                {expanded ? "less" : "more"}
-              </button>
-            )}
           </p>
+          {isLong && (
+            <button
+              type="button"
+              onClick={handleExpandToggle}
+              className="mt-1.5 inline-block text-xs font-bold px-2 py-1 rounded-full"
+              style={{background:"#FEF3C7", color:"#92400E", border:"1px solid #FCD34D"}}>
+              {expanded ? "▲ Show less" : "▼ Show more"}
+            </button>
+          )}
           {(f.client || f.branch) && <p className="text-sm text-slate-500 mt-1">{f.client}{f.branch ? ` — ${f.branch}` : ""}</p>}
           <p className="text-sm text-slate-400 mt-0.5">{smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
           {f.notes && <p className="text-xs text-slate-400 mt-1">{f.notes}</p>}
@@ -147,7 +154,6 @@ export function FollowupsScreen({ data, setData, userId }) {
     return !f.completed;
   }).sort((a, b) => a.completed - b.completed || a.date.localeCompare(b.date));
 
-  // Group by client alphabetically for "By Client" view
   const byClient = filter === "By Client"
     ? filtered.reduce((acc, f) => {
         const key = f.client || "No Client";
@@ -240,7 +246,6 @@ export function FollowupsScreen({ data, setData, userId }) {
             const pendingFUs = fus.filter(f => !f.completed);
             return (
               <div key={clientName} className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                {/* Company name header - prominently at top */}
                 <div className="px-4 py-3 border-b border-slate-100" style={{background:"#F7F3F3"}}>
                   <div className="flex items-center justify-between">
                     <p className="text-base font-black text-slate-900">{clientName}</p>
@@ -256,7 +261,6 @@ export function FollowupsScreen({ data, setData, userId }) {
                     </div>
                   </div>
                 </div>
-                {/* Follow-ups under the company */}
                 <div className="divide-y divide-slate-50 px-3 py-2 space-y-2">
                   {fus
                     .sort((a, b) => {
