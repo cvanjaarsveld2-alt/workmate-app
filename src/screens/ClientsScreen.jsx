@@ -92,7 +92,11 @@ function ClientFollowupRow({ followup: f, setData }) {
   }
 
   const [expanded, setExpanded] = useState(false);
-  const isLong = f.title && f.title.length > 80;
+  const LIMIT = 80;
+  const isLong = f.title && f.title.length > LIMIT;
+  const displayText = isLong && !expanded
+    ? f.title.slice(0, LIMIT).trimEnd() + "…"
+    : f.title;
 
   return (
     <div className={`rounded-xl p-2.5 ${isOverdue ? "bg-red-50" : f.completed ? "bg-slate-50" : "bg-white border border-slate-100"}`}>
@@ -102,16 +106,16 @@ function ClientFollowupRow({ followup: f, setData }) {
           <Check size={15} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-bold ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"} ${!expanded && isLong ? "line-clamp-3" : ""}`}>
-            {f.title}
+          <p className={`text-sm font-bold ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"}`}>
+            {displayText}
+            {isLong && (
+              <button onClick={() => setExpanded(!expanded)}
+                className="ml-1 text-xs font-bold px-1.5 py-0.5 rounded-full align-middle"
+                style={{background:"#FEF3C7", color:"#92400E", border:"1px solid #FCD34D"}}>
+                {expanded ? "less" : "more"}
+              </button>
+            )}
           </p>
-          {isLong && (
-            <button onClick={() => setExpanded(!expanded)}
-              className="text-xs font-bold mt-1 px-2 py-0.5 rounded-full"
-              style={{background:"#FEF3C7", color:"#92400E", border:"1px solid #FCD34D"}}>
-              {expanded ? "▲ Show less" : "▼ Read more"}
-            </button>
-          )}
           <p className="text-xs text-slate-400 mt-0.5">{smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
         </div>
         {isOverdue && <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600">Overdue</span>}
