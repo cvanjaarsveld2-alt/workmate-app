@@ -1,7 +1,7 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Check, Trash2, Clipboard, Paperclip } from "lucide-react";
+import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save } from "lucide-react";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
@@ -12,23 +12,91 @@ import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 
 export function NotesScreen({ data, setData, userId, isOnline }) {
   const [showForm, setShowForm]         = useState(false);
+  const [editId, setEditId]             = useState(null);
   const [search, setSearch]             = useState("");
   const [filterUrgency, setFilterUrgency] = useState("All");
   const [filterStatus, setFilterStatus] = useState("Unresolved");
   const [toast, setToast]               = useState("");
   const [form, setForm] = useState({ client: "", note: "", urgency: "Normal", resolve_by: "" });
   const [pendingMedia, setPendingMedia] = useState([]);
+  const [existingMedia, setExistingMedia] = useState([]); // photos already saved on the note when editing
   const { confirm, dialog } = useConfirm();
   const notes = data.notes || [];
   const today = todayISO();
 
   function addMedia(m)  { setPendingMedia(pm => [...pm, m]); }
   function removeMedia(id) { setPendingMedia(pm => pm.filter(m => m.id !== id)); }
+  function removeExistingMedia(id) { setExistingMedia(em => em.filter(m => m.id !== id)); }
 
-  async function addNote() {
+  function resetForm() {
+    setForm({ client: "", note: "", urgency: "Normal", resolve_by: "" });
+    setPendingMedia([]);
+    setExistingMedia([]);
+    setEditId(null);
+    setShowForm(false);
+  }
+
+  function startEdit(n) {
+    setForm({
+      client:     n.client || "",
+      note:       n.note || "",
+      urgency:    n.urgency || "Normal",
+      resolve_by: n.resolve_by || "",
+    });
+    setExistingMedia(n.media || []);
+    setPendingMedia([]);
+    setEditId(n.id);
+    setShowForm(true);
+  }
+
+  async function saveNote() {
     if (!form.note.trim()) { setToast("Please enter a note"); return; }
     const cleanForm = { ...form, resolve_by: form.resolve_by || null };
-    // Step 1: Upload photos FIRST
+
+    if (editId) {
+      // ── Edit existing note ──
+      const existing = notes.find(n => n.id === editId);
+      if (!existing) { setToast("Note not found"); return; }
+
+      // Upload any new photos
+      let newUploadedMedia = [];
+      if (isOnline && pendingMedia.length > 0) {
+        newUploadedMedia = await Promise.all(pendingMedia.map(async m => {
+          const path = "notes/" + editId + "/" + m.id;
+          const url = await uploadPhotoToSupabase(m.base64, path);
+          return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
+        }));
+      } else {
+        newUploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
+      }
+
+      const updated = {
+        ...existing,
+        ...cleanForm,
+        media: [...existingMedia, ...newUploadedMedia],
+        sync_status: "pending",
+      };
+
+      setData(d => ({
+        ...d,
+        notes: (d.notes || []).map(n => n.id === editId ? updated : n),
+        syncQueue: [{
+          id: genId(),
+          table: "notes",
+          action: "update",
+          data: { ...updated, media: updated.media.map(m => ({ ...m, base64: undefined })) },
+          status: "pending",
+          created_at: new Date().toISOString(),
+        }, ...(d.syncQueue || [])],
+      }));
+      await offlineSave("notes", updated);
+      setToast("Note updated");
+      triggerImmediateSync();
+      resetForm();
+      return;
+    }
+
+    // ── Create new note ──
     const noteId = genId();
     let uploadedMedia = [];
     if (isOnline && pendingMedia.length > 0) {
@@ -41,7 +109,6 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
       uploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
     }
 
-    // Step 2: Create record with photos already included
     const item = { id: noteId, user_id: userId, ...cleanForm, media: uploadedMedia, resolved: false, created_at: new Date().toISOString(), sync_status: "pending" };
     setData(d => ({
       ...d,
@@ -57,9 +124,9 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
         scheduleNotificationsViaSW([{ id: "note_" + item.id, title: emoji + " Unresolved Note: " + (form.client || "General"), body: form.note.slice(0, 80), fireAt: fireAt.toISOString(), tag: "note_" + item.id }]);
       }
     }
-    setForm({ client: "", note: "", urgency: "Normal", resolve_by: "" });
-    setPendingMedia([]); setShowForm(false); setToast("Note saved");
+    setToast("Note saved");
     triggerImmediateSync();
+    resetForm();
   }
 
   async function resolveNote(id) {
@@ -73,8 +140,13 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
   async function unresolveNote(id) {
     const n = notes.find(n => n.id === id); if (!n) return;
     const updated = { ...n, resolved: false, resolved_at: null, sync_status: "pending" };
-    setData(d => ({ ...d, notes: (d.notes || []).map(x => x.id === id ? updated : x) }));
+    setData(d => ({
+      ...d,
+      notes: (d.notes || []).map(x => x.id === id ? updated : x),
+      syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
     await offlineSave("notes", updated);
+    triggerImmediateSync();
   }
 
   async function changeUrgency(id, urgency) {
@@ -82,11 +154,14 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
     const updated = { ...n, urgency, sync_status: "pending" };
     setData(d => ({ ...d, notes: (d.notes || []).map(x => x.id === id ? updated : x), syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
     await offlineSave("notes", updated);
+    triggerImmediateSync();
   }
 
   async function deleteNote(id) {
     const ok = await confirm("Delete this note?", { confirmLabel: "Delete" });
     if (!ok) return;
+    // If this note is currently being edited, close the form
+    if (editId === id) resetForm();
     setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "notes", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], notes: (d.notes || []).filter(n => n.id !== id) }));
     setToast("Note deleted");
     triggerImmediateSync();
@@ -94,9 +169,14 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
 
   async function deleteNoteMedia(noteId, mediaId) {
     const note = notes.find(n => n.id === noteId); if (!note) return;
-    const updated = { ...note, media: (note.media || []).filter(m => m.id !== mediaId) };
-    setData(d => ({ ...d, notes: (d.notes || []).map(n => n.id === noteId ? updated : n) }));
+    const updated = { ...note, media: (note.media || []).filter(m => m.id !== mediaId), sync_status: "pending" };
+    setData(d => ({
+      ...d,
+      notes: (d.notes || []).map(n => n.id === noteId ? updated : n),
+      syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
     await offlineSave("notes", updated);
+    triggerImmediateSync();
   }
 
   const unresolvedCount = notes.filter(n => !n.resolved).length;
@@ -115,7 +195,9 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
       <div className="flex items-center justify-between">
         <PageHeader title="Field Notes" subtitle={`${unresolvedCount} unresolved · ${notes.length} total`} />
-        <Btn size="sm" onClick={() => setShowForm(!showForm)}>{showForm ? <X size={15} /> : <Plus size={15} />}{showForm ? "Cancel" : "Add"}</Btn>
+        <Btn size="sm" onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}>
+          {showForm ? <X size={15} /> : <Plus size={15} />}{showForm ? "Cancel" : "Add"}
+        </Btn>
       </div>
 
       {(criticalCount > 0 || overdueCount > 0) && (
@@ -129,7 +211,7 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
         {showForm && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
             <Card className="p-4 space-y-3">
-              <p className="text-base font-black text-slate-800">New Note</p>
+              <p className="text-base font-black text-slate-800">{editId ? "Edit Note" : "New Note"}</p>
               <Field label="Client / Branch" value={form.client} onChange={v => setForm(f => ({ ...f, client: v }))} placeholder="Client name" />
               <Field label="Note" value={form.note} onChange={v => setForm(f => ({ ...f, note: v }))} placeholder="Type your visit note…" multiline required />
               <div>
@@ -145,12 +227,28 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
                 </div>
               </div>
               <Field label="Resolve By (optional)" type="date" value={form.resolve_by} onChange={v => setForm(f => ({ ...f, resolve_by: v }))} />
+
+              {/* Existing photos (only shown in edit mode) */}
+              {editId && existingMedia.length > 0 && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-slate-500">Current Photos / Videos</label>
+                  <MediaGallery media={existingMedia} onDelete={removeExistingMedia} />
+                </div>
+              )}
+
               <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-500">Attach Photos / Videos</label>
+                <label className="mb-1.5 block text-sm font-bold text-slate-500">{editId ? "Add More Photos / Videos" : "Attach Photos / Videos"}</label>
                 <MediaPicker onAdd={addMedia} />
                 <MediaGallery media={pendingMedia} onDelete={removeMedia} />
               </div>
-              <Btn className="w-full" onClick={addNote}><Plus size={15} />Add Note{pendingMedia.length > 0 ? ` + ${pendingMedia.length} file${pendingMedia.length !== 1 ? "s" : ""}` : ""}</Btn>
+
+              <div className="flex gap-2">
+                <Btn className="flex-1" onClick={saveNote}>
+                  {editId ? <Save size={15} /> : <Plus size={15} />}
+                  {editId ? "Update Note" : `Add Note${pendingMedia.length > 0 ? ` + ${pendingMedia.length} file${pendingMedia.length !== 1 ? "s" : ""}` : ""}`}
+                </Btn>
+                <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
+              </div>
             </Card>
           </motion.div>
         )}
@@ -178,7 +276,7 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
                       {n.resolved && <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-700">Resolved</span>}
                       {isOverdue && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">Overdue</span>}
                     </div>
-                    <p className={"text-sm leading-relaxed " + (n.resolved ? "text-slate-400" : "text-slate-600")}>{n.note}</p>
+                    <p className={"text-sm leading-relaxed break-words " + (n.resolved ? "text-slate-400" : "text-slate-600")}>{n.note}</p>
                     {n.resolve_by && !n.resolved && <p className={"mt-1 text-sm font-medium " + (isOverdue ? "text-red-600" : "text-slate-400")}>Resolve by: {smartDate(n.resolve_by)}</p>}
                     {n.resolved && n.resolved_at && <p className="mt-1 text-xs text-slate-400">Resolved {new Date(n.resolved_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</p>}
                     {(n.media || []).length > 0 && <div className="mt-1 flex items-center gap-1 text-xs text-slate-400"><Paperclip size={11} />{n.media.length} attachment{n.media.length !== 1 ? "s" : ""}</div>}
@@ -186,7 +284,18 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
                     <p className="mt-1.5 text-xs text-slate-400">{n.created_at ? new Date(n.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</p>
                     {n.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
                   </div>
-                  <button onClick={() => deleteNote(n.id)} className="shrink-0 p-2.5 rounded-xl bg-slate-50 text-slate-300 hover:text-red-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={15} /></button>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button
+                      onClick={() => startEdit(n)}
+                      className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                      <Edit2 size={15} />
+                    </button>
+                    <button
+                      onClick={() => deleteNote(n.id)}
+                      className="p-2.5 rounded-xl bg-slate-50 text-slate-300 hover:text-red-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
                 {!n.resolved && (
                   <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
