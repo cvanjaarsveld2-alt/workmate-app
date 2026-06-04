@@ -1,29 +1,9 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { RefreshCw, Shield, Bell, LogOut } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
 import ReportExport from "../ReportExport";
-
-function PhotoDebugPanel() {
-  const [logs, setLogs] = useState([]);
-  useEffect(() => {
-    function handler(e) {
-      setLogs(prev => [`${new Date().toLocaleTimeString()}: ${e.detail}`, ...prev].slice(0, 10));
-    }
-    window.addEventListener("powermate:photo_log", handler);
-    return () => window.removeEventListener("powermate:photo_log", handler);
-  }, []);
-  if (logs.length === 0) return null;
-  return (
-    <div className="bg-slate-900 rounded-2xl p-4 space-y-1">
-      <p className="text-xs font-bold text-slate-400 mb-2">📸 Photo Upload Log</p>
-      {logs.map((log, i) => (
-        <p key={i} className={`text-xs font-mono ${log.includes("ERROR") || log.includes("EXCEPTION") ? "text-red-400" : log.includes("✓") ? "text-green-400" : "text-slate-300"}`}>{log}</p>
-      ))}
-    </div>
-  );
-}
 
 export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif }) {
   const { confirm, dialog } = useConfirm();
@@ -141,8 +121,6 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
 
       {/* Report Export */}
       <ReportExport data={data} />
-
-      <PhotoDebugPanel />
 
       <Btn variant="danger" className="w-full" size="lg" onClick={handleLogout}>
         <LogOut size={16} />Sign Out
