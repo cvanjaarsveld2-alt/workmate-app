@@ -1,7 +1,7 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save } from "lucide-react";
+import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square } from "lucide-react";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
@@ -9,6 +9,7 @@ import { triggerImmediateSync } from "../lib/sync";
 import { scheduleNotificationsViaSW } from "../lib/notifications";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, UrgencyBadge, useConfirm } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
+import { exportNotesPDF, exportNotesExcel } from "../NotesExport";
 
 export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }) {
   const [showForm, setShowForm]         = useState(false);
@@ -20,11 +21,16 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
   const [form, setForm] = useState({ client: "", note: "", urgency: "Normal", resolve_by: "" });
   const [pendingMedia, setPendingMedia] = useState([]);
   const [existingMedia, setExistingMedia] = useState([]);
+  // Multi-select export state
+  const [selectMode, setSelectMode]     = useState(false);
+  const [selectedIds, setSelectedIds]   = useState(new Set());
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting]       = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
   const { confirm, dialog } = useConfirm();
   const notes = data.notes || [];
   const today = todayISO();
 
-  // ── Quick capture: open add form when FAB triggers this screen ──
   useEffect(() => {
     if (!quickAddTrigger) return;
     if (quickAddTrigger.screen !== "Notes") return;
@@ -55,6 +61,66 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
     setPendingMedia([]);
     setEditId(n.id);
     setShowForm(true);
+  }
+
+  // ── Multi-select handlers ──
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function enterSelectMode(initialId = null) {
+    setSelectMode(true);
+    setSelectedIds(initialId ? new Set([initialId]) : new Set());
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+    setShowExportMenu(false);
+  }
+
+  function selectAllVisible(visibleNotes) {
+    setSelectedIds(new Set(visibleNotes.map(n => n.id)));
+  }
+
+  // ── Export handlers ──
+  async function handleExport(format) {
+    const selected = notes.filter(n => selectedIds.has(n.id));
+    if (selected.length === 0) { setToast("Select at least one note"); return; }
+
+    setExporting(true);
+    setShowExportMenu(false);
+    setExportProgress(0);
+
+    try {
+      if (format === "pdf") {
+        await exportNotesPDF(selected, {
+          onProgress: ({ percent }) => setExportProgress(percent),
+        });
+      } else if (format === "excel") {
+        await exportNotesExcel(selected, {
+          onProgress: ({ percent }) => setExportProgress(percent),
+        });
+      } else if (format === "both") {
+        await exportNotesPDF(selected, {
+          onProgress: ({ percent }) => setExportProgress(Math.round(percent / 2)),
+        });
+        await exportNotesExcel(selected, {
+          onProgress: ({ percent }) => setExportProgress(50 + Math.round(percent / 2)),
+        });
+      }
+      setToast(`Exported ${selected.length} note${selected.length !== 1 ? "s" : ""} ✓`);
+      exitSelectMode();
+    } catch (e) {
+      console.error("Export failed:", e);
+      setToast("Export failed: " + (e.message || "unknown error"));
+    }
+    setExporting(false);
+    setExportProgress(0);
   }
 
   async function saveNote() {
@@ -197,14 +263,126 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
-      <div className="flex items-center justify-between">
-        <PageHeader title="Field Notes" subtitle={`${unresolvedCount} unresolved · ${notes.length} total`} />
-        <Btn size="sm" onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}>
-          {showForm ? <X size={15} /> : <Plus size={15} />}{showForm ? "Cancel" : "Add"}
-        </Btn>
-      </div>
 
-      {(criticalCount > 0 || overdueCount > 0) && (
+      {/* ── Header ── */}
+      {!selectMode ? (
+        <div className="flex items-center justify-between">
+          <PageHeader title="Field Notes" subtitle={`${unresolvedCount} unresolved · ${notes.length} total`} />
+          <div className="flex gap-2">
+            {notes.length > 0 && (
+              <Btn size="sm" variant="secondary" onClick={() => enterSelectMode()}>
+                <FileDown size={14} /> Export
+              </Btn>
+            )}
+            <Btn size="sm" onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}>
+              {showForm ? <X size={15} /> : <Plus size={15} />}{showForm ? "Cancel" : "Add"}
+            </Btn>
+          </div>
+        </div>
+      ) : (
+        // ── Select-mode header ──
+        <div className="bg-white rounded-2xl border-2 border-red-200 p-3 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <div>
+              <p className="text-base font-black text-slate-900">{selectedIds.size} selected</p>
+              <p className="text-xs text-slate-400">Tap notes to select for export</p>
+            </div>
+            <button onClick={exitSelectMode} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center">
+              <X size={18} />
+            </button>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => selectAllVisible(filtered)}
+              className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 min-h-[40px]">
+              Select All Visible ({filtered.length})
+            </button>
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              disabled={selectedIds.size === 0}
+              className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-40 min-h-[40px]">
+              Clear
+            </button>
+            <button
+              onClick={() => setShowExportMenu(true)}
+              disabled={selectedIds.size === 0 || exporting}
+              className="flex-1 rounded-xl px-3 py-2 text-sm font-bold text-white disabled:opacity-40 min-h-[40px]"
+              style={{ background: "#8B1A1A" }}>
+              <FileDown size={14} className="inline mr-1" />
+              Export ({selectedIds.size})
+            </button>
+          </div>
+          {exporting && (
+            <div className="mt-3">
+              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+                <motion.div
+                  className="h-full"
+                  style={{ background: "#8B1A1A" }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${exportProgress}%` }}
+                  transition={{ duration: 0.3 }} />
+              </div>
+              <p className="text-xs text-slate-500 mt-1 text-center">Generating export… {exportProgress}%</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Export menu sheet ── */}
+      <AnimatePresence>
+        {showExportMenu && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowExportMenu(false)}
+              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="fixed left-4 right-4 top-1/2 -translate-y-1/2 z-50 max-w-sm mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100" style={{ background: "#F7F3F3" }}>
+                <p className="text-base font-black text-slate-900">Export {selectedIds.size} Note{selectedIds.size !== 1 ? "s" : ""}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Choose your format</p>
+              </div>
+              <div className="divide-y divide-slate-100">
+                <button onClick={() => handleExport("pdf")}
+                  className="w-full flex items-center gap-3 p-4 text-left hover:bg-slate-50 min-h-[68px]">
+                  <div className="w-11 h-11 rounded-xl bg-red-100 text-red-700 flex items-center justify-center text-xl shrink-0">📄</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-slate-900">PDF Report</p>
+                    <p className="text-xs text-slate-500">Polished, with embedded photos. For clients & archive.</p>
+                  </div>
+                </button>
+                <button onClick={() => handleExport("excel")}
+                  className="w-full flex items-center gap-3 p-4 text-left hover:bg-slate-50 min-h-[68px]">
+                  <div className="w-11 h-11 rounded-xl bg-green-100 text-green-700 flex items-center justify-center text-xl shrink-0">📊</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-slate-900">Excel Workbook</p>
+                    <p className="text-xs text-slate-500">Filterable, with photo links. For strategy sessions.</p>
+                  </div>
+                </button>
+                <button onClick={() => handleExport("both")}
+                  className="w-full flex items-center gap-3 p-4 text-left hover:bg-slate-50 min-h-[68px]">
+                  <div className="w-11 h-11 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl shrink-0">📦</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-slate-900">Both</p>
+                    <p className="text-xs text-slate-500">PDF + Excel. Best of both worlds.</p>
+                  </div>
+                </button>
+              </div>
+              <button onClick={() => setShowExportMenu(false)}
+                className="w-full p-3 text-sm font-bold text-slate-500 hover:bg-slate-50 min-h-[48px]">
+                Cancel
+              </button>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {!selectMode && (criticalCount > 0 || overdueCount > 0) && (
         <div className="flex gap-2 flex-wrap">
           {criticalCount > 0 && <div className="flex items-center gap-1.5 rounded-2xl px-3 py-2.5 text-sm font-bold border" style={{ background: NOTE_URGENCY.Critical.bg, color: NOTE_URGENCY.Critical.text, borderColor: NOTE_URGENCY.Critical.border }}>🚨 {criticalCount} Critical</div>}
           {overdueCount > 0 && <div className="flex items-center gap-1.5 rounded-2xl px-3 py-2.5 text-sm font-bold border" style={{ background: NOTE_URGENCY.Urgent.bg, color: NOTE_URGENCY.Urgent.text, borderColor: NOTE_URGENCY.Urgent.border }}>⏰ {overdueCount} Overdue</div>}
@@ -212,7 +390,7 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
       )}
 
       <AnimatePresence>
-        {showForm && (
+        {showForm && !selectMode && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
             <Card className="p-4 space-y-3">
               <p className="text-base font-black text-slate-800">{editId ? "Edit Note" : "New Note"}</p>
@@ -231,20 +409,17 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
                 </div>
               </div>
               <Field label="Resolve By (optional)" type="date" value={form.resolve_by} onChange={v => setForm(f => ({ ...f, resolve_by: v }))} />
-
               {editId && existingMedia.length > 0 && (
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-slate-500">Current Photos / Videos</label>
                   <MediaGallery media={existingMedia} onDelete={removeExistingMedia} />
                 </div>
               )}
-
               <div>
                 <label className="mb-1.5 block text-sm font-bold text-slate-500">{editId ? "Add More Photos / Videos" : "Attach Photos / Videos"}</label>
                 <MediaPicker onAdd={addMedia} />
                 <MediaGallery media={pendingMedia} onDelete={removeMedia} />
               </div>
-
               <div className="flex gap-2">
                 <Btn className="flex-1" onClick={saveNote}>
                   {editId ? <Save size={15} /> : <Plus size={15} />}
@@ -268,10 +443,23 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
         {filtered.map(n => {
           const urg      = NOTE_URGENCY[n.urgency || "Normal"] || NOTE_URGENCY.Normal;
           const isOverdue = !n.resolved && n.resolve_by && n.resolve_by < today;
+          const isSelected = selectedIds.has(n.id);
           return (
-            <Card key={n.id} className="overflow-hidden" style={{ borderLeft: "3px solid " + urg.dot }}>
-              <div className="p-4">
+            <Card key={n.id}
+              className={`overflow-hidden transition-all ${selectMode && isSelected ? "ring-2 ring-red-500" : ""}`}
+              style={{ borderLeft: "3px solid " + urg.dot }}
+              onClick={selectMode ? () => toggleSelect(n.id) : undefined}>
+              <div className={`p-4 ${selectMode ? "cursor-pointer" : ""}`}>
                 <div className="flex items-start justify-between gap-3">
+
+                  {selectMode && (
+                    <div className="shrink-0 mt-0.5">
+                      {isSelected
+                        ? <CheckSquare size={22} className="text-red-600" />
+                        : <Square size={22} className="text-slate-300" />}
+                    </div>
+                  )}
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <p className={"text-base font-bold " + (n.resolved ? "text-slate-400 line-through" : "text-slate-900")}>{n.client || "General Note"}</p>
@@ -283,40 +471,44 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
                     {n.resolve_by && !n.resolved && <p className={"mt-1 text-sm font-medium " + (isOverdue ? "text-red-600" : "text-slate-400")}>Resolve by: {smartDate(n.resolve_by)}</p>}
                     {n.resolved && n.resolved_at && <p className="mt-1 text-xs text-slate-400">Resolved {new Date(n.resolved_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</p>}
                     {(n.media || []).length > 0 && <div className="mt-1 flex items-center gap-1 text-xs text-slate-400"><Paperclip size={11} />{n.media.length} attachment{n.media.length !== 1 ? "s" : ""}</div>}
-                    <MediaGallery media={n.media || []} onDelete={mid => deleteNoteMedia(n.id, mid)} />
+                    {!selectMode && <MediaGallery media={n.media || []} onDelete={mid => deleteNoteMedia(n.id, mid)} />}
                     <p className="mt-1.5 text-xs text-slate-400">{n.created_at ? new Date(n.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</p>
                     {n.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
                   </div>
-                  <div className="flex flex-col gap-1 shrink-0">
-                    <button
-                      onClick={() => startEdit(n)}
-                      className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
-                      <Edit2 size={15} />
-                    </button>
-                    <button
-                      onClick={() => deleteNote(n.id)}
-                      className="p-2.5 rounded-xl bg-slate-50 text-slate-300 hover:text-red-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+
+                  {!selectMode && (
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startEdit(n); }}
+                        className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }}
+                        className="p-2.5 rounded-xl bg-slate-50 text-slate-300 hover:text-red-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {!n.resolved && (
+
+                {!selectMode && !n.resolved && (
                   <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
                     <div className="flex gap-1">
                       {Object.keys(NOTE_URGENCY).map(u2 => (
-                        <button key={u2} onClick={() => changeUrgency(n.id, u2)}
+                        <button key={u2} onClick={(e) => { e.stopPropagation(); changeUrgency(n.id, u2); }}
                           className="rounded-lg px-3 py-1.5 text-sm font-bold border transition-all min-h-[40px]"
                           style={(n.urgency || "Normal") === u2 ? { background: NOTE_URGENCY[u2].bg, color: NOTE_URGENCY[u2].text, borderColor: NOTE_URGENCY[u2].dot } : { background: "#F8FAFC", color: "#CBD5E1", borderColor: "#E2E8F0" }}>
                           {u2}
                         </button>
                       ))}
                     </div>
-                    <Btn size="sm" variant="success" onClick={() => resolveNote(n.id)}><Check size={13} /> Resolve</Btn>
+                    <Btn size="sm" variant="success" onClick={(e) => { e.stopPropagation(); resolveNote(n.id); }}><Check size={13} /> Resolve</Btn>
                   </div>
                 )}
-                {n.resolved && (
+                {!selectMode && n.resolved && (
                   <div className="mt-2 pt-2 border-t border-slate-100">
-                    <button onClick={() => unresolveNote(n.id)} className="text-sm text-slate-400 hover:text-slate-600 transition-colors font-medium py-1">Mark as unresolved</button>
+                    <button onClick={(e) => { e.stopPropagation(); unresolveNote(n.id); }} className="text-sm text-slate-400 hover:text-slate-600 transition-colors font-medium py-1">Mark as unresolved</button>
                   </div>
                 )}
               </div>
