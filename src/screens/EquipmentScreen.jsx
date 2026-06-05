@@ -1,5 +1,5 @@
 // ─── Equipment Screen ─────────────────────────────────────────────────────────
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip } from "lucide-react";
 import { smartDate, genId, uploadPhotoToSupabase, daysDiff } from "../lib/helpers";
@@ -8,7 +8,7 @@ import { triggerImmediateSync } from "../lib/sync";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, ServiceBadge, useConfirm } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 
-export function EquipmentScreen({ data, setData, userId, isOnline }) {
+export function EquipmentScreen({ data, setData, userId, isOnline, quickAddTrigger }) {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch]     = useState("");
   const [filter, setFilter]     = useState("All");
@@ -19,6 +19,14 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
   const { confirm, dialog } = useConfirm();
   const equipment = data.equipment || [];
 
+  // ── Quick capture: open add form when FAB triggers this screen ──
+  useEffect(() => {
+    if (!quickAddTrigger) return;
+    if (quickAddTrigger.screen !== "Equipment") return;
+    setEditId(null);
+    setShowForm(true);
+  }, [quickAddTrigger?.ts]);
+
   function resetForm() { setForm({ name: "", type: "", make: "", model: "", serial: "", location: "", client: "", service_due: "", notes: "" }); setEditId(null); setShowForm(false); setPendingMedia([]); }
   function addMedia(m)     { setPendingMedia(pm => [...pm, m]); }
   function removeMedia(id) { setPendingMedia(pm => pm.filter(m => m.id !== id)); }
@@ -28,7 +36,6 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
     if (editId) {
       const existing = equipment.find(e => e.id === editId);
       const cleanForm = { ...form, service_due: form.service_due || null };
-      // Step 1: Upload new photos FIRST
       let newUploaded = [];
       if (isOnline && pendingMedia.length > 0) {
         newUploaded = await Promise.all(pendingMedia.map(async m => {
@@ -40,11 +47,9 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
         newUploaded = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
       }
 
-      // Step 2: Build final record with all media (existing + new uploads)
       const allMedia = [...(existing?.media || []), ...newUploaded];
       const updated = { ...existing, ...cleanForm, media: allMedia, sync_status: "pending" };
 
-      // Step 3: Save with photos already included
       setData(d => ({
         ...d,
         equipment: (d.equipment || []).map(e => e.id === editId ? updated : e),
@@ -54,12 +59,9 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
       setToast("Equipment updated");
     triggerImmediateSync();
     } else {
-      // Convert empty date strings to null — Supabase date columns reject empty strings
       const cleanForm = { ...form, service_due: form.service_due || null };
-      // Generate ID first so we can use it for photo paths
       const itemId = genId();
 
-      // Step 1: Upload photos FIRST (before creating the record)
       let uploadedMedia = [];
       if (isOnline && pendingMedia.length > 0) {
         uploadedMedia = await Promise.all(pendingMedia.map(async m => {
@@ -74,11 +76,9 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
           }
         }));
       } else {
-        // Offline: keep base64 for now, mark as pending upload
         uploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
       }
 
-      // Step 2: Create record with photos already included
       const item = {
         id: itemId,
         user_id: userId,
@@ -88,7 +88,6 @@ export function EquipmentScreen({ data, setData, userId, isOnline }) {
         sync_status: "pending",
       };
 
-      // Step 3: Save locally and queue for sync (with photos already in the record)
       setData(d => ({
         ...d,
         equipment: [item, ...(d.equipment || [])],
