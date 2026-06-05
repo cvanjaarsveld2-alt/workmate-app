@@ -1,5 +1,5 @@
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, File as FileIcon } from "lucide-react";
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
@@ -8,7 +8,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
 import { Card, Btn, Field, SelectField, SearchBar, FilterPills, Toast, Empty, PageHeader, useConfirm } from "../components/ui";
 
-export function QuotesScreen({ data, setData, userId }) {
+export function QuotesScreen({ data, setData, userId, quickAddTrigger }) {
   const [showForm, setShowForm]       = useState(false);
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -17,6 +17,14 @@ export function QuotesScreen({ data, setData, userId }) {
   const [form, setForm] = useState({ client_name: "", description: "", value: "", status: "Pending" });
   const { confirm, dialog } = useConfirm();
   const quotes = data.quotes || [];
+
+  // ── Quick capture: open add form when FAB triggers this screen ──
+  useEffect(() => {
+    if (!quickAddTrigger) return;
+    if (quickAddTrigger.screen !== "Quotes") return;
+    setEditId(null);
+    setShowForm(true);
+  }, [quickAddTrigger?.ts]);
 
   function resetForm() { setForm({ client_name: "", description: "", value: "", status: "Pending" }); setEditId(null); setShowForm(false); }
 
