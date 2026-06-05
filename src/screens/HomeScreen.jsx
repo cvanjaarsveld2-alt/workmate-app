@@ -10,25 +10,6 @@ import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
 import { todayISO, niceDate, daysDiff, smartDate } from "../lib/helpers";
 import { Card, StatCard } from "../components/ui";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
-function firstName(user) {
-  // Try to pull a name from the auth user object (Supabase user)
-  if (!user) return "";
-  const meta = user.user_metadata || {};
-  const candidate = meta.first_name || meta.full_name || meta.name || user.email || "";
-  if (!candidate) return "";
-  // First token before space or @
-  return String(candidate).split(/[\s@]/)[0];
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
 export function HomeScreen({ data, setScreen, user }) {
   const today     = todayISO();
   const clients   = data.clients   || [];
@@ -36,9 +17,7 @@ export function HomeScreen({ data, setScreen, user }) {
   const followups = data.followups || [];
   const equipment = data.equipment || [];
   const notes     = data.notes     || [];
-  const name      = firstName(user);
 
-  // ── Action-required calculations ────────────────────────────────────────────
   const todayFU       = followups.filter(f => f.date === today && !f.completed)
                                   .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
   const overdueFU     = followups.filter(f => f.date < today && !f.completed);
@@ -60,7 +39,6 @@ export function HomeScreen({ data, setScreen, user }) {
   const lostC = pCount["Lost"] || 0;
   const inPipeline = clients.length - lostC;
 
-  // ── Build the Action Required list ──────────────────────────────────────────
   const actionItems = [];
   if (criticalNotes.length > 0)
     actionItems.push({ icon: "🚨", text: `${criticalNotes.length} critical note${criticalNotes.length !== 1 ? "s" : ""} unresolved`, screen: "Notes", color: "text-red-700" });
@@ -74,32 +52,18 @@ export function HomeScreen({ data, setScreen, user }) {
     actionItems.push({ icon: "🛠️", text: `${dueSoonEquip.length} service${dueSoonEquip.length !== 1 ? "s" : ""} due within 7 days`, screen: "Equipment", color: "text-amber-700" });
 
   const actionCount = actionItems.length;
-  const allClear = actionCount === 0;
 
-  // ── Today's schedule — show up to 5 items ────────────────────────────────────
   const todayList = todayFU.slice(0, 5);
   const todayOverflow = Math.max(0, todayFU.length - 5);
 
   return (
     <div className="space-y-5">
 
-      {/* ── Greeting + Action Count ───────────────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-slate-400">{niceDate()}</p>
-            <h1 className="text-2xl font-black text-slate-900 mt-0.5">
-              {greeting()}{name ? `, ${name}` : ""}
-            </h1>
-            <p className={`text-base font-bold mt-1 ${allClear ? "text-green-600" : "text-red-600"}`}>
-              {allClear
-                ? "✓ You're all caught up"
-                : `${actionCount} thing${actionCount !== 1 ? "s" : ""} to action today`}
-            </p>
-          </div>
-          <img src={BRAND.logo} alt="PW" className="h-10 object-contain opacity-80 shrink-0 ml-3" onError={e => e.target.style.display = "none"} />
-        </div>
-      </motion.div>
+      {/* ── Header: just date + logo ─────────────────────────────────────────── */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-400">{niceDate()}</p>
+        <img src={BRAND.logo} alt="PW" className="h-8 object-contain opacity-80" onError={e => e.target.style.display = "none"} />
+      </div>
 
       {/* ── Consolidated Action Required ──────────────────────────────────────── */}
       {actionItems.length > 0 && (
@@ -141,7 +105,7 @@ export function HomeScreen({ data, setScreen, user }) {
         {todayList.length === 0 ? (
           <div className="px-4 py-5 flex items-center gap-3">
             <CheckCircle2 size={18} className="text-green-500 shrink-0" />
-            <p className="text-sm text-slate-500">Nothing scheduled for today. Enjoy the breathing room.</p>
+            <p className="text-sm text-slate-500">Nothing scheduled for today.</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-50">
