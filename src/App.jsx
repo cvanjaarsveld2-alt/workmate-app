@@ -32,6 +32,7 @@ import { PINSetupScreen, PINLockScreen } from "./auth/PINScreens";
 // UI primitives
 import { NavTab, Spinner, DataLoadingScreen, Toast } from "./components/ui";
 import SyncStatusBadge from "./components/SyncStatusBadge";
+import { QuickCaptureFAB } from "./components/QuickCaptureFAB";
 
 // Screens
 import { HomeScreen }      from "./screens/HomeScreen";
@@ -85,6 +86,8 @@ export default function PowerWorksApp() {
   const [data, setData] = useState({
     clients: [], followups: [], quotes: [], notes: [], equipment: [], syncQueue: [],
   });
+  // Quick-capture trigger: { screen: "Notes", ts: 1234 } — screens listen to ts changes to auto-open their add form
+  const [quickAddTrigger, setQuickAddTrigger] = useState(null);
 
   // ── Auth ──
   useEffect(() => {
@@ -146,8 +149,6 @@ export default function PowerWorksApp() {
           ...data,
           notes:     (data.notes     || []).map(n => ({ ...n, media: (n.media     || []).map(m => m.url ? { ...m, base64: undefined } : m) })),
           equipment: (data.equipment || []).map(e => ({ ...e, media: (e.media     || []).map(m => m.url ? { ...m, base64: undefined } : m) })),
-          // Strip base64 from syncQueue to prevent localStorage bloat
-          // and prevent old base64 versions from overwriting synced URLs
           syncQueue: (data.syncQueue || []).map(q => {
             if (!q.data?.media) return q;
             return {
@@ -193,23 +194,19 @@ export default function PowerWorksApp() {
     if (!isOnline) { setDataLoading(false); return; }
     const uid = session.user.id;
 
-    // Pull fresh data then clean up any bad syncQueue entries
     pullFromSupabase(uid, setData).then(() => {
-      // After pull, remove any syncQueue entries where media has no URLs
-      // These are stale entries that would overwrite good data
       setData(d => ({
         ...d,
         syncQueue: (d.syncQueue || []).filter(q => {
-          if (!q.data?.media) return true; // no media field, keep it
+          if (!q.data?.media) return true;
           const hasUrls = q.data.media.some(m => m.url);
           const hasMedia = q.data.media.length > 0;
-          if (hasMedia && !hasUrls) return false; // has media but no URLs = bad entry, remove
+          if (hasMedia && !hasUrls) return false;
           return true;
         }),
       }));
     }).finally(() => setDataLoading(false));
 
-    // Set up real-time sync for all tables
     const cleanup = setupRealtimeSync(uid, setData);
     return cleanup;
   }, [session?.user?.id, isOnline]);
@@ -230,23 +227,21 @@ export default function PowerWorksApp() {
     scheduleNotificationsViaSW(buildNotificationItems(data.followups, data.equipment, data.notes));
   }, [data.followups, data.equipment, notifPermission]);
 
-  // ── Auto-sync: retry pending items when online, immediately on reconnect ──
+  // ── Auto-sync ──
   useEffect(() => {
     if (!isOnline || !session) return;
     const pending = (data.syncQueue || []).filter(i => i.status === "pending");
     if (pending.length === 0) return;
-    // Immediate retry when coming back online, 3s debounce otherwise
     const t = setTimeout(() => pushSyncQueue(data.syncQueue, setData), 3000);
     return () => clearTimeout(t);
   }, [isOnline, session, data.syncQueue?.length]);
 
-  // ── Re-pull when coming back online after being offline ──
+  // ── Re-pull when coming back online ──
   const prevOnlineRef = React.useRef(isOnline);
   useEffect(() => {
     const wasOffline = !prevOnlineRef.current;
     prevOnlineRef.current = isOnline;
     if (isOnline && wasOffline && session) {
-      // Just came back online — pull fresh data and flush queue
       pullFromSupabase(session.user.id, setData);
       if ((data.syncQueue || []).some(i => i.status === "pending")) {
         pushSyncQueue(data.syncQueue, setData);
@@ -279,6 +274,12 @@ export default function PowerWorksApp() {
     setSession(null);
   }
 
+  // ── Quick capture: navigate to screen and trigger its add form ──
+  function handleQuickCapture(targetScreen) {
+    setScreen(targetScreen);
+    setQuickAddTrigger({ screen: targetScreen, ts: Date.now() });
+  }
+
   // ── Badge counts ──
   const pendingCount    = (data.syncQueue || []).filter(i => i.status === "pending").length;
   const flaggedQuotes   = (data.quotes    || []).filter(q => q.status === "Pending").length;
@@ -293,14 +294,14 @@ export default function PowerWorksApp() {
   if (pinState === "locked")   return <PINLockScreen onUnlock={() => setPinState("unlocked")} onForgot={forgotPIN} />;
   if (dataLoading)             return <DataLoadingScreen />;
 
-  // ── Screens ──
+  // ── Screens (now receive quickAddTrigger) ──
   const screens = {
-    Home:      <HomeScreen      data={data} setScreen={setScreen} />,
-    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} />,
-    Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} />,
-    Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} />,
-    Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} />,
-    Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} />,
+    Home:      <HomeScreen      data={data} setScreen={setScreen} user={session.user} />,
+    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
+    Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
+    Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
+    Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} />,
+    Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout}  onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} />,
   };
 
@@ -334,6 +335,8 @@ export default function PowerWorksApp() {
         </nav>
 
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
+
+        <QuickCaptureFAB currentScreen={screen} onTrigger={handleQuickCapture} />
 
         <AnimatePresence>
           {syncError && <Toast message={syncError} type="error" onDone={() => setSyncError("")} />}
