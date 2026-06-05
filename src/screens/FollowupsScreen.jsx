@@ -1,5 +1,5 @@
 // ─── Follow-ups Screen ────────────────────────────────────────────────────────
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, Check, Calendar } from "lucide-react";
 import { BRAND, REMINDER_OPTIONS } from "../lib/constants";
@@ -68,7 +68,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
   );
 }
 
-export function FollowupsScreen({ data, setData, userId }) {
+export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter]     = useState("By Client");
   const [editId, setEditId]     = useState(null);
@@ -81,6 +81,14 @@ export function FollowupsScreen({ data, setData, userId }) {
   const today     = todayISO();
   const nextWeek  = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
   const nextWeekStr = nextWeek.toISOString().slice(0, 10);
+
+  // ── Quick capture: open add form when FAB triggers this screen ──
+  useEffect(() => {
+    if (!quickAddTrigger) return;
+    if (quickAddTrigger.screen !== "Followups") return;
+    setEditId(null);
+    setShowForm(true);
+  }, [quickAddTrigger?.ts]);
 
   function resetForm() {
     setForm({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "" });
