@@ -1,5 +1,5 @@
 // ─── Clients Screen ───────────────────────────────────────────────────────────
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, Check,
@@ -18,7 +18,6 @@ import {
 
 const STAGE_PRIORITY = { Active: 0, Quoted: 1, Contacted: 2, "New Lead": 3, Won: 4, Lost: 5 };
 
-// ─── Inline follow-up form (inside client card) ───────────────────────────────
 function InlineFollowupForm({ client, userId, setData, onDone }) {
   const [form, setForm] = useState({
     title: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "",
@@ -76,7 +75,6 @@ function InlineFollowupForm({ client, userId, setData, onDone }) {
   );
 }
 
-// ─── Follow-up row inside client card ─────────────────────────────────────────
 function ClientFollowupRow({ followup: f, setData }) {
   const today    = todayISO();
   const isOverdue = !f.completed && f.date < today;
@@ -144,8 +142,7 @@ function ClientFollowupRow({ followup: f, setData }) {
   );
 }
 
-// ─── Main ClientsScreen ───────────────────────────────────────────────────────
-export function ClientsScreen({ data, setData, userId }) {
+export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
   const [showForm, setShowForm]         = useState(false);
   const [search, setSearch]             = useState("");
   const [filterStage, setFilterStage]   = useState("All");
@@ -159,6 +156,14 @@ export function ClientsScreen({ data, setData, userId }) {
   const clients   = data.clients   || [];
   const followups = data.followups || [];
   const today     = todayISO();
+
+  // ── Quick capture: open add form when FAB triggers this screen ──
+  useEffect(() => {
+    if (!quickAddTrigger) return;
+    if (quickAddTrigger.screen !== "Clients") return;
+    setEditId(null);
+    setShowForm(true);
+  }, [quickAddTrigger?.ts]);
 
   function resetForm() {
     setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "" });
@@ -196,13 +201,11 @@ export function ClientsScreen({ data, setData, userId }) {
   async function deleteClient(id, companyName) {
     const ok = await confirm(`Delete ${companyName}? This cannot be undone.`, { confirmLabel: "Delete" });
     if (!ok) return;
-    // Queue delete for Supabase sync
     setData(d => ({
       ...d,
       clients: (d.clients || []).filter(c => c.id !== id),
       syncQueue: [{ id: genId(), table: "clients", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
     }));
-    // Also delete linked followups locally
     setData(d => ({ ...d, followups: (d.followups || []).filter(f => f.client_id !== id) }));
     setToast("Client deleted");
     triggerImmediateSync();
@@ -300,12 +303,10 @@ export function ClientsScreen({ data, setData, userId }) {
 
               <div className="divide-y divide-slate-50">
                 {[...branches].sort((a, b) => {
-                  // Overdue follow-ups first
                   const aOverdue = companyFU.some(f => f.client_id === a.id && !f.completed && f.date < today);
                   const bOverdue = companyFU.some(f => f.client_id === b.id && !f.completed && f.date < today);
                   if (aOverdue && !bOverdue) return -1;
                   if (!aOverdue && bOverdue) return 1;
-                  // Then by stage priority
                   const aPri = STAGE_PRIORITY[a.stage || "New Lead"] ?? 3;
                   const bPri = STAGE_PRIORITY[b.stage || "New Lead"] ?? 3;
                   return aPri - bPri;
