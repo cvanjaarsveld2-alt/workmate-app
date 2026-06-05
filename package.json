@@ -11,7 +11,10 @@
     "react-dom": "^18.3.1",
     "lucide-react": "^0.468.0",
     "framer-motion": "^11.11.17",
-    "@supabase/supabase-js": "^2.43.4"
+    "@supabase/supabase-js": "^2.43.4",
+    "exceljs": "^4.4.0",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.0"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.17",
