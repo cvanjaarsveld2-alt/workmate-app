@@ -1,5 +1,5 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save } from "lucide-react";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
@@ -10,7 +10,7 @@ import { scheduleNotificationsViaSW } from "../lib/notifications";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, UrgencyBadge, useConfirm } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 
-export function NotesScreen({ data, setData, userId, isOnline }) {
+export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }) {
   const [showForm, setShowForm]         = useState(false);
   const [editId, setEditId]             = useState(null);
   const [search, setSearch]             = useState("");
@@ -19,10 +19,18 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
   const [toast, setToast]               = useState("");
   const [form, setForm] = useState({ client: "", note: "", urgency: "Normal", resolve_by: "" });
   const [pendingMedia, setPendingMedia] = useState([]);
-  const [existingMedia, setExistingMedia] = useState([]); // photos already saved on the note when editing
+  const [existingMedia, setExistingMedia] = useState([]);
   const { confirm, dialog } = useConfirm();
   const notes = data.notes || [];
   const today = todayISO();
+
+  // ── Quick capture: open add form when FAB triggers this screen ──
+  useEffect(() => {
+    if (!quickAddTrigger) return;
+    if (quickAddTrigger.screen !== "Notes") return;
+    setEditId(null);
+    setShowForm(true);
+  }, [quickAddTrigger?.ts]);
 
   function addMedia(m)  { setPendingMedia(pm => [...pm, m]); }
   function removeMedia(id) { setPendingMedia(pm => pm.filter(m => m.id !== id)); }
@@ -54,11 +62,9 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
     const cleanForm = { ...form, resolve_by: form.resolve_by || null };
 
     if (editId) {
-      // ── Edit existing note ──
       const existing = notes.find(n => n.id === editId);
       if (!existing) { setToast("Note not found"); return; }
 
-      // Upload any new photos
       let newUploadedMedia = [];
       if (isOnline && pendingMedia.length > 0) {
         newUploadedMedia = await Promise.all(pendingMedia.map(async m => {
@@ -96,7 +102,6 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
       return;
     }
 
-    // ── Create new note ──
     const noteId = genId();
     let uploadedMedia = [];
     if (isOnline && pendingMedia.length > 0) {
@@ -160,7 +165,6 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
   async function deleteNote(id) {
     const ok = await confirm("Delete this note?", { confirmLabel: "Delete" });
     if (!ok) return;
-    // If this note is currently being edited, close the form
     if (editId === id) resetForm();
     setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "notes", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], notes: (d.notes || []).filter(n => n.id !== id) }));
     setToast("Note deleted");
@@ -228,7 +232,6 @@ export function NotesScreen({ data, setData, userId, isOnline }) {
               </div>
               <Field label="Resolve By (optional)" type="date" value={form.resolve_by} onChange={v => setForm(f => ({ ...f, resolve_by: v }))} />
 
-              {/* Existing photos (only shown in edit mode) */}
               {editId && existingMedia.length > 0 && (
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-slate-500">Current Photos / Videos</label>
