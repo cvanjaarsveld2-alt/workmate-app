@@ -1,28 +1,20 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // sync.js — PowerMate Bulletproof Sync Engine
-// ───────────────────────────────────────────────────────────────────────────
-// Strategy:
-//   1. Every write goes to IndexedDB FIRST (instant, never lost)
-//   2. Immediately attempt Supabase push in parallel
-//   3. If push fails (offline), item stays in syncQueue
-//   4. On reconnect, retry all pending items automatically
-//   5. Real-time subscription keeps all devices in sync
-//   6. Every item has a sync_status: 'synced' | 'pending' | 'error'
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { supabase } from "../supabase";
 import { logEvent } from "./helpers";
 import { offlineSave } from "../offline/offlineDb";
 
+// All tables that sync — extend here if you add new ones
+const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts"];
+
 // ─── Single item push ─────────────────────────────────────────────────────────
-// Tries to push one item to Supabase immediately.
-// Returns true on success, false on failure.
 export async function pushItem(item) {
   try {
     const table   = item.table;
     let   payload = item.data;
 
-    // Strip base64 media before pushing — only URLs go to DB
     if (payload?.media) {
       payload = {
         ...payload,
@@ -50,33 +42,23 @@ export async function pushItem(item) {
 }
 
 // ─── Immediate write + push ───────────────────────────────────────────────────
-// This is what every screen calls instead of manually managing syncQueue.
-// - Saves to IndexedDB immediately
-// - Attempts Supabase push immediately
-// - If push fails, adds to syncQueue for retry
-// Returns the item with updated sync_status
 export async function saveAndSync(item, table, action, setData, isOnline) {
-  // 1. Save to IndexedDB immediately (never lost)
   await offlineSave(table, item);
 
-  // 2. Attempt immediate Supabase push if online
   if (isOnline) {
     const success = await pushItem({ table, action, data: item });
     if (success) {
       const synced = { ...item, sync_status: "synced" };
       await offlineSave(table, synced);
-      // Update state to show synced
       setData(d => ({
         ...d,
         [table]: (d[table] || []).map(r => r.id === item.id ? synced : r),
-        // Remove from syncQueue if it was there
         syncQueue: (d.syncQueue || []).filter(q => q.data?.id !== item.id),
       }));
       return synced;
     }
   }
 
-  // 3. Push failed or offline — add to retry queue
   const queueItem = {
     id:         `sq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
     table,
@@ -91,7 +73,6 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
     ...d,
     syncQueue: [
       queueItem,
-      // Remove any older queue items for same entity (dedup)
       ...(d.syncQueue || []).filter(q => q.data?.id !== item.id),
     ],
   }));
@@ -100,8 +81,6 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
 }
 
 // ─── Full queue flush ─────────────────────────────────────────────────────────
-// Processes all pending items in the syncQueue.
-// Called on reconnect and manual "Sync Now".
 let _syncInProgress = false;
 
 export async function pushSyncQueue(syncQueue, setData) {
@@ -112,8 +91,6 @@ export async function pushSyncQueue(syncQueue, setData) {
     const pending = (syncQueue || []).filter(i => i.status === "pending");
     if (pending.length === 0) return;
 
-    // Deduplicate — for same entity, keep only the latest action
-    // When deduplicating, prefer the version with MORE media (has uploaded photos)
     const bestByKey = new Map();
     for (const item of pending) {
       const key = `${item.table}:${item.data?.id}`;
@@ -121,7 +98,6 @@ export async function pushSyncQueue(syncQueue, setData) {
       if (!existing) {
         bestByKey.set(key, item);
       } else {
-        // Keep the version with more media items (has uploaded URLs)
         const existingMediaCount = (existing.data?.media || []).filter(m => m.url).length;
         const newMediaCount = (item.data?.media || []).filter(m => m.url).length;
         if (newMediaCount >= existingMediaCount) {
@@ -157,13 +133,11 @@ export async function pushSyncQueue(syncQueue, setData) {
       logEvent("sync_succeeded", { count: succeeded.length });
     }
 
-    // Get entity IDs that succeeded
     const succeededEntityIds = deduped
       .filter(item => succeeded.includes(item.id))
       .map(item => item.data?.id)
       .filter(Boolean);
 
-    // Remove succeeded items from queue, mark entities as synced
     const succeededQueueIds = new Set();
     pending.forEach(item => {
       if (succeededEntityIds.includes(item.data?.id)) {
@@ -171,15 +145,13 @@ export async function pushSyncQueue(syncQueue, setData) {
       }
     });
 
-    setData(d => ({
-      ...d,
-      syncQueue:  (d.syncQueue  || []).filter(i => !succeededQueueIds.has(i.id)),
-      clients:    (d.clients    || []).map(r => succeededEntityIds.includes(r.id) ? { ...r, sync_status: "synced" } : r),
-      followups:  (d.followups  || []).map(r => succeededEntityIds.includes(r.id) ? { ...r, sync_status: "synced" } : r),
-      quotes:     (d.quotes     || []).map(r => succeededEntityIds.includes(r.id) ? { ...r, sync_status: "synced" } : r),
-      notes:      (d.notes      || []).map(r => succeededEntityIds.includes(r.id) ? { ...r, sync_status: "synced" } : r),
-      equipment:  (d.equipment  || []).map(r => succeededEntityIds.includes(r.id) ? { ...r, sync_status: "synced" } : r),
-    }));
+    setData(d => {
+      const update = { ...d, syncQueue: (d.syncQueue || []).filter(i => !succeededQueueIds.has(i.id)) };
+      SYNC_TABLES.forEach(table => {
+        update[table] = (d[table] || []).map(r => succeededEntityIds.includes(r.id) ? { ...r, sync_status: "synced" } : r);
+      });
+      return update;
+    });
 
   } finally {
     _syncInProgress = false;
@@ -187,20 +159,18 @@ export async function pushSyncQueue(syncQueue, setData) {
 }
 
 // ─── Pull fresh data from Supabase ────────────────────────────────────────────
-// Merges server data with local pending changes so nothing is overwritten
 export async function pullFromSupabase(uid, setData) {
   try {
-    const [a, b, c, d, e] = await Promise.all([
+    const [a, b, c, d, e, f] = await Promise.all([
       supabase.from("clients").select("id,user_id,company,division,contact,phone,email,location,branch,stage,pipeline_status,sync_status,auto_created,source,notes,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("followups").select("id,user_id,client_id,client,branch,title,date,time,reminder,notes,completed,sync_status,auto_generated,created_at").eq("user_id", uid).order("date", { ascending: false }).limit(500),
       supabase.from("quotes").select("id,user_id,client_name,description,value,status,sent_date,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("notes").select("id,user_id,client,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
+      supabase.from("contacts").select("id,user_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
     ]);
 
     setData(prev => {
-      // For each table: use server data but preserve any locally-pending items
-      // that haven't synced yet (they may be newer than server)
       function merge(serverRows, localRows, pendingQueue, table) {
         if (!serverRows) return localRows || [];
         const pendingIds = new Set(
@@ -209,9 +179,7 @@ export async function pullFromSupabase(uid, setData) {
             .map(q => q.data?.id)
             .filter(Boolean)
         );
-        // Start with server data
         const serverMap = new Map(serverRows.map(r => [r.id, r]));
-        // Overlay any pending local changes
         const localPending = (localRows || []).filter(r => pendingIds.has(r.id));
         localPending.forEach(r => serverMap.set(r.id, r));
         return Array.from(serverMap.values());
@@ -224,6 +192,7 @@ export async function pullFromSupabase(uid, setData) {
         quotes:    c.error ? prev.quotes    : merge(c.data, prev.quotes,    prev.syncQueue, "quotes"),
         notes:     d.error ? prev.notes     : merge(d.data, prev.notes,     prev.syncQueue, "notes"),
         equipment: e.error ? prev.equipment : merge(e.data, prev.equipment, prev.syncQueue, "equipment"),
+        contacts:  f.error ? prev.contacts  : merge(f.data, prev.contacts,  prev.syncQueue, "contacts"),
       };
     });
 
@@ -235,11 +204,8 @@ export async function pullFromSupabase(uid, setData) {
 }
 
 // ─── Real-time subscription setup ─────────────────────────────────────────────
-// Single multiplexed channel for all tables — more efficient than 5 separate channels
 export function setupRealtimeSync(uid, setData) {
-  const tables = ["clients", "followups", "quotes", "notes", "equipment"];
-
-  const channels = tables.map(table =>
+  const channels = SYNC_TABLES.map(table =>
     supabase
       .channel(`rt_${table}_${uid}`)
       .on("postgres_changes", {
@@ -252,10 +218,8 @@ export function setupRealtimeSync(uid, setData) {
           const current = prev[table] || [];
 
           if (payload.eventType === "INSERT") {
-            // Don't add if we already have it (our own optimistic insert)
             const exists = current.find(r => r.id === payload.new.id);
             if (exists) {
-              // Update sync_status to synced since server confirmed it
               return {
                 ...prev,
                 [table]: current.map(r => r.id === payload.new.id ? { ...r, sync_status: "synced" } : r),
@@ -266,10 +230,8 @@ export function setupRealtimeSync(uid, setData) {
           }
 
           if (payload.eventType === "UPDATE") {
-            // Only update if server version is newer than our pending version
-            const local = current.find(r => r.id === payload.new.id);
             const isPending = (prev.syncQueue || []).some(q => q.data?.id === payload.new.id && q.status === "pending");
-            if (isPending) return prev; // Don't overwrite our pending changes
+            if (isPending) return prev;
             return {
               ...prev,
               [table]: current.map(r => r.id === payload.new.id ? { ...payload.new, sync_status: "synced" } : r),
@@ -289,14 +251,10 @@ export function setupRealtimeSync(uid, setData) {
       .subscribe()
   );
 
-  // Return cleanup function
   return () => channels.forEach(ch => supabase.removeChannel(ch));
 }
 
-
 // ─── Immediate sync trigger ────────────────────────────────────────────────────
-// Call this after any save to attempt immediate push.
-// Screens can import and call this directly.
 let _globalSetData = null;
 let _globalGetQueue = null;
 
