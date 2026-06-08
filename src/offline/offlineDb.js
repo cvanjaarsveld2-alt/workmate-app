@@ -1,19 +1,14 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // offline/offlineDb.js
-// ───────────────────────────────────────────────────────────────────────────
 // IndexedDB wrapper for PowerMate offline storage.
-// Supports saving individual records AND reading all records per table.
-// This replaces whatever was here before — the old version had offlineGetAll
-// imported in App.jsx but never implemented properly.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const DB_NAME = "powermate_offline";
-const DB_VERSION = 2;
-const STORES = ["clients", "followups", "quotes", "notes", "equipment", "syncQueue"];
+const DB_VERSION = 3; // bumped for contacts store
+const STORES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "syncQueue"];
 
 let _db = null;
 
-// ─── Open / initialize the database ─────────────────────────────────────────
 function openDB() {
   if (_db) return Promise.resolve(_db);
 
@@ -41,7 +36,6 @@ function openDB() {
   });
 }
 
-// ─── Save a single record (upsert by id) ────────────────────────────────────
 export async function offlineSave(store, record) {
   if (!record || !record.id) return;
   try {
@@ -60,8 +54,6 @@ export async function offlineSave(store, record) {
   }
 }
 
-// ─── Get all records from a store ───────────────────────────────────────────
-// THIS IS THE FUNCTION THAT WAS MISSING — fixes the offline read bug
 export async function offlineGetAll(store) {
   try {
     const db = await openDB();
@@ -71,7 +63,7 @@ export async function offlineGetAll(store) {
       req.onsuccess = (e) => resolve(e.target.result || []);
       req.onerror = (e) => {
         console.warn(`[PowerMate offline] Read from ${store} failed:`, e.target.error);
-        resolve([]); // return empty rather than crash
+        resolve([]);
       };
     });
   } catch (e) {
@@ -80,7 +72,6 @@ export async function offlineGetAll(store) {
   }
 }
 
-// ─── Delete a single record ──────────────────────────────────────────────────
 export async function offlineDelete(store, id) {
   try {
     const db = await openDB();
@@ -88,14 +79,13 @@ export async function offlineDelete(store, id) {
       const tx = db.transaction(store, "readwrite");
       tx.objectStore(store).delete(id);
       tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve(); // fail silently
+      tx.onerror = () => resolve();
     });
   } catch (e) {
     console.warn(`[PowerMate offline] offlineDelete failed for ${store}:`, e);
   }
 }
 
-// ─── Clear all records from a store (used when syncing fresh data) ───────────
 export async function offlineClear(store) {
   try {
     const db = await openDB();
@@ -110,7 +100,6 @@ export async function offlineClear(store) {
   }
 }
 
-// ─── Get total record count (useful for monitoring) ──────────────────────────
 export async function offlineCount(store) {
   try {
     const db = await openDB();
