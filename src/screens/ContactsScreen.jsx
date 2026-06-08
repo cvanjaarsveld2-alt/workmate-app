@@ -1,0 +1,284 @@
+// ─── Contacts Screen ──────────────────────────────────────────────────────────
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Plus, X, Save, Edit2, Trash2, User, Building2, Phone, Mail,
+  MapPin, Calendar as CalendarIcon, ArrowUpRight,
+} from "lucide-react";
+import { BRAND } from "../lib/constants";
+import { todayISO, smartDate, genId } from "../lib/helpers";
+import { offlineSave } from "../offline/offlineDb";
+import { WhatsAppButton } from "../components/WhatsAppButton";
+import { EmailButton } from "../components/EmailButton";
+import { triggerImmediateSync } from "../lib/sync";
+import {
+  Card, Btn, Field, SearchBar, FilterPills,
+  Toast, Empty, PageHeader, useConfirm,
+} from "../components/ui";
+
+const STATUS_COLORS = {
+  lead:      { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
+  active:    { bg: "#DBEAFE", text: "#1E40AF", dot: "#3B82F6" },
+  converted: { bg: "#DCFCE7", text: "#166534", dot: "#16A34A" },
+  archived:  { bg: "#F1F5F9", text: "#64748B", dot: "#94A3B8" },
+};
+
+function StatusPill({ status }) {
+  const s = STATUS_COLORS[status || "lead"] || STATUS_COLORS.lead;
+  const label = status === "converted" ? "Converted" : status === "active" ? "Active" : status === "archived" ? "Archived" : "Lead";
+  return (
+    <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: s.bg, color: s.text }}>
+      {label}
+    </span>
+  );
+}
+
+export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
+  const [showForm, setShowForm]       = useState(false);
+  const [editId, setEditId]           = useState(null);
+  const [search, setSearch]           = useState("");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [toast, setToast]             = useState("");
+  const [form, setForm] = useState({
+    name: "", company: "", title: "", email: "", phone: "",
+    met_at: "", met_date: todayISO(), notes: "", status: "lead",
+  });
+  const { confirm, dialog } = useConfirm();
+  const contacts = data.contacts || [];
+
+  // Quick capture trigger
+  useEffect(() => {
+    if (!quickAddTrigger) return;
+    if (quickAddTrigger.screen !== "Contacts") return;
+    setEditId(null);
+    setShowForm(true);
+  }, [quickAddTrigger?.ts]);
+
+  function resetForm() {
+    setForm({
+      name: "", company: "", title: "", email: "", phone: "",
+      met_at: "", met_date: todayISO(), notes: "", status: "lead",
+    });
+    setEditId(null);
+    setShowForm(false);
+  }
+
+  function startEdit(c) {
+    setForm({
+      name:     c.name || "",
+      company:  c.company || "",
+      title:    c.title || "",
+      email:    c.email || "",
+      phone:    c.phone || "",
+      met_at:   c.met_at || "",
+      met_date: c.met_date || todayISO(),
+      notes:    c.notes || "",
+      status:   c.status || "lead",
+    });
+    setEditId(c.id);
+    setShowForm(true);
+  }
+
+  async function saveContact() {
+    if (!form.name.trim()) { setToast("Name is required"); return; }
+    const cleanForm = { ...form, met_date: form.met_date || null };
+
+    if (editId) {
+      const existing = contacts.find(c => c.id === editId);
+      const updated = {
+        ...existing,
+        ...cleanForm,
+        updated_at: new Date().toISOString(),
+        sync_status: "pending",
+      };
+      setData(d => ({
+        ...d,
+        contacts: (d.contacts || []).map(c => c.id === editId ? updated : c),
+        syncQueue: [{ id: genId(), table: "contacts", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+      }));
+      await offlineSave("contacts", updated);
+      setToast("Contact updated");
+      triggerImmediateSync();
+    } else {
+      const item = {
+        id: genId(),
+        user_id: userId,
+        ...cleanForm,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        sync_status: "pending",
+      };
+      setData(d => ({
+        ...d,
+        contacts: [item, ...(d.contacts || [])],
+        syncQueue: [{ id: genId(), table: "contacts", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+      }));
+      await offlineSave("contacts", item);
+      setToast("Contact added");
+      triggerImmediateSync();
+    }
+    resetForm();
+  }
+
+  async function deleteContact(id, name) {
+    const ok = await confirm(`Delete ${name}?`, { confirmLabel: "Delete" });
+    if (!ok) return;
+    setData(d => ({
+      ...d,
+      contacts: (d.contacts || []).filter(c => c.id !== id),
+      syncQueue: [{ id: genId(), table: "contacts", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    setToast("Contact deleted");
+    triggerImmediateSync();
+  }
+
+  // Search & filter
+  const filtered = contacts
+    .filter(c => filterStatus === "All" || (c.status || "lead") === filterStatus.toLowerCase())
+    .filter(c => !search || [c.name, c.company, c.title, c.email, c.phone, c.met_at, c.notes]
+      .some(f => f?.toLowerCase().includes(search.toLowerCase())))
+    .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+
+  // Group by company
+  const grouped = filtered.reduce((acc, c) => {
+    const k = c.company || "(No company)";
+    if (!acc[k]) acc[k] = [];
+    acc[k].push(c);
+    return acc;
+  }, {});
+
+  const leadCount = contacts.filter(c => (c.status || "lead") === "lead").length;
+  const convertedCount = contacts.filter(c => c.status === "converted").length;
+
+  return (
+    <div className="space-y-4">
+      {dialog}
+      <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+
+      <div className="flex items-center justify-between">
+        <PageHeader title="Contacts" subtitle={`${contacts.length} total · ${leadCount} leads`} />
+        <Btn size="sm" onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}>
+          {showForm ? <X size={15} /> : <Plus size={15} />}{showForm ? "Cancel" : "Add"}
+        </Btn>
+      </div>
+
+      <AnimatePresence>
+        {showForm && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+            <Card className="p-4 space-y-3">
+              <p className="text-base font-black text-slate-800">{editId ? "Edit Contact" : "New Contact"}</p>
+              <Field label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. John Smith" required />
+              <div className="grid grid-cols-1 gap-3">
+                <Field label="Company" value={form.company} onChange={v => setForm(f => ({ ...f, company: v }))} placeholder="e.g. ACME Mining" />
+                <Field label="Job Title" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Senior Engineer" />
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <Field label="Email" type="email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="email@company.com" />
+                <Field label="Phone" type="tel" value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} placeholder="+27 ..." />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Met At" value={form.met_at} onChange={v => setForm(f => ({ ...f, met_at: v }))} placeholder="e.g. Wampex 2026" />
+                <Field label="Met On" type="date" value={form.met_date} onChange={v => setForm(f => ({ ...f, met_date: v }))} />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-slate-500">Status</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {["lead", "active", "converted", "archived"].map(s => (
+                    <button key={s} type="button" onClick={() => setForm(f => ({ ...f, status: s }))}
+                      className="rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px] capitalize"
+                      style={form.status === s
+                        ? { background: STATUS_COLORS[s].bg, color: STATUS_COLORS[s].text, borderColor: STATUS_COLORS[s].dot }
+                        : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What you discussed, follow-ups, etc." multiline />
+              <div className="flex gap-2">
+                <Btn className="flex-1" onClick={saveContact}><Save size={15} />{editId ? "Update" : "Add Contact"}</Btn>
+                <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <SearchBar value={search} onChange={setSearch} placeholder="Search by name, company, email…" />
+      <FilterPills options={["All", "Lead", "Active", "Converted", "Archived"]} value={filterStatus} onChange={setFilterStatus} dangerValue={null} />
+
+      {Object.keys(grouped).length === 0 && (
+        <Empty title="No contacts yet" text="Add the people you meet at events and site visits — they'll be searchable here." icon={User} />
+      )}
+
+      <div className="space-y-3">
+        {Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([company, list]) => (
+          <Card key={company} className="overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-slate-100" style={{ background: "#F7F3F3" }}>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-black text-slate-900">{company}</p>
+                <span className="text-xs font-bold text-slate-500">{list.length} contact{list.length !== 1 ? "s" : ""}</span>
+              </div>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {list.map(c => (
+                <div key={c.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-base font-bold text-slate-900">{c.name}</p>
+                        <StatusPill status={c.status} />
+                      </div>
+                      {c.title && <p className="text-sm text-slate-500 mt-0.5">{c.title}</p>}
+
+                      <div className="flex flex-wrap gap-3 mt-1.5">
+                        {c.phone && (
+                          <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1 text-sm text-blue-600 font-medium" onClick={e => e.stopPropagation()}>
+                            <Phone size={12} />{c.phone}
+                          </a>
+                        )}
+                        {c.phone && (
+                          <span onClick={e => e.stopPropagation()}>
+                            <WhatsAppButton phone={c.phone} contactName={c.name} clientName={c.company} size="sm" />
+                          </span>
+                        )}
+                        {c.email && (
+                          <span onClick={e => e.stopPropagation()}>
+                            <EmailButton email={c.email} contactName={c.name} clientName={c.company} size="sm" />
+                          </span>
+                        )}
+                        {c.email && (
+                          <a href={`mailto:${c.email}`} className="inline-flex items-center gap-1 text-sm text-blue-600 truncate max-w-[180px]" onClick={e => e.stopPropagation()}>
+                            <Mail size={12} />{c.email}
+                          </a>
+                        )}
+                      </div>
+
+                      {(c.met_at || c.met_date) && (
+                        <p className="text-xs text-slate-400 mt-1.5 inline-flex items-center gap-1">
+                          <CalendarIcon size={11} />
+                          {c.met_at}{c.met_at && c.met_date ? " · " : ""}{c.met_date ? smartDate(c.met_date) : ""}
+                        </p>
+                      )}
+                      {c.notes && <p className="text-xs text-slate-500 mt-1.5 italic line-clamp-2">{c.notes}</p>}
+                      {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
+                    </div>
+
+                    <div className="flex flex-col gap-1 shrink-0">
+                      <button onClick={() => startEdit(c)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                        <Edit2 size={15} />
+                      </button>
+                      <button onClick={() => deleteContact(c.id, c.name)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
