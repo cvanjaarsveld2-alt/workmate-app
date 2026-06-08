@@ -1,49 +1,37 @@
 // ─── PowerMate App ────────────────────────────────────────────────────────────
-// Main application file — routing, auth, data management, sync
-// All UI components, screens, and business logic live in separate files
-// ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home, Users, Calendar, File as FileIcon,
-  Clipboard, Wrench, Settings,
+  Clipboard, Wrench, Settings, UserPlus,
 } from "lucide-react";
 
-// Supabase
 import { supabase } from "./supabase";
-
-// Hooks
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
-
-// Offline
 import { offlineSave, offlineGetAll } from "./offline/offlineDb";
 
-// Lib
-import { todayISO, logEvent, genId }                    from "./lib/helpers";
+import { todayISO, logEvent, genId } from "./lib/helpers";
 import { LOCAL_STORAGE_KEY, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY } from "./lib/constants";
 import { pushSyncQueue, pullFromSupabase, setupRealtimeSync, registerSyncHandlers, triggerImmediateSync } from "./lib/sync";
 import { requestNotificationPermission, scheduleNotificationsViaSW, buildNotificationItems } from "./lib/notifications";
 import { getPINHash, loadPINHash, isSessionUnlocked, resetPINAttempts } from "./lib/pinHelpers";
 
-// Auth & PIN
 import { AuthScreen }    from "./auth/AuthScreen";
 import { PINSetupScreen, PINLockScreen } from "./auth/PINScreens";
 
-// UI primitives
 import { NavTab, Spinner, DataLoadingScreen, Toast } from "./components/ui";
 import SyncStatusBadge from "./components/SyncStatusBadge";
 import { QuickCaptureFAB } from "./components/QuickCaptureFAB";
 
-// Screens
 import { HomeScreen }      from "./screens/HomeScreen";
 import { ClientsScreen }   from "./screens/ClientsScreen";
+import { ContactsScreen }  from "./screens/ContactsScreen";
 import { FollowupsScreen } from "./screens/FollowupsScreen";
 import { QuotesScreen }    from "./screens/QuotesScreen";
 import { NotesScreen }     from "./screens/NotesScreen";
 import { EquipmentScreen } from "./screens/EquipmentScreen";
 import { MoreScreen }      from "./screens/MoreScreen";
 
-// ─── Error Boundary ───────────────────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
   static getDerivedStateFromError() { return { hasError: true }; }
@@ -69,7 +57,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// ─── Main App ─────────────────────────────────────────────────────────────────
 export default function PowerWorksApp() {
   const isOnline = useOnlineStatus();
 
@@ -84,9 +71,8 @@ export default function PowerWorksApp() {
     "Notification" in window ? Notification.permission : "denied"
   );
   const [data, setData] = useState({
-    clients: [], followups: [], quotes: [], notes: [], equipment: [], syncQueue: [],
+    clients: [], followups: [], quotes: [], notes: [], equipment: [], contacts: [], syncQueue: [],
   });
-  // Quick-capture trigger: { screen: "Notes", ts: 1234 } — screens listen to ts changes to auto-open their add form
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
 
   // ── Auth ──
@@ -99,24 +85,22 @@ export default function PowerWorksApp() {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  // ── Register sync handlers so screens can trigger immediate sync ──
   useEffect(() => {
     registerSyncHandlers(setData, () => data.syncQueue);
   }, [data.syncQueue]);
 
-  // ── PIN — loads from localStorage or Supabase user metadata ──
   useEffect(() => {
     if (!session) return;
     async function checkPIN() {
       if (isSessionUnlocked()) { setPinState("unlocked"); return; }
-      const hash = await loadPINHash(); // checks local then Supabase
+      const hash = await loadPINHash();
       if (!hash) { setPinState("setup"); return; }
       setPinState("locked");
     }
     checkPIN();
   }, [session]);
 
-  // ── Load local data (IndexedDB + localStorage) ──
+  // ── Load local data (now includes contacts) ──
   useEffect(() => {
     async function loadLocalData() {
       try {
@@ -125,9 +109,9 @@ export default function PowerWorksApp() {
       } catch (e) { console.warn("localStorage load failed:", e); }
 
       try {
-        const tables  = ["clients", "followups", "quotes", "notes", "equipment"];
+        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts"];
         const results = await Promise.all(tables.map(t => offlineGetAll(t)));
-        const [clients, followups, quotes, notes, equipment] = results;
+        const [clients, followups, quotes, notes, equipment, contacts] = results;
         setData(d => ({
           ...d,
           ...(clients?.length   ? { clients }   : {}),
@@ -135,13 +119,13 @@ export default function PowerWorksApp() {
           ...(quotes?.length    ? { quotes }    : {}),
           ...(notes?.length     ? { notes }     : {}),
           ...(equipment?.length ? { equipment } : {}),
+          ...(contacts?.length  ? { contacts }  : {}),
         }));
       } catch (e) { console.warn("IndexedDB load failed:", e); }
     }
     loadLocalData();
   }, []);
 
-  // ── Save to localStorage (debounced 500ms) ──
   useEffect(() => {
     const t = setTimeout(() => {
       try {
@@ -153,15 +137,12 @@ export default function PowerWorksApp() {
             if (!q.data?.media) return q;
             return {
               ...q,
-              data: {
-                ...q.data,
-                media: q.data.media.map(m => ({ ...m, base64: undefined })),
-              },
+              data: { ...q.data, media: q.data.media.map(m => ({ ...m, base64: undefined })) },
             };
           }),
         };
         const serialized = JSON.stringify(safeData);
-        const sizeMB     = (serialized.length / 1024 / 1024).toFixed(1);
+        const sizeMB = (serialized.length / 1024 / 1024).toFixed(1);
         if (parseFloat(sizeMB) > 4) logEvent("localStorage_size_warning", { sizeMB });
         localStorage.setItem(LOCAL_STORAGE_KEY, serialized);
       } catch (e) {
@@ -172,7 +153,6 @@ export default function PowerWorksApp() {
     return () => clearTimeout(t);
   }, [data]);
 
-  // ── Auto-escalate overdue note urgency ──
   useEffect(() => {
     const today = todayISO();
     const notes = data.notes || [];
@@ -188,7 +168,6 @@ export default function PowerWorksApp() {
     if (changed) setData(d => ({ ...d, notes: escalated }));
   }, []); // eslint-disable-line
 
-  // ── Pull from Supabase + real-time subscriptions ──
   useEffect(() => {
     if (!session) return;
     if (!isOnline) { setDataLoading(false); return; }
@@ -211,7 +190,6 @@ export default function PowerWorksApp() {
     return cleanup;
   }, [session?.user?.id, isOnline]);
 
-  // ── Sync error listener ──
   useEffect(() => {
     function handleSyncFail(e) {
       setSyncError(`Sync failed: ${e.detail?.message || "Check your connection"}`);
@@ -221,13 +199,11 @@ export default function PowerWorksApp() {
     return () => window.removeEventListener("powermate:sync_failed", handleSyncFail);
   }, []);
 
-  // ── Schedule notifications ──
   useEffect(() => {
     if (notifPermission !== "granted") return;
     scheduleNotificationsViaSW(buildNotificationItems(data.followups, data.equipment, data.notes));
   }, [data.followups, data.equipment, notifPermission]);
 
-  // ── Auto-sync ──
   useEffect(() => {
     if (!isOnline || !session) return;
     const pending = (data.syncQueue || []).filter(i => i.status === "pending");
@@ -236,7 +212,6 @@ export default function PowerWorksApp() {
     return () => clearTimeout(t);
   }, [isOnline, session, data.syncQueue?.length]);
 
-  // ── Re-pull when coming back online ──
   const prevOnlineRef = React.useRef(isOnline);
   useEffect(() => {
     const wasOffline = !prevOnlineRef.current;
@@ -249,7 +224,6 @@ export default function PowerWorksApp() {
     }
   }, [isOnline]);
 
-  // ── Handlers ──
   async function handleSyncNow() { setSyncing(true); await pushSyncQueue(data.syncQueue, setData); setSyncing(false); }
 
   async function handleRequestNotif() {
@@ -274,19 +248,17 @@ export default function PowerWorksApp() {
     setSession(null);
   }
 
-  // ── Quick capture: navigate to screen and trigger its add form ──
   function handleQuickCapture(targetScreen) {
     setScreen(targetScreen);
     setQuickAddTrigger({ screen: targetScreen, ts: Date.now() });
   }
 
-  // ── Badge counts ──
-  const pendingCount    = (data.syncQueue || []).filter(i => i.status === "pending").length;
-  const flaggedQuotes   = (data.quotes    || []).filter(q => q.status === "Pending").length;
-  const overdueEquip    = (data.equipment || []).filter(e => { if (!e.service_due) return false; const d = Math.round((new Date(e.service_due + "T12:00:00") - new Date(todayISO() + "T12:00:00")) / 86400000); return d < 0; }).length;
+  const pendingCount     = (data.syncQueue || []).filter(i => i.status === "pending").length;
+  const flaggedQuotes    = (data.quotes    || []).filter(q => q.status === "Pending").length;
+  const overdueEquip     = (data.equipment || []).filter(e => { if (!e.service_due) return false; const d = Math.round((new Date(e.service_due + "T12:00:00") - new Date(todayISO() + "T12:00:00")) / 86400000); return d < 0; }).length;
   const overdueFollowups = (data.followups || []).filter(f => f.date < todayISO() && !f.completed).length;
+  const leadContacts     = (data.contacts  || []).filter(c => (c.status || "lead") === "lead").length;
 
-  // ── Early returns ──
   if (loading)              return <Spinner />;
   if (!session)             return <AuthScreen />;
   if (pinState === "checking") return <Spinner />;
@@ -294,25 +266,27 @@ export default function PowerWorksApp() {
   if (pinState === "locked")   return <PINLockScreen onUnlock={() => setPinState("unlocked")} onForgot={forgotPIN} />;
   if (dataLoading)             return <DataLoadingScreen />;
 
-  // ── Screens (now receive quickAddTrigger) ──
   const screens = {
     Home:      <HomeScreen      data={data} setScreen={setScreen} user={session.user} />,
     Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
+    Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} />,
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} />,
-    More:      <MoreScreen      data={data} onLogout={logout}  onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} />,
+    More:      <MoreScreen      data={data} onLogout={logout}  onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={setScreen} />,
   };
 
+  // ── Nav: Home, Clients, Contacts, Follow-ups, Notes, Equipment, More ──
+  // Quotes moved into More (accessible there) — per CRM design pattern
   const NAV = [
-    { icon: Home,      label: "Home",      key: "Home" },
-    { icon: Users,     label: "Clients",   key: "Clients" },
-    { icon: Calendar,  label: "Follow-ups",key: "Followups",  badge: overdueFollowups || undefined },
-    { icon: FileIcon,  label: "Quotes",    key: "Quotes",     badge: flaggedQuotes    || undefined },
-    { icon: Clipboard, label: "Notes",     key: "Notes" },
-    { icon: Wrench,    label: "Equipment", key: "Equipment",  badge: overdueEquip     || undefined },
-    { icon: Settings,  label: "More",      key: "More",       badge: pendingCount     || undefined },
+    { icon: Home,      label: "Home",       key: "Home" },
+    { icon: Users,     label: "Clients",    key: "Clients" },
+    { icon: UserPlus,  label: "Contacts",   key: "Contacts",   badge: leadContacts || undefined },
+    { icon: Calendar,  label: "Follow-ups", key: "Followups",  badge: overdueFollowups || undefined },
+    { icon: Clipboard, label: "Notes",      key: "Notes" },
+    { icon: Wrench,    label: "Equipment",  key: "Equipment",  badge: overdueEquip || undefined },
+    { icon: Settings,  label: "More",       key: "More",       badge: (pendingCount + flaggedQuotes) || undefined },
   ];
 
   return (
