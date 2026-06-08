@@ -1,13 +1,14 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
 import React from "react";
-import { RefreshCw, Shield, Bell, LogOut } from "lucide-react";
+import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
 import ReportExport from "../ReportExport";
 
-export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif }) {
+export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen }) {
   const { confirm, dialog } = useConfirm();
   const pendingCount = (data.syncQueue || []).filter(i => i.status === "pending").length;
+  const flaggedQuotes = (data.quotes || []).filter(q => q.status === "Pending").length;
 
   function changePIN() {
     localStorage.removeItem(PIN_KEY);
@@ -24,6 +25,24 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
     <div className="space-y-4">
       {dialog}
       <PageHeader title="Settings" subtitle="Sync, security & account" />
+
+      {/* Quotes shortcut (moved here from bottom nav) */}
+      {setScreen && (
+        <Card className="overflow-hidden">
+          <button onClick={() => setScreen("Quotes")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px]">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#DCFCE7", color: "#15803D" }}>
+              <FileIcon size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-bold text-slate-800">Quotes</p>
+              <p className="text-sm text-slate-400">
+                {(data.quotes || []).length} total{flaggedQuotes > 0 ? ` · ${flaggedQuotes} pending` : ""}
+              </p>
+            </div>
+            <ChevronRight size={16} className="text-slate-300 shrink-0" />
+          </button>
+        </Card>
+      )}
 
       {/* Sync */}
       <Card className="p-4 space-y-3">
@@ -47,7 +66,6 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
               <p className="text-xs text-amber-600 mt-0.5">{isOnline ? "Tap Sync Now or wait — syncs automatically" : "Will sync automatically when you reconnect"}</p>
               <button
                 onClick={() => {
-                  // Clear stuck sync items that have no chance of succeeding
                   const cleared = (data.syncQueue || []).filter(q => {
                     if (q.table === 'equipment' && q.data?.service_due === '') return false;
                     if (q.table === 'notes' && q.data?.resolve_by === '') return false;
@@ -71,7 +89,6 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         }
       </Card>
 
-      {/* Notifications */}
       <Card className="p-4 space-y-3">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Notifications</p>
         <div className="flex items-center justify-between gap-3">
@@ -90,7 +107,6 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         </div>
       </Card>
 
-      {/* Security */}
       <Card className="p-4 space-y-3">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Security</p>
         <div className="flex items-center justify-between">
@@ -102,11 +118,11 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         </div>
       </Card>
 
-      {/* Data summary */}
       <Card className="p-4">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Data Summary</p>
         {[
           { label: "Clients",    count: (data.clients   || []).length },
+          { label: "Contacts",   count: (data.contacts  || []).length },
           { label: "Follow-ups", count: (data.followups || []).length },
           { label: "Quotes",     count: (data.quotes    || []).length },
           { label: "Notes",      count: (data.notes     || []).length },
@@ -119,13 +135,12 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         ))}
       </Card>
 
-      {/* Report Export */}
       <ReportExport data={data} />
 
       <Btn variant="danger" className="w-full" size="lg" onClick={handleLogout}>
         <LogOut size={16} />Sign Out
       </Btn>
-      <p className="text-center text-xs text-slate-300">PowerMate v2.2 · Power Works (Pty) Ltd</p>
+      <p className="text-center text-xs text-slate-300">PowerMate v2.3 · Power Works (Pty) Ltd</p>
     </div>
   );
 }
