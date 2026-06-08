@@ -1,16 +1,13 @@
 // ─── Quick Capture FAB ────────────────────────────────────────────────────────
-// Floating action button that appears on data screens.
-// Tapping opens a sheet with context-aware quick-add options.
-// The primary action (matching the current screen) is prominently displayed.
-// ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Clipboard, Calendar, Users, File as FileIcon, Wrench } from "lucide-react";
+import { Plus, X, Clipboard, Calendar, Users, File as FileIcon, Wrench, UserPlus } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
 const OPTIONS = [
   { key: "Notes",     label: "Note",      icon: Clipboard, color: "#92400E", bg: "#FEF3C7" },
   { key: "Followups", label: "Follow-up", icon: Calendar,  color: "#0E7490", bg: "#CFFAFE" },
+  { key: "Contacts",  label: "Contact",   icon: UserPlus,  color: "#7C2D12", bg: "#FFE4D9" },
   { key: "Clients",   label: "Client",    icon: Users,     color: "#5B21B6", bg: "#EDE9FE" },
   { key: "Quotes",    label: "Quote",     icon: FileIcon,  color: "#15803D", bg: "#DCFCE7" },
   { key: "Equipment", label: "Equipment", icon: Wrench,    color: "#9F1239", bg: "#FFE4E6" },
@@ -33,7 +30,6 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
 
   return (
     <>
-      {/* Subtle FAB — smaller, softer shadow */}
       <motion.button
         initial={false}
         animate={{ rotate: open ? 45 : 0 }}
@@ -83,7 +79,6 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
                 <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Quick Add</p>
               </div>
 
-              {/* Primary action — slightly emphasized */}
               {primary && (
                 <button
                   onClick={() => handleSelect(primary.key)}
@@ -99,7 +94,6 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
                 </button>
               )}
 
-              {/* Secondary options */}
               <div className="divide-y divide-slate-50">
                 {secondary.map(opt => (
                   <button
