@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, X, Save, Edit2, Trash2, User, Building2, Phone, Mail,
-  MapPin, Calendar as CalendarIcon, ArrowUpRight,
+  Plus, X, Save, Edit2, Trash2, User, Phone, Mail,
+  Calendar as CalendarIcon, Camera, Sparkles,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
@@ -11,6 +11,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
+import { CardScanner } from "../components/CardScanner";
 import {
   Card, Btn, Field, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm,
@@ -35,10 +36,13 @@ function StatusPill({ status }) {
 
 export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
   const [showForm, setShowForm]       = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [editId, setEditId]           = useState(null);
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [toast, setToast]             = useState("");
+  const [cardPhotoUrl, setCardPhotoUrl] = useState(null);
+  const [scannedNotice, setScannedNotice] = useState(false);
   const [form, setForm] = useState({
     name: "", company: "", title: "", email: "", phone: "",
     met_at: "", met_date: todayISO(), notes: "", status: "lead",
@@ -46,7 +50,6 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
   const { confirm, dialog } = useConfirm();
   const contacts = data.contacts || [];
 
-  // Quick capture trigger
   useEffect(() => {
     if (!quickAddTrigger) return;
     if (quickAddTrigger.screen !== "Contacts") return;
@@ -61,6 +64,8 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
     });
     setEditId(null);
     setShowForm(false);
+    setCardPhotoUrl(null);
+    setScannedNotice(false);
   }
 
   function startEdit(c) {
@@ -75,13 +80,39 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
       notes:    c.notes || "",
       status:   c.status || "lead",
     });
+    setCardPhotoUrl(c.card_photo_url || null);
     setEditId(c.id);
     setShowForm(true);
+    setShowScanner(false);
+  }
+
+  // ── Called when scanner returns extracted data ──
+  function handleScanComplete(extracted) {
+    setForm({
+      name:     extracted.name    || "",
+      company:  extracted.company || "",
+      title:    extracted.title   || "",
+      email:    extracted.email   || "",
+      phone:    extracted.phone   || "",
+      met_at:   "",
+      met_date: todayISO(),
+      notes:    extracted.website ? `Website: ${extracted.website}` : "",
+      status:   "lead",
+    });
+    setCardPhotoUrl(extracted.card_photo_url);
+    setScannedNotice(true);
+    setShowScanner(false);
+    setShowForm(true);
+    setTimeout(() => setScannedNotice(false), 5000);
   }
 
   async function saveContact() {
     if (!form.name.trim()) { setToast("Name is required"); return; }
-    const cleanForm = { ...form, met_date: form.met_date || null };
+    const cleanForm = {
+      ...form,
+      met_date: form.met_date || null,
+      card_photo_url: cardPhotoUrl || null,
+    };
 
     if (editId) {
       const existing = contacts.find(c => c.id === editId);
@@ -132,14 +163,12 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
     triggerImmediateSync();
   }
 
-  // Search & filter
   const filtered = contacts
     .filter(c => filterStatus === "All" || (c.status || "lead") === filterStatus.toLowerCase())
     .filter(c => !search || [c.name, c.company, c.title, c.email, c.phone, c.met_at, c.notes]
       .some(f => f?.toLowerCase().includes(search.toLowerCase())))
     .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
 
-  // Group by company
   const grouped = filtered.reduce((acc, c) => {
     const k = c.company || "(No company)";
     if (!acc[k]) acc[k] = [];
@@ -148,25 +177,62 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
   }, {});
 
   const leadCount = contacts.filter(c => (c.status || "lead") === "lead").length;
-  const convertedCount = contacts.filter(c => c.status === "converted").length;
 
   return (
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <PageHeader title="Contacts" subtitle={`${contacts.length} total · ${leadCount} leads`} />
-        <Btn size="sm" onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}>
-          {showForm ? <X size={15} /> : <Plus size={15} />}{showForm ? "Cancel" : "Add"}
-        </Btn>
+        <div className="flex gap-2">
+          {!showForm && !showScanner && (
+            <Btn size="sm" variant="secondary" onClick={() => { setShowScanner(true); setEditId(null); }}>
+              <Camera size={14} /> Scan
+            </Btn>
+          )}
+          <Btn size="sm" onClick={() => {
+            if (showForm) resetForm();
+            else if (showScanner) setShowScanner(false);
+            else setShowForm(true);
+          }}>
+            {(showForm || showScanner) ? <X size={15} /> : <Plus size={15} />}
+            {(showForm || showScanner) ? "Cancel" : "Add"}
+          </Btn>
+        </div>
       </div>
 
+      {/* Scanner */}
+      <AnimatePresence>
+        {showScanner && (
+          <CardScanner
+            userId={userId}
+            onExtracted={handleScanComplete}
+            onCancel={() => setShowScanner(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Form */}
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
             <Card className="p-4 space-y-3">
-              <p className="text-base font-black text-slate-800">{editId ? "Edit Contact" : "New Contact"}</p>
+              <div className="flex items-center justify-between">
+                <p className="text-base font-black text-slate-800">{editId ? "Edit Contact" : "New Contact"}</p>
+                {scannedNotice && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
+                    <Sparkles size={12} /> AI extracted
+                  </span>
+                )}
+              </div>
+
+              {cardPhotoUrl && (
+                <div className="rounded-xl overflow-hidden border border-slate-200">
+                  <img src={cardPhotoUrl} alt="Business card" className="w-full max-h-48 object-contain bg-slate-50" />
+                </div>
+              )}
+
               <Field label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. John Smith" required />
               <div className="grid grid-cols-1 gap-3">
                 <Field label="Company" value={form.company} onChange={v => setForm(f => ({ ...f, company: v }))} placeholder="e.g. ACME Mining" />
@@ -228,6 +294,7 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-base font-bold text-slate-900">{c.name}</p>
                         <StatusPill status={c.status} />
+                        {c.card_photo_url && <Camera size={12} className="text-slate-400" />}
                       </div>
                       {c.title && <p className="text-sm text-slate-500 mt-0.5">{c.title}</p>}
 
