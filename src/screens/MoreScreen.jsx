@@ -4,6 +4,7 @@ import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight } from 
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
 import ReportExport from "../ReportExport";
+import { BackupExport } from "../components/BackupExport";
 
 export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen }) {
   const { confirm, dialog } = useConfirm();
@@ -26,7 +27,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
       {dialog}
       <PageHeader title="Settings" subtitle="Sync, security & account" />
 
-      {/* Quotes shortcut (moved here from bottom nav) */}
+      {/* Quotes shortcut */}
       {setScreen && (
         <Card className="overflow-hidden">
           <button onClick={() => setScreen("Quotes")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px]">
@@ -135,12 +136,16 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         ))}
       </Card>
 
+      {/* Backup */}
+      <BackupExport data={data} />
+
+      {/* Management Report (existing) */}
       <ReportExport data={data} />
 
       <Btn variant="danger" className="w-full" size="lg" onClick={handleLogout}>
         <LogOut size={16} />Sign Out
       </Btn>
-      <p className="text-center text-xs text-slate-300">PowerMate v2.3 · Power Works (Pty) Ltd</p>
+      <p className="text-center text-xs text-slate-300">PowerMate v2.4 · Power Works (Pty) Ltd</p>
     </div>
   );
 }
