@@ -14,7 +14,8 @@
     "@supabase/supabase-js": "^2.43.4",
     "exceljs": "^4.4.0",
     "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.0"
+    "jspdf-autotable": "^3.8.0",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "tailwindcss": "^3.4.17",
