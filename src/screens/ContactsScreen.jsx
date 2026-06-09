@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, User, Phone, Mail,
-  Calendar as CalendarIcon, Camera, Sparkles,
+  Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
@@ -49,6 +49,7 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
   });
   const { confirm, dialog } = useConfirm();
   const contacts = data.contacts || [];
+  const clients = data.clients || [];
 
   useEffect(() => {
     if (!quickAddTrigger) return;
@@ -86,7 +87,6 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
     setShowScanner(false);
   }
 
-  // ── Called when scanner returns extracted data ──
   function handleScanComplete(extracted) {
     setForm({
       name:     extracted.name    || "",
@@ -163,6 +163,82 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
     triggerImmediateSync();
   }
 
+  // ── Promote Contact to Client ──
+  async function promoteToClient(c) {
+    if (!c.company?.trim()) {
+      setToast("Add a company name first before promoting");
+      return;
+    }
+
+    // Check if a client with this company already exists
+    const existingClient = clients.find(cl => (cl.company || "").toLowerCase() === c.company.toLowerCase());
+
+    const message = existingClient
+      ? `A client called "${c.company}" already exists. This will mark ${c.name} as converted and link to that client. Continue?`
+      : `This will create a new client "${c.company}" and mark ${c.name} as converted. Continue?`;
+
+    const ok = await confirm(message, { confirmLabel: "Promote" });
+    if (!ok) return;
+
+    let clientId;
+    let clientItem = null;
+
+    if (existingClient) {
+      clientId = existingClient.id;
+    } else {
+      // Create new client from contact data
+      clientId = genId();
+      clientItem = {
+        id: clientId,
+        user_id: userId,
+        company:  c.company,
+        branch:   "",
+        contact:  c.name,
+        phone:    c.phone || "",
+        email:    c.email || "",
+        stage:    "New Lead",
+        notes:    [c.notes, c.met_at ? `Originally met at ${c.met_at}${c.met_date ? ` on ${smartDate(c.met_date)}` : ""}` : ""].filter(Boolean).join("\n\n"),
+        source:   "Contact promotion",
+        created_at: new Date().toISOString(),
+        sync_status: "pending",
+      };
+    }
+
+    // Update the contact: mark converted + link to client
+    const updatedContact = {
+      ...c,
+      status: "converted",
+      client_id: clientId,
+      updated_at: new Date().toISOString(),
+      sync_status: "pending",
+    };
+
+    setData(d => {
+      const updates = {
+        ...d,
+        contacts: (d.contacts || []).map(x => x.id === c.id ? updatedContact : x),
+        syncQueue: [
+          { id: genId(), table: "contacts", action: "update", data: updatedContact, status: "pending", created_at: new Date().toISOString() },
+          ...(d.syncQueue || []),
+        ],
+      };
+      if (clientItem) {
+        updates.clients = [clientItem, ...(d.clients || [])];
+        updates.syncQueue = [
+          { id: genId(), table: "clients", action: "insert", data: clientItem, status: "pending", created_at: new Date().toISOString() },
+          ...updates.syncQueue,
+        ];
+      }
+      return updates;
+    });
+
+    await offlineSave("contacts", updatedContact);
+    if (clientItem) await offlineSave("clients", clientItem);
+
+    setToast(existingClient ? `Linked to existing client ✓` : `Promoted to Client ✓`);
+    triggerImmediateSync();
+  }
+
   const filtered = contacts
     .filter(c => filterStatus === "All" || (c.status || "lead") === filterStatus.toLowerCase())
     .filter(c => !search || [c.name, c.company, c.title, c.email, c.phone, c.met_at, c.notes]
@@ -202,7 +278,6 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
         </div>
       </div>
 
-      {/* Scanner */}
       <AnimatePresence>
         {showScanner && (
           <CardScanner
@@ -213,7 +288,6 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
         )}
       </AnimatePresence>
 
-      {/* Form */}
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
@@ -287,61 +361,74 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
               </div>
             </div>
             <div className="divide-y divide-slate-50">
-              {list.map(c => (
-                <div key={c.id} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-base font-bold text-slate-900">{c.name}</p>
-                        <StatusPill status={c.status} />
-                        {c.card_photo_url && <Camera size={12} className="text-slate-400" />}
-                      </div>
-                      {c.title && <p className="text-sm text-slate-500 mt-0.5">{c.title}</p>}
+              {list.map(c => {
+                const canPromote = (c.status === "lead" || c.status === "active") && c.company?.trim();
+                return (
+                  <div key={c.id} className="px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-base font-bold text-slate-900">{c.name}</p>
+                          <StatusPill status={c.status} />
+                          {c.card_photo_url && <Camera size={12} className="text-slate-400" />}
+                        </div>
+                        {c.title && <p className="text-sm text-slate-500 mt-0.5">{c.title}</p>}
 
-                      <div className="flex flex-wrap gap-3 mt-1.5">
-                        {c.phone && (
-                          <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1 text-sm text-blue-600 font-medium" onClick={e => e.stopPropagation()}>
-                            <Phone size={12} />{c.phone}
-                          </a>
+                        <div className="flex flex-wrap gap-3 mt-1.5">
+                          {c.phone && (
+                            <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1 text-sm text-blue-600 font-medium" onClick={e => e.stopPropagation()}>
+                              <Phone size={12} />{c.phone}
+                            </a>
+                          )}
+                          {c.phone && (
+                            <span onClick={e => e.stopPropagation()}>
+                              <WhatsAppButton phone={c.phone} contactName={c.name} clientName={c.company} size="sm" />
+                            </span>
+                          )}
+                          {c.email && (
+                            <span onClick={e => e.stopPropagation()}>
+                              <EmailButton email={c.email} contactName={c.name} clientName={c.company} size="sm" />
+                            </span>
+                          )}
+                          {c.email && (
+                            <a href={`mailto:${c.email}`} className="inline-flex items-center gap-1 text-sm text-blue-600 truncate max-w-[180px]" onClick={e => e.stopPropagation()}>
+                              <Mail size={12} />{c.email}
+                            </a>
+                          )}
+                        </div>
+
+                        {(c.met_at || c.met_date) && (
+                          <p className="text-xs text-slate-400 mt-1.5 inline-flex items-center gap-1">
+                            <CalendarIcon size={11} />
+                            {c.met_at}{c.met_at && c.met_date ? " · " : ""}{c.met_date ? smartDate(c.met_date) : ""}
+                          </p>
                         )}
-                        {c.phone && (
-                          <span onClick={e => e.stopPropagation()}>
-                            <WhatsAppButton phone={c.phone} contactName={c.name} clientName={c.company} size="sm" />
-                          </span>
-                        )}
-                        {c.email && (
-                          <span onClick={e => e.stopPropagation()}>
-                            <EmailButton email={c.email} contactName={c.name} clientName={c.company} size="sm" />
-                          </span>
-                        )}
-                        {c.email && (
-                          <a href={`mailto:${c.email}`} className="inline-flex items-center gap-1 text-sm text-blue-600 truncate max-w-[180px]" onClick={e => e.stopPropagation()}>
-                            <Mail size={12} />{c.email}
-                          </a>
-                        )}
+                        {c.notes && <p className="text-xs text-slate-500 mt-1.5 italic line-clamp-2">{c.notes}</p>}
+                        {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
                       </div>
 
-                      {(c.met_at || c.met_date) && (
-                        <p className="text-xs text-slate-400 mt-1.5 inline-flex items-center gap-1">
-                          <CalendarIcon size={11} />
-                          {c.met_at}{c.met_at && c.met_date ? " · " : ""}{c.met_date ? smartDate(c.met_date) : ""}
-                        </p>
-                      )}
-                      {c.notes && <p className="text-xs text-slate-500 mt-1.5 italic line-clamp-2">{c.notes}</p>}
-                      {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <button onClick={() => startEdit(c)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                          <Edit2 size={15} />
+                        </button>
+                        <button onClick={() => deleteContact(c.id, c.name)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-1 shrink-0">
-                      <button onClick={() => startEdit(c)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
-                        <Edit2 size={15} />
-                      </button>
-                      <button onClick={() => deleteContact(c.id, c.name)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
+                    {canPromote && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <button
+                          onClick={() => promoteToClient(c)}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold border-2 border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-colors min-h-[44px]">
+                          <ArrowUpRight size={14} /> Promote to Client
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         ))}
