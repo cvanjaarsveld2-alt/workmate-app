@@ -6,10 +6,8 @@ import { supabase } from "../supabase";
 import { logEvent } from "./helpers";
 import { offlineSave } from "../offline/offlineDb";
 
-// All tables that sync — extend here if you add new ones
 const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts"];
 
-// ─── Single item push ─────────────────────────────────────────────────────────
 export async function pushItem(item) {
   try {
     const table   = item.table;
@@ -41,7 +39,6 @@ export async function pushItem(item) {
   }
 }
 
-// ─── Immediate write + push ───────────────────────────────────────────────────
 export async function saveAndSync(item, table, action, setData, isOnline) {
   await offlineSave(table, item);
 
@@ -80,7 +77,6 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
   return { ...item, sync_status: "pending" };
 }
 
-// ─── Full queue flush ─────────────────────────────────────────────────────────
 let _syncInProgress = false;
 
 export async function pushSyncQueue(syncQueue, setData) {
@@ -158,14 +154,13 @@ export async function pushSyncQueue(syncQueue, setData) {
   }
 }
 
-// ─── Pull fresh data from Supabase ────────────────────────────────────────────
 export async function pullFromSupabase(uid, setData) {
   try {
     const [a, b, c, d, e, f] = await Promise.all([
       supabase.from("clients").select("id,user_id,company,division,contact,phone,email,location,branch,stage,pipeline_status,sync_status,auto_created,source,notes,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("followups").select("id,user_id,client_id,client,branch,title,date,time,reminder,notes,completed,sync_status,auto_generated,created_at").eq("user_id", uid).order("date", { ascending: false }).limit(500),
       supabase.from("quotes").select("id,user_id,client_name,description,value,status,sent_date,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-      supabase.from("notes").select("id,user_id,client,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
+      supabase.from("notes").select("id,user_id,client,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("contacts").select("id,user_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
     ]);
@@ -203,7 +198,6 @@ export async function pullFromSupabase(uid, setData) {
   }
 }
 
-// ─── Real-time subscription setup ─────────────────────────────────────────────
 export function setupRealtimeSync(uid, setData) {
   const channels = SYNC_TABLES.map(table =>
     supabase
@@ -254,7 +248,6 @@ export function setupRealtimeSync(uid, setData) {
   return () => channels.forEach(ch => supabase.removeChannel(ch));
 }
 
-// ─── Immediate sync trigger ────────────────────────────────────────────────────
 let _globalSetData = null;
 let _globalGetQueue = null;
 
