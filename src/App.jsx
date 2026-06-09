@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home, Users, Calendar, File as FileIcon,
-  Clipboard, Wrench, Settings, UserPlus,
+  Clipboard, Wrench, Settings, UserPlus, Search,
 } from "lucide-react";
 
 import { supabase } from "./supabase";
@@ -22,6 +22,7 @@ import { PINSetupScreen, PINLockScreen } from "./auth/PINScreens";
 import { NavTab, Spinner, DataLoadingScreen, Toast } from "./components/ui";
 import SyncStatusBadge from "./components/SyncStatusBadge";
 import { QuickCaptureFAB } from "./components/QuickCaptureFAB";
+import { GlobalSearch } from "./components/GlobalSearch";
 
 import { HomeScreen }      from "./screens/HomeScreen";
 import { ClientsScreen }   from "./screens/ClientsScreen";
@@ -67,6 +68,7 @@ export default function PowerWorksApp() {
   const [pinState,   setPinState]   = useState("checking");
   const [dataLoading, setDataLoading] = useState(true);
   const [syncError,  setSyncError]  = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [notifPermission, setNotifPermission] = useState(
     "Notification" in window ? Notification.permission : "denied"
   );
@@ -75,7 +77,6 @@ export default function PowerWorksApp() {
   });
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
 
-  // ── Auth ──
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -100,7 +101,6 @@ export default function PowerWorksApp() {
     checkPIN();
   }, [session]);
 
-  // ── Load local data (now includes contacts) ──
   useEffect(() => {
     async function loadLocalData() {
       try {
@@ -224,6 +224,19 @@ export default function PowerWorksApp() {
     }
   }, [isOnline]);
 
+  // ── Keyboard shortcut for search (desktop) ──
+  useEffect(() => {
+    function handleKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      if (e.key === "Escape" && searchOpen) setSearchOpen(false);
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [searchOpen]);
+
   async function handleSyncNow() { setSyncing(true); await pushSyncQueue(data.syncQueue, setData); setSyncing(false); }
 
   async function handleRequestNotif() {
@@ -277,8 +290,6 @@ export default function PowerWorksApp() {
     More:      <MoreScreen      data={data} onLogout={logout}  onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={setScreen} />,
   };
 
-  // ── Nav: Home, Clients, Contacts, Follow-ups, Notes, Equipment, More ──
-  // Quotes moved into More (accessible there) — per CRM design pattern
   const NAV = [
     { icon: Home,      label: "Home",       key: "Home" },
     { icon: Users,     label: "Clients",    key: "Clients" },
@@ -292,6 +303,15 @@ export default function PowerWorksApp() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen pb-28" style={{ background: "#F7F3F3" }}>
+
+        {/* Floating Search button (top-right) */}
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="fixed z-30 top-3 right-4 w-10 h-10 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:shadow-lg transition-all active:scale-95"
+          aria-label="Search">
+          <Search size={18} />
+        </button>
+
         <main className="mx-auto max-w-2xl px-4 pt-4">
           <AnimatePresence mode="wait">
             <motion.div key={screen} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
@@ -311,6 +331,13 @@ export default function PowerWorksApp() {
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
 
         <QuickCaptureFAB currentScreen={screen} onTrigger={handleQuickCapture} />
+
+        <GlobalSearch
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          data={data}
+          onNavigate={setScreen}
+        />
 
         <AnimatePresence>
           {syncError && <Toast message={syncError} type="error" onDone={() => setSyncError("")} />}
