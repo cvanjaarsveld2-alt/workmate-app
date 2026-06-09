@@ -1,9 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // NotesExport.jsx
 // ───────────────────────────────────────────────────────────────────────────
-// Export selected field notes to PDF (detailed report) or Excel (strategy
-// workbook with filters, conditional formatting, hyperlinked photos).
-// Designed for client deliverables and internal strategy sessions.
+// Export selected field notes to PDF or Excel including linked contacts.
 // ═══════════════════════════════════════════════════════════════════════════
 
 import jsPDF from "jspdf";
@@ -24,7 +22,6 @@ const URGENCY_COLORS = {
   Normal:   { hex: "F8FAFC", text: "475569" },
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 function smartDate(ds) {
@@ -44,7 +41,18 @@ function autoFilename(prefix, count, customName) {
   return base;
 }
 
-// Convert a Supabase image URL to base64 data URL for embedding
+function getLinkedContacts(note, allContacts) {
+  if (!note.linked_contact_ids || note.linked_contact_ids.length === 0) return [];
+  return note.linked_contact_ids
+    .map(id => allContacts.find(c => c.id === id))
+    .filter(Boolean);
+}
+
+function formatLinkedContacts(linked) {
+  if (linked.length === 0) return "";
+  return linked.map(c => `${c.name}${c.company ? ` (${c.company})` : ""}`).join(", ");
+}
+
 async function imageUrlToBase64(url) {
   try {
     const res = await fetch(url, { mode: "cors" });
@@ -62,7 +70,6 @@ async function imageUrlToBase64(url) {
   }
 }
 
-// Get image dimensions from a data URL (returns {w, h})
 function getImageDims(dataUrl) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -74,7 +81,7 @@ function getImageDims(dataUrl) {
 
 // ─── PDF Export ──────────────────────────────────────────────────────────────
 export async function exportNotesPDF(selectedNotes, options = {}) {
-  const { customName = null, onProgress = () => {} } = options;
+  const { customName = null, onProgress = () => {}, contacts = [] } = options;
 
   if (!selectedNotes || selectedNotes.length === 0) {
     throw new Error("No notes selected");
@@ -88,7 +95,7 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
   const margin     = 15;
   const contentW   = pageWidth - margin * 2;
 
-  // ── Cover page ──
+  // Cover page
   doc.setFillColor(BRAND.primary);
   doc.rect(0, 0, pageWidth, 50, "F");
   doc.setTextColor(255, 255, 255);
@@ -111,7 +118,6 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
   doc.text(`Critical: ${critical}   Urgent: ${urgent}   Resolved: ${resolved}`, margin, y);
   y += 14;
 
-  // Summary table on cover
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text("Summary by Client", margin, y); y += 4;
@@ -139,14 +145,12 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
 
   onProgress({ step: "cover", percent: 15 });
 
-  // ── Per-note pages ──
   const totalNotes = selectedNotes.length;
   for (let i = 0; i < totalNotes; i++) {
     const n = selectedNotes[i];
     doc.addPage();
     let cursorY = margin;
 
-    // Header bar with urgency color
     const urgColor = n.urgency === "Critical" ? [220, 38, 38]
                    : n.urgency === "Urgent"   ? [234, 88, 12]
                    : [100, 116, 139];
@@ -161,13 +165,11 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
     cursorY = 22;
     doc.setTextColor(BRAND.text);
 
-    // Client name
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
     doc.text(n.client || "General Note", margin, cursorY);
     cursorY += 8;
 
-    // Meta line
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 130);
@@ -183,7 +185,27 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
     }
     cursorY += 8;
 
-    // Note body
+    // Linked contacts (NEW)
+    const linked = getLinkedContacts(n, contacts);
+    if (linked.length > 0) {
+      doc.setFillColor(255, 228, 217);
+      doc.setDrawColor(248, 213, 196);
+      doc.roundedRect(margin, cursorY - 4, contentW, linked.length * 5 + 8, 2, 2, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(124, 45, 18);
+      doc.text(`Linked Contacts (${linked.length})`, margin + 3, cursorY);
+      cursorY += 5;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      linked.forEach(c => {
+        const line = `• ${c.name}${c.company ? ` — ${c.company}` : ""}${c.title ? `, ${c.title}` : ""}`;
+        doc.text(line, margin + 3, cursorY);
+        cursorY += 4;
+      });
+      cursorY += 6;
+    }
+
     doc.setTextColor(BRAND.text);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(11);
@@ -191,7 +213,6 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
     doc.text(noteLines, margin, cursorY);
     cursorY += noteLines.length * 5.5 + 6;
 
-    // Photos
     const photos = (n.media || []).filter(m => m.url && m.type !== "video");
     const videos = (n.media || []).filter(m => m.url && m.type === "video");
 
@@ -202,7 +223,6 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
       doc.text(`Photos (${photos.length})`, margin, cursorY);
       cursorY += 5;
 
-      // Layout photos 2 per row, ~80mm wide
       const photoW = 85;
       const photoMaxH = 60;
       const gap = 5;
@@ -211,7 +231,6 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
       for (const photo of photos) {
         const dataUrl = await imageUrlToBase64(photo.url);
         if (!dataUrl) {
-          // Show URL as fallback link
           doc.setFont("helvetica", "italic");
           doc.setFontSize(8);
           doc.setTextColor(0, 100, 200);
@@ -220,7 +239,6 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
           continue;
         }
 
-        // Get dimensions to preserve aspect ratio
         const dims = await getImageDims(dataUrl);
         const ratio = dims.w / dims.h;
         let renderW = photoW;
@@ -232,7 +250,6 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
 
         const x = margin + col * (photoW + gap);
 
-        // Page-break check
         if (cursorY + renderH > pageHeight - 15) {
           doc.addPage();
           cursorY = margin;
@@ -250,7 +267,7 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
           cursorY += renderH + gap;
         }
       }
-      if (col > 0) cursorY += 65; // close out partial row
+      if (col > 0) cursorY += 65;
       cursorY += 4;
     }
 
@@ -270,7 +287,6 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
       });
     }
 
-    // Footer
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(180, 180, 190);
@@ -288,7 +304,7 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
 
 // ─── Excel Export ────────────────────────────────────────────────────────────
 export async function exportNotesExcel(selectedNotes, options = {}) {
-  const { customName = null, onProgress = () => {} } = options;
+  const { customName = null, onProgress = () => {}, contacts = [] } = options;
 
   if (!selectedNotes || selectedNotes.length === 0) {
     throw new Error("No notes selected");
@@ -302,26 +318,24 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
   wb.created = new Date();
   wb.modified = new Date();
 
-  // ── Sheet 1: Notes (the strategy session sheet) ──
   const ws = wb.addWorksheet("Field Notes", {
     properties: { defaultColWidth: 18 },
     views: [{ state: "frozen", ySplit: 1 }],
   });
 
-  // Define columns
   ws.columns = [
-    { header: "Client",        key: "client",     width: 22 },
-    { header: "Urgency",       key: "urgency",    width: 12 },
-    { header: "Status",        key: "status",     width: 12 },
-    { header: "Created",       key: "created",    width: 18 },
-    { header: "Resolve By",    key: "resolve_by", width: 14 },
-    { header: "Note",          key: "note",       width: 60 },
-    { header: "Photos",        key: "photos",     width: 14 },
-    { header: "Videos",        key: "videos",     width: 14 },
-    { header: "Photo Links",   key: "photo_urls", width: 50 },
+    { header: "Client",            key: "client",     width: 22 },
+    { header: "Urgency",           key: "urgency",    width: 12 },
+    { header: "Status",            key: "status",     width: 12 },
+    { header: "Created",           key: "created",    width: 18 },
+    { header: "Resolve By",        key: "resolve_by", width: 14 },
+    { header: "Note",              key: "note",       width: 60 },
+    { header: "Linked Contacts",   key: "linked",     width: 35 },
+    { header: "Photos",            key: "photos",     width: 10 },
+    { header: "Videos",            key: "videos",     width: 10 },
+    { header: "Photo Links",       key: "photo_urls", width: 50 },
   ];
 
-  // Header row styling
   const header = ws.getRow(1);
   header.height = 22;
   header.eachCell((cell) => {
@@ -331,7 +345,6 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
     cell.border    = { bottom: { style: "thin", color: { argb: "FF000000" } } };
   });
 
-  // Sort: critical first, then urgent, then by date desc
   const urgencyRank = { Critical: 0, Urgent: 1, Normal: 2 };
   const sorted = [...selectedNotes].sort((a, b) => {
     if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
@@ -341,10 +354,10 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
     return (b.created_at || "").localeCompare(a.created_at || "");
   });
 
-  // Add rows
   sorted.forEach((n) => {
     const photos = (n.media || []).filter(m => m.url && m.type !== "video");
     const videos = (n.media || []).filter(m => m.url && m.type === "video");
+    const linked = getLinkedContacts(n, contacts);
 
     const row = ws.addRow({
       client:     n.client || "General",
@@ -353,29 +366,26 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
       created:    n.created_at ? new Date(n.created_at) : null,
       resolve_by: n.resolve_by ? new Date(n.resolve_by + "T12:00:00") : null,
       note:       n.note || "",
+      linked:     formatLinkedContacts(linked),
       photos:     photos.length,
       videos:     videos.length,
       photo_urls: photos.map((p, i) => `Photo ${i + 1}: ${p.url}`).join(" | "),
     });
 
-    // Style based on urgency
     const urg = URGENCY_COLORS[n.urgency || "Normal"] || URGENCY_COLORS.Normal;
 
-    row.height = 32;
+    row.height = 36;
     row.alignment = { vertical: "top", wrapText: true };
 
-    // Urgency cell highlight
     const urgencyCell = row.getCell("urgency");
     urgencyCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + urg.hex } };
     urgencyCell.font = { bold: true, color: { argb: "FF" + urg.text } };
     urgencyCell.alignment = { vertical: "middle", horizontal: "center" };
 
-    // Status cell (resolved = green, open = neutral)
     const statusCell = row.getCell("status");
     if (n.resolved) {
       statusCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7F8EC" } };
       statusCell.font = { color: { argb: "FF166534" } };
-      // Strikethrough on the note text if resolved
       row.getCell("note").font = { color: { argb: "FF94A3B8" }, italic: true, strike: true };
     } else {
       statusCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
@@ -383,20 +393,22 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
     }
     statusCell.alignment = { vertical: "middle", horizontal: "center" };
 
-    // Date formatting
     row.getCell("created").numFmt = "dd-mmm-yyyy hh:mm";
     row.getCell("resolve_by").numFmt = "dd-mmm-yyyy";
 
-    // Photo count cell
+    if (linked.length > 0) {
+      const linkedCell = row.getCell("linked");
+      linkedCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFE4D9" } };
+      linkedCell.font = { color: { argb: "FF7C2D12" }, size: 10 };
+    }
+
     const photoCell = row.getCell("photos");
     photoCell.alignment = { vertical: "middle", horizontal: "center" };
     if (photos.length > 0) photoCell.font = { bold: true };
 
-    // Make photo_urls a multi-line cell
     row.getCell("photo_urls").alignment = { vertical: "top", wrapText: true };
     row.getCell("photo_urls").font = { size: 9, color: { argb: "FF0E7490" } };
 
-    // Borders on every cell
     row.eachCell((cell) => {
       cell.border = {
         top:    { style: "hair", color: { argb: "FFE2E8F0" } },
@@ -407,7 +419,6 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
     });
   });
 
-  // Enable autofilter on header row
   ws.autoFilter = {
     from: { row: 1, column: 1 },
     to:   { row: 1, column: ws.columns.length },
@@ -415,10 +426,8 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
 
   onProgress({ step: "data", percent: 50 });
 
-  // ── Sheet 2: Summary ──
-  const sum = wb.addWorksheet("Summary", {
-    properties: { defaultColWidth: 20 },
-  });
+  // Summary sheet
+  const sum = wb.addWorksheet("Summary", { properties: { defaultColWidth: 20 } });
 
   sum.mergeCells("A1:D1");
   const titleCell = sum.getCell("A1");
@@ -455,11 +464,18 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
   sum.getCell("B8").value = selectedNotes.filter(n => n.resolved).length;
   sum.getCell("B8").font = { color: { argb: "FF166534" } };
 
-  // By-client breakdown
-  sum.getCell("A10").value = "By Client";
-  sum.getCell("A10").font = { bold: true, size: 12 };
+  // New: contacts mentioned
+  const allLinkedIds = new Set();
+  selectedNotes.forEach(n => (n.linked_contact_ids || []).forEach(id => allLinkedIds.add(id)));
+  sum.getCell("A9").value = "Contacts referenced";
+  sum.getCell("A9").font = { bold: true };
+  sum.getCell("B9").value = allLinkedIds.size;
+  sum.getCell("B9").font = { color: { argb: "FF7C2D12" }, bold: true };
 
-  const headerRow = sum.getRow(11);
+  sum.getCell("A11").value = "By Client";
+  sum.getCell("A11").font = { bold: true, size: 12 };
+
+  const headerRow = sum.getRow(12);
   headerRow.values = [null, "Client", "Total", "Critical", "Unresolved"];
   headerRow.eachCell((cell) => {
     cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -475,7 +491,7 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
     if (!n.resolved) byClientMap[k].unresolved++;
   });
 
-  let rowIdx = 12;
+  let rowIdx = 13;
   Object.entries(byClientMap).sort((a, b) => b[1].total - a[1].total).forEach(([client, stats]) => {
     sum.getRow(rowIdx).values = [null, client, stats.total, stats.critical, stats.unresolved];
     rowIdx++;
@@ -483,7 +499,6 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
 
   onProgress({ step: "summary", percent: 80 });
 
-  // ── Save ──
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const url = URL.createObjectURL(blob);
