@@ -153,20 +153,49 @@ export default function PowerWorksApp() {
     return () => clearTimeout(t);
   }, [data]);
 
+  // ── FIXED: urgency escalation for overdue notes ──
+  // Previously this ran on mount (before data had loaded, so it saw an empty
+  // list) and never queued the escalated notes for sync — they showed
+  // "Not synced" forever and other devices never saw the new urgency.
+  // Now it runs once data is loaded, queues sync entries, persists offline,
+  // and pushes immediately.
   useEffect(() => {
+    if (dataLoading) return;
     const today = todayISO();
     const notes = data.notes || [];
-    let changed = false;
-    const escalated = notes.map(n => {
-      if (n.resolved || !n.resolve_by || n.resolve_by >= today) return n;
-      if (n.last_escalated === n.resolve_by) return n;
-      const next = URGENCY_ESCALATION[n.urgency || "Normal"];
-      if (next === (n.urgency || "Normal")) return { ...n, last_escalated: n.resolve_by };
-      changed = true;
-      return { ...n, urgency: next, last_escalated: n.resolve_by, sync_status: "pending" };
-    });
-    if (changed) setData(d => ({ ...d, notes: escalated }));
-  }, []); // eslint-disable-line
+    const toEscalate = notes.filter(n =>
+      !n.resolved &&
+      n.resolve_by &&
+      n.resolve_by < today &&
+      n.last_escalated !== n.resolve_by &&
+      URGENCY_ESCALATION[n.urgency || "Normal"] !== (n.urgency || "Normal")
+    );
+    if (toEscalate.length === 0) return;
+
+    const now = new Date().toISOString();
+    const updates = toEscalate.map(n => ({
+      ...n,
+      urgency: URGENCY_ESCALATION[n.urgency || "Normal"],
+      last_escalated: n.resolve_by,
+      sync_status: "pending",
+    }));
+    const queueItems = updates.map(u => ({
+      id: genId(),
+      table: "notes",
+      action: "update",
+      data: { ...u, media: (u.media || []).map(m => ({ ...m, base64: undefined })) },
+      status: "pending",
+      created_at: now,
+    }));
+
+    setData(d => ({
+      ...d,
+      notes: (d.notes || []).map(n => updates.find(u => u.id === n.id) || n),
+      syncQueue: [...queueItems, ...(d.syncQueue || [])],
+    }));
+    updates.forEach(u => offlineSave("notes", u));
+    triggerImmediateSync();
+  }, [dataLoading]); // eslint-disable-line
 
   useEffect(() => {
     if (!session) return;
