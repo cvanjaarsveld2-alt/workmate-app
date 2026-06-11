@@ -3,9 +3,9 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, Check,
-  ChevronDown, ChevronUp, Phone,
+  ChevronDown, ChevronUp, Phone, Clipboard,
 } from "lucide-react";
-import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS } from "../lib/constants";
+import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS, NOTE_URGENCY } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
@@ -18,6 +18,29 @@ import {
 
 const STAGE_PRIORITY = { Active: 0, Quoted: 1, Contacted: 2, "New Lead": 3, Won: 4, Lost: 5 };
 
+// ─── Expandable text (used for long client notes) ─────────────────────────────
+function ExpandableText({ text, limit = 100, className = "" }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!text) return null;
+  const isLong = text.length > limit;
+  const display = isLong && !expanded ? text.slice(0, limit).trimEnd() + "…" : text;
+  return (
+    <div className={className}>
+      <p className="text-xs text-slate-500 break-words whitespace-pre-wrap">{display}</p>
+      {isLong && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setExpanded(v => !v); }}
+          className="mt-1 inline-block text-xs font-bold px-2 py-0.5 rounded-full"
+          style={{ background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D" }}>
+          {expanded ? "▲ Show less" : "▼ Show more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Inline follow-up form (inside client card) ───────────────────────────────
 function InlineFollowupForm({ client, userId, setData, onDone }) {
   const [form, setForm] = useState({
     title: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "",
@@ -75,6 +98,133 @@ function InlineFollowupForm({ client, userId, setData, onDone }) {
   );
 }
 
+// ─── Inline NOTE form (inside client card) — NEW ──────────────────────────────
+function InlineNoteForm({ client, userId, setData, onDone }) {
+  const [form, setForm] = useState({ note: "", urgency: "Normal", resolve_by: "" });
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    if (!form.note.trim()) return;
+    setSaving(true);
+    const clientLabel = client.company + (client.branch ? ` — ${client.branch}` : "");
+    const item = {
+      id: genId(),
+      user_id: userId,
+      client_id: client.id,
+      client: clientLabel,
+      note: form.note,
+      urgency: form.urgency,
+      resolve_by: form.resolve_by || null,
+      media: [],
+      linked_contact_ids: [],
+      resolved: false,
+      created_at: new Date().toISOString(),
+      sync_status: "pending",
+    };
+    setData(d => ({
+      ...d,
+      notes: [item, ...(d.notes || [])],
+      syncQueue: [{ id: genId(), table: "notes", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    await offlineSave("notes", item);
+    triggerImmediateSync();
+    setSaving(false);
+    onDone();
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+      className="bg-slate-50 rounded-xl p-3 space-y-2.5 mb-3">
+      <Field label="Note" value={form.note} onChange={v => setForm(f => ({ ...f, note: v }))} placeholder="Visit note, issue, reminder…" multiline />
+      <div>
+        <label className="mb-1.5 block text-sm font-bold text-slate-500">Urgency</label>
+        <div className="flex gap-2">
+          {Object.keys(NOTE_URGENCY).map(u => (
+            <button key={u} type="button" onClick={() => setForm(f => ({ ...f, urgency: u }))}
+              className="flex-1 rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px]"
+              style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+              {u}
+            </button>
+          ))}
+        </div>
+      </div>
+      <Field label="Resolve By (optional)" type="date" value={form.resolve_by} onChange={v => setForm(f => ({ ...f, resolve_by: v }))} />
+      <div className="flex gap-2">
+        <Btn className="flex-1" size="sm" onClick={save} disabled={saving || !form.note.trim()}>
+          <Check size={14} />{saving ? "Saving…" : "Save Note"}
+        </Btn>
+        <Btn variant="secondary" size="sm" onClick={onDone}>Cancel</Btn>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Note row inside client card — NEW ────────────────────────────────────────
+function ClientNoteRow({ note: n, setData }) {
+  const today = todayISO();
+  const urg = NOTE_URGENCY[n.urgency || "Normal"] || NOTE_URGENCY.Normal;
+  const isOverdue = !n.resolved && n.resolve_by && n.resolve_by < today;
+  const [expanded, setExpanded] = useState(false);
+  const LIMIT = 100;
+  const isLong = n.note && n.note.length > LIMIT;
+  const displayText = isLong && !expanded ? n.note.slice(0, LIMIT).trimEnd() + "…" : n.note;
+
+  async function toggleResolved() {
+    const updated = {
+      ...n,
+      resolved: !n.resolved,
+      resolved_at: !n.resolved ? new Date().toISOString() : null,
+      sync_status: "pending",
+    };
+    setData(d => ({
+      ...d,
+      notes: (d.notes || []).map(x => x.id === n.id ? updated : x),
+      syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    await offlineSave("notes", updated);
+    triggerImmediateSync();
+  }
+
+  return (
+    <div className={`rounded-xl p-2.5 ${n.resolved ? "bg-slate-50" : "bg-white border border-slate-100"}`}
+      style={!n.resolved ? { borderLeft: "3px solid " + urg.dot } : {}}>
+      <div className="flex items-start gap-2.5">
+        <button onClick={toggleResolved}
+          className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all mt-0.5 ${n.resolved ? "bg-green-100 text-green-600" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
+          <Check size={15} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm break-words ${n.resolved ? "line-through text-slate-400" : "text-slate-700"}`}>
+            {displayText}
+          </p>
+          {isLong && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v); }}
+              className="mt-1.5 inline-block text-xs font-bold px-2 py-1 rounded-full"
+              style={{ background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D" }}>
+              {expanded ? "▲ Show less" : "▼ Show more"}
+            </button>
+          )}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {!n.resolved && (
+              <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: urg.bg, color: urg.text }}>
+                {n.urgency || "Normal"}
+              </span>
+            )}
+            {isOverdue && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-600">Overdue</span>}
+            <span className="text-xs text-slate-400">
+              {n.created_at ? new Date(n.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }) : ""}
+              {n.resolve_by && !n.resolved ? ` · resolve by ${smartDate(n.resolve_by)}` : ""}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Follow-up row inside client card ─────────────────────────────────────────
 function ClientFollowupRow({ followup: f, setData }) {
   const today    = todayISO();
   const isOverdue = !f.completed && f.date < today;
@@ -142,6 +292,7 @@ function ClientFollowupRow({ followup: f, setData }) {
   );
 }
 
+// ─── Main ClientsScreen ───────────────────────────────────────────────────────
 export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
   const [showForm, setShowForm]         = useState(false);
   const [search, setSearch]             = useState("");
@@ -150,11 +301,13 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
   const [toast, setToast]               = useState("");
   const [expandedClient, setExpandedClient] = useState(null);
   const [showFollowupForm, setShowFollowupForm] = useState(null);
+  const [showNoteForm, setShowNoteForm] = useState(null);
   const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "" });
   const { confirm, dialog } = useConfirm();
 
   const clients   = data.clients   || [];
   const followups = data.followups || [];
+  const notes     = data.notes     || [];
   const today     = todayISO();
 
   useEffect(() => {
@@ -197,13 +350,10 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
     resetForm();
   }
 
-  // ── FIXED: deleting a client now also queues deletes for its linked
-  // follow-ups in Supabase. Previously they were removed locally only,
-  // stayed in the cloud, and reappeared as orphans on the next sync pull.
   async function deleteClient(id, companyName) {
     const linkedFUs = followups.filter(f => f.client_id === id);
     const message = linkedFUs.length > 0
-      ? `Delete ${companyName} and its ${linkedFUs.length} follow-up${linkedFUs.length !== 1 ? "s" : ""}? This cannot be undone.`
+      ? `Delete ${companyName} and its ${linkedFUs.length} follow-up${linkedFUs.length !== 1 ? "s" : ""}? This cannot be undone. (Notes are kept.)`
       : `Delete ${companyName}? This cannot be undone.`;
     const ok = await confirm(message, { confirmLabel: "Delete" });
     if (!ok) return;
@@ -223,10 +373,11 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
     triggerImmediateSync();
   }
 
+  // ── Edit-in-place: the edit form renders where the branch row is. ──
   function startEdit(c) {
     setForm({ company: c.company || "", branch: c.branch || "", contact: c.contact || "", phone: c.phone || "", email: c.email || "", stage: c.stage || "New Lead", notes: c.notes || "" });
     setEditId(c.id);
-    setShowForm(true);
+    setShowForm(false);
   }
 
   function getClientFollowups(clientId) {
@@ -234,6 +385,35 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       return a.date.localeCompare(b.date);
     });
+  }
+
+  function getClientNotes(clientId) {
+    return notes.filter(n => n.client_id === clientId).sort((a, b) => {
+      if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
+      return (b.created_at || "").localeCompare(a.created_at || "");
+    });
+  }
+
+  // ── Shared client form JSX (top for NEW, in-place for EDIT) ──
+  function renderClientForm(isEdit) {
+    return (
+      <Card className="p-4 space-y-3">
+        <p className="text-base font-black text-slate-800">{isEdit ? "Edit Client" : "New Client"}</p>
+        <Field label="Company Name" value={form.company} onChange={v => setForm(f => ({ ...f, company: v }))} placeholder="e.g. Anglo American" required />
+        <Field label="Branch / Mine / Site" value={form.branch} onChange={v => setForm(f => ({ ...f, branch: v }))} placeholder="e.g. Mogalakwena Mine" />
+        <Field label="Contact Person" value={form.contact} onChange={v => setForm(f => ({ ...f, contact: v }))} placeholder="Contact name" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Phone" value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} placeholder="Phone" type="tel" />
+          <Field label="Email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="Email" type="email" />
+        </div>
+        <SelectField label="Pipeline Stage" value={form.stage} onChange={v => setForm(f => ({ ...f, stage: v }))} options={PIPELINE_STAGES} />
+        <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Notes about this client…" multiline />
+        <div className="flex gap-2">
+          <Btn className="flex-1" onClick={saveClient}><Save size={15} />{isEdit ? "Update" : "Add Client"}</Btn>
+          <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
+        </div>
+      </Card>
+    );
   }
 
   const filtered = clients
@@ -254,30 +434,16 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
 
       <div className="flex items-center justify-between">
         <PageHeader title="Clients" subtitle={`${clients.length} total`} />
-        <Btn size="sm" onClick={() => setShowForm(!showForm)}>
-          {showForm ? <X size={15} /> : <Plus size={15} />}{showForm ? "Cancel" : "Add Client"}
+        <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
+          {(showForm || editId) ? <X size={15} /> : <Plus size={15} />}{(showForm || editId) ? "Cancel" : "Add Client"}
         </Btn>
       </div>
 
+      {/* Top form: NEW clients only. Edits render in-place. */}
       <AnimatePresence>
-        {showForm && (
+        {showForm && !editId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-            <Card className="p-4 space-y-3">
-              <p className="text-base font-black text-slate-800">{editId ? "Edit Client" : "New Client"}</p>
-              <Field label="Company Name" value={form.company} onChange={v => setForm(f => ({ ...f, company: v }))} placeholder="e.g. Anglo American" required />
-              <Field label="Branch / Mine / Site" value={form.branch} onChange={v => setForm(f => ({ ...f, branch: v }))} placeholder="e.g. Mogalakwena Mine" />
-              <Field label="Contact Person" value={form.contact} onChange={v => setForm(f => ({ ...f, contact: v }))} placeholder="Contact name" />
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Phone" value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} placeholder="Phone" type="tel" />
-                <Field label="Email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="Email" type="email" />
-              </div>
-              <SelectField label="Pipeline Stage" value={form.stage} onChange={v => setForm(f => ({ ...f, stage: v }))} options={PIPELINE_STAGES} />
-              <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Notes about this client…" multiline />
-              <div className="flex gap-2">
-                <Btn className="flex-1" onClick={saveClient}><Save size={15} />{editId ? "Update" : "Add Client"}</Btn>
-                <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
-              </div>
-            </Card>
+            {renderClientForm(false)}
           </motion.div>
         )}
       </AnimatePresence>
@@ -292,20 +458,27 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
           const isExpanded    = expandedClient === cn;
           const allBranchIds  = branches.map(b => b.id);
           const companyFU     = followups.filter(f => allBranchIds.includes(f.client_id));
+          const companyNotes  = notes.filter(n => allBranchIds.includes(n.client_id));
           const pendingFU     = companyFU.filter(f => !f.completed);
           const overdueFU     = companyFU.filter(f => !f.completed && f.date < today);
+          const openNotes     = companyNotes.filter(n => !n.resolved);
 
           return (
             <Card key={cn} className="overflow-hidden">
               <button className="w-full text-left px-4 pt-4 pb-3 flex items-center justify-between"
                 onClick={() => setExpandedClient(isExpanded ? null : cn)}>
-                <div>
-                  <p className="font-black text-slate-900 text-base">{cn}</p>
+                <div className="flex-1 min-w-0 pr-2">
+                  <p className="font-black text-slate-900 text-base break-words">{cn}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <p className="text-sm text-slate-400">{branches.length} branch{branches.length !== 1 ? "es" : ""}</p>
                     {pendingFU.length > 0 && (
                       <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${overdueFU.length > 0 ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
                         {overdueFU.length > 0 ? `⚠️ ${overdueFU.length} overdue` : `${pendingFU.length} follow-up${pendingFU.length !== 1 ? "s" : ""}`}
+                      </span>
+                    )}
+                    {openNotes.length > 0 && (
+                      <span className="rounded-full px-2 py-0.5 text-xs font-bold bg-amber-100 text-amber-700">
+                        📝 {openNotes.length} note{openNotes.length !== 1 ? "s" : ""}
                       </span>
                     )}
                   </div>
@@ -323,9 +496,19 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
                   const bPri = STAGE_PRIORITY[b.stage || "New Lead"] ?? 3;
                   return aPri - bPri;
                 }).map(c => {
+                  // ── Edit-in-place: form replaces this branch row ──
+                  if (editId === c.id) {
+                    return (
+                      <motion.div key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-4 py-3">
+                        {renderClientForm(true)}
+                      </motion.div>
+                    );
+                  }
+
                   const clientFU      = getClientFollowups(c.id);
-                  const clientOverdue = clientFU.filter(f => !f.completed && f.date < today).length;
+                  const clientNotes   = getClientNotes(c.id);
                   const clientPending = clientFU.filter(f => !f.completed).length;
+                  const clientOpenNotes = clientNotes.filter(n => !n.resolved).length;
 
                   return (
                     <div key={c.id} className="px-4 py-3">
@@ -368,7 +551,8 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
                               </a>
                             )}
                           </div>
-                          {c.notes && <p className="text-xs text-slate-400 mt-1 line-clamp-2">{c.notes}</p>}
+                          {/* Full info — no more clipped text */}
+                          <ExpandableText text={c.notes} className="mt-1" />
                           {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
                         </div>
                         <div className="flex gap-1 shrink-0">
@@ -380,33 +564,69 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
                       <AnimatePresence>
                         {isExpanded && (
                           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                            className="mt-3 pt-3 border-t border-slate-100">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                Follow-ups {clientPending > 0 ? `· ${clientPending} pending` : ""}
-                              </p>
-                              <button
-                                onClick={() => setShowFollowupForm(showFollowupForm === c.id ? null : c.id)}
-                                className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold min-h-[36px]"
-                                style={{ background: BRAND.light, color: BRAND.primary }}>
-                                <Plus size={12} /> Add
-                              </button>
-                            </div>
+                            className="mt-3 pt-3 border-t border-slate-100 space-y-4">
 
-                            <AnimatePresence>
-                              {showFollowupForm === c.id && (
-                                <InlineFollowupForm client={c} userId={userId} setData={setData} onDone={() => setShowFollowupForm(null)} />
+                            {/* ── Follow-ups section ── */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                  Follow-ups {clientPending > 0 ? `· ${clientPending} pending` : ""}
+                                </p>
+                                <button
+                                  onClick={() => { setShowFollowupForm(showFollowupForm === c.id ? null : c.id); setShowNoteForm(null); }}
+                                  className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold min-h-[36px]"
+                                  style={{ background: BRAND.light, color: BRAND.primary }}>
+                                  <Plus size={12} /> Add
+                                </button>
+                              </div>
+
+                              <AnimatePresence>
+                                {showFollowupForm === c.id && (
+                                  <InlineFollowupForm client={c} userId={userId} setData={setData} onDone={() => setShowFollowupForm(null)} />
+                                )}
+                              </AnimatePresence>
+
+                              {clientFU.length === 0 && showFollowupForm !== c.id && (
+                                <p className="text-sm text-slate-400 py-1">No follow-ups yet.</p>
                               )}
-                            </AnimatePresence>
-
-                            {clientFU.length === 0 && showFollowupForm !== c.id && (
-                              <p className="text-sm text-slate-400 py-2">No follow-ups yet. Tap + Add to create one.</p>
-                            )}
-                            <div className="space-y-2">
-                              {clientFU.map(f => (
-                                <ClientFollowupRow key={f.id} followup={f} setData={setData} />
-                              ))}
+                              <div className="space-y-2">
+                                {clientFU.map(f => (
+                                  <ClientFollowupRow key={f.id} followup={f} setData={setData} />
+                                ))}
+                              </div>
                             </div>
+
+                            {/* ── Notes section — NEW ── */}
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                  <Clipboard size={11} className="inline mr-1 -mt-0.5" />
+                                  Notes {clientOpenNotes > 0 ? `· ${clientOpenNotes} open` : ""}
+                                </p>
+                                <button
+                                  onClick={() => { setShowNoteForm(showNoteForm === c.id ? null : c.id); setShowFollowupForm(null); }}
+                                  className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold min-h-[36px]"
+                                  style={{ background: "#FEF3C7", color: "#92400E" }}>
+                                  <Plus size={12} /> Add
+                                </button>
+                              </div>
+
+                              <AnimatePresence>
+                                {showNoteForm === c.id && (
+                                  <InlineNoteForm client={c} userId={userId} setData={setData} onDone={() => setShowNoteForm(null)} />
+                                )}
+                              </AnimatePresence>
+
+                              {clientNotes.length === 0 && showNoteForm !== c.id && (
+                                <p className="text-sm text-slate-400 py-1">No notes for this client yet.</p>
+                              )}
+                              <div className="space-y-2">
+                                {clientNotes.map(n => (
+                                  <ClientNoteRow key={n.id} note={n} setData={setData} />
+                                ))}
+                              </div>
+                            </div>
+
                           </motion.div>
                         )}
                       </AnimatePresence>
