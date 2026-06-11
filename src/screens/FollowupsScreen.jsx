@@ -137,10 +137,18 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
     resetForm();
   }
 
+  // ── FIXED: toggleDone now queues the update for Supabase sync ──
+  // Previously this only updated local state + IndexedDB, so completing a
+  // follow-up never reached the cloud and would "un-complete" on next pull.
   async function toggleDone(id) {
-    const t  = followups.find(f => f.id === id);
+    const t = followups.find(f => f.id === id);
+    if (!t) return;
     const up = { ...t, completed: !t.completed, sync_status: "pending" };
-    setData(d => ({ ...d, followups: (d.followups || []).map(f => f.id === id ? up : f) }));
+    setData(d => ({
+      ...d,
+      followups: (d.followups || []).map(f => f.id === id ? up : f),
+      syncQueue: [{ id: genId(), table: "followups", action: "update", data: up, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
     await offlineSave("followups", up);
     triggerImmediateSync();
   }
