@@ -407,7 +407,7 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
                         {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
                       </div>
 
-                      <div className="flex flex-col gap-1 shrink-0">
+                      <div className="flex flex-col gap-2 shrink-0">
                         <button onClick={() => startEdit(c)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
                           <Edit2 size={15} />
                         </button>
