@@ -12,7 +12,7 @@ import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { ContactPicker, LinkedContactsDisplay } from "../components/ContactPicker";
 import { exportNotesPDF, exportNotesExcel } from "../NotesExport";
 
-export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }) {
+export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]         = useState(false);
   const [editId, setEditId]             = useState(null);
   const [search, setSearch]             = useState("");
@@ -41,6 +41,13 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
     setEditId(null);
     setShowForm(true);
   }, [quickAddTrigger?.ts]);
+
+  // ── Global search handoff: carry the term into this screen's search box ──
+  useEffect(() => {
+    if (!searchSeed?.ts) return;
+    setSearch(searchSeed.term || "");
+  }, [searchSeed?.ts]);
+
 
   function addMedia(m)  { setPendingMedia(pm => [...pm, m]); }
   function removeMedia(id) { setPendingMedia(pm => pm.filter(m => m.id !== id)); }
