@@ -333,12 +333,22 @@ export default function PowerWorksApp() {
     <ErrorBoundary>
       <div className="min-h-screen pb-28" style={{ background: "#F7F3F3" }}>
 
-        {/* Floating Search button (top-right) */}
+        {/* Floating Search button — docked above the quick-capture FAB.
+            (Top-right placement collided with screen header buttons on mobile.) */}
         <button
           onClick={() => setSearchOpen(true)}
-          className="fixed z-30 top-3 right-4 w-10 h-10 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:shadow-lg transition-all active:scale-95"
+          className="fixed z-40 rounded-full bg-white flex items-center justify-center text-slate-500 hover:text-slate-800 transition-all active:scale-95"
+          style={{
+            width: 44,
+            height: 44,
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 152px)",
+            right: 20,
+            boxShadow: "0 2px 6px rgba(15, 23, 42, 0.12), 0 1px 2px rgba(15, 23, 42, 0.08)",
+            border: "1px solid #E2E8F0",
+            opacity: 0.96,
+          }}
           aria-label="Search">
-          <Search size={18} />
+          <Search size={19} />
         </button>
 
         <main className="mx-auto max-w-2xl px-4 pt-4">
