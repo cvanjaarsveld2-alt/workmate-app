@@ -34,7 +34,28 @@ function StatusPill({ status }) {
   );
 }
 
-export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
+// ─── Show-more text (full info on tap, no silent clipping) ──────────────────
+function ExpandableText({ text, limit = 100, className = "" }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!text) return null;
+  const isLong = text.length > limit;
+  const display = isLong && !expanded ? text.slice(0, limit).trimEnd() + "…" : text;
+  return (
+    <div className={className}>
+      <p className="text-xs text-slate-500 italic break-words whitespace-pre-wrap">{display}</p>
+      {isLong && (
+        <button type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v); }}
+          className="mt-1.5 inline-block text-xs font-bold px-2 py-1 rounded-full not-italic"
+          style={{ background: "#FEF3C7", color: "#92400E", border: "1px solid #FCD34D" }}>
+          {expanded ? "▲ Show less" : "▼ Show more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]       = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [editId, setEditId]           = useState(null);
@@ -57,6 +78,12 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
     setEditId(null);
     setShowForm(true);
   }, [quickAddTrigger?.ts]);
+
+  // ── Global search handoff: carry the term into this screen's search box ──
+  useEffect(() => {
+    if (!searchSeed?.ts) return;
+    setSearch(searchSeed.term || "");
+  }, [searchSeed?.ts]);
 
   function resetForm() {
     setForm({
@@ -102,6 +129,7 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
     setCardPhotoUrl(extracted.card_photo_url);
     setScannedNotice(true);
     setShowScanner(false);
+    setEditId(null);
     setShowForm(true);
     setTimeout(() => setScannedNotice(false), 5000);
   }
@@ -154,6 +182,7 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
   async function deleteContact(id, name) {
     const ok = await confirm(`Delete ${name}?`, { confirmLabel: "Delete" });
     if (!ok) return;
+    if (editId === id) resetForm();
     setData(d => ({
       ...d,
       contacts: (d.contacts || []).filter(c => c.id !== id),
@@ -170,7 +199,6 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
       return;
     }
 
-    // Check if a client with this company already exists
     const existingClient = clients.find(cl => (cl.company || "").toLowerCase() === c.company.toLowerCase());
 
     const message = existingClient
@@ -186,7 +214,6 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
     if (existingClient) {
       clientId = existingClient.id;
     } else {
-      // Create new client from contact data
       clientId = genId();
       clientItem = {
         id: clientId,
@@ -204,7 +231,6 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
       };
     }
 
-    // Update the contact: mark converted + link to client
     const updatedContact = {
       ...c,
       status: "converted",
@@ -239,6 +265,61 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
     triggerImmediateSync();
   }
 
+  // ── Shared form: rendered at top for NEW, in-place for EDIT ──
+  function renderContactForm(isEdit) {
+    return (
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-base font-black text-slate-800">{isEdit ? "Edit Contact" : "New Contact"}</p>
+          {scannedNotice && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
+              <Sparkles size={12} /> AI extracted
+            </span>
+          )}
+        </div>
+
+        {cardPhotoUrl && (
+          <div className="rounded-xl overflow-hidden border border-slate-200">
+            <img src={cardPhotoUrl} alt="Business card" className="w-full max-h-48 object-contain bg-slate-50" />
+          </div>
+        )}
+
+        <Field label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. John Smith" required />
+        <div className="grid grid-cols-1 gap-3">
+          <Field label="Company" value={form.company} onChange={v => setForm(f => ({ ...f, company: v }))} placeholder="e.g. ACME Mining" />
+          <Field label="Job Title" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Senior Engineer" />
+        </div>
+        <div className="grid grid-cols-1 gap-3">
+          <Field label="Email" type="email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="email@company.com" />
+          <Field label="Phone" type="tel" value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} placeholder="+27 ..." />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Met At" value={form.met_at} onChange={v => setForm(f => ({ ...f, met_at: v }))} placeholder="e.g. Wampex 2026" />
+          <Field label="Met On" type="date" value={form.met_date} onChange={v => setForm(f => ({ ...f, met_date: v }))} />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-bold text-slate-500">Status</label>
+          <div className="grid grid-cols-4 gap-2">
+            {["lead", "active", "converted", "archived"].map(s => (
+              <button key={s} type="button" onClick={() => setForm(f => ({ ...f, status: s }))}
+                className="rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px] capitalize"
+                style={form.status === s
+                  ? { background: STATUS_COLORS[s].bg, color: STATUS_COLORS[s].text, borderColor: STATUS_COLORS[s].dot }
+                  : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What you discussed, follow-ups, etc." multiline />
+        <div className="flex gap-2">
+          <Btn className="flex-1" onClick={saveContact}><Save size={15} />{isEdit ? "Update" : "Add Contact"}</Btn>
+          <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
+        </div>
+      </Card>
+    );
+  }
+
   const filtered = contacts
     .filter(c => filterStatus === "All" || (c.status || "lead") === filterStatus.toLowerCase())
     .filter(c => !search || [c.name, c.company, c.title, c.email, c.phone, c.met_at, c.notes]
@@ -262,18 +343,18 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
       <div className="flex items-center justify-between gap-2">
         <PageHeader title="Contacts" subtitle={`${contacts.length} total · ${leadCount} leads`} />
         <div className="flex gap-2">
-          {!showForm && !showScanner && (
+          {!showForm && !editId && !showScanner && (
             <Btn size="sm" variant="secondary" onClick={() => { setShowScanner(true); setEditId(null); }}>
               <Camera size={14} /> Scan
             </Btn>
           )}
           <Btn size="sm" onClick={() => {
-            if (showForm) resetForm();
+            if (showForm || editId) resetForm();
             else if (showScanner) setShowScanner(false);
             else setShowForm(true);
           }}>
-            {(showForm || showScanner) ? <X size={15} /> : <Plus size={15} />}
-            {(showForm || showScanner) ? "Cancel" : "Add"}
+            {(showForm || editId || showScanner) ? <X size={15} /> : <Plus size={15} />}
+            {(showForm || editId || showScanner) ? "Cancel" : "Add"}
           </Btn>
         </div>
       </div>
@@ -288,58 +369,11 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
         )}
       </AnimatePresence>
 
+      {/* Top form: NEW contacts only (incl. scanned). Edits render in place. */}
       <AnimatePresence>
-        {showForm && (
+        {showForm && !editId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-            <Card className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-base font-black text-slate-800">{editId ? "Edit Contact" : "New Contact"}</p>
-                {scannedNotice && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
-                    <Sparkles size={12} /> AI extracted
-                  </span>
-                )}
-              </div>
-
-              {cardPhotoUrl && (
-                <div className="rounded-xl overflow-hidden border border-slate-200">
-                  <img src={cardPhotoUrl} alt="Business card" className="w-full max-h-48 object-contain bg-slate-50" />
-                </div>
-              )}
-
-              <Field label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. John Smith" required />
-              <div className="grid grid-cols-1 gap-3">
-                <Field label="Company" value={form.company} onChange={v => setForm(f => ({ ...f, company: v }))} placeholder="e.g. ACME Mining" />
-                <Field label="Job Title" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Senior Engineer" />
-              </div>
-              <div className="grid grid-cols-1 gap-3">
-                <Field label="Email" type="email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="email@company.com" />
-                <Field label="Phone" type="tel" value={form.phone} onChange={v => setForm(f => ({ ...f, phone: v }))} placeholder="+27 ..." />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Met At" value={form.met_at} onChange={v => setForm(f => ({ ...f, met_at: v }))} placeholder="e.g. Wampex 2026" />
-                <Field label="Met On" type="date" value={form.met_date} onChange={v => setForm(f => ({ ...f, met_date: v }))} />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-500">Status</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {["lead", "active", "converted", "archived"].map(s => (
-                    <button key={s} type="button" onClick={() => setForm(f => ({ ...f, status: s }))}
-                      className="rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px] capitalize"
-                      style={form.status === s
-                        ? { background: STATUS_COLORS[s].bg, color: STATUS_COLORS[s].text, borderColor: STATUS_COLORS[s].dot }
-                        : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What you discussed, follow-ups, etc." multiline />
-              <div className="flex gap-2">
-                <Btn className="flex-1" onClick={saveContact}><Save size={15} />{editId ? "Update" : "Add Contact"}</Btn>
-                <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
-              </div>
-            </Card>
+            {renderContactForm(false)}
           </motion.div>
         )}
       </AnimatePresence>
@@ -362,6 +396,15 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
             </div>
             <div className="divide-y divide-slate-50">
               {list.map(c => {
+                // ── Edit-in-place: form replaces this contact at its position ──
+                if (editId === c.id) {
+                  return (
+                    <motion.div key={c.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-4 py-3">
+                      {renderContactForm(true)}
+                    </motion.div>
+                  );
+                }
+
                 const canPromote = (c.status === "lead" || c.status === "active") && c.company?.trim();
                 return (
                   <div key={c.id} className="px-4 py-3">
@@ -403,7 +446,8 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger }) {
                             {c.met_at}{c.met_at && c.met_date ? " · " : ""}{c.met_date ? smartDate(c.met_date) : ""}
                           </p>
                         )}
-                        {c.notes && <p className="text-xs text-slate-500 mt-1.5 italic line-clamp-2">{c.notes}</p>}
+                        {/* Full info — no more clipped notes */}
+                        <ExpandableText text={c.notes} className="mt-1.5" />
                         {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
                       </div>
 
