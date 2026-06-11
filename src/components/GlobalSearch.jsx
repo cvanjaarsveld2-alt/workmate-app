@@ -129,7 +129,7 @@ export function GlobalSearch({ open, onClose, data, onNavigate }) {
 
   function handleResultClick(entity) {
     const config = ENTITY_CONFIG[entity];
-    if (onNavigate) onNavigate(config.screen);
+    if (onNavigate) onNavigate(config.screen, query);
     onClose();
   }
 
