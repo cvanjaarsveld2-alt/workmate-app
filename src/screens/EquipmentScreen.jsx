@@ -19,7 +19,6 @@ export function EquipmentScreen({ data, setData, userId, isOnline, quickAddTrigg
   const { confirm, dialog } = useConfirm();
   const equipment = data.equipment || [];
 
-  // ── Quick capture: open add form when FAB triggers this screen ──
   useEffect(() => {
     if (!quickAddTrigger) return;
     if (quickAddTrigger.screen !== "Equipment") return;
@@ -100,11 +99,19 @@ export function EquipmentScreen({ data, setData, userId, isOnline, quickAddTrigg
     resetForm();
   }
 
+  // ── FIXED: deleting an equipment photo now queues the update for Supabase.
+  // Previously it only saved locally, so deleted photos reappeared after a
+  // refresh or on other devices. Now matches the Notes screen behaviour.
   async function deleteEquipMedia(equipId, mediaId) {
     const eq = equipment.find(e => e.id === equipId); if (!eq) return;
-    const updated = { ...eq, media: (eq.media || []).filter(m => m.id !== mediaId) };
-    setData(d => ({ ...d, equipment: (d.equipment || []).map(e => e.id === equipId ? updated : e) }));
+    const updated = { ...eq, media: (eq.media || []).filter(m => m.id !== mediaId), sync_status: "pending" };
+    setData(d => ({
+      ...d,
+      equipment: (d.equipment || []).map(e => e.id === equipId ? updated : e),
+      syncQueue: [{ id: genId(), table: "equipment", action: "update", data: { ...updated, media: updated.media.map(m => ({ ...m, base64: undefined })) }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
     await offlineSave("equipment", updated);
+    triggerImmediateSync();
   }
 
   async function deleteEquipment(id, name) {
