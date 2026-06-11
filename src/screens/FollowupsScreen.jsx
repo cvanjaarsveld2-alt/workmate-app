@@ -50,7 +50,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
           )}
           {(f.client || f.branch) && <p className="text-sm text-slate-500 mt-1">{f.client}{f.branch ? ` — ${f.branch}` : ""}</p>}
           <p className="text-sm text-slate-400 mt-0.5">{smartDate(f.date)}{f.time ? ` at ${f.time}` : ""}</p>
-          {f.notes && <p className="text-xs text-slate-400 mt-1">{f.notes}</p>}
+          {f.notes && <p className="text-xs text-slate-400 mt-1 break-words whitespace-pre-wrap">{f.notes}</p>}
           {reminder && reminder.value !== "none" && !f.completed && <p className="text-xs text-blue-400 mt-0.5">🔔 {reminder.label}</p>}
           {f.clientPhone && !f.completed && (
             <div className="mt-2">
@@ -58,7 +58,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
             </div>
           )}
         </div>
-        <div className="flex flex-col gap-1 shrink-0">
+        <div className="flex flex-col gap-2 shrink-0">
           {isOverdue && <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-600 whitespace-nowrap">Overdue</span>}
           <button onClick={onEdit} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={14} /></button>
           <button onClick={onDelete} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={14} /></button>
@@ -118,7 +118,7 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
       }));
       await offlineSave("followups", updated);
       setToast("Follow-up updated");
-    triggerImmediateSync();
+      triggerImmediateSync();
     } else {
       const item = {
         id: genId(), user_id: userId, ...form,
@@ -132,14 +132,12 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
       }));
       await offlineSave("followups", item);
       setToast("Follow-up added");
-    triggerImmediateSync();
+      triggerImmediateSync();
     }
     resetForm();
   }
 
-  // ── FIXED: toggleDone now queues the update for Supabase sync ──
-  // Previously this only updated local state + IndexedDB, so completing a
-  // follow-up never reached the cloud and would "un-complete" on next pull.
+  // toggleDone queues the update for Supabase sync (cross-device completions).
   async function toggleDone(id) {
     const t = followups.find(f => f.id === id);
     if (!t) return;
@@ -156,9 +154,51 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
   async function deleteFollowup(id) {
     const ok = await confirm("Delete this follow-up?", { confirmLabel: "Delete" });
     if (!ok) return;
+    if (editId === id) resetForm();
     setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "followups", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], followups: (d.followups || []).filter(f => f.id !== id) }));
     setToast("Follow-up deleted");
     triggerImmediateSync();
+  }
+
+  // ── Shared form: rendered at top for NEW, in-place for EDIT ──
+  function renderFollowupForm(isEdit) {
+    return (
+      <Card className="p-4 space-y-3">
+        <p className="text-base font-black text-slate-800">{isEdit ? "Edit Follow-up" : "New Follow-up"}</p>
+        <Field label="What to follow up on" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Call mine buyer re quote" required />
+        <ClientSelector label="Client" value={form.client_id} onChange={v => setForm(f => ({ ...f, client_id: v }))} clients={clients} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Date" type="date" value={form.date} onChange={v => setForm(f => ({ ...f, date: v }))} />
+          <Field label="Time" type="time" value={form.time} onChange={v => setForm(f => ({ ...f, time: v }))} />
+        </div>
+        <div>
+          <label className="mb-1.5 block text-sm font-bold text-slate-500">🔔 Reminder</label>
+          <select value={form.reminder} onChange={e => setForm(f => ({ ...f, reminder: e.target.value }))}
+            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[52px]">
+            {REMINDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
+        <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Any context…" multiline />
+        <div className="flex gap-2">
+          <Btn className="flex-1" onClick={saveFollowup}><Save size={15} />{isEdit ? "Update" : "Add Follow-up"}</Btn>
+          <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
+        </div>
+      </Card>
+    );
+  }
+
+  // ── Render one followup row, or the edit form in its place ──
+  function renderFollowupOrForm(f) {
+    if (editId === f.id) {
+      return (
+        <motion.div key={f.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          {renderFollowupForm(true)}
+        </motion.div>
+      );
+    }
+    return (
+      <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)} />
+    );
   }
 
   const filtered = followups.filter(f => {
@@ -201,8 +241,8 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
 
       <div className="flex items-center justify-between">
         <PageHeader title="Follow-ups" subtitle={`${pendingTotal} pending${overdueCount > 0 ? ` · ${overdueCount} overdue` : ""}`} />
-        <Btn size="sm" onClick={() => { if (showForm && editId) resetForm(); else setShowForm(!showForm); }}>
-          {showForm ? <X size={15} /> : <Plus size={15} />}{showForm ? "Cancel" : "Add"}
+        <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
+          {(showForm || editId) ? <X size={15} /> : <Plus size={15} />}{(showForm || editId) ? "Cancel" : "Add"}
         </Btn>
       </div>
 
@@ -223,30 +263,11 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
         </div>
       )}
 
+      {/* Top form: NEW follow-ups only. Edits render in place. */}
       <AnimatePresence>
-        {showForm && (
+        {showForm && !editId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-            <Card className="p-4 space-y-3">
-              <p className="text-base font-black text-slate-800">{editId ? "Edit Follow-up" : "New Follow-up"}</p>
-              <Field label="What to follow up on" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Call mine buyer re quote" required />
-              <ClientSelector label="Client" value={form.client_id} onChange={v => setForm(f => ({ ...f, client_id: v }))} clients={clients} />
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Date" type="date" value={form.date} onChange={v => setForm(f => ({ ...f, date: v }))} />
-                <Field label="Time" type="time" value={form.time} onChange={v => setForm(f => ({ ...f, time: v }))} />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-500">🔔 Reminder</label>
-                <select value={form.reminder} onChange={e => setForm(f => ({ ...f, reminder: e.target.value }))}
-                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[52px]">
-                  {REMINDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-              <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Any context…" multiline />
-              <div className="flex gap-2">
-                <Btn className="flex-1" onClick={saveFollowup}><Save size={15} />{editId ? "Update" : "Add Follow-up"}</Btn>
-                <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
-              </div>
-            </Card>
+            {renderFollowupForm(false)}
           </motion.div>
         )}
       </AnimatePresence>
@@ -277,7 +298,7 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
                     </div>
                   </div>
                 </div>
-                <div className="divide-y divide-slate-50 px-3 py-2 space-y-2">
+                <div className="px-3 py-2 space-y-2">
                   {fus
                     .sort((a, b) => {
                       const aOverdue = a.date < today && !a.completed;
@@ -288,9 +309,7 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
                       if (!a.completed && b.completed) return -1;
                       return a.date.localeCompare(b.date);
                     })
-                    .map(f => (
-                      <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)} />
-                    ))}
+                    .map(f => renderFollowupOrForm(f))}
                 </div>
               </div>
             );
@@ -304,18 +323,14 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
                 {bucket === "Overdue" ? `⚠️ ${bucket}` : bucket === "Today" ? `📍 ${bucket}` : bucket} ({grouped[bucket].length})
               </p>
               <div className="space-y-2">
-                {grouped[bucket].map(f => (
-                  <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)} />
-                ))}
+                {grouped[bucket].map(f => renderFollowupOrForm(f))}
               </div>
             </div>
           ))}
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(f => (
-            <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)} />
-          ))}
+          {filtered.map(f => renderFollowupOrForm(f))}
         </div>
       )}
     </div>
