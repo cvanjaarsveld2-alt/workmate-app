@@ -157,7 +157,6 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
   const followups = data.followups || [];
   const today     = todayISO();
 
-  // ── Quick capture: open add form when FAB triggers this screen ──
   useEffect(() => {
     if (!quickAddTrigger) return;
     if (quickAddTrigger.screen !== "Clients") return;
@@ -198,16 +197,29 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
     resetForm();
   }
 
+  // ── FIXED: deleting a client now also queues deletes for its linked
+  // follow-ups in Supabase. Previously they were removed locally only,
+  // stayed in the cloud, and reappeared as orphans on the next sync pull.
   async function deleteClient(id, companyName) {
-    const ok = await confirm(`Delete ${companyName}? This cannot be undone.`, { confirmLabel: "Delete" });
+    const linkedFUs = followups.filter(f => f.client_id === id);
+    const message = linkedFUs.length > 0
+      ? `Delete ${companyName} and its ${linkedFUs.length} follow-up${linkedFUs.length !== 1 ? "s" : ""}? This cannot be undone.`
+      : `Delete ${companyName}? This cannot be undone.`;
+    const ok = await confirm(message, { confirmLabel: "Delete" });
     if (!ok) return;
+
+    const now = new Date().toISOString();
     setData(d => ({
       ...d,
-      clients: (d.clients || []).filter(c => c.id !== id),
-      syncQueue: [{ id: genId(), table: "clients", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+      clients:   (d.clients   || []).filter(c => c.id !== id),
+      followups: (d.followups || []).filter(f => f.client_id !== id),
+      syncQueue: [
+        { id: genId(), table: "clients", action: "delete", data: { id }, status: "pending", created_at: now },
+        ...linkedFUs.map(f => ({ id: genId(), table: "followups", action: "delete", data: { id: f.id }, status: "pending", created_at: now })),
+        ...(d.syncQueue || []),
+      ],
     }));
-    setData(d => ({ ...d, followups: (d.followups || []).filter(f => f.client_id !== id) }));
-    setToast("Client deleted");
+    setToast(linkedFUs.length > 0 ? `Client + ${linkedFUs.length} follow-up${linkedFUs.length !== 1 ? "s" : ""} deleted` : "Client deleted");
     triggerImmediateSync();
   }
 
