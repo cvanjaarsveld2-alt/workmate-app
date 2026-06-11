@@ -291,9 +291,38 @@ export default function PowerWorksApp() {
   }
 
   function handleQuickCapture(targetScreen) {
-    setScreen(targetScreen);
+    navigate(targetScreen);
     setQuickAddTrigger({ screen: targetScreen, ts: Date.now() });
   }
+
+  // ── Android / browser back button support ──
+  // Each screen change pushes a history entry, so the phone's back button
+  // walks back through screens instead of exiting the app. If the search
+  // overlay is open, back closes it first.
+  function navigate(key) {
+    if (key === screen) return;
+    window.history.pushState({ pmScreen: key }, "");
+    setScreen(key);
+  }
+
+  useEffect(() => {
+    if (!window.history.state?.pmScreen) {
+      window.history.replaceState({ pmScreen: "Home" }, "");
+    }
+  }, []);
+
+  useEffect(() => {
+    function onPop(e) {
+      if (searchOpen) {
+        setSearchOpen(false);
+        window.history.pushState({ pmScreen: screen }, "");
+        return;
+      }
+      setScreen(e.state?.pmScreen || "Home");
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [searchOpen, screen]);
 
   const pendingCount     = (data.syncQueue || []).filter(i => i.status === "pending").length;
   const flaggedQuotes    = (data.quotes    || []).filter(q => q.status === "Pending").length;
@@ -309,14 +338,14 @@ export default function PowerWorksApp() {
   if (dataLoading)             return <DataLoadingScreen />;
 
   const screens = {
-    Home:      <HomeScreen      data={data} setScreen={setScreen} user={session.user} />,
+    Home:      <HomeScreen      data={data} setScreen={navigate} user={session.user} />,
     Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} />,
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} />,
-    More:      <MoreScreen      data={data} onLogout={logout}  onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={setScreen} />,
+    More:      <MoreScreen      data={data} onLogout={logout}  onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
   };
 
   const NAV = [
@@ -362,7 +391,7 @@ export default function PowerWorksApp() {
         <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-100 bg-white/95 backdrop-blur-md px-1 pt-1 pb-safe shadow-lg">
           <div className="mx-auto grid max-w-2xl grid-cols-7 gap-0 pb-1">
             {NAV.map(({ icon, label, key, badge }) => (
-              <NavTab key={key} icon={icon} label={label} active={screen === key} onClick={() => setScreen(key)} badge={badge} />
+              <NavTab key={key} icon={icon} label={label} active={screen === key} onClick={() => navigate(key)} badge={badge} />
             ))}
           </div>
         </nav>
@@ -375,7 +404,7 @@ export default function PowerWorksApp() {
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
           data={data}
-          onNavigate={setScreen}
+          onNavigate={navigate}
         />
 
         <AnimatePresence>
