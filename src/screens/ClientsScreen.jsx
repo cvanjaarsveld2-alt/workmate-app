@@ -293,7 +293,7 @@ function ClientFollowupRow({ followup: f, setData }) {
 }
 
 // ─── Main ClientsScreen ───────────────────────────────────────────────────────
-export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
+export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]         = useState(false);
   const [search, setSearch]             = useState("");
   const [filterStage, setFilterStage]   = useState("All");
@@ -316,6 +316,13 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger }) {
     setEditId(null);
     setShowForm(true);
   }, [quickAddTrigger?.ts]);
+
+  // ── Global search handoff: carry the term into this screen's search box ──
+  useEffect(() => {
+    if (!searchSeed?.ts) return;
+    setSearch(searchSeed.term || "");
+  }, [searchSeed?.ts]);
+
 
   function resetForm() {
     setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "" });
