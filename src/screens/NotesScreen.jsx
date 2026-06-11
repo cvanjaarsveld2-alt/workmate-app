@@ -7,7 +7,7 @@ import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helper
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
 import { scheduleNotificationsViaSW } from "../lib/notifications";
-import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, UrgencyBadge, useConfirm } from "../components/ui";
+import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, UrgencyBadge, useConfirm, ClientSelector } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { ContactPicker, LinkedContactsDisplay } from "../components/ContactPicker";
 import { exportNotesPDF, exportNotesExcel } from "../NotesExport";
@@ -19,7 +19,7 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
   const [filterUrgency, setFilterUrgency] = useState("All");
   const [filterStatus, setFilterStatus] = useState("Unresolved");
   const [toast, setToast]               = useState("");
-  const [form, setForm] = useState({ client: "", note: "", urgency: "Normal", resolve_by: "" });
+  const [form, setForm] = useState({ client_id: "", note: "", urgency: "Normal", resolve_by: "" });
   const [pendingMedia, setPendingMedia] = useState([]);
   const [existingMedia, setExistingMedia] = useState([]);
   const [linkedContactIds, setLinkedContactIds] = useState([]);
@@ -30,9 +30,10 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
   const [exporting, setExporting]       = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const { confirm, dialog } = useConfirm();
-  const notes = data.notes || [];
+  const notes    = data.notes    || [];
   const contacts = data.contacts || [];
-  const today = todayISO();
+  const clients  = data.clients  || [];
+  const today    = todayISO();
 
   useEffect(() => {
     if (!quickAddTrigger) return;
@@ -47,7 +48,7 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
   function removeLinkedContact(id) { setLinkedContactIds(ids => ids.filter(x => x !== id)); }
 
   function resetForm() {
-    setForm({ client: "", note: "", urgency: "Normal", resolve_by: "" });
+    setForm({ client_id: "", note: "", urgency: "Normal", resolve_by: "" });
     setPendingMedia([]);
     setExistingMedia([]);
     setLinkedContactIds([]);
@@ -55,9 +56,11 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
     setShowForm(false);
   }
 
+  // ── Edit-in-place: startEdit no longer opens the top form. The edit form
+  // renders directly where the note card was, so the screen doesn't jump.
   function startEdit(n) {
     setForm({
-      client:     n.client || "",
+      client_id:  n.client_id || "",
       note:       n.note || "",
       urgency:    n.urgency || "Normal",
       resolve_by: n.resolve_by || "",
@@ -66,7 +69,7 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
     setPendingMedia([]);
     setLinkedContactIds(n.linked_contact_ids || []);
     setEditId(n.id);
-    setShowForm(true);
+    setShowForm(false);
   }
 
   function toggleSelect(id) {
@@ -76,7 +79,7 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
       return next;
     });
   }
-  function enterSelectMode() { setSelectMode(true); setSelectedIds(new Set()); }
+  function enterSelectMode() { resetForm(); setSelectMode(true); setSelectedIds(new Set()); }
   function exitSelectMode()  { setSelectMode(false); setSelectedIds(new Set()); setShowExportMenu(false); }
   function selectAllVisible(visibleNotes) { setSelectedIds(new Set(visibleNotes.map(n => n.id))); }
 
@@ -111,7 +114,13 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
 
   async function saveNote() {
     if (!form.note.trim()) { setToast("Please enter a note"); return; }
-    const cleanForm = { ...form, resolve_by: form.resolve_by || null };
+
+    // Resolve the selected client into a display label (kept in the `client`
+    // text column so grouping, search, and exports keep working as before).
+    const selectedClient = clients.find(c => c.id === form.client_id);
+    const clientLabel = selectedClient
+      ? selectedClient.company + (selectedClient.branch ? ` — ${selectedClient.branch}` : "")
+      : "";
 
     if (editId) {
       const existing = notes.find(n => n.id === editId);
@@ -130,7 +139,11 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
 
       const updated = {
         ...existing,
-        ...cleanForm,
+        client_id:  form.client_id || null,
+        client:     clientLabel || (form.client_id ? "" : existing.client) || "",
+        note:       form.note,
+        urgency:    form.urgency,
+        resolve_by: form.resolve_by || null,
         media: [...existingMedia, ...newUploadedMedia],
         linked_contact_ids: linkedContactIds,
         sync_status: "pending",
@@ -170,7 +183,11 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
     const item = {
       id: noteId,
       user_id: userId,
-      ...cleanForm,
+      client_id:  form.client_id || null,
+      client:     clientLabel,
+      note:       form.note,
+      urgency:    form.urgency,
+      resolve_by: form.resolve_by || null,
       media: uploadedMedia,
       linked_contact_ids: linkedContactIds,
       resolved: false,
@@ -188,7 +205,7 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
       if (fireAt > new Date()) {
         const urg = form.urgency || "Normal";
         const emoji = urg === "Critical" ? "🚨" : urg === "Urgent" ? "⚠️" : "📌";
-        scheduleNotificationsViaSW([{ id: "note_" + item.id, title: emoji + " Unresolved Note: " + (form.client || "General"), body: form.note.slice(0, 80), fireAt: fireAt.toISOString(), tag: "note_" + item.id }]);
+        scheduleNotificationsViaSW([{ id: "note_" + item.id, title: emoji + " Unresolved Note: " + (clientLabel || "General"), body: form.note.slice(0, 80), fireAt: fireAt.toISOString(), tag: "note_" + item.id }]);
       }
     }
     setToast("Note saved");
@@ -255,6 +272,75 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
     .filter(n => !search || [n.client, n.note].some(x => x?.toLowerCase().includes(search.toLowerCase())))
     .sort((a, b) => { const u = { Critical: 0, Urgent: 1, Normal: 2 }; if (a.resolved !== b.resolved) return a.resolved ? 1 : -1; return (u[a.urgency || "Normal"] || 2) - (u[b.urgency || "Normal"] || 2); });
 
+  // ── Shared form JSX (rendered at top for NEW, in-place for EDIT) ──
+  // Plain function returning JSX (not a component) so inputs keep focus.
+  function renderNoteForm(isEdit) {
+    return (
+      <Card className="p-4 space-y-3">
+        <p className="text-base font-black text-slate-800">{isEdit ? "Edit Note" : "New Note"}</p>
+
+        <ClientSelector label="Client" value={form.client_id} onChange={v => setForm(f => ({ ...f, client_id: v }))} clients={clients} />
+
+        <div>
+          <label className="mb-1.5 block text-sm font-bold text-slate-500">Linked Contacts</label>
+          <button type="button" onClick={() => setShowContactPicker(true)}
+            className="w-full flex items-center gap-2 rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm text-left hover:border-red-300 transition-colors min-h-[52px]">
+            <Users size={16} className="text-slate-400 shrink-0" />
+            {linkedContactIds.length === 0
+              ? <span className="text-slate-400">Tap to link people you met…</span>
+              : <span className="font-bold text-slate-700">{linkedContactIds.length} contact{linkedContactIds.length !== 1 ? "s" : ""} linked</span>}
+          </button>
+          {linkedContactIds.length > 0 && (
+            <div className="mt-2">
+              <LinkedContactsDisplay
+                contactIds={linkedContactIds}
+                contacts={contacts}
+                onRemove={removeLinkedContact}
+                size="md"
+              />
+            </div>
+          )}
+        </div>
+
+        <Field label="Note" value={form.note} onChange={v => setForm(f => ({ ...f, note: v }))} placeholder="Type your visit note…" multiline required />
+        <div>
+          <label className="mb-1.5 block text-sm font-bold text-slate-500">Urgency</label>
+          <div className="flex gap-2">
+            {Object.keys(NOTE_URGENCY).map(u => (
+              <button key={u} type="button" onClick={() => setForm(f => ({ ...f, urgency: u }))}
+                className="flex-1 rounded-xl py-3 text-sm font-bold border-2 transition-all min-h-[48px]"
+                style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label="Resolve By (optional)" type="date" value={form.resolve_by} onChange={v => setForm(f => ({ ...f, resolve_by: v }))} />
+
+        {isEdit && existingMedia.length > 0 && (
+          <div>
+            <label className="mb-1.5 block text-sm font-bold text-slate-500">Current Photos / Videos</label>
+            <MediaGallery media={existingMedia} onDelete={removeExistingMedia} />
+          </div>
+        )}
+
+        <div>
+          <label className="mb-1.5 block text-sm font-bold text-slate-500">{isEdit ? "Add More Photos / Videos" : "Attach Photos / Videos"}</label>
+          <MediaPicker onAdd={addMedia} />
+          <MediaGallery media={pendingMedia} onDelete={removeMedia} />
+        </div>
+
+        <div className="flex gap-2">
+          <Btn className="flex-1" onClick={saveNote}>
+            {isEdit ? <Save size={15} /> : <Plus size={15} />}
+            {isEdit ? "Update Note" : `Add Note${pendingMedia.length > 0 ? ` + ${pendingMedia.length} file${pendingMedia.length !== 1 ? "s" : ""}` : ""}`}
+          </Btn>
+          <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {dialog}
@@ -269,8 +355,8 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
                 <FileDown size={14} /> Export
               </Btn>
             )}
-            <Btn size="sm" onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}>
-              {showForm ? <X size={15} /> : <Plus size={15} />}{showForm ? "Cancel" : "Add"}
+            <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
+              {(showForm || editId) ? <X size={15} /> : <Plus size={15} />}{(showForm || editId) ? "Cancel" : "Add"}
             </Btn>
           </div>
         </div>
@@ -363,71 +449,11 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
         </div>
       )}
 
+      {/* Top form: NEW notes only. Edits render in-place in the list below. */}
       <AnimatePresence>
-        {showForm && !selectMode && (
+        {showForm && !editId && !selectMode && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-            <Card className="p-4 space-y-3">
-              <p className="text-base font-black text-slate-800">{editId ? "Edit Note" : "New Note"}</p>
-              <Field label="Client / Branch" value={form.client} onChange={v => setForm(f => ({ ...f, client: v }))} placeholder="Client name" />
-
-              {/* ── Linked Contacts ── */}
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-500">Linked Contacts</label>
-                <button type="button" onClick={() => setShowContactPicker(true)}
-                  className="w-full flex items-center gap-2 rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm text-left hover:border-red-300 transition-colors min-h-[52px]">
-                  <Users size={16} className="text-slate-400 shrink-0" />
-                  {linkedContactIds.length === 0
-                    ? <span className="text-slate-400">Tap to link people you met…</span>
-                    : <span className="font-bold text-slate-700">{linkedContactIds.length} contact{linkedContactIds.length !== 1 ? "s" : ""} linked</span>}
-                </button>
-                {linkedContactIds.length > 0 && (
-                  <div className="mt-2">
-                    <LinkedContactsDisplay
-                      contactIds={linkedContactIds}
-                      contacts={contacts}
-                      onRemove={removeLinkedContact}
-                      size="md"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <Field label="Note" value={form.note} onChange={v => setForm(f => ({ ...f, note: v }))} placeholder="Type your visit note…" multiline required />
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-500">Urgency</label>
-                <div className="flex gap-2">
-                  {Object.keys(NOTE_URGENCY).map(u => (
-                    <button key={u} type="button" onClick={() => setForm(f => ({ ...f, urgency: u }))}
-                      className="flex-1 rounded-xl py-3 text-sm font-bold border-2 transition-all min-h-[48px]"
-                      style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
-                      {u}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <Field label="Resolve By (optional)" type="date" value={form.resolve_by} onChange={v => setForm(f => ({ ...f, resolve_by: v }))} />
-
-              {editId && existingMedia.length > 0 && (
-                <div>
-                  <label className="mb-1.5 block text-sm font-bold text-slate-500">Current Photos / Videos</label>
-                  <MediaGallery media={existingMedia} onDelete={removeExistingMedia} />
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-500">{editId ? "Add More Photos / Videos" : "Attach Photos / Videos"}</label>
-                <MediaPicker onAdd={addMedia} />
-                <MediaGallery media={pendingMedia} onDelete={removeMedia} />
-              </div>
-
-              <div className="flex gap-2">
-                <Btn className="flex-1" onClick={saveNote}>
-                  {editId ? <Save size={15} /> : <Plus size={15} />}
-                  {editId ? "Update Note" : `Add Note${pendingMedia.length > 0 ? ` + ${pendingMedia.length} file${pendingMedia.length !== 1 ? "s" : ""}` : ""}`}
-                </Btn>
-                <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
-              </div>
-            </Card>
+            {renderNoteForm(false)}
           </motion.div>
         )}
       </AnimatePresence>
@@ -441,6 +467,15 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger }
 
       <div className="space-y-2">
         {filtered.map(n => {
+          // ── Edit-in-place: the form replaces the card at its position ──
+          if (editId === n.id && !selectMode) {
+            return (
+              <motion.div key={n.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                {renderNoteForm(true)}
+              </motion.div>
+            );
+          }
+
           const urg      = NOTE_URGENCY[n.urgency || "Normal"] || NOTE_URGENCY.Normal;
           const isOverdue = !n.resolved && n.resolve_by && n.resolve_by < today;
           const isSelected = selectedIds.has(n.id);
