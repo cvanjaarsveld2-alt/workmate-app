@@ -69,6 +69,7 @@ export default function PowerWorksApp() {
   const [dataLoading, setDataLoading] = useState(true);
   const [syncError,  setSyncError]  = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchSeed, setSearchSeed] = useState(null);
   const [notifPermission, setNotifPermission] = useState(
     "Notification" in window ? Notification.permission : "denied"
   );
@@ -301,8 +302,16 @@ export default function PowerWorksApp() {
   // overlay is open, back closes it first.
   function navigate(key) {
     if (key === screen) return;
+    setSearchSeed(null); // normal navigation clears any pending search handoff
     window.history.pushState({ pmScreen: key }, "");
     setScreen(key);
+  }
+
+  // ── Global search handoff: navigating from a search result carries the
+  // term into the destination screen's own search box ──
+  function handleSearchNavigate(key, term) {
+    navigate(key);
+    setSearchSeed({ term: term || "", ts: Date.now() });
   }
 
   useEffect(() => {
@@ -339,12 +348,12 @@ export default function PowerWorksApp() {
 
   const screens = {
     Home:      <HomeScreen      data={data} setScreen={navigate} user={session.user} />,
-    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
-    Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
+    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
+    Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
-    Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
-    Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} />,
-    Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} />,
+    Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
+    Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
+    Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     More:      <MoreScreen      data={data} onLogout={logout}  onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
   };
 
@@ -404,7 +413,7 @@ export default function PowerWorksApp() {
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
           data={data}
-          onNavigate={navigate}
+          onNavigate={handleSearchNavigate}
         />
 
         <AnimatePresence>
