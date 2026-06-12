@@ -24,6 +24,8 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
   const [existingMedia, setExistingMedia] = useState([]);
   const [linkedContactIds, setLinkedContactIds] = useState([]);
   const [showContactPicker, setShowContactPicker] = useState(false);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [newClient, setNewClient] = useState({ company: "", branch: "" });
   const [selectMode, setSelectMode]     = useState(false);
   const [selectedIds, setSelectedIds]   = useState(new Set());
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -59,8 +61,38 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
     setPendingMedia([]);
     setExistingMedia([]);
     setLinkedContactIds([]);
+    setShowNewClient(false);
+    setNewClient({ company: "", branch: "" });
     setEditId(null);
     setShowForm(false);
+  }
+
+  // ── Create a client on the fly from inside the note form ──
+  async function createClientInline() {
+    if (!newClient.company.trim()) { setToast("Company name is required"); return; }
+    const item = {
+      id: genId(),
+      user_id: userId,
+      company: newClient.company.trim(),
+      branch: newClient.branch.trim(),
+      contact: "", phone: "", email: "",
+      stage: "New Lead",
+      notes: "",
+      source: "Created from field note",
+      created_at: new Date().toISOString(),
+      sync_status: "pending",
+    };
+    setData(d => ({
+      ...d,
+      clients: [item, ...(d.clients || [])],
+      syncQueue: [{ id: genId(), table: "clients", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    await offlineSave("clients", item);
+    setForm(f => ({ ...f, client_id: item.id }));
+    setNewClient({ company: "", branch: "" });
+    setShowNewClient(false);
+    setToast(`Client "${item.company}" added ✓`);
+    triggerImmediateSync();
   }
 
   // ── Edit-in-place: startEdit no longer opens the top form. The edit form
@@ -286,7 +318,31 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
       <Card className="p-4 space-y-3">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Note" : "New Note"}</p>
 
-        <ClientSelector label="Client" value={form.client_id} onChange={v => setForm(f => ({ ...f, client_id: v }))} clients={clients} />
+        <div>
+          <div className="flex items-end gap-2">
+            <div className="flex-1 min-w-0">
+              <ClientSelector label="Client" value={form.client_id} onChange={v => setForm(f => ({ ...f, client_id: v }))} clients={clients} />
+            </div>
+            <button type="button"
+              onClick={() => setShowNewClient(v => !v)}
+              className="shrink-0 flex items-center gap-1 rounded-xl px-3 text-sm font-bold min-h-[52px] border-2 transition-colors"
+              style={showNewClient
+                ? { background: "#F7F3F3", color: "#8B1A1A", borderColor: "#8B1A1A" }
+                : { background: "#F8FAFC", color: "#64748B", borderColor: "#E2E8F0" }}>
+              {showNewClient ? <X size={14} /> : <Plus size={14} />} New
+            </button>
+          </div>
+          {showNewClient && (
+            <div className="mt-2 rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2.5">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quick-add Client</p>
+              <Field label="Company" value={newClient.company} onChange={v => setNewClient(c => ({ ...c, company: v }))} placeholder="e.g. ACME Mining" required />
+              <Field label="Branch / Site (optional)" value={newClient.branch} onChange={v => setNewClient(c => ({ ...c, branch: v }))} placeholder="e.g. Rustenburg Plant" />
+              <Btn size="sm" className="w-full" onClick={createClientInline} disabled={!newClient.company.trim()}>
+                <Check size={14} /> Add &amp; Select
+              </Btn>
+            </div>
+          )}
+        </div>
 
         <div>
           <label className="mb-1.5 block text-sm font-bold text-slate-500">Linked Contacts</label>
