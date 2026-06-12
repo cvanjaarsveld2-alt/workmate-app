@@ -319,27 +319,36 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Note" : "New Note"}</p>
 
         <div>
-          <div className="flex items-end gap-2">
-            <div className="flex-1 min-w-0">
-              <ClientSelector label="Client" value={form.client_id} onChange={v => setForm(f => ({ ...f, client_id: v }))} clients={clients} />
+          {!showNewClient ? (
+            <div className="flex items-end gap-2">
+              <div className="flex-1 min-w-0">
+                <ClientSelector label="Client" value={form.client_id} onChange={v => setForm(f => ({ ...f, client_id: v }))} clients={clients} />
+              </div>
+              <button type="button"
+                onClick={() => setShowNewClient(true)}
+                className="shrink-0 flex items-center gap-1 rounded-xl px-3 text-sm font-bold min-h-[52px] border-2 transition-colors"
+                style={{ background: "#F8FAFC", color: "#64748B", borderColor: "#E2E8F0" }}>
+                <Plus size={14} /> New
+              </button>
             </div>
-            <button type="button"
-              onClick={() => setShowNewClient(v => !v)}
-              className="shrink-0 flex items-center gap-1 rounded-xl px-3 text-sm font-bold min-h-[52px] border-2 transition-colors"
-              style={showNewClient
-                ? { background: "#F7F3F3", color: "#8B1A1A", borderColor: "#8B1A1A" }
-                : { background: "#F8FAFC", color: "#64748B", borderColor: "#E2E8F0" }}>
-              {showNewClient ? <X size={14} /> : <Plus size={14} />} New
-            </button>
-          </div>
-          {showNewClient && (
-            <div className="mt-2 rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2.5">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Quick-add Client</p>
-              <Field label="Company" value={newClient.company} onChange={v => setNewClient(c => ({ ...c, company: v }))} placeholder="e.g. ACME Mining" required />
-              <Field label="Branch / Site (optional)" value={newClient.branch} onChange={v => setNewClient(c => ({ ...c, branch: v }))} placeholder="e.g. Rustenburg Plant" />
-              <Btn size="sm" className="w-full" onClick={createClientInline} disabled={!newClient.company.trim()}>
-                <Check size={14} /> Add &amp; Select
-              </Btn>
+          ) : (
+            <div>
+              <label className="mb-1.5 block text-sm font-bold text-slate-500">Client</label>
+              <div className="rounded-xl bg-slate-50 border-2 border-slate-200 p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#8B1A1A" }}>New Client</p>
+                  <button type="button"
+                    onClick={() => { setShowNewClient(false); setNewClient({ company: "", branch: "" }); }}
+                    className="text-xs font-bold text-slate-400 hover:text-slate-600 px-2 py-1.5 rounded-lg">
+                    ← Select existing instead
+                  </button>
+                </div>
+                <Field label="Company" value={newClient.company} onChange={v => setNewClient(c => ({ ...c, company: v }))} placeholder="e.g. ACME Mining" required />
+                <Field label="Branch / Site (optional)" value={newClient.branch} onChange={v => setNewClient(c => ({ ...c, branch: v }))} placeholder="e.g. Rustenburg Plant" />
+                <Btn size="sm" className="w-full" onClick={createClientInline} disabled={!newClient.company.trim()}>
+                  <Check size={14} /> Add &amp; Select
+                </Btn>
+              </div>
             </div>
           )}
         </div>
