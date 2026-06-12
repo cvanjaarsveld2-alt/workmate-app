@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, Check,
-  ChevronDown, ChevronUp, Phone, Clipboard,
+  ChevronDown, ChevronUp, Phone, Clipboard, Send,
 } from "lucide-react";
 import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS, NOTE_URGENCY } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
@@ -11,6 +11,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
+import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import {
   Card, Btn, Field, SelectField, SearchBar,
   FilterPills, Toast, Empty, StagePill, PageHeader, useConfirm,
@@ -299,6 +300,7 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
   const [filterStage, setFilterStage]   = useState("All");
   const [editId, setEditId]             = useState(null);
   const [toast, setToast]               = useState("");
+  const [sendInfo, setSendInfo]         = useState(null);
   const [expandedClient, setExpandedClient] = useState(null);
   const [showFollowupForm, setShowFollowupForm] = useState(null);
   const [showNoteForm, setShowNoteForm] = useState(null);
@@ -438,6 +440,16 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+      <AnimatePresence>
+        {sendInfo && (
+          <SendCompanyInfoSheet
+            recipientName={sendInfo.name}
+            recipientEmail={sendInfo.email}
+            recipientPhone={sendInfo.phone}
+            onClose={() => setSendInfo(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="flex items-center justify-between">
         <PageHeader title="Clients" subtitle={`${clients.length} total`} />
@@ -561,6 +573,13 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
                           {/* Full info — no more clipped text */}
                           <ExpandableText text={c.notes} className="mt-1" />
                           {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
+                          {(c.email || c.phone) && (
+                            <button
+                              onClick={() => setSendInfo({ name: c.contact || c.company, email: c.email, phone: c.phone })}
+                              className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-bold border-2 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors min-h-[40px]">
+                              <Send size={13} /> Send Company Info
+                            </button>
+                          )}
                         </div>
                         <div className="flex gap-2 shrink-0">
                           <button onClick={() => startEdit(c)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={15} /></button>
