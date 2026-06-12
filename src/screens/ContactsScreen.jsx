@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, User, Phone, Mail,
-  Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight,
+  Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight, Send,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
@@ -12,6 +12,7 @@ import { WhatsAppButton } from "../components/WhatsAppButton";
 import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import { CardScanner } from "../components/CardScanner";
+import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import {
   Card, Btn, Field, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm,
@@ -71,6 +72,7 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
   const { confirm, dialog } = useConfirm();
   const contacts = data.contacts || [];
   const clients = data.clients || [];
+  const [sendInfo, setSendInfo] = useState(null); // { name, email, phone }
 
   useEffect(() => {
     if (!quickAddTrigger) return;
@@ -339,6 +341,16 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+      <AnimatePresence>
+        {sendInfo && (
+          <SendCompanyInfoSheet
+            recipientName={sendInfo.name}
+            recipientEmail={sendInfo.email}
+            recipientPhone={sendInfo.phone}
+            onClose={() => setSendInfo(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="flex items-center justify-between gap-2">
         <PageHeader title="Contacts" subtitle={`${contacts.length} total · ${leadCount} leads`} />
@@ -462,11 +474,25 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
                     </div>
 
                     {canPromote && (
-                      <div className="mt-3 pt-3 border-t border-slate-100">
+                      <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                        <button
+                          onClick={() => setSendInfo({ name: c.name, email: c.email, phone: c.phone })}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold border-2 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors min-h-[44px]">
+                          <Send size={14} /> Send Company Info
+                        </button>
                         <button
                           onClick={() => promoteToClient(c)}
                           className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold border-2 border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-colors min-h-[44px]">
                           <ArrowUpRight size={14} /> Promote to Client
+                        </button>
+                      </div>
+                    )}
+                    {!canPromote && (c.email || c.phone) && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <button
+                          onClick={() => setSendInfo({ name: c.name, email: c.email, phone: c.phone })}
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold border-2 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors min-h-[44px]">
+                          <Send size={14} /> Send Company Info
                         </button>
                       </div>
                     )}
