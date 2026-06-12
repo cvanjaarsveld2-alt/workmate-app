@@ -5,8 +5,9 @@ import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
 import ReportExport from "../ReportExport";
 import { BackupExport } from "../components/BackupExport";
+import { CompanyDocuments } from "../components/CompanyDocuments";
 
-export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen }) {
+export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen, userId }) {
   const { confirm, dialog } = useConfirm();
   const pendingCount = (data.syncQueue || []).filter(i => i.status === "pending").length;
   const flaggedQuotes = (data.quotes || []).filter(q => q.status === "Pending").length;
@@ -135,6 +136,9 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           </div>
         ))}
       </Card>
+
+      {/* Company Documents */}
+      <CompanyDocuments userId={userId} />
 
       {/* Backup */}
       <BackupExport data={data} />
