@@ -14,14 +14,14 @@ export default function SyncStatusBadge({ isOnline, pendingCount, syncing }) {
   const prevOnline = useRef(isOnline);
 
   useEffect(() => {
-    if (isOnline && !prevOnline.current) {
+    const wasOffline = !prevOnline.current;
+    prevOnline.current = isOnline;
+    if (isOnline && wasOffline) {
       setJustReconnected(true);
       const t = setTimeout(() => setJustReconnected(false), 2500);
       return () => clearTimeout(t);
     }
-    prevOnline.current = isOnline;
   }, [isOnline]);
-  useEffect(() => { prevOnline.current = isOnline; }, [isOnline]);
 
   let content = null;
 
