@@ -67,6 +67,34 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
     setShowForm(false);
   }
 
+  // ── Create a contact on the fly from inside the Link Contacts sheet ──
+  async function createContactInline(c) {
+    if (!c.name?.trim()) return null;
+    const item = {
+      id: genId(),
+      user_id: userId,
+      name: c.name.trim(),
+      company: (c.company || "").trim(),
+      title: "", email: "",
+      phone: (c.phone || "").trim(),
+      met_at: "", met_date: todayISO(),
+      notes: "", card_photo_url: null,
+      status: "lead",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      sync_status: "pending",
+    };
+    setData(d => ({
+      ...d,
+      contacts: [item, ...(d.contacts || [])],
+      syncQueue: [{ id: genId(), table: "contacts", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    await offlineSave("contacts", item);
+    setToast(`Contact "${item.name}" added ✓`);
+    triggerImmediateSync();
+    return item.id;
+  }
+
   // ── Create a client on the fly from inside the note form ──
   async function createClientInline() {
     if (!newClient.company.trim()) { setToast("Company name is required"); return; }
@@ -510,6 +538,7 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
             selectedIds={linkedContactIds}
             onChange={setLinkedContactIds}
             onClose={() => setShowContactPicker(false)}
+            onCreate={createContactInline}
           />
         )}
       </AnimatePresence>
