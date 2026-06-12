@@ -34,7 +34,7 @@ function toCSV(rows, columns) {
 const COLUMNS = {
   clients: [
     "id", "company", "branch", "contact", "phone", "email", "stage",
-    "pipeline_status", "location", "notes", "created_at", "sync_status",
+    "location", "notes", "created_at", "sync_status",
   ],
   contacts: [
     "id", "name", "company", "title", "email", "phone", "met_at", "met_date",
