@@ -1,18 +1,19 @@
 // ─── Follow-ups Screen ────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Save, Edit2, Trash2, Check, Calendar } from "lucide-react";
+import { Plus, X, Save, Edit2, Trash2, Check, Calendar, Send } from "lucide-react";
 import { BRAND, REMINDER_OPTIONS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { triggerImmediateSync } from "../lib/sync";
+import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import {
   Card, Btn, Field, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 
-function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
+function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo }) {
   const [expanded, setExpanded] = useState(false);
   const isOverdue = !f.completed && f.date < today;
   const reminder  = REMINDER_OPTIONS.find(o => o.value === f.reminder);
@@ -57,6 +58,13 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete }) {
               <WhatsAppButton phone={f.clientPhone} contactName={f.clientContact} clientName={f.client} followupTitle={f.title} size="sm" />
             </div>
           )}
+          {(f.clientEmail || f.clientPhone) && !f.completed && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onSendInfo && onSendInfo(f); }}
+              className="mt-2 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold border border-blue-200 bg-blue-50 text-blue-700 min-h-[36px]">
+              <Send size={12} /> Send Company Info
+            </button>
+          )}
         </div>
         <div className="flex flex-col gap-2 shrink-0">
           {isOverdue && <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-600 whitespace-nowrap">Overdue</span>}
@@ -73,6 +81,7 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
   const [filter, setFilter]     = useState("By Client");
   const [editId, setEditId]     = useState(null);
   const [toast, setToast]       = useState("");
+  const [sendInfo, setSendInfo] = useState(null);
   const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "" });
   const { confirm, dialog } = useConfirm();
 
@@ -197,7 +206,11 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
       );
     }
     return (
-      <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)} />
+      <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)}
+        onSendInfo={() => {
+          const client = clients.find(c => c.id === f.client_id);
+          setSendInfo({ name: f.client || client?.contact || "", email: client?.email || "", phone: f.clientPhone || client?.phone || "" });
+        }} />
     );
   }
 
@@ -237,6 +250,16 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
   return (
     <div className="space-y-4">
       {dialog}
+      <AnimatePresence>
+        {sendInfo && (
+          <SendCompanyInfoSheet
+            recipientName={sendInfo.name}
+            recipientEmail={sendInfo.email}
+            recipientPhone={sendInfo.phone}
+            onClose={() => setSendInfo(null)}
+          />
+        )}
+      </AnimatePresence>
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
       <div className="flex items-center justify-between">
