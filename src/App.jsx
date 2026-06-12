@@ -318,6 +318,9 @@ export default function PowerWorksApp() {
     if (!window.history.state?.pmScreen) {
       window.history.replaceState({ pmScreen: "Home" }, "");
     }
+    // Prevent accidental pull-to-refresh while scrolling lists (PWA polish).
+    document.documentElement.style.overscrollBehaviorY = "contain";
+    document.body.style.overscrollBehaviorY = "contain";
   }, []);
 
   useEffect(() => {
