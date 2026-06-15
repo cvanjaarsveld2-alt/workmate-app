@@ -55,6 +55,11 @@ const COLUMNS = {
     "id", "name", "type", "make", "model", "serial", "location", "client",
     "service_due", "notes", "media", "created_at",
   ],
+  expenses: [
+    "id", "vendor", "amount", "vat_amount", "currency", "expense_date",
+    "expense_time", "category", "payment_method", "notes", "receipt_url",
+    "status", "created_at",
+  ],
 };
 
 // ─── Main backup export ──────────────────────────────────────────────────────
@@ -81,6 +86,7 @@ async function generateBackup(data) {
       quotes:    (data.quotes    || []).length,
       notes:     (data.notes     || []).length,
       equipment: (data.equipment || []).length,
+      expenses:  (data.expenses  || []).length,
     },
     data: {
       clients:   data.clients   || [],
@@ -89,6 +95,7 @@ async function generateBackup(data) {
       quotes:    data.quotes    || [],
       notes:     data.notes     || [],
       equipment: data.equipment || [],
+      expenses:  data.expenses  || [],
     },
   };
   zip.file("powermate_master.json", JSON.stringify(master, null, 2));
