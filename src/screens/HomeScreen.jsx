@@ -1,22 +1,31 @@
-// ─── Home Screen ──────────────────────────────────────────────────────────────
+// ─── Dashboard (Home) ─────────────────────────────────────────────────────────
+// The command-centre landing screen: action items, today's schedule, quick-add,
+// key stats, expenses snapshot, and pipeline.
+// ─────────────────────────────────────────────────────────────────────────────
 import React from "react";
 import { motion } from "framer-motion";
 import {
   Calendar, ChevronRight, File as FileIcon,
-  TrendingUp, Wrench, AlertCircle, Clock, Clipboard,
-  CheckCircle2, ArrowRight,
+  TrendingUp, Wrench, Clipboard, CheckCircle2, ArrowRight,
+  Receipt, UserPlus, Plus, Users,
 } from "lucide-react";
 import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
 import { todayISO, niceDate, daysDiff, smartDate } from "../lib/helpers";
 import { Card, StatCard } from "../components/ui";
 
-export function HomeScreen({ data, setScreen, user }) {
+function money(n) {
+  return "R" + Math.round(n || 0).toLocaleString("en-ZA");
+}
+
+export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
   const today     = todayISO();
   const clients   = data.clients   || [];
   const quotes    = data.quotes    || [];
   const followups = data.followups || [];
   const equipment = data.equipment || [];
   const notes     = data.notes     || [];
+  const expenses  = data.expenses  || [];
+  const contacts  = data.contacts  || [];
 
   const todayFU       = followups.filter(f => f.date === today && !f.completed)
                                   .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
@@ -29,6 +38,18 @@ export function HomeScreen({ data, setScreen, user }) {
   const dueSoonEquip  = equipment.filter(e => e.service_due && daysDiff(e.service_due) !== null && daysDiff(e.service_due) >= 0 && daysDiff(e.service_due) <= 7);
   const criticalNotes = notes.filter(n => !n.resolved && n.urgency === "Critical");
   const overdueNotes  = notes.filter(n => !n.resolved && n.resolve_by && n.resolve_by < today);
+  const leadContacts  = contacts.filter(c => (c.status || "lead") === "lead");
+
+  // Expenses this month
+  const now = new Date();
+  const expThisMonth = expenses.filter(e => {
+    if (!e.expense_date) return false;
+    const d = new Date(e.expense_date + "T12:00:00");
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const expMonthTotal     = expThisMonth.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const unsubmittedExp    = expenses.filter(e => e.status === "unsubmitted");
+  const unsubmittedTotal  = unsubmittedExp.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
 
   const quoteConversion = sentQuotes > 0 ? Math.round((acceptedQ / sentQuotes) * 100) : 0;
 
@@ -50,22 +71,47 @@ export function HomeScreen({ data, setScreen, user }) {
     actionItems.push({ icon: "🔧", text: `${overdueEquip.length} equipment service${overdueEquip.length !== 1 ? "s" : ""} overdue`, screen: "Equipment", color: "text-orange-700" });
   if (dueSoonEquip.length > 0)
     actionItems.push({ icon: "🛠️", text: `${dueSoonEquip.length} service${dueSoonEquip.length !== 1 ? "s" : ""} due within 7 days`, screen: "Equipment", color: "text-amber-700" });
+  if (unsubmittedExp.length > 0)
+    actionItems.push({ icon: "🧾", text: `${unsubmittedExp.length} expense${unsubmittedExp.length !== 1 ? "s" : ""} not submitted (${money(unsubmittedTotal)})`, screen: "Expenses", color: "text-amber-700" });
 
   const actionCount = actionItems.length;
-
   const todayList = todayFU.slice(0, 5);
   const todayOverflow = Math.max(0, todayFU.length - 5);
+
+  const quickActions = [
+    { label: "Note",     icon: Clipboard, screen: "Notes",     bg: "#FEF3C7", color: "#92400E" },
+    { label: "Expense",  icon: Receipt,   screen: "Expenses",  bg: "#FFE4D9", color: "#7C2D12" },
+    { label: "Follow-up",icon: Calendar,  screen: "Followups", bg: "#CFFAFE", color: "#0E7490" },
+    { label: "Contact",  icon: UserPlus,  screen: "Contacts",  bg: "#FFE4D9", color: "#7C2D12" },
+  ];
 
   return (
     <div className="space-y-5">
 
-      {/* ── Header: just date + logo ─────────────────────────────────────────── */}
+      {/* ── Header: date + logo ── */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-400">{niceDate()}</p>
+        <div>
+          <p className="text-sm text-slate-400">{niceDate()}</p>
+          <p className="text-xl font-black text-slate-900">Dashboard</p>
+        </div>
         <img src={BRAND.logo} alt="PW" className="h-8 object-contain opacity-80" onError={e => e.target.style.display = "none"} />
       </div>
 
-      {/* ── Consolidated Action Required ──────────────────────────────────────── */}
+      {/* ── Quick actions ── */}
+      <div className="grid grid-cols-4 gap-2">
+        {quickActions.map(qa => (
+          <button key={qa.label}
+            onClick={() => (onQuickAdd ? onQuickAdd(qa.screen) : setScreen(qa.screen))}
+            className="flex flex-col items-center gap-1.5 rounded-2xl bg-white border border-slate-100 shadow-sm py-3 hover:shadow-md transition-shadow min-h-[76px]">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: qa.bg, color: qa.color }}>
+              <qa.icon size={17} />
+            </div>
+            <span className="text-xs font-bold text-slate-600">{qa.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Action Required ── */}
       {actionItems.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="overflow-hidden">
@@ -90,7 +136,7 @@ export function HomeScreen({ data, setScreen, user }) {
         </motion.div>
       )}
 
-      {/* ── Today's Schedule ───────────────────────────────────────────────────── */}
+      {/* ── Today's Schedule ── */}
       <Card className="overflow-hidden">
         <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100">
           <p className="text-xs font-black text-slate-500 uppercase tracking-wider">
@@ -135,44 +181,28 @@ export function HomeScreen({ data, setScreen, user }) {
         )}
       </Card>
 
-      {/* ── Stats Grid ─────────────────────────────────────────────────────────── */}
+      {/* ── Stats Grid (tappable) ── */}
       <div className="grid grid-cols-2 gap-3">
-        <StatCard
-          label="Today's Tasks"
-          value={todayFU.length}
-          sub={todayFU.length === 0 ? "all clear" : "follow-ups due"}
-          color={BRAND.primary}
-          icon={Calendar}
-        />
-        <StatCard
-          label="Pending Quotes"
-          value={pendingQ.length}
-          sub={pendingQ.length === 0 ? "none awaiting" : "awaiting response"}
-          color="#B45309"
-          icon={FileIcon}
-        />
-        <StatCard
-          label="Won Revenue"
-          value={`R${Math.round(wonRev / 1000)}k`}
-          sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`}
-          color="#16A34A"
-          icon={TrendingUp}
-        />
-        <StatCard
-          label="Quote Conversion"
-          value={`${quoteConversion}%`}
-          sub={`${acceptedQ} of ${sentQuotes} sent`}
-          color="#7C3AED"
-          icon={TrendingUp}
-        />
+        <button onClick={() => setScreen("Followups")} className="text-left">
+          <StatCard label="Today's Tasks" value={todayFU.length} sub={todayFU.length === 0 ? "all clear" : "follow-ups due"} color={BRAND.primary} icon={Calendar} />
+        </button>
+        <button onClick={() => setScreen("Quotes")} className="text-left">
+          <StatCard label="Pending Quotes" value={pendingQ.length} sub={pendingQ.length === 0 ? "none awaiting" : "awaiting response"} color="#B45309" icon={FileIcon} />
+        </button>
+        <button onClick={() => setScreen("Quotes")} className="text-left">
+          <StatCard label="Won Revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} />
+        </button>
+        <button onClick={() => setScreen("Expenses")} className="text-left">
+          <StatCard label="Expenses (mo)" value={money(expMonthTotal)} sub={unsubmittedExp.length > 0 ? `${unsubmittedExp.length} unsubmitted` : "all submitted"} color="#7C2D12" icon={Receipt} />
+        </button>
       </div>
 
-      {/* ── Pipeline ──────────────────────────────────────────────────────────── */}
+      {/* ── Pipeline ── */}
       <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
+        <button onClick={() => setScreen("Clients")} className="w-full flex items-center justify-between mb-3">
           <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Sales Pipeline</p>
           <p className="text-xs text-slate-400">{inPipeline} in pipeline{lostC > 0 ? ` · ${lostC} lost` : ""}</p>
-        </div>
+        </button>
         <div className="space-y-2.5">
           {PIPELINE_STAGES.filter(s => s !== "Lost").map(stage => {
             const count = pCount[stage] || 0;
