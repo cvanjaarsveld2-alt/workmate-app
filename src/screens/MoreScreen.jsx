@@ -1,6 +1,6 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
 import React from "react";
-import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight } from "lucide-react";
+import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
 import ReportExport from "../ReportExport";
@@ -11,6 +11,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
   const { confirm, dialog } = useConfirm();
   const pendingCount = (data.syncQueue || []).filter(i => i.status === "pending").length;
   const flaggedQuotes = (data.quotes || []).filter(q => q.status === "Pending").length;
+  const unsubmittedExpenses = (data.expenses || []).filter(e => e.status === "unsubmitted").length;
 
   function changePIN() {
     localStorage.removeItem(PIN_KEY);
@@ -28,10 +29,10 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
       {dialog}
       <PageHeader title="Settings" subtitle="Sync, security & account" />
 
-      {/* Quotes shortcut */}
+      {/* Quotes + Expenses shortcuts */}
       {setScreen && (
         <Card className="overflow-hidden">
-          <button onClick={() => setScreen("Quotes")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px]">
+          <button onClick={() => setScreen("Quotes")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px] border-b border-slate-100">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#DCFCE7", color: "#15803D" }}>
               <FileIcon size={18} />
             </div>
@@ -39,6 +40,18 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
               <p className="text-base font-bold text-slate-800">Quotes</p>
               <p className="text-sm text-slate-400">
                 {(data.quotes || []).length} total{flaggedQuotes > 0 ? ` · ${flaggedQuotes} pending` : ""}
+              </p>
+            </div>
+            <ChevronRight size={16} className="text-slate-300 shrink-0" />
+          </button>
+          <button onClick={() => setScreen("Expenses")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px]">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FFE4D9", color: "#7C2D12" }}>
+              <Receipt size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-bold text-slate-800">Expenses</p>
+              <p className="text-sm text-slate-400">
+                {(data.expenses || []).length} total{unsubmittedExpenses > 0 ? ` · ${unsubmittedExpenses} unsubmitted` : ""}
               </p>
             </div>
             <ChevronRight size={16} className="text-slate-300 shrink-0" />
@@ -129,6 +142,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           { label: "Quotes",     count: (data.quotes    || []).length },
           { label: "Notes",      count: (data.notes     || []).length },
           { label: "Equipment",  count: (data.equipment || []).length },
+          { label: "Expenses",   count: (data.expenses  || []).length },
         ].map(({ label, count }) => (
           <div key={label} className="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0">
             <p className="text-base text-slate-600">{label}</p>
