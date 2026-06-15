@@ -1,13 +1,14 @@
 // ─── Quick Capture FAB ────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Clipboard, Calendar, Users, File as FileIcon, Wrench, UserPlus } from "lucide-react";
+import { Plus, X, Clipboard, Calendar, Users, File as FileIcon, Wrench, UserPlus, Receipt } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
 const OPTIONS = [
   { key: "Notes",     label: "Note",      icon: Clipboard, color: "#92400E", bg: "#FEF3C7" },
   { key: "Followups", label: "Follow-up", icon: Calendar,  color: "#0E7490", bg: "#CFFAFE" },
   { key: "Contacts",  label: "Contact",   icon: UserPlus,  color: "#7C2D12", bg: "#FFE4D9" },
+  { key: "Expenses",  label: "Expense",   icon: Receipt,   color: "#7C2D12", bg: "#FFE4D9" },
   { key: "Clients",   label: "Client",    icon: Users,     color: "#5B21B6", bg: "#EDE9FE" },
   { key: "Quotes",    label: "Quote",     icon: FileIcon,  color: "#15803D", bg: "#DCFCE7" },
   { key: "Equipment", label: "Equipment", icon: Wrench,    color: "#9F1239", bg: "#FFE4E6" },
