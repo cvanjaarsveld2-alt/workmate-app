@@ -31,6 +31,7 @@ import { FollowupsScreen } from "./screens/FollowupsScreen";
 import { QuotesScreen }    from "./screens/QuotesScreen";
 import { NotesScreen }     from "./screens/NotesScreen";
 import { EquipmentScreen } from "./screens/EquipmentScreen";
+import { ExpensesScreen }  from "./screens/ExpensesScreen";
 import { MoreScreen }      from "./screens/MoreScreen";
 
 class ErrorBoundary extends React.Component {
@@ -74,7 +75,7 @@ export default function PowerWorksApp() {
     "Notification" in window ? Notification.permission : "denied"
   );
   const [data, setData] = useState({
-    clients: [], followups: [], quotes: [], notes: [], equipment: [], contacts: [], syncQueue: [],
+    clients: [], followups: [], quotes: [], notes: [], equipment: [], contacts: [], expenses: [], syncQueue: [],
   });
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
 
@@ -110,9 +111,9 @@ export default function PowerWorksApp() {
       } catch (e) { console.warn("localStorage load failed:", e); }
 
       try {
-        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts"];
+        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses"];
         const results = await Promise.all(tables.map(t => offlineGetAll(t)));
-        const [clients, followups, quotes, notes, equipment, contacts] = results;
+        const [clients, followups, quotes, notes, equipment, contacts, expenses] = results;
         setData(d => ({
           ...d,
           ...(clients?.length   ? { clients }   : {}),
@@ -121,6 +122,7 @@ export default function PowerWorksApp() {
           ...(notes?.length     ? { notes }     : {}),
           ...(equipment?.length ? { equipment } : {}),
           ...(contacts?.length  ? { contacts }  : {}),
+          ...(expenses?.length  ? { expenses }  : {}),
         }));
       } catch (e) { console.warn("IndexedDB load failed:", e); }
     }
@@ -357,6 +359,7 @@ export default function PowerWorksApp() {
     Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
+    Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
   };
 
