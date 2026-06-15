@@ -6,7 +6,7 @@ import { supabase } from "../supabase";
 import { logEvent } from "./helpers";
 import { offlineSave } from "../offline/offlineDb";
 
-const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts"];
+const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses"];
 
 export async function pushItem(item) {
   try {
@@ -156,13 +156,14 @@ export async function pushSyncQueue(syncQueue, setData) {
 
 export async function pullFromSupabase(uid, setData) {
   try {
-    const [a, b, c, d, e, f] = await Promise.all([
+    const [a, b, c, d, e, f, g] = await Promise.all([
       supabase.from("clients").select("id,user_id,company,division,contact,phone,email,location,branch,stage,sync_status,auto_created,source,notes,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("followups").select("id,user_id,client_id,client,branch,title,date,time,reminder,notes,completed,sync_status,auto_generated,created_at").eq("user_id", uid).order("date", { ascending: false }).limit(500),
       supabase.from("quotes").select("id,user_id,client_name,description,value,status,sent_date,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("notes").select("id,user_id,client,client_id,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("contacts").select("id,user_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
+      supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,expense_date,expense_time,category,payment_method,notes,receipt_url,status,ai_extracted,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
     ]);
 
     setData(prev => {
@@ -188,6 +189,7 @@ export async function pullFromSupabase(uid, setData) {
         notes:     d.error ? prev.notes     : merge(d.data, prev.notes,     prev.syncQueue, "notes"),
         equipment: e.error ? prev.equipment : merge(e.data, prev.equipment, prev.syncQueue, "equipment"),
         contacts:  f.error ? prev.contacts  : merge(f.data, prev.contacts,  prev.syncQueue, "contacts"),
+        expenses:  g.error ? prev.expenses  : merge(g.data, prev.expenses,  prev.syncQueue, "expenses"),
       };
     });
 
