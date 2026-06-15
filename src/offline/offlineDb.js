@@ -4,8 +4,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const DB_NAME = "powermate_offline";
-const DB_VERSION = 3; // bumped for contacts store
-const STORES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "syncQueue"];
+const DB_VERSION = 4; // bumped for expenses store
+const STORES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "syncQueue"];
 
 let _db = null;
 
