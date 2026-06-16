@@ -49,14 +49,13 @@ export function ReceiptScanner({ userId, onExtracted, onCancel }) {
       setPreview(compressed);
       setStage("uploading");
 
-      // Upload to Storage
+      // Upload to Storage (private bucket — store the PATH, sign on read)
       const path = `receipts/${userId}/${genId()}.jpg`;
       const blob = await (await fetch(compressed)).blob();
       const { error: upErr } = await supabase.storage.from("receipts").upload(path, blob, {
         contentType: "image/jpeg", upsert: false,
       });
       if (upErr) throw new Error("Upload failed: " + upErr.message);
-      const { data: urlData } = supabase.storage.from("receipts").getPublicUrl(path);
 
       // Call AI scan
       setStage("scanning");
@@ -78,7 +77,8 @@ export function ReceiptScanner({ userId, onExtracted, onCancel }) {
       }
 
       const extracted = await res.json();
-      onExtracted({ ...extracted, receipt_url: urlData.publicUrl });
+      // Store the storage PATH (not a public URL); display code signs it on demand.
+      onExtracted({ ...extracted, receipt_url: path });
     } catch (e) {
       console.error("Receipt scan error:", e);
       setError(e.message || "Something went wrong");
