@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home, Users, Calendar, File as FileIcon,
-  Clipboard, Wrench, Settings, UserPlus, Search,
+  Clipboard, Wrench, Settings, UserPlus, Search, Menu, Receipt,
 } from "lucide-react";
 
 import { supabase } from "./supabase";
@@ -11,7 +11,7 @@ import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import { offlineSave, offlineGetAll } from "./offline/offlineDb";
 
 import { todayISO, logEvent, genId } from "./lib/helpers";
-import { LOCAL_STORAGE_KEY, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY } from "./lib/constants";
+import { LOCAL_STORAGE_KEY, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY, BRAND } from "./lib/constants";
 import { pushSyncQueue, pullFromSupabase, setupRealtimeSync, registerSyncHandlers, triggerImmediateSync } from "./lib/sync";
 import { requestNotificationPermission, scheduleNotificationsViaSW, buildNotificationItems } from "./lib/notifications";
 import { getPINHash, loadPINHash, isSessionUnlocked, resetPINAttempts } from "./lib/pinHelpers";
@@ -23,6 +23,8 @@ import { NavTab, Spinner, DataLoadingScreen, Toast } from "./components/ui";
 import SyncStatusBadge from "./components/SyncStatusBadge";
 import { QuickCaptureFAB } from "./components/QuickCaptureFAB";
 import { GlobalSearch } from "./components/GlobalSearch";
+import { NavDrawer } from "./components/NavDrawer";
+import { NavGrid } from "./components/NavGrid";
 
 import { HomeScreen }      from "./screens/HomeScreen";
 import { ClientsScreen }   from "./screens/ClientsScreen";
@@ -71,6 +73,8 @@ export default function PowerWorksApp() {
   const [syncError,  setSyncError]  = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchSeed, setSearchSeed] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [navGridOpen, setNavGridOpen] = useState(false);
   const [notifPermission, setNotifPermission] = useState(
     "Notification" in window ? Notification.permission : "denied"
   );
@@ -343,6 +347,19 @@ export default function PowerWorksApp() {
   const overdueEquip     = (data.equipment || []).filter(e => { if (!e.service_due) return false; const d = Math.round((new Date(e.service_due + "T12:00:00") - new Date(todayISO() + "T12:00:00")) / 86400000); return d < 0; }).length;
   const overdueFollowups = (data.followups || []).filter(f => f.date < todayISO() && !f.completed).length;
   const leadContacts     = (data.contacts  || []).filter(c => (c.status || "lead") === "lead").length;
+  const criticalNotes    = (data.notes     || []).filter(n => !n.resolved && n.urgency === "Critical").length;
+  const unsubmittedExp   = (data.expenses  || []).filter(e => e.status === "unsubmitted").length;
+
+  const drawerBadges = {
+    clients:        (data.clients || []).length,
+    leads:          leadContacts,
+    overdueFU:      overdueFollowups,
+    criticalNotes,
+    overdueEquip,
+    pendingQ:       flaggedQuotes,
+    unsubmittedExp,
+    pending:        pendingCount,
+  };
 
   if (loading)              return <Spinner />;
   if (!session)             return <AuthScreen />;
@@ -352,7 +369,7 @@ export default function PowerWorksApp() {
   if (dataLoading)             return <DataLoadingScreen />;
 
   const screens = {
-    Home:      <HomeScreen      data={data} setScreen={navigate} user={session.user} />,
+    Home:      <HomeScreen      data={data} setScreen={navigate} user={session.user} onQuickAdd={handleQuickCapture} />,
     Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
@@ -363,37 +380,36 @@ export default function PowerWorksApp() {
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
   };
 
-  const NAV = [
-    { icon: Home,      label: "Home",       key: "Home" },
-    { icon: Users,     label: "Clients",    key: "Clients" },
-    { icon: UserPlus,  label: "Contacts",   key: "Contacts",   badge: leadContacts || undefined },
-    { icon: Calendar,  label: "Follow-ups", key: "Followups",  badge: overdueFollowups || undefined },
-    { icon: Clipboard, label: "Notes",      key: "Notes" },
-    { icon: Wrench,    label: "Equipment",  key: "Equipment",  badge: overdueEquip || undefined },
-    { icon: Settings,  label: "More",       key: "More",       badge: (pendingCount + flaggedQuotes) || undefined },
-  ];
-
   return (
     <ErrorBoundary>
       <div className="min-h-screen pb-28" style={{ background: "#F7F3F3" }}>
 
-        {/* Floating Search button — docked above the quick-capture FAB.
-            (Top-right placement collided with screen header buttons on mobile.) */}
-        <button
-          onClick={() => setSearchOpen(true)}
-          className="fixed z-40 rounded-full bg-white flex items-center justify-center text-slate-500 hover:text-slate-800 transition-all active:scale-95"
-          style={{
-            width: 44,
-            height: 44,
-            bottom: "calc(env(safe-area-inset-bottom, 0px) + 152px)",
-            right: 20,
-            boxShadow: "0 2px 6px rgba(15, 23, 42, 0.12), 0 1px 2px rgba(15, 23, 42, 0.08)",
-            border: "1px solid #E2E8F0",
-            opacity: 0.96,
-          }}
-          aria-label="Search">
-          <Search size={19} />
-        </button>
+        {/* ── Top bar: hamburger + title + search ── */}
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100">
+          <div className="mx-auto max-w-2xl px-3 h-14 flex items-center justify-between">
+            <button onClick={() => setDrawerOpen(true)}
+              className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Menu">
+              <Menu size={22} />
+            </button>
+            <img src={BRAND.logo} alt="PowerMate" className="h-7 object-contain opacity-90" onError={e => e.target.style.display = "none"} />
+            <button onClick={() => setSearchOpen(true)}
+              className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              aria-label="Search">
+              <Search size={20} />
+            </button>
+          </div>
+        </header>
+
+        <NavDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          currentScreen={screen}
+          onNavigate={navigate}
+          badges={drawerBadges}
+          userEmail={session.user?.email}
+          onLogout={logout}
+        />
 
         <main className="mx-auto max-w-2xl px-4 pt-4">
           <AnimatePresence mode="wait">
@@ -403,13 +419,14 @@ export default function PowerWorksApp() {
           </AnimatePresence>
         </main>
 
-        <nav className="fixed bottom-0 left-0 right-0 border-t border-slate-100 bg-white/95 backdrop-blur-md px-1 pt-1 pb-safe shadow-lg">
-          <div className="mx-auto grid max-w-2xl grid-cols-7 gap-0 pb-1">
-            {NAV.map(({ icon, label, key, badge }) => (
-              <NavTab key={key} icon={icon} label={label} active={screen === key} onClick={() => navigate(key)} badge={badge} />
-            ))}
-          </div>
-        </nav>
+        <NavGrid
+          open={navGridOpen}
+          onOpen={() => setNavGridOpen(true)}
+          onClose={() => setNavGridOpen(false)}
+          currentScreen={screen}
+          onNavigate={navigate}
+          badges={drawerBadges}
+        />
 
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
 
