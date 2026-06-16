@@ -10,7 +10,6 @@ import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { ReceiptScanner } from "../components/ReceiptScanner";
-import { resolveReceiptUrl, getSignedUrl, extractStoragePath } from "../lib/storage";
 import {
   Card, Btn, Field, SelectField, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm,
@@ -94,27 +93,6 @@ function fmtMoney(amount, currency = "ZAR") {
   const sym = currency === "ZAR" ? "R" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : "";
   const n = parseFloat(amount || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return sym ? `${sym}${n}` : `${n} ${currency}`;
-}
-
-// Resolves a private receipt path/URL into a signed URL for display.
-function SignedReceiptImg({ stored, className, alt = "Receipt" }) {
-  const [url, setUrl] = React.useState(null);
-  React.useEffect(() => {
-    let active = true;
-    if (!stored) { setUrl(null); return; }
-    // Already a usable http URL that isn't a stale public link? use directly.
-    resolveReceiptUrl(stored).then(u => { if (active) setUrl(u); });
-    return () => { active = false; };
-  }, [stored]);
-  if (!stored) return null;
-  if (!url) return <div className={className} style={{ background: "#F1F5F9" }} />;
-  return <img src={url} alt={alt} className={className} />;
-}
-
-// Opens a receipt in a new tab via a freshly signed URL.
-async function openReceipt(stored) {
-  const url = await resolveReceiptUrl(stored);
-  if (url) window.open(url, "_blank");
 }
 
 export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
