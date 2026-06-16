@@ -8,7 +8,9 @@ import {
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
+import { supabase } from "../supabase";
 import { ReceiptScanner } from "../components/ReceiptScanner";
+import { resolveReceiptUrl, getSignedUrl, extractStoragePath } from "../lib/storage";
 import {
   Card, Btn, Field, SelectField, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm,
@@ -39,10 +41,80 @@ const STATUS_COLORS = {
 // ⚠️ SET YOUR FINANCE DEPARTMENT EMAIL HERE
 const FINANCE_EMAIL = "vicky@pwrstart.com";
 
+// Receipts live in a PRIVATE bucket. We mint a short-lived signed URL on demand
+// (path is what's stored in receipt_url). Falls back to treating the value as a
+// full URL for any legacy rows saved before the bucket was made private.
+async function signReceipt(pathOrUrl) {
+  if (!pathOrUrl) return null;
+  if (pathOrUrl.startsWith("http")) return pathOrUrl; // legacy public URL
+  try {
+    const { data, error } = await supabase.storage
+      .from("receipts")
+      .createSignedUrl(pathOrUrl, 60 * 60); // 1 hour
+    if (error) return null;
+    return data?.signedUrl || null;
+  } catch {
+    return null;
+  }
+}
+
+// Thumbnail that resolves a signed URL for a private receipt path.
+function ReceiptThumb({ path, onClick }) {
+  const [url, setUrl] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    signReceipt(path).then(u => { if (alive) setUrl(u); });
+    return () => { alive = false; };
+  }, [path]);
+  if (!url) {
+    return <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0"><Receipt size={16} className="text-slate-300" /></div>;
+  }
+  return (
+    <button onClick={onClick} className="shrink-0 w-12 h-12 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+      <img src={url} alt="" className="w-full h-full object-cover" />
+    </button>
+  );
+}
+
+// Full-size signed receipt image (used in the form preview).
+function SignedReceiptImg({ stored, className }) {
+  const [url, setUrl] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    signReceipt(stored).then(u => { if (alive) setUrl(u); });
+    return () => { alive = false; };
+  }, [stored]);
+  if (!url) {
+    return <div className="w-full h-32 bg-slate-50 flex items-center justify-center"><Receipt size={24} className="text-slate-300" /></div>;
+  }
+  return <img src={url} alt="Receipt" className={className} />;
+}
+
 function fmtMoney(amount, currency = "ZAR") {
   const sym = currency === "ZAR" ? "R" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : "";
   const n = parseFloat(amount || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return sym ? `${sym}${n}` : `${n} ${currency}`;
+}
+
+// Resolves a private receipt path/URL into a signed URL for display.
+function SignedReceiptImg({ stored, className, alt = "Receipt" }) {
+  const [url, setUrl] = React.useState(null);
+  React.useEffect(() => {
+    let active = true;
+    if (!stored) { setUrl(null); return; }
+    // Already a usable http URL that isn't a stale public link? use directly.
+    resolveReceiptUrl(stored).then(u => { if (active) setUrl(u); });
+    return () => { active = false; };
+  }, [stored]);
+  if (!stored) return null;
+  if (!url) return <div className={className} style={{ background: "#F1F5F9" }} />;
+  return <img src={url} alt={alt} className={className} />;
+}
+
+// Opens a receipt in a new tab via a freshly signed URL.
+async function openReceipt(stored) {
+  const url = await resolveReceiptUrl(stored);
+  if (url) window.open(url, "_blank");
 }
 
 export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
@@ -184,15 +256,27 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     });
   }
 
-  function sendToFinance() {
+  async function sendToFinance() {
     const selected = expenses.filter(e => selectedIds.has(e.id));
     if (selected.length === 0) { setToast("Select expenses to send"); return; }
+
+    setToast("Preparing receipt links…");
+
+    // Sign each receipt with a 7-day link so Finance has time to open them.
+    const signedLinks = await Promise.all(selected.map(async (e) => {
+      if (!e.receipt_url) return null;
+      if (e.receipt_url.startsWith("http")) return e.receipt_url;
+      try {
+        const { data } = await supabase.storage.from("receipts").createSignedUrl(e.receipt_url, 60 * 60 * 24 * 7);
+        return data?.signedUrl || null;
+      } catch { return null; }
+    }));
 
     const total = selected.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
     const lines = selected.map((e, i) =>
       `${i + 1}. ${e.expense_date ? smartDate(e.expense_date) : "No date"} — ${e.vendor || "Unknown vendor"}\n` +
       `   ${e.category} · ${fmtMoney(e.amount, e.currency)}${e.vat_amount > 0 ? ` (VAT ${fmtMoney(e.vat_amount, e.currency)})` : ""} · ${e.payment_method}\n` +
-      `   ${e.receipt_url ? "Receipt: " + e.receipt_url : "No receipt photo"}`
+      `   ${signedLinks[i] ? "Receipt: " + signedLinks[i] : "No receipt photo"}`
     ).join("\n\n");
 
     const body = `Hi Finance team,
@@ -203,8 +287,9 @@ ${lines}
 
 ────────────────────
 TOTAL: ${fmtMoney(total, selected[0]?.currency || "ZAR")}
-Submitted by: ${userId}
 Date: ${smartDate(todayISO())}
+
+Note: receipt links expire in 7 days.
 
 Kind regards`;
 
@@ -314,7 +399,7 @@ Kind regards`;
 
               {receiptUrl && (
                 <div className="rounded-xl overflow-hidden border border-slate-200">
-                  <img src={receiptUrl} alt="Receipt" className="w-full max-h-44 object-contain bg-slate-50" />
+                  <SignedReceiptImg stored={receiptUrl} className="w-full max-h-44 object-contain bg-slate-50" />
                 </div>
               )}
 
@@ -390,10 +475,14 @@ Kind regards`;
                             </div>
                           )}
                           {ex.receipt_url && !selectMode && (
-                            <a href={ex.receipt_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                              className="shrink-0 w-12 h-12 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                              <img src={ex.receipt_url} alt="" className="w-full h-full object-cover" />
-                            </a>
+                            <ReceiptThumb
+                              path={ex.receipt_url}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const signed = await signReceipt(ex.receipt_url);
+                                if (signed) window.open(signed, "_blank");
+                              }}
+                            />
                           )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
