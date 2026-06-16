@@ -57,7 +57,7 @@ export default function SyncStatusBadge({ isOnline, pendingCount, syncing }) {
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.18 }}
           className="fixed left-1/2 -translate-x-1/2 z-30 pointer-events-none"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 78px)" }}>
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 90px)" }}>
           <div
             className="rounded-full bg-white/95 backdrop-blur px-3 py-1 text-[11px] font-bold text-slate-500"
             style={{
