@@ -43,7 +43,7 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
           color: "white",
           width: 48,
           height: 48,
-          bottom: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 20px)",
           right: 18,
           boxShadow: "0 2px 6px rgba(15, 23, 42, 0.12), 0 1px 2px rgba(15, 23, 42, 0.08)",
           opacity: 0.94,
@@ -70,7 +70,7 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
               transition={{ type: "spring", stiffness: 320, damping: 28 }}
               className="fixed z-50 rounded-2xl bg-white overflow-hidden"
               style={{
-                bottom: "calc(env(safe-area-inset-bottom, 0px) + 156px)",
+                bottom: "calc(env(safe-area-inset-bottom, 0px) + 84px)",
                 right: 18,
                 width: 236,
                 boxShadow: "0 12px 32px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08)",
