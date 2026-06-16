@@ -1,15 +1,44 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
 import ReportExport from "../ReportExport";
 import { BackupExport } from "../components/BackupExport";
 import { CompanyDocuments } from "../components/CompanyDocuments";
+import { subscribeToPush, pushSupported, iosNeedsInstall } from "../lib/pushManager";
 
 export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen, userId }) {
   const { confirm, dialog } = useConfirm();
   const pendingCount = (data.syncQueue || []).filter(i => i.status === "pending").length;
+
+  // Push notification state: idle | working | active | denied | ios-install | unsupported
+  const [pushState, setPushState] = useState("idle");
+
+  useEffect(() => {
+    if (!pushSupported()) { setPushState("unsupported"); return; }
+    if (iosNeedsInstall()) { setPushState("ios-install"); return; }
+    if (typeof Notification !== "undefined") {
+      if (Notification.permission === "granted") setPushState("active");
+      else if (Notification.permission === "denied") setPushState("denied");
+      else setPushState("idle");
+    }
+  }, []);
+
+  async function handleEnablePush() {
+    setPushState("working");
+    const result = await subscribeToPush(userId);
+    if (result.ok) {
+      setPushState("active");
+    } else if (result.reason === "ios-needs-install") {
+      setPushState("ios-install");
+    } else if (result.reason === "denied") {
+      setPushState("denied");
+    } else {
+      setPushState("idle");
+    }
+  }
+
   const flaggedQuotes = (data.quotes || []).filter(q => q.status === "Pending").length;
   const unsubmittedExpenses = (data.expenses || []).filter(e => e.status === "unsubmitted").length;
 
@@ -108,18 +137,40 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Notifications</p>
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-base font-bold text-slate-800">Push Notifications</p>
+            <p className="text-base font-bold text-slate-800">Background Notifications</p>
             <p className="text-sm text-slate-400 mt-0.5">
-              {notifPermission === "granted" ? "✓ Active — follow-up reminders on"
-               : notifPermission === "denied" ? "✗ Blocked in browser settings"
-               : "Get reminders for follow-ups and service due dates"}
+              {pushState === "active" ? "✓ Active — overdue & follow-up alerts, even when app is closed"
+               : pushState === "denied" ? "✗ Blocked in browser settings"
+               : pushState === "ios-install" ? "⚠ Add to Home Screen first (see below)"
+               : pushState === "working" ? "Enabling…"
+               : "Get alerts for overdue items and follow-ups, even when the app is closed"}
             </p>
           </div>
-          {notifPermission === "granted"
+          {pushState === "active"
             ? <span className="shrink-0 text-green-600 text-sm font-bold">Active ✓</span>
-            : notifPermission !== "denied" && <Btn size="sm" variant="warning" onClick={onRequestNotif}><Bell size={14} />Enable</Btn>
+            : (pushState !== "denied" && pushState !== "ios-install") &&
+              <Btn size="sm" variant="warning" onClick={handleEnablePush} disabled={pushState === "working"}>
+                <Bell size={14} />{pushState === "working" ? "…" : "Enable"}
+              </Btn>
           }
         </div>
+        {pushState === "ios-install" && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+            <p className="text-xs font-bold text-amber-800 mb-1">📱 iPhone/iPad — one-time setup</p>
+            <p className="text-xs text-amber-700 leading-relaxed">
+              Apple only allows notifications after you add PowerMate to your Home Screen:
+              tap the <strong>Share</strong> button → <strong>Add to Home Screen</strong> → open PowerMate
+              from the new icon → then tap Enable here. This is an Apple requirement for all web apps.
+            </p>
+          </div>
+        )}
+        {pushState === "denied" && (
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Notifications are blocked. Re-enable them in your browser's site settings for this app, then tap Enable.
+            </p>
+          </div>
+        )}
       </Card>
 
       <Card className="p-4 space-y-3">
