@@ -24,7 +24,6 @@ import SyncStatusBadge from "./components/SyncStatusBadge";
 import { QuickCaptureFAB } from "./components/QuickCaptureFAB";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
-import { NavGrid } from "./components/NavGrid";
 
 import { HomeScreen }      from "./screens/HomeScreen";
 import { ClientsScreen }   from "./screens/ClientsScreen";
@@ -66,7 +65,15 @@ export default function PowerWorksApp() {
 
   const [session,    setSession]    = useState(null);
   const [loading,    setLoading]    = useState(true);
-  const [screen,     setScreen]     = useState("Home");
+  const [screen,     setScreen]     = useState(() => {
+    // Notifications open the app at /?screen=Followups etc — honour that on load.
+    try {
+      const p = new URLSearchParams(window.location.search).get("screen");
+      const valid = ["Home", "Clients", "Contacts", "Followups", "Notes", "Equipment", "Quotes", "Expenses", "More"];
+      if (p && valid.includes(p)) return p;
+    } catch (e) { /* ignore */ }
+    return "Home";
+  });
   const [syncing,    setSyncing]    = useState(false);
   const [pinState,   setPinState]   = useState("checking");
   const [dataLoading, setDataLoading] = useState(true);
@@ -74,7 +81,6 @@ export default function PowerWorksApp() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchSeed, setSearchSeed] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [navGridOpen, setNavGridOpen] = useState(false);
   const [notifPermission, setNotifPermission] = useState(
     "Notification" in window ? Notification.permission : "denied"
   );
@@ -90,6 +96,14 @@ export default function PowerWorksApp() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s));
     return () => { mounted = false; subscription.unsubscribe(); };
+  }, []);
+
+  // Register the service worker (enables background push + offline).
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(err => {
+      console.warn("Service worker registration failed:", err);
+    });
   }, []);
 
   useEffect(() => {
@@ -418,15 +432,6 @@ export default function PowerWorksApp() {
             </motion.div>
           </AnimatePresence>
         </main>
-
-        <NavGrid
-          open={navGridOpen}
-          onOpen={() => setNavGridOpen(true)}
-          onClose={() => setNavGridOpen(false)}
-          currentScreen={screen}
-          onNavigate={navigate}
-          badges={drawerBadges}
-        />
 
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
 
