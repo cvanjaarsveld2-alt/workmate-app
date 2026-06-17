@@ -38,26 +38,57 @@ export async function subscribeToPush(userId) {
   if (!pushSupported()) return { ok: false, reason: "unsupported" };
   if (iosNeedsInstall()) return { ok: false, reason: "ios-needs-install" };
 
+  // Helper: wrap any promise with a timeout so an iOS silent-hang fails visibly.
+  const withTimeout = (promise, ms, label) => Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout: " + label)), ms)),
+  ]);
+
   try {
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return { ok: false, reason: "denied" };
 
-    const reg = await navigator.serviceWorker.ready;
+    // Wait for the service worker, but don't hang forever.
+    let reg;
+    try {
+      reg = await withTimeout(navigator.serviceWorker.ready, 10000, "service worker activation");
+    } catch (e) {
+      console.error("[Push] Service worker never became ready:", e);
+      return { ok: false, reason: "sw-not-ready" };
+    }
 
     // Reuse an existing subscription if present
-    let sub = await reg.pushManager.getSubscription();
+    let sub;
+    try {
+      sub = await reg.pushManager.getSubscription();
+    } catch (e) {
+      console.warn("[Push] getSubscription failed:", e);
+    }
+
     if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      });
+      try {
+        sub = await withTimeout(
+          reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+          }),
+          15000,
+          "push subscribe (likely VAPID key mismatch or Apple Push service)"
+        );
+      } catch (e) {
+        console.error("[Push] subscribe() failed:", e.message || e);
+        return { ok: false, reason: "subscribe-failed", detail: e.message };
+      }
     }
 
     const json = sub.toJSON();
     const endpoint = json.endpoint;
     const p256dh = json.keys?.p256dh;
     const auth = json.keys?.auth;
-    if (!endpoint || !p256dh || !auth) return { ok: false, reason: "bad-subscription" };
+    if (!endpoint || !p256dh || !auth) {
+      console.error("[Push] Bad subscription shape:", json);
+      return { ok: false, reason: "bad-subscription" };
+    }
 
     // Upsert into Supabase (unique on user_id + endpoint)
     const { error } = await supabase
@@ -75,13 +106,13 @@ export async function subscribeToPush(userId) {
       );
 
     if (error) {
-      console.warn("Failed to save push subscription:", error);
-      return { ok: false, reason: "save-failed" };
+      console.error("[Push] Failed to save subscription:", error);
+      return { ok: false, reason: "save-failed", detail: error.message };
     }
 
     return { ok: true };
   } catch (e) {
-    console.error("Push subscribe error:", e);
+    console.error("[Push] Unexpected error:", e);
     return { ok: false, reason: e.message || "error" };
   }
 }
