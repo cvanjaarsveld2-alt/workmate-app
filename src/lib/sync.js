@@ -171,7 +171,7 @@ export async function pullFromSupabase(uid, setData) {
       supabase.from("notes").select("id,user_id,client,client_id,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("contacts").select("id,user_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-      supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,expense_date,expense_time,category,payment_method,notes,receipt_url,status,ai_extracted,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
+      supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,amount_zar,exchange_rate,rate_date,rate_source,expense_date,expense_time,category,payment_method,notes,receipt_url,payment_slip_url,status,ai_extracted,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
     ]);
 
     setData(prev => {
