@@ -120,10 +120,24 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
     if (editId) {
       const existing = followups.find(f => f.id === editId);
       const updated  = { ...existing, ...form, client: clientName, branch: clientBranch, sync_status: "pending" };
+      // Strict payload — only real table columns get sent up.
+      const syncPayload = {
+        id: updated.id,
+        client_id: updated.client_id || null,
+        client: updated.client || "",
+        branch: updated.branch || "",
+        title: updated.title || "",
+        date: updated.date || null,
+        time: updated.time || "",
+        reminder: updated.reminder || "morning",
+        notes: updated.notes || "",
+        completed: !!updated.completed,
+        sync_status: "pending",
+      };
       setData(d => ({
         ...d,
         followups: (d.followups || []).map(f => f.id === editId ? updated : f),
-        syncQueue: [{ id: genId(), table: "followups", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+        syncQueue: [{ id: genId(), table: "followups", action: "update", data: syncPayload, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
       }));
       await offlineSave("followups", updated);
       setToast("Follow-up updated");
@@ -151,10 +165,17 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
     const t = followups.find(f => f.id === id);
     if (!t) return;
     const up = { ...t, completed: !t.completed, sync_status: "pending" };
+    // Narrow payload for the sync push — avoids accidentally pushing any
+    // fields that aren't actual columns on the followups table.
+    const syncPayload = {
+      id: t.id,
+      completed: !t.completed,
+      sync_status: "pending",
+    };
     setData(d => ({
       ...d,
       followups: (d.followups || []).map(f => f.id === id ? up : f),
-      syncQueue: [{ id: genId(), table: "followups", action: "update", data: up, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+      syncQueue: [{ id: genId(), table: "followups", action: "update", data: syncPayload, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
     }));
     await offlineSave("followups", up);
     triggerImmediateSync();
