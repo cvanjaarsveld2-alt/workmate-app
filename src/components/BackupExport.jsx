@@ -56,9 +56,10 @@ const COLUMNS = {
     "service_due", "notes", "media", "created_at",
   ],
   expenses: [
-    "id", "vendor", "amount", "vat_amount", "currency", "expense_date",
-    "expense_time", "category", "payment_method", "notes", "receipt_url",
-    "status", "created_at",
+    "id", "vendor", "amount", "vat_amount", "currency", "amount_zar",
+    "exchange_rate", "rate_date", "rate_source",
+    "expense_date", "expense_time", "category", "payment_method", "notes",
+    "receipt_url", "payment_slip_url", "status", "created_at",
   ],
 };
 
