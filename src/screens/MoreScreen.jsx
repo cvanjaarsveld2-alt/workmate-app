@@ -12,8 +12,9 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
   const { confirm, dialog } = useConfirm();
   const pendingCount = (data.syncQueue || []).filter(i => i.status === "pending").length;
 
-  // Push notification state: idle | working | active | denied | ios-install | unsupported
+  // Push notification state: idle | working | active | denied | ios-install | unsupported | error
   const [pushState, setPushState] = useState("idle");
+  const [pushError, setPushError] = useState("");
 
   useEffect(() => {
     if (!pushSupported()) { setPushState("unsupported"); return; }
@@ -27,6 +28,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
 
   async function handleEnablePush() {
     setPushState("working");
+    setPushError("");
     const result = await subscribeToPush(userId);
     if (result.ok) {
       setPushState("active");
@@ -35,7 +37,15 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
     } else if (result.reason === "denied") {
       setPushState("denied");
     } else {
-      setPushState("idle");
+      // Subscribe-failed, sw-not-ready, save-failed, etc — show the real reason.
+      setPushState("error");
+      setPushError(
+        result.reason === "sw-not-ready" ? "Service worker not ready. Hard-refresh and try again."
+        : result.reason === "subscribe-failed" ? `Apple Push declined — usually a VAPID key mismatch. (${result.detail || ""})`
+        : result.reason === "save-failed" ? `Couldn't save to database: ${result.detail || ""}`
+        : result.reason === "unsupported" ? "This browser doesn't support push notifications."
+        : `Failed: ${result.reason || "unknown error"}`
+      );
     }
   }
 
@@ -154,6 +164,15 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
               </Btn>
           }
         </div>
+        {pushState === "error" && (
+          <div className="rounded-xl bg-red-50 border border-red-200 p-3 space-y-2">
+            <p className="text-xs font-bold text-red-800">⚠ Couldn't enable notifications</p>
+            <p className="text-xs text-red-700 leading-relaxed">{pushError}</p>
+            <Btn size="sm" variant="warning" onClick={handleEnablePush}>
+              <Bell size={13} /> Try again
+            </Btn>
+          </div>
+        )}
         {pushState === "ios-install" && (
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
             <p className="text-xs font-bold text-amber-800 mb-1">📱 iPhone/iPad — one-time setup</p>
