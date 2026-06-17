@@ -10,6 +10,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { ReceiptScanner } from "../components/ReceiptScanner";
+import { convertToZAR } from "../lib/exchangeRate";
 import {
   Card, Btn, Field, SelectField, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm,
@@ -103,6 +104,9 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
   const [filterCat, setFilterCat]     = useState("All");
   const [toast, setToast]             = useState("");
   const [receiptUrl, setReceiptUrl]   = useState(null);
+  const [paymentSlipUrl, setPaymentSlipUrl] = useState(null);
+  const [scannerMode, setScannerMode] = useState("receipt"); // "receipt" or "payment"
+  const [paymentMismatch, setPaymentMismatch] = useState(null); // { tillAmount, slipAmount }
   const [scannedNotice, setScannedNotice] = useState(false);
   const [selectMode, setSelectMode]   = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -128,6 +132,9 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       payment_method: "Card", notes: "",
     });
     setReceiptUrl(null);
+    setPaymentSlipUrl(null);
+    setPaymentMismatch(null);
+    setScannerMode("receipt");
     setScannedNotice(false);
     setEditId(null);
     setShowForm(false);
@@ -135,6 +142,23 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
   }
 
   function handleScanComplete(extracted) {
+    if (scannerMode === "payment") {
+      // Payment slip: keep the photo + cross-check the amount against the till slip
+      setPaymentSlipUrl(extracted.receipt_url || null);
+      const tillAmount = parseFloat(form.amount || 0);
+      const slipAmount = parseFloat(extracted.amount || 0);
+      // Allow R0.50 rounding tolerance
+      if (tillAmount > 0 && slipAmount > 0 && Math.abs(tillAmount - slipAmount) > 0.5) {
+        setPaymentMismatch({ tillAmount, slipAmount });
+      } else {
+        setPaymentMismatch(null);
+      }
+      setShowScanner(false);
+      setShowForm(true);
+      setScannerMode("receipt"); // reset for next time
+      return;
+    }
+    // Till slip (default): fill the form fields
     setForm({
       vendor:         extracted.vendor || "",
       amount:         extracted.amount ? String(extracted.amount) : "",
@@ -166,6 +190,7 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       notes:          ex.notes || "",
     });
     setReceiptUrl(ex.receipt_url || null);
+    setPaymentSlipUrl(ex.payment_slip_url || null);
     setEditId(ex.id);
     setShowForm(true);
     setShowScanner(false);
@@ -173,12 +198,34 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
 
   async function saveExpense() {
     if (!form.amount || parseFloat(form.amount) <= 0) { setToast("Enter a valid amount"); return; }
+    // Card payments require a payment slip (SA finance compliance).
+    if (form.payment_method === "Card" && !paymentSlipUrl) {
+      setToast("Card payments need a payment slip — tap 'Add payment slip' below");
+      return;
+    }
+
+    // Convert to ZAR using the ECB rate for the expense date (or today if blank).
+    // Foreign currency? show a brief notice. Offline / API down? save anyway,
+    // leaving the ZAR fields blank — the next edit will retry.
+    let zarInfo = null;
+    if (form.currency && form.currency !== "ZAR") {
+      setToast("Fetching exchange rate…");
+      zarInfo = await convertToZAR(form.amount, form.currency, form.expense_date || undefined);
+    } else {
+      zarInfo = { zar: parseFloat(form.amount), rate: 1, rateDate: form.expense_date || todayISO(), source: "n/a" };
+    }
+
     const clean = {
       ...form,
       amount: parseFloat(form.amount || 0),
       vat_amount: parseFloat(form.vat_amount || 0),
       expense_date: form.expense_date || null,
       receipt_url: receiptUrl || null,
+      payment_slip_url: paymentSlipUrl || null,
+      amount_zar:    zarInfo ? zarInfo.zar : null,
+      exchange_rate: zarInfo ? zarInfo.rate : null,
+      rate_date:     zarInfo ? zarInfo.rateDate : null,
+      rate_source:   zarInfo ? zarInfo.source : null,
     };
 
     if (editId) {
@@ -240,22 +287,37 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
 
     setToast("Preparing receipt links…");
 
-    // Sign each receipt with a 7-day link so Finance has time to open them.
-    const signedLinks = await Promise.all(selected.map(async (e) => {
-      if (!e.receipt_url) return null;
-      if (e.receipt_url.startsWith("http")) return e.receipt_url;
+    // Helper to sign one stored path with a 7-day link (so Finance has time).
+    async function signOne(stored) {
+      if (!stored) return null;
+      if (stored.startsWith("http")) return stored;
       try {
-        const { data } = await supabase.storage.from("receipts").createSignedUrl(e.receipt_url, 60 * 60 * 24 * 7);
+        const { data } = await supabase.storage.from("receipts").createSignedUrl(stored, 60 * 60 * 24 * 7);
         return data?.signedUrl || null;
       } catch { return null; }
-    }));
+    }
 
-    const total = selected.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
-    const lines = selected.map((e, i) =>
-      `${i + 1}. ${e.expense_date ? smartDate(e.expense_date) : "No date"} — ${e.vendor || "Unknown vendor"}\n` +
-      `   ${e.category} · ${fmtMoney(e.amount, e.currency)}${e.vat_amount > 0 ? ` (VAT ${fmtMoney(e.vat_amount, e.currency)})` : ""} · ${e.payment_method}\n` +
-      `   ${signedLinks[i] ? "Receipt: " + signedLinks[i] : "No receipt photo"}`
-    ).join("\n\n");
+    // Sign both till slips and payment slips, in order.
+    const signedTills = await Promise.all(selected.map(e => signOne(e.receipt_url)));
+    const signedPays  = await Promise.all(selected.map(e => signOne(e.payment_slip_url)));
+
+    const totalZAR = selected.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
+    const lines = selected.map((e, i) => {
+      const head =
+        `${i + 1}. ${e.expense_date ? smartDate(e.expense_date) : "No date"}${e.expense_time ? ` ${e.expense_time}` : ""} — ${e.vendor || "Unknown vendor"}\n` +
+        `   ${e.category} · ${fmtMoney(e.amount, e.currency)}${e.vat_amount > 0 ? ` (VAT ${fmtMoney(e.vat_amount, e.currency)})` : ""} · ${e.payment_method}`;
+      const fxLine = (e.currency && e.currency !== "ZAR" && e.amount_zar > 0)
+        ? `   ≈ ${fmtMoney(e.amount_zar, "ZAR")} (rate ${Number(e.exchange_rate || 0).toFixed(4)} on ${e.rate_date || "n/a"}, source ${e.rate_source || "n/a"})`
+        : null;
+      const slipLines = [];
+      if (signedTills[i]) slipLines.push(`   Till slip:    ${signedTills[i]}`);
+      else                slipLines.push(`   Till slip:    (not attached)`);
+      if (e.payment_method === "Card") {
+        if (signedPays[i]) slipLines.push(`   Payment slip: ${signedPays[i]}`);
+        else               slipLines.push(`   Payment slip: (not attached)`);
+      }
+      return [head, fxLine, ...slipLines].filter(Boolean).join("\n");
+    }).join("\n\n");
 
     const body = `Hi Finance team,
 
@@ -264,7 +326,7 @@ Please find my expense claim below (${selected.length} item${selected.length !==
 ${lines}
 
 ────────────────────
-TOTAL: ${fmtMoney(total, selected[0]?.currency || "ZAR")}
+TOTAL (ZAR): ${fmtMoney(totalZAR, "ZAR")}
 Date: ${smartDate(todayISO())}
 
 Note: receipt links expire in 7 days.
@@ -294,16 +356,38 @@ Kind regards`;
   const filtered = expenses
     .filter(e => filterCat === "All" || e.category === filterCat)
     .filter(e => !search || [e.vendor, e.category, e.notes].some(x => x?.toLowerCase().includes(search.toLowerCase())))
-    .sort((a, b) => (b.expense_date || "").localeCompare(a.expense_date || ""));
+    .sort((a, b) => {
+      // Sort by month descending (newest month first), then within each month
+      // by date+time ASCENDING (oldest first — true chronological order).
+      const da = a.expense_date || "";
+      const db = b.expense_date || "";
+      // Within month grouping the rendering already groups by month;
+      // we sort the whole list ascending by date+time, then reverse-group.
+      const dt = da.localeCompare(db);
+      if (dt !== 0) return dt;
+      const ta = a.expense_time || "";
+      const tb = b.expense_time || "";
+      return ta.localeCompare(tb);
+    });
 
   // Group by month
-  const byMonth = filtered.reduce((acc, e) => {
+  // `filtered` is sorted ascending (oldest first). Build month groups in
+  // insertion order, then reverse the groups so the *newest month* is at the
+  // top while items *within* a month stay oldest-first (true chronological).
+  const monthsInOrder = [];
+  const byMonthMap = {};
+  filtered.forEach(e => {
     const d = e.expense_date ? new Date(e.expense_date + "T12:00:00") : null;
     const key = d ? d.toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "No date";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(e);
-    return acc;
-  }, {});
+    if (!byMonthMap[key]) { byMonthMap[key] = []; monthsInOrder.push(key); }
+    byMonthMap[key].push(e);
+  });
+  // "No date" always sinks to the bottom regardless of order
+  const orderedMonths = monthsInOrder
+    .filter(m => m !== "No date")
+    .reverse() // newest month first
+    .concat(monthsInOrder.includes("No date") ? ["No date"] : []);
+  const byMonth = Object.fromEntries(orderedMonths.map(m => [m, byMonthMap[m]]));
 
   const totalThisMonth = (() => {
     const now = new Date();
@@ -313,7 +397,8 @@ Kind regards`;
         const d = new Date(e.expense_date + "T12:00:00");
         return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
       })
-      .reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+      // Always add the ZAR equivalent; for ZAR-currency rows that's just `amount`.
+      .reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
   })();
 
   const unsubmittedCount = expenses.filter(e => e.status === "unsubmitted").length;
@@ -358,7 +443,12 @@ Kind regards`;
 
       <AnimatePresence>
         {showScanner && (
-          <ReceiptScanner userId={userId} onExtracted={handleScanComplete} onCancel={() => { setShowScanner(false); setShowForm(true); }} />
+          <ReceiptScanner
+            userId={userId}
+            slipType={scannerMode === "payment" ? "payment" : "till"}
+            onExtracted={handleScanComplete}
+            onCancel={() => { setShowScanner(false); setShowForm(true); setScannerMode("receipt"); }}
+          />
         )}
       </AnimatePresence>
 
@@ -375,9 +465,55 @@ Kind regards`;
                 )}
               </div>
 
-              {receiptUrl && (
-                <div className="rounded-xl overflow-hidden border border-slate-200">
-                  <SignedReceiptImg stored={receiptUrl} className="w-full max-h-44 object-contain bg-slate-50" />
+              {/* Slips: till on the left, payment on the right */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <p className="text-xs font-bold text-slate-500 mb-1.5">Till slip</p>
+                  {receiptUrl ? (
+                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                      <SignedReceiptImg stored={receiptUrl} className="w-full h-32 object-contain" />
+                    </div>
+                  ) : (
+                    <button type="button"
+                      onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
+                      className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 transition-colors">
+                      <Camera size={20} style={{ color: "#8B1A1A" }} />
+                      <span className="text-xs font-bold text-slate-500">Scan till slip</span>
+                    </button>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-500 mb-1.5">
+                    Payment slip {form.payment_method === "Card" && <span className="text-red-500">*</span>}
+                    {form.payment_method !== "Card" && <span className="text-slate-400 font-normal">(optional)</span>}
+                  </p>
+                  {paymentSlipUrl ? (
+                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 relative">
+                      <SignedReceiptImg stored={paymentSlipUrl} className="w-full h-32 object-contain" />
+                      <button type="button" onClick={() => { setPaymentSlipUrl(null); setPaymentMismatch(null); }}
+                        className="absolute top-1 right-1 p-1 rounded-full bg-white/90 shadow text-slate-500 hover:text-red-600">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button"
+                      onClick={() => { setScannerMode("payment"); setShowScanner(true); }}
+                      className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 transition-colors">
+                      <Camera size={20} style={{ color: "#8B1A1A" }} />
+                      <span className="text-xs font-bold text-slate-500">Add payment slip</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {paymentMismatch && (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+                  <p className="text-xs font-bold text-amber-800">⚠ Amount mismatch</p>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Till slip says {fmtMoney(paymentMismatch.tillAmount, form.currency)},
+                    payment slip says {fmtMoney(paymentMismatch.slipAmount, form.currency)}.
+                    Please verify which is correct before saving.
+                  </p>
                 </div>
               )}
 
@@ -429,7 +565,7 @@ Kind regards`;
 
       <div className="space-y-4">
         {Object.entries(byMonth).map(([month, items]) => {
-          const monthTotal = items.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+          const monthTotal = items.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
           return (
             <div key={month}>
               <div className="flex items-center justify-between px-1 mb-2">
@@ -468,6 +604,12 @@ Kind regards`;
                               <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: cc.bg, color: cc.text }}>{ex.category}</span>
                               {ex.ai_extracted && <Sparkles size={12} className="text-purple-400" />}
                             </div>
+                            {ex.currency && ex.currency !== "ZAR" && ex.amount_zar > 0 && (
+                              <p className="text-xs font-bold mt-0.5" style={{ color: "#15803D" }}>
+                                ≈ {fmtMoney(ex.amount_zar, "ZAR")}
+                                <span className="text-slate-400 font-normal"> · @ {ex.exchange_rate ? Number(ex.exchange_rate).toFixed(4) : "?"}</span>
+                              </p>
+                            )}
                             {ex.vendor && <p className="text-sm text-slate-600 mt-0.5">{ex.vendor}</p>}
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <p className="text-xs text-slate-400">{ex.expense_date ? smartDate(ex.expense_date) : "No date"}{ex.expense_time ? ` · ${ex.expense_time}` : ""}</p>
