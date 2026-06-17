@@ -60,23 +60,38 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       });
       if (upErr) throw new Error("Upload failed: " + upErr.message);
 
-      // Call AI scan
+      // Call AI scan — with a hard 60 second timeout so an iOS silent-hang
+      // becomes a visible error instead of an endless spinner.
       setStage("scanning");
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const res = await fetch(FUNCTION_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ imageBase64: compressed, slipType }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+      let res;
+      try {
+        res = await fetch(FUNCTION_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ imageBase64: compressed, slipType }),
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === "AbortError") {
+          throw new Error("AI scan timed out after 60s — the function may not be deployed correctly.");
+        }
+        throw new Error("Network error: " + (fetchErr.message || "couldn't reach the AI"));
+      }
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || "AI scan failed");
+        throw new Error(errBody.error || `AI scan failed (HTTP ${res.status})`);
       }
 
       const extracted = await res.json();
