@@ -34,7 +34,7 @@ async function compressImage(file, maxDim = 1600, quality = 0.85) {
   });
 }
 
-export function ReceiptScanner({ userId, onExtracted, onCancel }) {
+export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till" }) {
   const [stage, setStage]       = useState("idle"); // idle | uploading | scanning
   const [preview, setPreview]   = useState(null);
   const [error, setError]       = useState("");
@@ -50,7 +50,10 @@ export function ReceiptScanner({ userId, onExtracted, onCancel }) {
       setStage("uploading");
 
       // Upload to Storage (private bucket — store the PATH, sign on read)
-      const path = `receipts/${userId}/${genId()}.jpg`;
+      // Both slip types live in the same private 'receipts' bucket, but in
+      // different subfolders so they're easy to tell apart on inspection.
+      const subfolder = slipType === "payment" ? "payment-slips" : "receipts";
+      const path = `receipts/${userId}/${subfolder}/${genId()}.jpg`;
       const blob = await (await fetch(compressed)).blob();
       const { error: upErr } = await supabase.storage.from("receipts").upload(path, blob, {
         contentType: "image/jpeg", upsert: false,
@@ -68,7 +71,7 @@ export function ReceiptScanner({ userId, onExtracted, onCancel }) {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({ imageBase64: compressed }),
+        body: JSON.stringify({ imageBase64: compressed, slipType }),
       });
 
       if (!res.ok) {
@@ -93,7 +96,7 @@ export function ReceiptScanner({ userId, onExtracted, onCancel }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles size={16} style={{ color: "#8B1A1A" }} />
-          <p className="text-base font-black text-slate-800">Scan Receipt</p>
+          <p className="text-base font-black text-slate-800">{slipType === "payment" ? "Scan Payment Slip" : "Scan Till Slip"}</p>
         </div>
         <button onClick={onCancel} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100">
           <X size={18} />
@@ -122,7 +125,9 @@ export function ReceiptScanner({ userId, onExtracted, onCancel }) {
       {!busy && (
         <>
           <p className="text-sm text-slate-500">
-            Take a clear photo of the slip — AI will read the amount, date, vendor and category for you to confirm.
+            {slipType === "payment"
+              ? "Take a clear photo of the card payment slip — AI will read the amount to verify it matches the till total."
+              : "Take a clear photo of the slip — AI will read the amount, date, vendor and category for you to confirm."}
           </p>
           <div className="grid grid-cols-2 gap-2">
             <button onClick={() => cameraRef.current?.click()}
