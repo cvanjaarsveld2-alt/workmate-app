@@ -34,7 +34,15 @@ export async function pushItem(item) {
     }
     return true;
   } catch (e) {
-    console.warn(`[Sync] Failed to push ${item.table} ${item.action}:`, e?.message);
+    // Verbose log makes failed-sync triage immediate.
+    console.warn(
+      `[Sync] FAILED ${item.table} ${item.action}`,
+      "\n  code:", e?.code,
+      "\n  message:", e?.message,
+      "\n  details:", e?.details,
+      "\n  hint:", e?.hint,
+      "\n  payload:", payload
+    );
     return false;
   }
 }
