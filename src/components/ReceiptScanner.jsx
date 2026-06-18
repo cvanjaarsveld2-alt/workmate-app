@@ -38,37 +38,50 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
   const [stage, setStage]       = useState("idle"); // idle | uploading | scanning
   const [preview, setPreview]   = useState(null);
   const [error, setError]       = useState("");
+  const [debug, setDebug]       = useState([]); // visible step log for iOS
   const cameraRef = useRef(null);
   const galleryRef = useRef(null);
+
+  function log(msg) {
+    const t = new Date().toLocaleTimeString();
+    setDebug(d => [...d, `${t} · ${msg}`].slice(-8));
+    console.log("[ReceiptScanner]", msg);
+  }
 
   async function handleFile(file) {
     if (!file) return;
     setError("");
+    setDebug([]);
     try {
+      log("Compressing image…");
       const compressed = await compressImage(file);
+      log(`Compressed (${Math.round(compressed.length / 1024)} KB)`);
       setPreview(compressed);
       setStage("uploading");
 
-      // Upload to Storage (private bucket — store the PATH, sign on read)
-      // Both slip types live in the same private 'receipts' bucket, but in
-      // different subfolders so they're easy to tell apart on inspection.
+      // Upload to Storage
       const subfolder = slipType === "payment" ? "payment-slips" : "receipts";
       const path = `receipts/${userId}/${subfolder}/${genId()}.jpg`;
+      log(`Uploading to ${path}`);
       const blob = await (await fetch(compressed)).blob();
       const { error: upErr } = await supabase.storage.from("receipts").upload(path, blob, {
         contentType: "image/jpeg", upsert: false,
       });
       if (upErr) throw new Error("Upload failed: " + upErr.message);
+      log("Upload OK ✓");
 
-      // Call AI scan — with a hard 60 second timeout so an iOS silent-hang
-      // becomes a visible error instead of an endless spinner.
+      // Call AI scan — with a hard 60 second timeout.
       setStage("scanning");
+      log("Getting auth token…");
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      if (!token) throw new Error("No auth session — please sign in again");
+      log("Token OK ✓");
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
+      log(`Calling AI (${slipType})…`);
       let res;
       try {
         res = await fetch(FUNCTION_URL, {
@@ -83,19 +96,20 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       } catch (fetchErr) {
         clearTimeout(timeoutId);
         if (fetchErr.name === "AbortError") {
-          throw new Error("AI scan timed out after 60s — the function may not be deployed correctly.");
+          throw new Error("AI scan timed out after 60s — the Edge Function may not be deployed correctly. Check Supabase → Edge Functions → scan-receipt → Logs.");
         }
-        throw new Error("Network error: " + (fetchErr.message || "couldn't reach the AI"));
+        throw new Error("Network error reaching AI: " + (fetchErr.message || "unknown"));
       }
       clearTimeout(timeoutId);
+      log(`AI replied (HTTP ${res.status})`);
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || `AI scan failed (HTTP ${res.status})`);
+        throw new Error(errBody.error || `AI scan failed (HTTP ${res.status}) — check Edge Function logs`);
       }
 
       const extracted = await res.json();
-      // Store the storage PATH (not a public URL); display code signs it on demand.
+      log("Got extracted data ✓");
       onExtracted({ ...extracted, receipt_url: path });
     } catch (e) {
       console.error("Receipt scan error:", e);
@@ -134,6 +148,17 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
         <div className="rounded-xl bg-red-50 border border-red-200 p-3">
           <p className="text-sm font-bold text-red-700">{error}</p>
           <p className="text-xs text-red-500 mt-0.5">Try again, or enter the details manually.</p>
+        </div>
+      )}
+
+      {debug.length > 0 && (busy || error) && (
+        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Debug log</p>
+          <div className="space-y-0.5">
+            {debug.map((line, i) => (
+              <p key={i} className="text-xs font-mono text-slate-600 break-all">{line}</p>
+            ))}
+          </div>
         </div>
       )}
 
