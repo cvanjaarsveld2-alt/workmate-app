@@ -110,6 +110,7 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
   const [scannedNotice, setScannedNotice] = useState(false);
   const [selectMode, setSelectMode]   = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [manualZAR, setManualZAR]     = useState(""); // for currencies ECB doesn't cover
   const [form, setForm] = useState({
     vendor: "", amount: "", vat_amount: "", currency: "ZAR",
     expense_date: todayISO(), expense_time: "", category: "Other",
@@ -136,6 +137,7 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     setPaymentMismatch(null);
     setScannerMode("receipt");
     setScannedNotice(false);
+    setManualZAR("");
     setEditId(null);
     setShowForm(false);
     setShowScanner(false);
@@ -191,6 +193,9 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     });
     setReceiptUrl(ex.receipt_url || null);
     setPaymentSlipUrl(ex.payment_slip_url || null);
+    // If this expense was manually converted, prefill the manual ZAR field
+    // so the user can adjust it when re-editing.
+    setManualZAR(ex.rate_source === "Manual entry" && ex.amount_zar ? String(ex.amount_zar) : "");
     setEditId(ex.id);
     setShowForm(true);
     setShowScanner(false);
@@ -204,15 +209,28 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       return;
     }
 
-    // Convert to ZAR using the ECB rate for the expense date (or today if blank).
-    // Foreign currency? show a brief notice. Offline / API down? save anyway,
-    // leaving the ZAR fields blank — the next edit will retry.
+    // ZAR conversion logic:
+    //   1. ZAR currency? trivial (zar = amount, rate = 1).
+    //   2. Manual ZAR entered? use it (rate_source = "Manual entry").
+    //   3. Otherwise try ECB rate via Frankfurter.
+    //   4. If all fails, save without ZAR conversion (fields left null).
     let zarInfo = null;
-    if (form.currency && form.currency !== "ZAR") {
+    const manualZARNum = parseFloat(manualZAR);
+    if (!form.currency || form.currency === "ZAR") {
+      zarInfo = { zar: parseFloat(form.amount), rate: 1, rateDate: form.expense_date || todayISO(), source: "n/a" };
+    } else if (!isNaN(manualZARNum) && manualZARNum > 0) {
+      const amt = parseFloat(form.amount);
+      zarInfo = {
+        zar: manualZARNum,
+        rate: amt > 0 ? manualZARNum / amt : 0,
+        rateDate: form.expense_date || todayISO(),
+        source: "Manual entry",
+      };
+    } else {
       setToast("Fetching exchange rate…");
       zarInfo = await convertToZAR(form.amount, form.currency, form.expense_date || undefined);
-    } else {
-      zarInfo = { zar: parseFloat(form.amount), rate: 1, rateDate: form.expense_date || todayISO(), source: "n/a" };
+      // If ECB doesn't cover this currency, zarInfo will be null — that's fine,
+      // the expense saves with no ZAR conversion. User can edit and add manually.
     }
 
     const clean = {
@@ -524,10 +542,45 @@ Kind regards`;
                   <label className="mb-1.5 block text-sm font-bold text-slate-500">Currency</label>
                   <select value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
                     className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[52px]">
-                    {["ZAR", "USD", "GBP", "EUR"].map(c => <option key={c} value={c}>{c}</option>)}
+                    {[
+                      "ZAR", "USD", "GBP", "EUR",       // major
+                      "GHS",                              // Ghanaian Cedi
+                      "NGN", "KES", "TZS", "UGX",         // other Africa
+                      "BWP", "NAD", "MWK", "MZN", "ZMW", // Southern Africa
+                      "AED", "SAR", "INR", "CNY", "JPY", "AUD", "CAD", // common others
+                    ].map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
               </div>
+
+              {/* Manual ZAR override — appears whenever currency is not ZAR.
+                  For currencies the ECB rate covers (USD/GBP/EUR/etc) this is
+                  optional and overrides the auto rate if you fill it in. For
+                  currencies the ECB doesn't cover (Cedi, Naira, etc) this is
+                  the ONLY way to record the ZAR figure. */}
+              {form.currency && form.currency !== "ZAR" && (
+                <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
+                  <label className="mb-1.5 block text-sm font-bold text-slate-600">
+                    ZAR equivalent <span className="text-slate-400 font-normal">— what your bank/card actually charged you</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-bold text-slate-500 shrink-0">R</span>
+                    <input
+                      type="number"
+                      value={manualZAR}
+                      onChange={e => setManualZAR(e.target.value)}
+                      placeholder="leave blank to use ECB rate"
+                      inputMode="decimal"
+                      className="flex-1 rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-none focus:border-red-300 min-h-[48px]"
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+                    Leave blank for USD/GBP/EUR/major currencies — the app fetches the official ECB rate automatically.
+                    Fill in for Cedi, Naira and other African currencies, or to override the auto rate.
+                  </p>
+                </div>
+              )}
+
               <Field label="VAT amount (optional)" type="number" value={form.vat_amount} onChange={v => setForm(f => ({ ...f, vat_amount: v }))} placeholder="0.00" />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Date" type="date" value={form.expense_date} onChange={v => setForm(f => ({ ...f, expense_date: v }))} />
