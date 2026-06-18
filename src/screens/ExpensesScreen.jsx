@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, Camera, Sparkles, Receipt,
-  Mail, CheckSquare, Square, FileDown,
+  Mail, CheckSquare, Square, FileDown, Send,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
@@ -11,6 +11,7 @@ import { triggerImmediateSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { ReceiptScanner } from "../components/ReceiptScanner";
 import { convertToZAR } from "../lib/exchangeRate";
+import { buildExpensePDF } from "../lib/expenseFinancePDF";
 import {
   Card, Btn, Field, SelectField, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm,
@@ -88,6 +89,49 @@ function SignedReceiptImg({ stored, className }) {
     return <div className="w-full h-32 bg-slate-50 flex items-center justify-center"><Receipt size={24} className="text-slate-300" /></div>;
   }
   return <img src={url} alt="Receipt" className={className} />;
+}
+
+// ─── Finance period: 26th → 25th cycle ──────────────────────────────────────
+// Power Works' expense period runs from the 26th of one month to the 25th of
+// the next. An expense dated the 25th itself belongs to the CLOSING period
+// (i.e. the one ending on that 25th).
+//
+// Given any ISO date, return:
+//   - key       a stable sort key like "2026-05-26" (period start)
+//   - label     human label like "26 May – 25 Jun 2026"
+//   - start     ISO date when the period started (the 26th)
+//   - end       ISO date when the period ends (the 25th)
+function financePeriod(isoDate) {
+  if (!isoDate) return null;
+  const d = new Date(isoDate + "T12:00:00");
+  if (isNaN(d.getTime())) return null;
+
+  // If the day is 1..25, the period started on the 26th of the PREVIOUS month
+  // and ends on the 25th of THIS month. If the day is 26..31, the period
+  // started on the 26th of THIS month and ends on the 25th of NEXT month.
+  let startYear, startMonth; // 0-indexed month
+  if (d.getDate() <= 25) {
+    startYear  = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
+    startMonth = d.getMonth() === 0 ? 11 : d.getMonth() - 1;
+  } else {
+    startYear  = d.getFullYear();
+    startMonth = d.getMonth();
+  }
+
+  const start = new Date(Date.UTC(startYear, startMonth, 26));
+  const end   = new Date(Date.UTC(startYear, startMonth + 1, 25));
+  const startISO = start.toISOString().slice(0, 10);
+  const endISO   = end.toISOString().slice(0, 10);
+
+  const opt = { day: "numeric", month: "short" };
+  const startLbl = start.toLocaleDateString("en-GB", opt);
+  const endLbl   = end.toLocaleDateString("en-GB", { ...opt, year: "numeric" });
+  return { key: startISO, label: `${startLbl} – ${endLbl}`, start: startISO, end: endISO };
+}
+
+// Period that contains today.
+function currentFinancePeriod() {
+  return financePeriod(new Date().toISOString().slice(0, 10));
 }
 
 function fmtMoney(amount, currency = "ZAR") {
@@ -299,76 +343,152 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     });
   }
 
+  // The built PDF lives here so the preview/share/email actions all reuse it.
+  // Cleared after the user closes the sheet.
+  const [financePack, setFinancePack] = React.useState(null); // { blob, url, filename, ref, periodLabel, totalZAR, count, ids }
+
   async function sendToFinance() {
     const selected = expenses.filter(e => selectedIds.has(e.id));
     if (selected.length === 0) { setToast("Select expenses to send"); return; }
 
-    setToast("Preparing receipt links…");
+    setToast("Building finance pack…");
 
-    // Helper to sign one stored path with a 7-day link (so Finance has time).
-    async function signOne(stored) {
-      if (!stored) return null;
-      if (stored.startsWith("http")) return stored;
-      try {
-        const { data } = await supabase.storage.from("receipts").createSignedUrl(stored, 60 * 60 * 24 * 7);
-        return data?.signedUrl || null;
-      } catch { return null; }
+    // Use the first selected item's date for the period label on the cover.
+    const sampleDate = selected[0]?.expense_date;
+    const period = sampleDate ? financePeriod(sampleDate) : currentFinancePeriod();
+
+    let pdfBlob, filename, ref;
+    try {
+      const result = await buildExpensePDF({
+        expenses: selected,
+        submitter: { name: data?._submitter?.name, email: data?._submitter?.email },
+        periodLabel: period?.label || "—",
+      });
+      pdfBlob = result.blob;
+      filename = result.filename;
+      ref = result.ref;
+    } catch (e) {
+      console.error("PDF build failed:", e);
+      setToast("Couldn't build PDF — try again");
+      return;
     }
 
-    // Sign both till slips and payment slips, in order.
-    const signedTills = await Promise.all(selected.map(e => signOne(e.receipt_url)));
-    const signedPays  = await Promise.all(selected.map(e => signOne(e.payment_slip_url)));
-
     const totalZAR = selected.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
-    const lines = selected.map((e, i) => {
-      const head =
-        `${i + 1}. ${e.expense_date ? smartDate(e.expense_date) : "No date"}${e.expense_time ? ` ${e.expense_time}` : ""} — ${e.vendor || "Unknown vendor"}\n` +
-        `   ${e.category} · ${fmtMoney(e.amount, e.currency)}${e.vat_amount > 0 ? ` (VAT ${fmtMoney(e.vat_amount, e.currency)})` : ""} · ${e.payment_method}`;
-      const fxLine = (e.currency && e.currency !== "ZAR" && e.amount_zar > 0)
-        ? `   ≈ ${fmtMoney(e.amount_zar, "ZAR")} (rate ${Number(e.exchange_rate || 0).toFixed(4)} on ${e.rate_date || "n/a"}, source ${e.rate_source || "n/a"})`
-        : null;
-      const slipLines = [];
-      if (signedTills[i]) slipLines.push(`   Till slip:    ${signedTills[i]}`);
-      else                slipLines.push(`   Till slip:    (not attached)`);
-      if (e.payment_method === "Card") {
-        if (signedPays[i]) slipLines.push(`   Payment slip: ${signedPays[i]}`);
-        else               slipLines.push(`   Payment slip: (not attached)`);
-      }
-      return [head, fxLine, ...slipLines].filter(Boolean).join("\n");
-    }).join("\n\n");
+    const url = URL.createObjectURL(pdfBlob);
+    setFinancePack({
+      blob: pdfBlob,
+      url,
+      filename,
+      ref,
+      periodLabel: period?.label || "—",
+      totalZAR,
+      count: selected.length,
+      ids: Array.from(selectedIds),
+    });
+    setToast("");
+  }
 
-    const body = `Hi Finance team,
-
-Please find my expense claim below (${selected.length} item${selected.length !== 1 ? "s" : ""}):
-
-${lines}
-
-────────────────────
-TOTAL (ZAR): ${fmtMoney(totalZAR, "ZAR")}
-Date: ${smartDate(todayISO())}
-
-Note: receipt links expire in 7 days.
-
-Kind regards`;
-
-    const subject = encodeURIComponent(`Expense Claim — ${smartDate(todayISO())} (${selected.length} item${selected.length !== 1 ? "s" : ""})`);
-    window.open(`mailto:${encodeURIComponent(FINANCE_EMAIL)}?subject=${subject}&body=${encodeURIComponent(body)}`, "_blank");
-
-    // Mark as submitted
+  // Mark the included expenses as 'submitted' and trigger sync.
+  // Called only after the user actually shares/emails the pack — so they can
+  // back out of the preview without altering state.
+  function markPackSubmitted() {
+    if (!financePack) return;
+    const ids = new Set(financePack.ids);
     const now = new Date().toISOString();
+    const updates = expenses.filter(e => ids.has(e.id));
     setData(d => ({
       ...d,
-      expenses: (d.expenses || []).map(e => selectedIds.has(e.id) ? { ...e, status: "submitted", sync_status: "pending" } : e),
+      expenses: (d.expenses || []).map(e => ids.has(e.id) ? { ...e, status: "submitted", sync_status: "pending" } : e),
       syncQueue: [
-        ...selected.map(e => ({ id: genId(), table: "expenses", action: "update", data: { ...e, status: "submitted", sync_status: "pending" }, status: "pending", created_at: now })),
+        ...updates.map(e => ({ id: genId(), table: "expenses", action: "update", data: { ...e, status: "submitted", sync_status: "pending" }, status: "pending", created_at: now })),
         ...(d.syncQueue || []),
       ],
     }));
-    selected.forEach(e => offlineSave("expenses", { ...e, status: "submitted" }));
+    updates.forEach(e => offlineSave("expenses", { ...e, status: "submitted" }));
     triggerImmediateSync();
-    setToast(`${selected.length} expense${selected.length !== 1 ? "s" : ""} sent to finance ✓`);
+    setToast(`${financePack.count} expense${financePack.count !== 1 ? "s" : ""} marked submitted ✓`);
     setSelectMode(false);
     setSelectedIds(new Set());
+    closeFinancePack();
+  }
+
+  function closeFinancePack() {
+    if (financePack?.url) URL.revokeObjectURL(financePack.url);
+    setFinancePack(null);
+  }
+
+  // — Preview: open the PDF in a new tab/window. Mobile: usually opens in the
+  // device PDF viewer; user can then share from there.
+  function previewFinancePack() {
+    if (!financePack) return;
+    window.open(financePack.url, "_blank");
+  }
+
+  // — Share: native share sheet on mobile (iOS / Android). Lets the user pick
+  // Mail, Outlook, iCloud Mail, WhatsApp, Files, AirDrop, etc.
+  async function shareFinancePack() {
+    if (!financePack) return;
+    const { blob, filename, ref, totalZAR, periodLabel } = financePack;
+    const file = new File([blob], filename, { type: "application/pdf" });
+    const shareData = {
+      title: `Expense Claim ${ref}`,
+      text: `Expense claim ${ref} — ${fmtMoney(totalZAR, "ZAR")} for ${periodLabel}.`,
+      files: [file],
+    };
+    // Feature-detect Web Share API with file support (iOS Safari ≥15, Android Chrome).
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share(shareData);
+        markPackSubmitted(); // Share completed (or user cancelled — we can't tell).
+      } catch (e) {
+        // User cancelled or share failed silently — don't mark submitted.
+        if (e.name !== "AbortError") console.warn("Share failed:", e);
+      }
+    } else {
+      // Fallback: download the PDF so the user can attach it manually.
+      const a = document.createElement("a");
+      a.href = financePack.url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setToast("PDF downloaded — attach it to your email manually");
+    }
+  }
+
+  // — Email: open the user's mail client with a pre-filled message. The PDF
+  // is also downloaded so they can attach it (browsers can't auto-attach).
+  function emailFinancePack() {
+    if (!financePack) return;
+    const { filename, ref, totalZAR, periodLabel, count, url } = financePack;
+
+    // Download the PDF first so it's in their Files / Downloads ready to attach.
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    const body = `Hi Vicky,
+
+Please find attached my expense claim ${ref}.
+
+Summary:
+  • ${count} item${count !== 1 ? "s" : ""}
+  • Period: ${periodLabel}
+  • Total claim: ${fmtMoney(totalZAR, "ZAR")}
+
+The attached PDF (${filename}) contains the full breakdown, totals by category, and all receipt images.
+
+Kind regards`;
+
+    const subject = encodeURIComponent(`Expense Claim ${ref} — ${fmtMoney(totalZAR, "ZAR")}`);
+    setToast("PDF downloaded — attach it to the email that just opened");
+    setTimeout(() => {
+      window.open(`mailto:${encodeURIComponent(FINANCE_EMAIL)}?subject=${subject}&body=${encodeURIComponent(body)}`, "_blank");
+      markPackSubmitted();
+    }, 500);
   }
 
   const filtered = expenses
@@ -389,35 +509,34 @@ Kind regards`;
     });
 
   // Group by month
-  // `filtered` is sorted ascending (oldest first). Build month groups in
-  // insertion order, then reverse the groups so the *newest month* is at the
-  // top while items *within* a month stay oldest-first (true chronological).
-  const monthsInOrder = [];
-  const byMonthMap = {};
+  // Group by finance period (26th → 25th). Newest period at the top; within
+  // each period, items remain in true chronological order (oldest → newest).
+  const periodsInOrder = [];
+  const byPeriodMap = {};
   filtered.forEach(e => {
-    const d = e.expense_date ? new Date(e.expense_date + "T12:00:00") : null;
-    const key = d ? d.toLocaleDateString("en-GB", { month: "long", year: "numeric" }) : "No date";
-    if (!byMonthMap[key]) { byMonthMap[key] = []; monthsInOrder.push(key); }
-    byMonthMap[key].push(e);
+    const period = e.expense_date ? financePeriod(e.expense_date) : null;
+    const key = period ? period.key : "no-date";
+    const label = period ? period.label : "No date";
+    if (!byPeriodMap[key]) {
+      byPeriodMap[key] = { label, items: [] };
+      periodsInOrder.push(key);
+    }
+    byPeriodMap[key].items.push(e);
   });
-  // "No date" always sinks to the bottom regardless of order
-  const orderedMonths = monthsInOrder
-    .filter(m => m !== "No date")
-    .reverse() // newest month first
-    .concat(monthsInOrder.includes("No date") ? ["No date"] : []);
-  const byMonth = Object.fromEntries(orderedMonths.map(m => [m, byMonthMap[m]]));
+  // No-date always sinks to the bottom; everything else sorts by period key DESC.
+  const orderedPeriodKeys = periodsInOrder
+    .filter(k => k !== "no-date")
+    .sort((a, b) => b.localeCompare(a)) // newest period first
+    .concat(periodsInOrder.includes("no-date") ? ["no-date"] : []);
 
-  const totalThisMonth = (() => {
-    const now = new Date();
-    return expenses
-      .filter(e => {
-        if (!e.expense_date) return false;
-        const d = new Date(e.expense_date + "T12:00:00");
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      })
-      // Always add the ZAR equivalent; for ZAR-currency rows that's just `amount`.
-      .reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
-  })();
+  // Total for the CURRENT finance period (26th–25th cycle).
+  const thisPeriod = currentFinancePeriod();
+  const totalThisPeriod = expenses
+    .filter(e => {
+      if (!e.expense_date) return false;
+      return e.expense_date >= thisPeriod.start && e.expense_date <= thisPeriod.end;
+    })
+    .reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
 
   const unsubmittedCount = expenses.filter(e => e.status === "unsubmitted").length;
 
@@ -426,9 +545,71 @@ Kind regards`;
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
+      {/* ── Finance Pack ready: preview, share, or email ── */}
+      <AnimatePresence>
+        {financePack && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={closeFinancePack}
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+            <motion.div
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col">
+
+              <div className="flex justify-center pt-2.5 pb-1">
+                <div className="w-12 h-1 rounded-full bg-slate-300" />
+              </div>
+
+              <div className="px-5 pt-2 pb-3 flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-base font-black text-slate-900">Finance Pack Ready</p>
+                  <p className="text-xs text-slate-500 truncate">{financePack.ref} · {financePack.count} item{financePack.count !== 1 ? "s" : ""} · {fmtMoney(financePack.totalZAR, "ZAR")}</p>
+                </div>
+                <button onClick={closeFinancePack} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Embedded preview */}
+              <div className="px-4 pb-3">
+                <div className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50" style={{ aspectRatio: "1 / 1.2" }}>
+                  <iframe src={financePack.url} title="Finance pack preview" className="w-full h-full" />
+                </div>
+                <p className="text-xs text-slate-400 mt-1.5 text-center">Pinch / scroll to review · {financePack.filename}</p>
+              </div>
+
+              {/* Action buttons */}
+              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+                <button onClick={shareFinancePack}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
+                  style={{ background: "#8B1A1A" }}>
+                  <Send size={16} /> Share / Send (Mail, Outlook, iCloud, WhatsApp…)
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={previewFinancePack}
+                    className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+                    <FileDown size={14} /> Open PDF
+                  </button>
+                  <button onClick={emailFinancePack}
+                    className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+                    <Mail size={14} /> Email to Vicky
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 text-center pt-0.5 leading-relaxed">
+                  <strong>Share</strong> opens your device's share sheet — pick any email app.
+                  Expenses are marked submitted after you share or email.
+                </p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {!selectMode ? (
         <div className="flex items-center justify-between gap-2">
-          <PageHeader title="Expenses" subtitle={`${fmtMoney(totalThisMonth)} this month · ${unsubmittedCount} unsubmitted`} />
+          <PageHeader title="Expenses" subtitle={`${fmtMoney(totalThisPeriod)} this period (${thisPeriod.label}) · ${unsubmittedCount} unsubmitted`} />
           <div className="flex gap-2">
             {expenses.length > 0 && (
               <Btn size="sm" variant="secondary" onClick={() => { setSelectMode(true); setSelectedIds(new Set()); }}>
@@ -617,13 +798,14 @@ Kind regards`;
       {filtered.length === 0 && <Empty title="No expenses yet" text="Snap a receipt and let AI capture the details." icon={Receipt} />}
 
       <div className="space-y-4">
-        {Object.entries(byMonth).map(([month, items]) => {
-          const monthTotal = items.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
+        {orderedPeriodKeys.map(periodKey => {
+          const { label, items } = byPeriodMap[periodKey];
+          const periodTotal = items.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
           return (
-            <div key={month}>
+            <div key={periodKey}>
               <div className="flex items-center justify-between px-1 mb-2">
-                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">{month}</p>
-                <p className="text-sm font-black" style={{ color: "#8B1A1A" }}>{fmtMoney(monthTotal)}</p>
+                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">{label}</p>
+                <p className="text-sm font-black" style={{ color: "#8B1A1A" }}>{fmtMoney(periodTotal)}</p>
               </div>
               <div className="space-y-2">
                 {items.map(ex => {
