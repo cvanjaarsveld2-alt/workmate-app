@@ -40,16 +40,27 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
   const overdueNotes  = notes.filter(n => !n.resolved && n.resolve_by && n.resolve_by < today);
   const leadContacts  = contacts.filter(c => (c.status || "lead") === "lead");
 
-  // Expenses this month
+  // Expenses this finance period (26th → 25th cycle, matches Vicky's books).
   const now = new Date();
-  const expThisMonth = expenses.filter(e => {
-    if (!e.expense_date) return false;
-    const d = new Date(e.expense_date + "T12:00:00");
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-  const expMonthTotal     = expThisMonth.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const periodStart = (() => {
+    const d = now.getDate() <= 25
+      ? new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 26))
+      : new Date(Date.UTC(now.getFullYear(), now.getMonth(), 26));
+    return d.toISOString().slice(0, 10);
+  })();
+  const periodEnd = (() => {
+    const d = now.getDate() <= 25
+      ? new Date(Date.UTC(now.getFullYear(), now.getMonth(), 25))
+      : new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 25));
+    return d.toISOString().slice(0, 10);
+  })();
+  const expThisMonth = expenses.filter(e =>
+    e.expense_date && e.expense_date >= periodStart && e.expense_date <= periodEnd
+  );
+  // Use ZAR equivalent so mixed-currency periods sum sensibly.
+  const expMonthTotal     = expThisMonth.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
   const unsubmittedExp    = expenses.filter(e => e.status === "unsubmitted");
-  const unsubmittedTotal  = unsubmittedExp.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+  const unsubmittedTotal  = unsubmittedExp.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
 
   const quoteConversion = sentQuotes > 0 ? Math.round((acceptedQ / sentQuotes) * 100) : 0;
 
@@ -193,7 +204,7 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
           <StatCard label="Won Revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} />
         </button>
         <button onClick={() => setScreen("Expenses")} className="text-left">
-          <StatCard label="Expenses (mo)" value={money(expMonthTotal)} sub={unsubmittedExp.length > 0 ? `${unsubmittedExp.length} unsubmitted` : "all submitted"} color="#7C2D12" icon={Receipt} />
+          <StatCard label="Expenses (period)" value={money(expMonthTotal)} sub={unsubmittedExp.length > 0 ? `${unsubmittedExp.length} unsubmitted` : "all submitted"} color="#7C2D12" icon={Receipt} />
         </button>
       </div>
 
