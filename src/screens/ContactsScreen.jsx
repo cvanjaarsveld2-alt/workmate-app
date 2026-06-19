@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, User, Phone, Mail,
-  Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight, Send,
+  Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight, Send, ChevronRight,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
@@ -13,6 +13,8 @@ import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import { CardScanner } from "../components/CardScanner";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
+import { DetailSheet, DetailRow } from "../components/DetailSheet";
+import { ImageViewer } from "../components/ImageViewer";
 import {
   Card, Btn, Field, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm,
@@ -65,6 +67,8 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
   const [toast, setToast]             = useState("");
   const [cardPhotoUrl, setCardPhotoUrl] = useState(null);
   const [scannedNotice, setScannedNotice] = useState(false);
+  const [detailContact, setDetailContact] = useState(null);
+  const [viewerImages, setViewerImages] = useState(null);
   const [form, setForm] = useState({
     name: "", company: "", title: "", email: "", phone: "",
     met_at: "", met_date: todayISO(), notes: "", status: "lead",
@@ -341,6 +345,110 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+
+      {/* ── Contact detail sheet ── */}
+      <DetailSheet
+        open={!!detailContact}
+        onClose={() => setDetailContact(null)}
+        title={detailContact?.name || ""}
+        subtitle={detailContact ? [detailContact.title, detailContact.company].filter(Boolean).join(" · ") : ""}
+        primaryActions={detailContact && (
+          <div className="grid grid-cols-3 gap-2">
+            {detailContact.phone ? (
+              <a href={`tel:${detailContact.phone}`}
+                className="flex flex-col items-center justify-center gap-1 rounded-xl py-3 text-white min-h-[64px]"
+                style={{ background: "#8B1A1A" }}>
+                <Phone size={18} />
+                <span className="text-xs font-bold">Call</span>
+              </a>
+            ) : <div className="rounded-xl bg-slate-100 flex flex-col items-center justify-center gap-1 py-3 text-slate-300"><Phone size={18} /><span className="text-xs font-bold">—</span></div>}
+            {detailContact.phone ? (
+              <a href={`https://wa.me/${detailContact.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer"
+                className="flex flex-col items-center justify-center gap-1 rounded-xl py-3 text-white min-h-[64px]"
+                style={{ background: "#25D366" }}>
+                <Send size={18} />
+                <span className="text-xs font-bold">WhatsApp</span>
+              </a>
+            ) : <div className="rounded-xl bg-slate-100 flex flex-col items-center justify-center gap-1 py-3 text-slate-300"><Send size={18} /><span className="text-xs font-bold">—</span></div>}
+            {detailContact.email ? (
+              <a href={`mailto:${detailContact.email}`}
+                className="flex flex-col items-center justify-center gap-1 rounded-xl py-3 text-white min-h-[64px]"
+                style={{ background: "#2563EB" }}>
+                <Mail size={18} />
+                <span className="text-xs font-bold">Email</span>
+              </a>
+            ) : <div className="rounded-xl bg-slate-100 flex flex-col items-center justify-center gap-1 py-3 text-slate-300"><Mail size={18} /><span className="text-xs font-bold">—</span></div>}
+          </div>
+        )}
+        secondaryActions={detailContact && (
+          <>
+            <button onClick={() => { setDetailContact(null); startEdit(detailContact); }}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+              <Edit2 size={14} /> Edit
+            </button>
+            <button onClick={() => { const c = detailContact; setDetailContact(null); deleteContact(c.id, c.name); }}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-red-100 bg-white text-red-600 min-h-[48px]">
+              <Trash2 size={14} /> Delete
+            </button>
+          </>
+        )}
+      >
+        {detailContact && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <DetailRow label="Phone" value={detailContact.phone} mono />
+              <DetailRow label="Email" value={detailContact.email} />
+              <DetailRow label="Status" value={detailContact.status} />
+              {(detailContact.met_at || detailContact.met_date) && (
+                <DetailRow label="Met at" value={`${detailContact.met_at || ""}${detailContact.met_at && detailContact.met_date ? " · " : ""}${detailContact.met_date ? smartDate(detailContact.met_date) : ""}`} />
+              )}
+            </div>
+
+            {detailContact.notes && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Notes</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 border border-slate-100">{detailContact.notes}</p>
+              </div>
+            )}
+
+            {detailContact.card_photo_url && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Business card · tap to enlarge</p>
+                <button onClick={() => setViewerImages({ list: [{ url: detailContact.card_photo_url, caption: detailContact.name }], startIndex: 0 })}
+                  className="w-full rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80">
+                  <img src={detailContact.card_photo_url} alt="" className="w-full h-48 object-contain bg-slate-50" />
+                </button>
+              </div>
+            )}
+
+            {((detailContact.status === "lead" || detailContact.status === "active") && detailContact.company?.trim()) && (
+              <div className="pt-2 space-y-2 border-t border-slate-100">
+                <button
+                  onClick={() => { setSendInfo({ name: detailContact.name, email: detailContact.email, phone: detailContact.phone }); setDetailContact(null); }}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-blue-200 bg-blue-50 text-blue-700 min-h-[48px]">
+                  <Send size={14} /> Send Company Info
+                </button>
+                <button
+                  onClick={() => { const c = detailContact; setDetailContact(null); promoteToClient(c); }}
+                  className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-green-200 bg-green-50 text-green-700 min-h-[48px]">
+                  <ArrowUpRight size={14} /> Promote to Client
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </DetailSheet>
+
+      {/* ── Fullscreen image viewer ── */}
+      <AnimatePresence>
+        {viewerImages && (
+          <ImageViewer
+            images={viewerImages.list}
+            startIndex={viewerImages.startIndex || 0}
+            onClose={() => setViewerImages(null)}
+          />
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {sendInfo && (
           <SendCompanyInfoSheet
@@ -419,7 +527,7 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
 
                 const canPromote = (c.status === "lead" || c.status === "active") && c.company?.trim();
                 return (
-                  <div key={c.id} className="px-4 py-3">
+                  <div key={c.id} className="px-4 py-3 active:bg-slate-50 cursor-pointer" onClick={() => setDetailContact(c)}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -428,74 +536,23 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
                           {c.card_photo_url && <Camera size={12} className="text-slate-400" />}
                         </div>
                         {c.title && <p className="text-sm text-slate-500 mt-0.5">{c.title}</p>}
+                        {c.company && <p className="text-sm text-slate-600 mt-0.5">{c.company}</p>}
 
-                        <div className="flex flex-wrap gap-3 mt-1.5">
-                          {c.phone && (
-                            <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1 text-sm text-blue-600 font-medium" onClick={e => e.stopPropagation()}>
-                              <Phone size={12} />{c.phone}
-                            </a>
-                          )}
-                          {c.phone && (
-                            <span onClick={e => e.stopPropagation()}>
-                              <WhatsAppButton phone={c.phone} contactName={c.name} clientName={c.company} size="sm" />
-                            </span>
-                          )}
-                          {c.email && (
-                            <span onClick={e => e.stopPropagation()}>
-                              <EmailButton email={c.email} contactName={c.name} clientName={c.company} size="sm" />
-                            </span>
-                          )}
-                          {c.email && (
-                            <a href={`mailto:${c.email}`} className="inline-flex items-center gap-1 text-sm text-blue-600 truncate max-w-[180px]" onClick={e => e.stopPropagation()}>
-                              <Mail size={12} />{c.email}
-                            </a>
-                          )}
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          {c.phone && <span className="text-xs text-slate-400 inline-flex items-center gap-1"><Phone size={11} />{c.phone}</span>}
+                          {c.email && <span className="text-xs text-slate-400 inline-flex items-center gap-1 truncate max-w-[200px]"><Mail size={11} />{c.email}</span>}
                         </div>
 
                         {(c.met_at || c.met_date) && (
-                          <p className="text-xs text-slate-400 mt-1.5 inline-flex items-center gap-1">
+                          <p className="text-xs text-slate-400 mt-1 inline-flex items-center gap-1">
                             <CalendarIcon size={11} />
                             {c.met_at}{c.met_at && c.met_date ? " · " : ""}{c.met_date ? smartDate(c.met_date) : ""}
                           </p>
                         )}
-                        {/* Full info — no more clipped notes */}
-                        <ExpandableText text={c.notes} className="mt-1.5" />
                         {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
                       </div>
-
-                      <div className="flex flex-col gap-2 shrink-0">
-                        <button onClick={() => startEdit(c)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
-                          <Edit2 size={15} />
-                        </button>
-                        <button onClick={() => deleteContact(c.id, c.name)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
+                      <ChevronRight size={18} className="text-slate-300 shrink-0 mt-1" />
                     </div>
-
-                    {canPromote && (
-                      <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
-                        <button
-                          onClick={() => setSendInfo({ name: c.name, email: c.email, phone: c.phone })}
-                          className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold border-2 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors min-h-[44px]">
-                          <Send size={14} /> Send Company Info
-                        </button>
-                        <button
-                          onClick={() => promoteToClient(c)}
-                          className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold border-2 border-green-200 bg-green-50 text-green-700 hover:bg-green-100 transition-colors min-h-[44px]">
-                          <ArrowUpRight size={14} /> Promote to Client
-                        </button>
-                      </div>
-                    )}
-                    {!canPromote && (c.email || c.phone) && (
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <button
-                          onClick={() => setSendInfo({ name: c.name, email: c.email, phone: c.phone })}
-                          className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-bold border-2 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors min-h-[44px]">
-                          <Send size={14} /> Send Company Info
-                        </button>
-                      </div>
-                    )}
                   </div>
                 );
               })}
