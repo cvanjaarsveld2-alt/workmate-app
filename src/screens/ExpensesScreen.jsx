@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, Camera, Sparkles, Receipt,
-  Mail, CheckSquare, Square, FileDown, Send,
+  Mail, CheckSquare, Square, FileDown, Send, ChevronRight, ExternalLink,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
@@ -12,6 +12,8 @@ import { supabase } from "../supabase";
 import { ReceiptScanner } from "../components/ReceiptScanner";
 import { convertToZAR } from "../lib/exchangeRate";
 import { buildExpensePDF } from "../lib/expenseFinancePDF";
+import { DetailSheet, DetailRow } from "../components/DetailSheet";
+import { ImageViewer } from "../components/ImageViewer";
 import {
   Card, Btn, Field, SelectField, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm,
@@ -155,6 +157,8 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
   const [selectMode, setSelectMode]   = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [manualZAR, setManualZAR]     = useState(""); // for currencies ECB doesn't cover
+  const [detailExpense, setDetailExpense] = useState(null);   // the row whose sheet is open
+  const [viewerImages, setViewerImages] = useState(null);     // array of {url, caption} or null
   const [form, setForm] = useState({
     vendor: "", amount: "", vat_amount: "", currency: "ZAR",
     expense_date: todayISO(), expense_time: "", category: "Other",
@@ -247,11 +251,8 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
 
   async function saveExpense() {
     if (!form.amount || parseFloat(form.amount) <= 0) { setToast("Enter a valid amount"); return; }
-    // Card payments require a payment slip (SA finance compliance).
-    if (form.payment_method === "Card" && !paymentSlipUrl) {
-      setToast("Card payments need a payment slip — tap 'Add payment slip' below");
-      return;
-    }
+    // Payment slip is OPTIONAL in all cases. (Some merchants don't issue one,
+    // and finance can verify card payments against the bank statement.)
 
     // ZAR conversion logic:
     //   1. ZAR currency? trivial (zar = amount, rate = 1).
@@ -417,6 +418,18 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     setFinancePack(null);
   }
 
+  // Open one (or both) of an expense's slip images in the fullscreen viewer.
+  async function openExpenseImages(ex, startWith = "till") {
+    const items = [];
+    const tillSigned = await signReceipt(ex.receipt_url);
+    if (tillSigned) items.push({ url: tillSigned, caption: `Till slip — ${ex.vendor || ""}` });
+    const paySigned = await signReceipt(ex.payment_slip_url);
+    if (paySigned) items.push({ url: paySigned, caption: `Payment slip — ${ex.vendor || ""}` });
+    if (items.length === 0) { setToast("No images on this expense"); return; }
+    const startIdx = startWith === "payment" && items.length > 1 ? 1 : 0;
+    setViewerImages({ list: items, startIndex: startIdx });
+  }
+
   // — Preview: open the PDF in a new tab/window. Mobile: usually opens in the
   // device PDF viewer; user can then share from there.
   function previewFinancePack() {
@@ -544,6 +557,120 @@ Kind regards`;
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+
+      {/* ── Expense detail sheet (opens on card tap) ── */}
+      <DetailSheet
+        open={!!detailExpense}
+        onClose={() => setDetailExpense(null)}
+        title={detailExpense ? fmtMoney(detailExpense.amount, detailExpense.currency) : ""}
+        subtitle={detailExpense
+          ? `${detailExpense.vendor || "Unknown vendor"} · ${detailExpense.category}${detailExpense.expense_date ? ` · ${smartDate(detailExpense.expense_date)}` : ""}`
+          : ""}
+        primaryActions={detailExpense && (
+          <div className={`grid gap-2 ${detailExpense.receipt_url && detailExpense.payment_slip_url ? "grid-cols-2" : "grid-cols-1"}`}>
+            {detailExpense.receipt_url && (
+              <button onClick={() => openExpenseImages(detailExpense, "till")}
+                className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
+                style={{ background: "#8B1A1A" }}>
+                📄 View till slip
+              </button>
+            )}
+            {detailExpense.payment_slip_url && (
+              <button onClick={() => openExpenseImages(detailExpense, "payment")}
+                className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
+                style={{ background: "#7C2D12" }}>
+                💳 View payment slip
+              </button>
+            )}
+            {!detailExpense.receipt_url && !detailExpense.payment_slip_url && (
+              <p className="text-sm text-slate-500 text-center py-2">No slip photos on this expense</p>
+            )}
+          </div>
+        )}
+        secondaryActions={detailExpense && (
+          <>
+            <button
+              onClick={() => { setDetailExpense(null); startEdit(detailExpense); }}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+              <Edit2 size={14} /> Edit
+            </button>
+            <button
+              onClick={() => { const id = detailExpense.id; setDetailExpense(null); deleteExpense(id); }}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-red-100 bg-white text-red-600 min-h-[48px]">
+              <Trash2 size={14} /> Delete
+            </button>
+          </>
+        )}
+      >
+        {detailExpense && (
+          <>
+            {/* ZAR equivalent (if foreign currency) */}
+            {detailExpense.currency && detailExpense.currency !== "ZAR" && detailExpense.amount_zar > 0 && (
+              <div className="rounded-xl bg-green-50 border border-green-100 p-3">
+                <p className="text-xs font-bold text-green-700 uppercase tracking-wider">ZAR equivalent</p>
+                <p className="text-xl font-black text-green-800 mt-0.5">{fmtMoney(detailExpense.amount_zar, "ZAR")}</p>
+                <p className="text-xs text-green-600 mt-0.5">
+                  Rate {Number(detailExpense.exchange_rate || 0).toFixed(4)} on {detailExpense.rate_date || "n/a"} ({detailExpense.rate_source || "n/a"})
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <DetailRow label="Payment" value={detailExpense.payment_method} />
+              <DetailRow label="Status" value={(STATUS_COLORS[detailExpense.status] || STATUS_COLORS.unsubmitted).label} />
+              {detailExpense.expense_time && <DetailRow label="Time" value={detailExpense.expense_time} mono />}
+              {detailExpense.vat_amount > 0 && <DetailRow label="VAT included" value={fmtMoney(detailExpense.vat_amount, detailExpense.currency)} />}
+            </div>
+
+            {detailExpense.notes && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Notes</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 border border-slate-100">{detailExpense.notes}</p>
+              </div>
+            )}
+
+            {/* Inline slip previews — big, tappable */}
+            {(detailExpense.receipt_url || detailExpense.payment_slip_url) && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Receipt photos · tap to enlarge</p>
+                <div className={`grid gap-2 ${detailExpense.receipt_url && detailExpense.payment_slip_url ? "grid-cols-2" : "grid-cols-1"}`}>
+                  {detailExpense.receipt_url && (
+                    <button onClick={() => openExpenseImages(detailExpense, "till")}
+                      className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80">
+                      <SignedReceiptImg stored={detailExpense.receipt_url} className="w-full h-40 object-contain bg-slate-50" />
+                      <p className="text-xs font-bold text-slate-600 py-2 text-center bg-white">Till slip</p>
+                    </button>
+                  )}
+                  {detailExpense.payment_slip_url && (
+                    <button onClick={() => openExpenseImages(detailExpense, "payment")}
+                      className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80">
+                      <SignedReceiptImg stored={detailExpense.payment_slip_url} className="w-full h-40 object-contain bg-slate-50" />
+                      <p className="text-xs font-bold text-slate-600 py-2 text-center bg-white">Payment slip</p>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {detailExpense.ai_extracted && (
+              <p className="text-xs text-purple-600 flex items-center gap-1.5">
+                <Sparkles size={12} /> Filled by AI from the slip — verify before submitting
+              </p>
+            )}
+          </>
+        )}
+      </DetailSheet>
+
+      {/* ── Fullscreen image viewer ── */}
+      <AnimatePresence>
+        {viewerImages && (
+          <ImageViewer
+            images={viewerImages.list}
+            startIndex={viewerImages.startIndex || 0}
+            onClose={() => setViewerImages(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── Finance Pack ready: preview, share, or email ── */}
       <AnimatePresence>
@@ -683,8 +810,7 @@ Kind regards`;
                 </div>
                 <div>
                   <p className="text-xs font-bold text-slate-500 mb-1.5">
-                    Payment slip {form.payment_method === "Card" && <span className="text-red-500">*</span>}
-                    {form.payment_method !== "Card" && <span className="text-slate-400 font-normal">(optional)</span>}
+                    Payment slip <span className="text-slate-400 font-normal">(optional)</span>
                   </p>
                   {paymentSlipUrl ? (
                     <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 relative">
@@ -814,54 +940,40 @@ Kind regards`;
                   const isSelected = selectedIds.has(ex.id);
                   return (
                     <Card key={ex.id}
-                      className={`overflow-hidden transition-all ${selectMode && isSelected ? "ring-2 ring-red-500" : ""}`}
-                      onClick={selectMode ? () => toggleSelect(ex.id) : undefined}>
-                      <div className={`p-4 ${selectMode ? "cursor-pointer" : ""}`}>
+                      className={`overflow-hidden transition-all ${selectMode && isSelected ? "ring-2 ring-red-500" : ""} ${!selectMode ? "active:bg-slate-50 cursor-pointer" : ""}`}
+                      onClick={selectMode ? () => toggleSelect(ex.id) : () => setDetailExpense(ex)}>
+                      <div className="p-4">
                         <div className="flex items-start gap-3">
                           {selectMode && (
                             <div className="shrink-0 mt-0.5">
                               {isSelected ? <CheckSquare size={22} className="text-red-600" /> : <Square size={22} className="text-slate-300" />}
                             </div>
                           )}
-                          {ex.receipt_url && !selectMode && (
-                            <ReceiptThumb
-                              path={ex.receipt_url}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                const signed = await signReceipt(ex.receipt_url);
-                                if (signed) window.open(signed, "_blank");
-                              }}
-                            />
-                          )}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-base font-black text-slate-900">{fmtMoney(ex.amount, ex.currency)}</p>
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <p className="text-lg font-black text-slate-900">{fmtMoney(ex.amount, ex.currency)}</p>
                               <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: cc.bg, color: cc.text }}>{ex.category}</span>
                               {ex.ai_extracted && <Sparkles size={12} className="text-purple-400" />}
                             </div>
                             {ex.currency && ex.currency !== "ZAR" && ex.amount_zar > 0 && (
                               <p className="text-xs font-bold mt-0.5" style={{ color: "#15803D" }}>
                                 ≈ {fmtMoney(ex.amount_zar, "ZAR")}
-                                <span className="text-slate-400 font-normal"> · @ {ex.exchange_rate ? Number(ex.exchange_rate).toFixed(4) : "?"}</span>
                               </p>
                             )}
-                            {ex.vendor && <p className="text-sm text-slate-600 mt-0.5">{ex.vendor}</p>}
+                            {ex.vendor && <p className="text-sm font-bold text-slate-700 mt-1">{ex.vendor}</p>}
                             <div className="flex items-center gap-2 mt-1 flex-wrap">
                               <p className="text-xs text-slate-400">{ex.expense_date ? smartDate(ex.expense_date) : "No date"}{ex.expense_time ? ` · ${ex.expense_time}` : ""}</p>
                               <span className="text-xs text-slate-300">·</span>
                               <p className="text-xs text-slate-400">{ex.payment_method}</p>
-                              {ex.vat_amount > 0 && <><span className="text-xs text-slate-300">·</span><p className="text-xs text-slate-400">VAT {fmtMoney(ex.vat_amount, ex.currency)}</p></>}
                             </div>
-                            {ex.notes && <p className="text-xs text-slate-500 italic mt-1 break-words">{ex.notes}</p>}
-                            <span className="mt-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: sc.bg, color: sc.text }}>{sc.label}</span>
-                            {ex.sync_status === "pending" && <span className="mt-1 ml-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
+                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: sc.bg, color: sc.text }}>{sc.label}</span>
+                              {ex.receipt_url && <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">📄 Slip</span>}
+                              {ex.payment_slip_url && <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">💳 Card slip</span>}
+                              {ex.sync_status === "pending" && <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Syncing…</span>}
+                            </div>
                           </div>
-                          {!selectMode && (
-                            <div className="flex flex-col gap-2 shrink-0">
-                              <button onClick={(e) => { e.stopPropagation(); startEdit(ex); }} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={15} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); deleteExpense(ex.id); }} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={15} /></button>
-                            </div>
-                          )}
+                          {!selectMode && <ChevronRight size={18} className="text-slate-300 shrink-0 mt-1" />}
                         </div>
                       </div>
                     </Card>
