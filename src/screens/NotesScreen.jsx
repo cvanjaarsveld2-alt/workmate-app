@@ -1,7 +1,7 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users } from "lucide-react";
+import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight } from "lucide-react";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
@@ -10,6 +10,8 @@ import { scheduleNotificationsViaSW } from "../lib/notifications";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, UrgencyBadge, useConfirm, ClientSelector } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { ContactPicker, LinkedContactsDisplay } from "../components/ContactPicker";
+import { DetailSheet, DetailRow } from "../components/DetailSheet";
+import { ImageViewer } from "../components/ImageViewer";
 import { exportNotesPDF, exportNotesExcel } from "../NotesExport";
 
 export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, searchSeed }) {
@@ -28,6 +30,8 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
   const [newClient, setNewClient] = useState({ company: "", branch: "" });
   const [selectMode, setSelectMode]     = useState(false);
   const [selectedIds, setSelectedIds]   = useState(new Set());
+  const [detailNote, setDetailNote]     = useState(null);
+  const [viewerImages, setViewerImages] = useState(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting]       = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -446,6 +450,100 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
+      {/* ── Note detail sheet ── */}
+      <DetailSheet
+        open={!!detailNote}
+        onClose={() => setDetailNote(null)}
+        title={detailNote ? (detailNote.client || "General Note") : ""}
+        subtitle={detailNote
+          ? `${detailNote.urgency || "Normal"}${detailNote.resolve_by ? ` · Resolve by ${smartDate(detailNote.resolve_by)}` : ""}${detailNote.resolved ? " · Resolved" : ""}`
+          : ""}
+        primaryActions={detailNote && !detailNote.resolved && (
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => { resolveNote(detailNote.id); setDetailNote(null); }}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
+              style={{ background: "#15803D" }}>
+              <Check size={14} /> Resolve
+            </button>
+            <div className="flex gap-1">
+              {Object.keys(NOTE_URGENCY).map(u2 => (
+                <button key={u2} onClick={() => { changeUrgency(detailNote.id, u2); setDetailNote(n => ({ ...n, urgency: u2 })); }}
+                  className="flex-1 rounded-lg px-2 py-2 text-xs font-bold border transition-all min-h-[48px]"
+                  style={(detailNote.urgency || "Normal") === u2 ? { background: NOTE_URGENCY[u2].bg, color: NOTE_URGENCY[u2].text, borderColor: NOTE_URGENCY[u2].dot } : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  {u2.charAt(0)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        secondaryActions={detailNote && (
+          <>
+            <button onClick={() => { setDetailNote(null); startEdit(detailNote); }}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+              <Edit2 size={14} /> Edit
+            </button>
+            <button onClick={() => { const id = detailNote.id; setDetailNote(null); deleteNote(id); }}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-red-100 bg-white text-red-600 min-h-[48px]">
+              <Trash2 size={14} /> Delete
+            </button>
+          </>
+        )}
+      >
+        {detailNote && (
+          <>
+            <div>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Note</p>
+              <p className="text-sm text-slate-800 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 border border-slate-100 leading-relaxed">
+                {detailNote.note || <span className="text-slate-400 italic">(empty)</span>}
+              </p>
+            </div>
+
+            {(detailNote.linked_contact_ids || []).length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Linked contacts</p>
+                <LinkedContactsDisplay contactIds={detailNote.linked_contact_ids} contacts={contacts} size="sm" />
+              </div>
+            )}
+
+            {(detailNote.media || []).length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Attachments · tap to enlarge</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {detailNote.media.map((m, i) => (
+                    <button key={m.id} onClick={() => setViewerImages({ list: detailNote.media.map(mm => ({ url: mm.url, caption: detailNote.client || "Note" })), startIndex: i })}
+                      className="rounded-lg overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80 aspect-square">
+                      <img src={m.url} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              {detailNote.resolved && detailNote.resolved_at && (
+                <DetailRow label="Resolved" value={new Date(detailNote.resolved_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} />
+              )}
+              {detailNote.created_at && (
+                <DetailRow label="Created" value={new Date(detailNote.created_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} />
+              )}
+            </div>
+
+            {detailNote.resolved && (
+              <button onClick={() => { unresolveNote(detailNote.id); setDetailNote(null); }}
+                className="w-full text-sm text-slate-500 underline py-2">
+                Mark as unresolved
+              </button>
+            )}
+          </>
+        )}
+      </DetailSheet>
+
+      <AnimatePresence>
+        {viewerImages && (
+          <ImageViewer images={viewerImages.list} startIndex={viewerImages.startIndex} onClose={() => setViewerImages(null)} />
+        )}
+      </AnimatePresence>
+
       {!selectMode ? (
         <div className="flex items-center justify-between">
           <PageHeader title="Field Notes" subtitle={`${unresolvedCount} unresolved · ${notes.length} total`} />
@@ -580,13 +678,14 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
           const urg      = NOTE_URGENCY[n.urgency || "Normal"] || NOTE_URGENCY.Normal;
           const isOverdue = !n.resolved && n.resolve_by && n.resolve_by < today;
           const isSelected = selectedIds.has(n.id);
+          const mediaCount = (n.media || []).length;
           return (
             <Card key={n.id}
-              className={`overflow-hidden transition-all ${selectMode && isSelected ? "ring-2 ring-red-500" : ""}`}
+              className={`overflow-hidden transition-all ${selectMode && isSelected ? "ring-2 ring-red-500" : ""} ${!selectMode ? "active:bg-slate-50 cursor-pointer" : ""}`}
               style={{ borderLeft: "3px solid " + urg.dot }}
-              onClick={selectMode ? () => toggleSelect(n.id) : undefined}>
-              <div className={`p-4 ${selectMode ? "cursor-pointer" : ""}`}>
-                <div className="flex items-start justify-between gap-3">
+              onClick={selectMode ? () => toggleSelect(n.id) : () => setDetailNote(n)}>
+              <div className="p-4">
+                <div className="flex items-start gap-3">
                   {selectMode && (
                     <div className="shrink-0 mt-0.5">
                       {isSelected ? <CheckSquare size={22} className="text-red-600" /> : <Square size={22} className="text-slate-300" />}
@@ -599,51 +698,17 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
                       {n.resolved && <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-700">Resolved</span>}
                       {isOverdue && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">Overdue</span>}
                     </div>
-                    <p className={"text-sm leading-relaxed break-words " + (n.resolved ? "text-slate-400" : "text-slate-600")}>{n.note}</p>
+                    <p className={"text-sm leading-relaxed break-words line-clamp-2 " + (n.resolved ? "text-slate-400" : "text-slate-600")}>{n.note}</p>
 
-                    {(n.linked_contact_ids || []).length > 0 && (
-                      <div className="mt-2">
-                        <LinkedContactsDisplay contactIds={n.linked_contact_ids} contacts={contacts} size="sm" />
-                      </div>
-                    )}
-
-                    {n.resolve_by && !n.resolved && <p className={"mt-1 text-sm font-medium " + (isOverdue ? "text-red-600" : "text-slate-400")}>Resolve by: {smartDate(n.resolve_by)}</p>}
-                    {n.resolved && n.resolved_at && <p className="mt-1 text-xs text-slate-400">Resolved {new Date(n.resolved_at).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}</p>}
-                    {(n.media || []).length > 0 && <div className="mt-1 flex items-center gap-1 text-xs text-slate-400"><Paperclip size={11} />{n.media.length} attachment{n.media.length !== 1 ? "s" : ""}</div>}
-                    {!selectMode && <MediaGallery media={n.media || []} onDelete={mid => deleteNoteMedia(n.id, mid)} />}
-                    <p className="mt-1.5 text-xs text-slate-400">{n.created_at ? new Date(n.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</p>
-                    {n.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
-                  </div>
-                  {!selectMode && (
-                    <div className="flex flex-col gap-2 shrink-0">
-                      <button onClick={(e) => { e.stopPropagation(); startEdit(n); }} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
-                        <Edit2 size={15} />
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); deleteNote(n.id); }} className="p-2.5 rounded-xl bg-slate-50 text-slate-300 hover:text-red-500 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
-                        <Trash2 size={15} />
-                      </button>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      {n.resolve_by && !n.resolved && <p className={"text-xs " + (isOverdue ? "text-red-600 font-bold" : "text-slate-400")}>Resolve by {smartDate(n.resolve_by)}</p>}
+                      {mediaCount > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600"><Paperclip size={10} />{mediaCount}</span>}
+                      {(n.linked_contact_ids || []).length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700"><Users size={10} />{(n.linked_contact_ids || []).length}</span>}
+                      {n.sync_status === "pending" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Syncing…</span>}
                     </div>
-                  )}
+                  </div>
+                  {!selectMode && <ChevronRight size={18} className="text-slate-300 shrink-0 mt-1" />}
                 </div>
-                {!selectMode && !n.resolved && (
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <div className="flex gap-1">
-                      {Object.keys(NOTE_URGENCY).map(u2 => (
-                        <button key={u2} onClick={(e) => { e.stopPropagation(); changeUrgency(n.id, u2); }}
-                          className="rounded-lg px-3 py-1.5 text-sm font-bold border transition-all min-h-[40px]"
-                          style={(n.urgency || "Normal") === u2 ? { background: NOTE_URGENCY[u2].bg, color: NOTE_URGENCY[u2].text, borderColor: NOTE_URGENCY[u2].dot } : { background: "#F8FAFC", color: "#CBD5E1", borderColor: "#E2E8F0" }}>
-                          {u2}
-                        </button>
-                      ))}
-                    </div>
-                    <Btn size="sm" variant="success" onClick={(e) => { e.stopPropagation(); resolveNote(n.id); }}><Check size={13} /> Resolve</Btn>
-                  </div>
-                )}
-                {!selectMode && n.resolved && (
-                  <div className="mt-2 pt-2 border-t border-slate-100">
-                    <button onClick={(e) => { e.stopPropagation(); unresolveNote(n.id); }} className="text-sm text-slate-400 hover:text-slate-600 transition-colors font-medium py-1">Mark as unresolved</button>
-                  </div>
-                )}
               </div>
             </Card>
           );
