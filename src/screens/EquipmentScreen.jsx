@@ -1,12 +1,14 @@
 // ─── Equipment Screen ─────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip } from "lucide-react";
+import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip, ChevronRight } from "lucide-react";
 import { smartDate, genId, uploadPhotoToSupabase, daysDiff } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, ServiceBadge, useConfirm } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
+import { DetailSheet, DetailRow } from "../components/DetailSheet";
+import { ImageViewer } from "../components/ImageViewer";
 
 // ─── Show-more text (full info on tap, no silent clipping) ──────────────────
 function ExpandableText({ text, limit = 110, className = "" }) {
@@ -32,6 +34,8 @@ function ExpandableText({ text, limit = 110, className = "" }) {
 export function EquipmentScreen({ data, setData, userId, isOnline, quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch]     = useState("");
+  const [detailEq, setDetailEq] = useState(null);
+  const [viewerImages, setViewerImages] = useState(null);
   const [filter, setFilter]     = useState("All");
   const [editId, setEditId]     = useState(null);
   const [toast, setToast]       = useState("");
@@ -201,6 +205,82 @@ export function EquipmentScreen({ data, setData, userId, isOnline, quickAddTrigg
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+
+      {/* ── Equipment detail sheet ── */}
+      <DetailSheet
+        open={!!detailEq}
+        onClose={() => setDetailEq(null)}
+        title={detailEq?.name || ""}
+        subtitle={detailEq ? [detailEq.type, detailEq.make, detailEq.model].filter(Boolean).join(" · ") : ""}
+        primaryActions={detailEq && (detailEq.media || []).length > 0 && (
+          <button
+            onClick={() => setViewerImages({ list: (detailEq.media || []).map(m => ({ url: m.url || m, caption: detailEq.name })), startIndex: 0 })}
+            className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
+            style={{ background: "#8B1A1A" }}>
+            <Paperclip size={16} /> View {(detailEq.media || []).length} photo{(detailEq.media || []).length !== 1 ? "s" : ""}
+          </button>
+        )}
+        secondaryActions={detailEq && (
+          <>
+            <button onClick={() => { const e = detailEq; setDetailEq(null); startEdit(e); }}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+              <Edit2 size={14} /> Edit
+            </button>
+            <button onClick={() => { const id = detailEq.id; const nm = detailEq.name; setDetailEq(null); deleteEquipment(id, nm); }}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-red-100 bg-white text-red-600 min-h-[48px]">
+              <Trash2 size={14} /> Delete
+            </button>
+          </>
+        )}
+      >
+        {detailEq && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {detailEq.serial && <DetailRow label="Serial #" value={detailEq.serial} mono />}
+              {detailEq.client && <DetailRow label="Client" value={detailEq.client} />}
+              {detailEq.location && <DetailRow label="Location" value={detailEq.location} />}
+              {detailEq.service_due && <DetailRow label="Service due" value={smartDate(detailEq.service_due)} />}
+              {detailEq.installed_date && <DetailRow label="Installed" value={smartDate(detailEq.installed_date)} />}
+            </div>
+
+            {detailEq.notes && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Notes</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 border border-slate-100">{detailEq.notes}</p>
+              </div>
+            )}
+
+            {(detailEq.media || []).length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Photos · tap to enlarge</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(detailEq.media || []).map((m, i) => {
+                    const url = m.url || m;
+                    return (
+                      <button key={i}
+                        onClick={() => setViewerImages({ list: (detailEq.media || []).map(mm => ({ url: mm.url || mm, caption: detailEq.name })), startIndex: i })}
+                        className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80">
+                        <img src={url} alt="" className="w-full h-32 object-cover" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </DetailSheet>
+
+      {/* ── Fullscreen image viewer ── */}
+      <AnimatePresence>
+        {viewerImages && (
+          <ImageViewer
+            images={viewerImages.list}
+            startIndex={viewerImages.startIndex || 0}
+            onClose={() => setViewerImages(null)}
+          />
+        )}
+      </AnimatePresence>
       <div className="flex items-center justify-between">
         <PageHeader title="Equipment" subtitle={`${equipment.length} registered · ${overdueCount} overdue`} />
         <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
@@ -239,9 +319,12 @@ export function EquipmentScreen({ data, setData, userId, isOnline, quickAddTrigg
             );
           }
 
+          const mediaCount = (eq.media || []).length;
           return (
-            <Card key={eq.id} className="p-4">
-              <div className="flex items-start justify-between gap-3">
+            <Card key={eq.id}
+              className="p-4 active:bg-slate-50 cursor-pointer"
+              onClick={() => setDetailEq(eq)}>
+              <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap mb-1">
                     <p className="text-base font-black text-slate-900">{eq.name}</p>
@@ -249,20 +332,14 @@ export function EquipmentScreen({ data, setData, userId, isOnline, quickAddTrigg
                     {eq.service_due && <ServiceBadge dueDate={eq.service_due} />}
                   </div>
                   {(eq.make || eq.model) && <p className="text-sm text-slate-500">{[eq.make, eq.model].filter(Boolean).join(" · ")}</p>}
-                  {eq.serial && <div className="mt-1 inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1"><Hash size={11} className="text-slate-400" /><span className="text-sm font-mono font-bold text-slate-600">{eq.serial}</span></div>}
-                  <div className="mt-1.5 flex flex-wrap gap-3">
-                    {eq.location && <span className="inline-flex items-center gap-1 text-sm text-slate-400"><MapPin size={12} />{eq.location}</span>}
-                    {eq.client && <span className="inline-flex items-center gap-1 text-sm text-slate-400"><Users size={12} />{eq.client}</span>}
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    {eq.location && <span className="inline-flex items-center gap-1 text-xs text-slate-400"><MapPin size={11} />{eq.location}</span>}
+                    {eq.client && <span className="inline-flex items-center gap-1 text-xs text-slate-400"><Users size={11} />{eq.client}</span>}
+                    {mediaCount > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600"><Paperclip size={10} />{mediaCount}</span>}
+                    {eq.sync_status === "pending" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Syncing…</span>}
                   </div>
-                  {eq.service_due && <p className="mt-1 text-sm text-slate-400">Service due: {smartDate(eq.service_due)}</p>}
-                  <ExpandableText text={eq.notes} className="mt-1" />
-                  {(eq.media || []).length > 0 && <><div className="mt-1 flex items-center gap-1 text-sm text-slate-400"><Paperclip size={12} />{eq.media.length} photo{eq.media.length !== 1 ? "s" : ""}</div><MediaGallery media={eq.media || []} onDelete={mid => deleteEquipMedia(eq.id, mid)} /></>}
-                  {eq.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
                 </div>
-                <div className="flex flex-col gap-2 shrink-0">
-                  <button onClick={() => startEdit(eq)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={15} /></button>
-                  <button onClick={() => deleteEquipment(eq.id, eq.name)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={15} /></button>
-                </div>
+                <ChevronRight size={18} className="text-slate-300 shrink-0 mt-1" />
               </div>
             </Card>
           );
