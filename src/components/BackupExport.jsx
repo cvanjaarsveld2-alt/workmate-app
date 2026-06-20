@@ -3,7 +3,7 @@
 // Use this regularly — your data lives in Supabase but a local backup is safer.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
-import { Download, Database, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Download, Database, CheckCircle2, AlertTriangle, Share2 } from "lucide-react";
 import JSZip from "jszip";
 import { Card, Btn } from "./ui";
 
@@ -141,20 +141,26 @@ The JSON file is human-readable and can be re-imported into the system.
     compressionOptions: { level: 6 },
   });
 
-  // Trigger download
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `PowerMate_Backup_${stamp}.zip`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const filename = `PowerMate_Backup_${stamp}.zip`;
 
   // Record the backup time
   try {
     localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
   } catch {}
 
-  return master.counts;
+  return { blob, filename, counts: master.counts };
+}
+
+// Trigger a plain browser download (desktop fallback / explicit "Save to phone").
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -170,12 +176,36 @@ export function BackupExport({ data }) {
     } catch {}
   }, []);
 
-  async function handleExport() {
+  async function handleExport(mode) {
     setExporting(true);
     try {
-      const counts = await generateBackup(data);
+      const { blob, filename, counts } = await generateBackup(data);
       setLastResult(counts);
       setLastBackup(new Date());
+
+      if (mode === "share") {
+        const file = new File([blob], filename, { type: "application/zip" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              title: "PowerMate Backup",
+              text: `PowerMate backup — ${new Date().toLocaleDateString("en-GB")}`,
+              files: [file],
+            });
+          } catch (e) {
+            // User cancelled the share sheet — not an error, don't alert.
+            if (e.name !== "AbortError") {
+              console.warn("Share failed, falling back to download:", e);
+              downloadBlob(blob, filename);
+            }
+          }
+        } else {
+          // No Web Share file support (most desktop browsers) — just download.
+          downloadBlob(blob, filename);
+        }
+      } else {
+        downloadBlob(blob, filename);
+      }
     } catch (e) {
       console.error("Backup failed:", e);
       alert("Backup failed: " + (e.message || "unknown error"));
@@ -204,8 +234,10 @@ export function BackupExport({ data }) {
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Data Backup</p>
       </div>
       <p className="text-sm text-slate-500">
-        Download all your PowerMate data as a ZIP file. Open the CSVs in Excel,
-        or keep the JSON for full restore. Store off-device (Google Drive, email to yourself).
+        Save all your PowerMate data as a ZIP file. Open the CSVs in Excel,
+        or keep the JSON for full restore.
+        <strong> Share it to Google Drive, iCloud, or email it to yourself</strong> — a
+        backup that only lives on this phone isn't really a backup.
       </p>
 
       {/* Status indicator */}
@@ -237,10 +269,17 @@ export function BackupExport({ data }) {
         </div>
       </div>
 
-      <Btn variant={isStale ? "solid" : "secondary"} className="w-full" onClick={handleExport} disabled={exporting}>
-        <Download size={15} />
-        {exporting ? "Generating backup…" : `Download Backup (${totalRows} items)`}
+      <Btn variant="solid" className="w-full" onClick={() => handleExport("share")} disabled={exporting}>
+        <Share2 size={15} />
+        {exporting ? "Generating backup…" : `Share Backup to Drive/Email (${totalRows} items)`}
       </Btn>
+      <Btn variant="secondary" className="w-full" onClick={() => handleExport("download")} disabled={exporting}>
+        <Download size={15} />
+        {exporting ? "Generating backup…" : "Just download to this phone"}
+      </Btn>
+      <p className="text-xs text-slate-400 text-center -mt-1">
+        Share opens your device's share sheet — pick Google Drive, iCloud, Mail, or WhatsApp.
+      </p>
 
       {lastResult && !exporting && (
         <div className="rounded-xl bg-slate-50 p-3 text-xs space-y-1">
