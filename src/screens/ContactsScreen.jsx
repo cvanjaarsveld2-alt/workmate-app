@@ -138,6 +138,11 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
     setEditId(null);
     setShowForm(true);
     setTimeout(() => setScannedNotice(false), 5000);
+    // The AI extraction succeeded even if the photo failed to upload — tell
+    // the user clearly rather than leaving a silently-missing photo.
+    if (extracted._photo_upload_error) {
+      setToast(`Card details saved, but the photo didn't upload: ${extracted._photo_upload_error}`);
+    }
   }
 
   async function saveContact() {
