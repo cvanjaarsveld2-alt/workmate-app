@@ -103,6 +103,57 @@ function SignedReceiptImg({ stored, className }) {
 //   - label     human label like "26 May – 25 Jun 2026"
 //   - start     ISO date when the period started (the 26th)
 //   - end       ISO date when the period ends (the 25th)
+// ─── Decimal-safe amount input ──────────────────────────────────────────────
+// Some iPhones (locale-dependent) show a numeric keypad that uses a COMMA as
+// the decimal separator. HTML's type="number" only accepts a period, so on
+// those devices typing "1223,14" either gets rejected or silently mangled.
+// Fix: use a plain text input with inputMode="decimal" (still shows the
+// numeric keypad) and accept EITHER comma or period as the separator,
+// normalising to a period internally before it's ever parsed as a number.
+
+// Turn whatever the user typed (1223,14 / 1223.14 / 1 223,14) into a clean
+// string suitable for parseFloat — always period-separated, digits only.
+function normaliseDecimalInput(raw) {
+  if (raw === null || raw === undefined) return "";
+  let s = String(raw);
+  // Strip anything that isn't a digit, comma, period, or leading minus.
+  s = s.replace(/[^\d.,-]/g, "");
+  // If both a comma and a period appear, assume the comma was a thousands
+  // separator (e.g. "1,223.14") and just remove it.
+  if (s.includes(",") && s.includes(".")) {
+    s = s.replace(/,/g, "");
+  } else {
+    // Only a comma present → it's being used as the decimal separator.
+    s = s.replace(",", ".");
+  }
+  // Collapse any accidental double periods from fast typing.
+  s = s.replace(/\.(?=.*\.)/g, "");
+  return s;
+}
+
+// A drop-in replacement for <Field type="number"> that works correctly on
+// comma-decimal iPhone keyboards. Displays exactly what the user typed
+// (so they can keep using a comma if that's their habit) but the value
+// handed back via onChange is always period-normalised and safe to
+// parseFloat() when saving.
+function AmountField({ label, value, onChange, placeholder = "0.00", required = false }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-bold text-slate-600">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={value}
+        onChange={e => onChange(normaliseDecimalInput(e.target.value))}
+        placeholder={placeholder}
+        className="w-full rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-none focus:border-red-300 min-h-[48px]"
+      />
+    </div>
+  );
+}
+
 function financePeriod(isoDate) {
   if (!isoDate) return null;
   const d = new Date(isoDate + "T12:00:00");
@@ -844,7 +895,7 @@ Kind regards`;
 
               <Field label="Vendor" value={form.vendor} onChange={v => setForm(f => ({ ...f, vendor: v }))} placeholder="e.g. Engen Garage" />
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Amount (total)" type="number" value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} placeholder="0.00" required />
+                <AmountField label="Amount (total)" value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} placeholder="0.00" required />
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-slate-500">Currency</label>
                   <select value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
@@ -873,11 +924,11 @@ Kind regards`;
                   <div className="flex items-center gap-2">
                     <span className="text-base font-bold text-slate-500 shrink-0">R</span>
                     <input
-                      type="number"
-                      value={manualZAR}
-                      onChange={e => setManualZAR(e.target.value)}
-                      placeholder="leave blank to use ECB rate"
+                      type="text"
                       inputMode="decimal"
+                      value={manualZAR}
+                      onChange={e => setManualZAR(normaliseDecimalInput(e.target.value))}
+                      placeholder="leave blank to use ECB rate"
                       className="flex-1 rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-none focus:border-red-300 min-h-[48px]"
                     />
                   </div>
@@ -888,7 +939,7 @@ Kind regards`;
                 </div>
               )}
 
-              <Field label="VAT amount (optional)" type="number" value={form.vat_amount} onChange={v => setForm(f => ({ ...f, vat_amount: v }))} placeholder="0.00" />
+              <AmountField label="VAT amount (optional)" value={form.vat_amount} onChange={v => setForm(f => ({ ...f, vat_amount: v }))} placeholder="0.00" />
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Date" type="date" value={form.expense_date} onChange={v => setForm(f => ({ ...f, expense_date: v }))} />
                 <Field label="Time (optional)" type="time" value={form.expense_time} onChange={v => setForm(f => ({ ...f, expense_time: v }))} />
