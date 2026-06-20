@@ -221,6 +221,34 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         ))}
       </Card>
 
+      {/* Diagnostics — quick health check, only loud when something's wrong */}
+      {setScreen && (() => {
+        const failedCount = (data.syncQueue || []).filter(i => i.status === "failed").length;
+        const pendingCount2 = (data.syncQueue || []).filter(i => i.status === "pending").length;
+        const isHealthy = failedCount === 0;
+        return (
+          <Card className="p-0 overflow-hidden">
+            <button onClick={() => setScreen("Diagnostics")}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px]">
+              <div className="flex items-center gap-3">
+                <Shield size={18} className={isHealthy ? "text-slate-400" : "text-red-500"} />
+                <div>
+                  <p className="text-base font-bold text-slate-800">Diagnostics</p>
+                  <p className="text-xs text-slate-400">
+                    {isHealthy
+                      ? (pendingCount2 > 0 ? `${pendingCount2} syncing` : "All clear")
+                      : `${failedCount} sync issue${failedCount !== 1 ? "s" : ""} — tap to view`}
+                  </p>
+                </div>
+              </div>
+              {!isHealthy && (
+                <span className="shrink-0 w-2.5 h-2.5 rounded-full bg-red-500" />
+              )}
+            </button>
+          </Card>
+        );
+      })()}
+
       {/* Company Documents */}
       <CompanyDocuments userId={userId} />
 
