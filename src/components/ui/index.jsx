@@ -8,7 +8,7 @@ import { Search, X, Users, ChevronDown } from "lucide-react";
 import { BRAND, STAGE_COLORS, NOTE_URGENCY } from "../../lib/constants";
 import { daysDiff, smartDate } from "../../lib/helpers";
 
-// ─── Card ─────────────────────────────────────────────────────────────────────
+// ─── Card ───────────────────────────────────────────────────────────────────── 
 export function Card({ children, className = "", onClick }) {
   return (
     <div
@@ -67,7 +67,7 @@ export function Field({ label, value, onChange, placeholder = "", type = "text",
   );
 }
 
-// ─── SelectField ──────────────────────────────────────────────────────────────
+// ─── SelectField ────────────────────────────────────────────────────────────── 
 export function SelectField({ label, value, onChange, options }) {
   return (
     <div>
@@ -180,15 +180,18 @@ export function FilterPills({ options, value, onChange, dangerValue }) {
   );
 }
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
+// ─── Toast ──────────────────────────────────────────────────────────────────── 
 export function Toast({ message, onDone, type = "success" }) {
-  useEffect(() => { const t = setTimeout(onDone, 2400); return () => clearTimeout(t); }, []);
+  // Longer messages (like detailed error text) get more time on screen —
+  // a one-word "Saved" doesn't need the same 2.4s as a full error sentence.
+  const duration = Math.min(2400 + Math.max(0, (message?.length || 0) - 20) * 60, 6000);
+  useEffect(() => { const t = setTimeout(onDone, duration); return () => clearTimeout(t); }, []);
   const bg = type === "error" ? "#DC2626" : BRAND.primary;
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
-      className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shadow-lg"
-      style={{ background: bg, whiteSpace: "nowrap", minWidth: "160px", textAlign: "center" }}>
+      className="fixed bottom-24 left-4 z-50 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shadow-lg"
+      style={{ background: bg, maxWidth: "calc(100vw - 32px)", textAlign: "left" }}>
       {type === "success" ? "✓ " : "✗ "}{message}
     </motion.div>
   );
