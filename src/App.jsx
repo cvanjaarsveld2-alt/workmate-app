@@ -34,6 +34,8 @@ import { NotesScreen }     from "./screens/NotesScreen";
 import { EquipmentScreen } from "./screens/EquipmentScreen";
 import { ExpensesScreen }  from "./screens/ExpensesScreen";
 import { MoreScreen }      from "./screens/MoreScreen";
+import { DiagnosticsScreen } from "./screens/DiagnosticsScreen";
+import { ErrorBoundary as ScreenErrorBoundary } from "./components/ErrorBoundary";
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
@@ -69,7 +71,7 @@ export default function PowerWorksApp() {
     // Notifications open the app at /?screen=Followups etc — honour that on load.
     try {
       const p = new URLSearchParams(window.location.search).get("screen");
-      const valid = ["Home", "Clients", "Contacts", "Followups", "Notes", "Equipment", "Quotes", "Expenses", "More"];
+      const valid = ["Home", "Clients", "Contacts", "Followups", "Notes", "Equipment", "Quotes", "Expenses", "More", "Diagnostics"];
       if (p && valid.includes(p)) return p;
     } catch (e) { /* ignore */ }
     return "Home";
@@ -109,6 +111,18 @@ export default function PowerWorksApp() {
   useEffect(() => {
     registerSyncHandlers(setData, () => data.syncQueue);
   }, [data.syncQueue]);
+
+  // Diagnostics screen dispatches this when the user taps "Clear failed".
+  useEffect(() => {
+    function onClearFailed() {
+      setData(d => ({
+        ...d,
+        syncQueue: (d.syncQueue || []).filter(i => i.status !== "failed"),
+      }));
+    }
+    window.addEventListener("powermate-clear-failed-queue", onClearFailed);
+    return () => window.removeEventListener("powermate-clear-failed-queue", onClearFailed);
+  }, []);
 
   useEffect(() => {
     if (!session) return;
@@ -392,6 +406,7 @@ export default function PowerWorksApp() {
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
+    Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} />,
   };
 
   return (
@@ -428,7 +443,9 @@ export default function PowerWorksApp() {
         <main className="mx-auto max-w-2xl px-4 pt-4">
           <AnimatePresence mode="wait">
             <motion.div key={screen} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
-              {screens[screen]}
+              <ScreenErrorBoundary label={screen} onGoHome={() => navigate("Home")}>
+                {screens[screen]}
+              </ScreenErrorBoundary>
             </motion.div>
           </AnimatePresence>
         </main>
