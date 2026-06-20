@@ -51,7 +51,7 @@ async function compressImage(file, maxWidth = 1600, quality = 0.85) {
 async function uploadCardImage(blob, userId) {
   const fileName = `contacts/${userId}/${genId()}.jpg`;
   const { data, error } = await supabase.storage
-    .from("photos")
+    .from("powermate-media")
     .upload(fileName, blob, { contentType: "image/jpeg", upsert: false });
 
   if (error) {
@@ -62,7 +62,7 @@ async function uploadCardImage(blob, userId) {
     throw new Error("Photo upload failed: " + (error.message || "unknown storage error"));
   }
 
-  const { data: pub } = supabase.storage.from("photos").getPublicUrl(data.path);
+  const { data: pub } = supabase.storage.from("powermate-media").getPublicUrl(data.path);
   return pub.publicUrl;
 }
 
