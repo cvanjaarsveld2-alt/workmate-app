@@ -55,8 +55,11 @@ async function uploadCardImage(blob, userId) {
     .upload(fileName, blob, { contentType: "image/jpeg", upsert: false });
 
   if (error) {
-    console.error("Upload error:", error);
-    return null;
+    // Surface the real reason instead of silently returning null — a missing
+    // bucket, an RLS policy, or a bad path all look identical to the user
+    // otherwise ("scan worked, but no photo" with zero explanation).
+    console.error("[CardScanner] Photo upload failed:", error);
+    throw new Error("Photo upload failed: " + (error.message || "unknown storage error"));
   }
 
   const { data: pub } = supabase.storage.from("photos").getPublicUrl(data.path);
@@ -107,7 +110,12 @@ export function CardScanner({ userId, onExtracted, onCancel }) {
 
       // Step 2 — upload to storage (in parallel with AI extraction)
       setProgress("Uploading…");
-      const uploadPromise = uploadCardImage(blob, userId);
+      const uploadPromise = uploadCardImage(blob, userId).catch(err => {
+        // Don't let a photo failure kill the whole scan — the AI-extracted
+        // name/company/etc is still valuable even with no photo attached.
+        console.error("[CardScanner] Photo upload failed, continuing without photo:", err);
+        return { failed: true, message: err.message };
+      });
 
       // Step 3 — call AI
       setProgress("Reading the card…");
@@ -115,12 +123,14 @@ export function CardScanner({ userId, onExtracted, onCancel }) {
 
       // Step 4 — wait for upload to finish too
       setProgress("Almost done…");
-      const photoUrl = await uploadPromise;
+      const uploadResult = await uploadPromise;
+      const photoUrl = (uploadResult && uploadResult.failed) ? null : uploadResult;
 
       // Pass data back to parent
       onExtracted({
         ...extracted,
         card_photo_url: photoUrl,
+        _photo_upload_error: (uploadResult && uploadResult.failed) ? uploadResult.message : null,
       });
     } catch (e) {
       console.error("Scan failed:", e);
