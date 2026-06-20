@@ -55,6 +55,39 @@ async function urlToDataURL(url) {
   } catch { return null; }
 }
 
+// Same as urlToDataURL, but also reports the image's natural pixel size so
+// callers can fit it into a box without distorting the aspect ratio.
+async function urlToDataURLWithSize(url) {
+  const dataUrl = await urlToDataURL(url);
+  if (!dataUrl) return null;
+  try {
+    const dims = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload  = () => resolve({ w: img.naturalWidth || img.width, h: img.naturalHeight || img.height });
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+    return { dataUrl, width: dims.w, height: dims.h };
+  } catch {
+    // Couldn't read dimensions — still return the data so we can fall back
+    // to filling the box (better than nothing).
+    return { dataUrl, width: null, height: null };
+  }
+}
+
+// Compute the draw rect that fits an image of (imgW × imgH) inside a square
+// box of `size` × `size`, preserving aspect ratio, centred (letterboxed).
+function fitInsideSquare(imgW, imgH, size) {
+  if (!imgW || !imgH) {
+    // Unknown dimensions — fill the box as a safe fallback.
+    return { x: 0, y: 0, w: size, h: size };
+  }
+  const scale = Math.min(size / imgW, size / imgH);
+  const w = imgW * scale;
+  const h = imgH * scale;
+  return { x: (size - w) / 2, y: (size - h) / 2, w, h };
+}
+
 /**
  * Build the finance PDF and return a Blob.
  *
@@ -206,68 +239,106 @@ export async function buildExpensePDF({ expenses, submitter, periodLabel }) {
   doc.text(`TOTAL CLAIM: ${fmtMoney(totalZAR)}`, pageWidth - margin, finalY, { align: "right" });
 
   // ─── RECEIPTS APPENDIX ───────────────────────────────────────────────────
-  // 2 receipts per page (till + payment side-by-side), with a small caption.
+  // 2×2 grid, each slip exactly 7.87cm × 7.87cm (per spec), 4 slips per A4
+  // page. Till and payment slips are both counted as individual "slots" so
+  // an expense with both fills 2 slots; one with only a till slip fills 1.
+  const CM_TO_PT = 28.346;
+  const SLOT_SIZE = 7.87 * CM_TO_PT; // ≈ 223.1pt — the fixed square per spec
+  const GRID_GAP  = 16;              // gap between slots, in pt
+  const CAPTION_H = 28;              // space reserved under each image for caption + link
+
+  // Flatten every expense's slips into a single ordered list of "slots" —
+  // this is what actually gets laid out 4-per-page, regardless of which
+  // expense they belong to.
+  const slots = [];
   for (let i = 0; i < expenses.length; i++) {
     const e = expenses[i];
-    const tillUrl = signedTills[i];
-    const payUrl  = signedPays[i];
-    if (!tillUrl && !payUrl) continue;
+    if (signedTills[i]) {
+      slots.push({
+        url: signedTills[i],
+        kind: "Till slip",
+        caption: `#${i + 1} · ${e.vendor || "—"} · ${fmtMoney(e.amount, e.currency)}`,
+      });
+    }
+    if (signedPays[i]) {
+      slots.push({
+        url: signedPays[i],
+        kind: "Payment slip",
+        caption: `#${i + 1} · ${e.vendor || "—"}`,
+      });
+    }
+  }
 
-    doc.addPage();
-    doc.setTextColor(30, 30, 30);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.text(`Receipt ${i + 1} of ${expenses.length}`, margin, 50);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`${fmtDate(e.expense_date)}  ·  ${e.vendor || "—"}  ·  ${fmtMoney(e.amount, e.currency)}${e.currency && e.currency !== "ZAR" && e.amount_zar ? `  (≈ ${fmtMoney(e.amount_zar, "ZAR")})` : ""}`, margin, 68);
+  if (slots.length > 0) {
+    // Grid geometry: 2 columns × 2 rows, centred horizontally on the page.
+    const gridWidth = 2 * SLOT_SIZE + GRID_GAP;
+    const gridStartX = (pageWidth - gridWidth) / 2;
+    const headerSpace = 50; // room for the "Receipts X–Y of N" page heading
 
-    // Embed images — half-page each, side by side.
-    const imgWidth  = (pageWidth - 2 * margin - 20) / 2;
-    const imgTop    = 90;
-    const imgHeight = pageHeight - imgTop - 60; // leave footer space
+    const positions = [
+      { col: 0, row: 0 }, { col: 1, row: 0 },
+      { col: 0, row: 1 }, { col: 1, row: 1 },
+    ];
 
-    if (tillUrl) {
-      const tillData = await urlToDataURL(tillUrl);
-      if (tillData) {
-        try {
-          // Caption above
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "bold");
-          doc.text("Till slip", margin, imgTop - 4);
-          doc.setFont("helvetica", "normal");
-          doc.addImage(tillData, "JPEG", margin, imgTop, imgWidth, imgHeight, undefined, "FAST");
-        } catch (err) {
-          // Image embed failed — fall back to a text URL line
-          doc.text(`Till: ${tillUrl}`, margin, imgTop + 10);
+    for (let pageStart = 0; pageStart < slots.length; pageStart += 4) {
+      doc.addPage();
+      const pageSlots = slots.slice(pageStart, pageStart + 4);
+
+      doc.setTextColor(30, 30, 30);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.text(
+        `Receipts ${pageStart + 1}–${Math.min(pageStart + pageSlots.length, slots.length)} of ${slots.length}`,
+        margin, 36
+      );
+
+      for (let s = 0; s < pageSlots.length; s++) {
+        const slot = pageSlots[s];
+        const { col, row } = positions[s];
+        const x = gridStartX + col * (SLOT_SIZE + GRID_GAP);
+        const y = headerSpace + row * (SLOT_SIZE + GRID_GAP + CAPTION_H);
+
+        // Border so empty/failed-to-load slots are still visually obvious.
+        doc.setDrawColor(220, 220, 220);
+        doc.rect(x, y, SLOT_SIZE, SLOT_SIZE);
+
+        const img = await urlToDataURLWithSize(slot.url);
+        if (img) {
+          try {
+            // Fit inside the square without distortion — preserves the
+            // receipt's real aspect ratio, centred with white space top/bottom
+            // (or left/right) as needed rather than stretching it.
+            const fit = fitInsideSquare(img.width, img.height, SLOT_SIZE);
+            doc.addImage(img.dataUrl, "JPEG", x + fit.x, y + fit.y, fit.w, fit.h, undefined, "FAST");
+          } catch (err) {
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text("(image failed to embed)", x + 8, y + SLOT_SIZE / 2);
+          }
+        } else {
+          doc.setFontSize(8);
+          doc.setTextColor(150);
+          doc.text("(no image)", x + 8, y + SLOT_SIZE / 2);
         }
-      }
-    }
 
-    if (payUrl) {
-      const payData = await urlToDataURL(payUrl);
-      if (payData) {
-        try {
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "bold");
-          doc.text("Payment slip", margin + imgWidth + 20, imgTop - 4);
-          doc.setFont("helvetica", "normal");
-          doc.addImage(payData, "JPEG", margin + imgWidth + 20, imgTop, imgWidth, imgHeight, undefined, "FAST");
-        } catch (err) {
-          doc.text(`Payment: ${payUrl}`, margin + imgWidth + 20, imgTop + 10);
-        }
-      }
-    }
+        // Caption + kind label below the square
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(BRAND_RED);
+        doc.text(slot.kind, x, y + SLOT_SIZE + 12);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(60, 60, 60);
+        doc.text(slot.caption, x, y + SLOT_SIZE + 22, { maxWidth: SLOT_SIZE });
 
-    // Live link line at the bottom for high-res / verification
-    doc.setFontSize(8);
-    doc.setTextColor(80);
-    let linkY = pageHeight - 40;
-    if (tillUrl) {
-      doc.textWithLink(`Open till slip (valid 14 days)`, margin, linkY, { url: tillUrl });
-    }
-    if (payUrl) {
-      doc.textWithLink(`Open payment slip (valid 14 days)`, margin + imgWidth + 20, linkY, { url: payUrl });
+        // Clickable link over the caption area for the high-res original.
+        doc.textWithLink("Open full size (14 days)", x, y + SLOT_SIZE + 22, { url: slot.url, maxWidth: SLOT_SIZE });
+      }
+
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(`Ref ${ref}`, margin, pageHeight - 20);
+      doc.text(`Generated ${submittedAt}`, pageWidth - margin, pageHeight - 20, { align: "right" });
     }
   }
 
