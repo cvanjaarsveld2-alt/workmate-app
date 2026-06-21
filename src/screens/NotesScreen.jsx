@@ -111,7 +111,7 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
       contact: "", phone: "", email: "",
       stage: "New Lead",
       notes: "",
-      source: "Created from field note",
+      source: "field_note",
       created_at: new Date().toISOString(),
       sync_status: "pending",
     };
