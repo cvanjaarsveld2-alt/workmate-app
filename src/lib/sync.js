@@ -5,8 +5,10 @@
 import { supabase } from "../supabase";
 import { logEvent } from "./helpers";
 import { offlineSave } from "../offline/offlineDb";
+import { logCrash } from "../components/ErrorBoundary";
 
 const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses"];
+const MAX_SYNC_ATTEMPTS = 5; // after this many failed tries, give up and mark "failed"
 
 export async function pushItem(item) {
   try {
@@ -32,18 +34,21 @@ export async function pushItem(item) {
       const { error } = await supabase.from(table).delete().eq("id", payload.id);
       if (error) throw error;
     }
-    return true;
+    return { ok: true };
   } catch (e) {
     // Verbose log makes failed-sync triage immediate.
-    console.warn(
-      `[Sync] FAILED ${item.table} ${item.action}`,
-      "\n  code:", e?.code,
-      "\n  message:", e?.message,
-      "\n  details:", e?.details,
-      "\n  hint:", e?.hint,
-      "\n  payload:", payload
-    );
-    return false;
+    const detail = {
+      code: e?.code, message: e?.message, details: e?.details, hint: e?.hint,
+    };
+    console.warn(`[Sync] FAILED ${item.table} ${item.action}`, detail, "\n  payload:", item.data);
+    // Also write to the on-device crash log so it's readable from
+    // Settings → Diagnostics without needing the browser console (which is
+    // painful to reach on a phone).
+    logCrash({
+      screen: `Sync (${item.table} ${item.action})`,
+      message: `${detail.message || "Unknown error"}${detail.code ? ` [${detail.code}]` : ""}${detail.hint ? ` — hint: ${detail.hint}` : ""}`,
+    });
+    return { ok: false, error: detail };
   }
 }
 
@@ -113,17 +118,15 @@ export async function pushSyncQueue(syncQueue, setData) {
 
     const results = await Promise.allSettled(
       deduped.map(async item => {
-        const success = await pushItem(item);
-        if (!success) throw new Error(`Push failed for ${item.table}`);
-        return item.id;
+        const result = await pushItem(item);
+        return { queueId: item.id, entityId: item.data?.id, ...result };
       })
     );
 
-    const succeeded = results
-      .filter(r => r.status === "fulfilled")
-      .map(r => r.value);
+    const outcomes = results.map(r => r.status === "fulfilled" ? r.value : { ok: false, error: { message: "Unexpected error" } });
 
-    const failed = results.filter(r => r.status === "rejected");
+    const succeeded = outcomes.filter(o => o.ok);
+    const failed    = outcomes.filter(o => !o.ok);
 
     if (failed.length > 0) {
       console.warn(`[Sync] ${failed.length} items failed to sync`);
@@ -137,20 +140,27 @@ export async function pushSyncQueue(syncQueue, setData) {
       logEvent("sync_succeeded", { count: succeeded.length });
     }
 
-    const succeededEntityIds = deduped
-      .filter(item => succeeded.includes(item.id))
-      .map(item => item.data?.id)
-      .filter(Boolean);
-
-    const succeededQueueIds = new Set();
-    pending.forEach(item => {
-      if (succeededEntityIds.includes(item.data?.id)) {
-        succeededQueueIds.add(item.id);
-      }
-    });
+    const succeededEntityIds = succeeded.map(o => o.entityId).filter(Boolean);
+    const succeededQueueIds  = new Set(succeeded.map(o => o.queueId));
+    const failedQueueIds     = new Set(failed.map(o => o.queueId));
 
     setData(d => {
-      const update = { ...d, syncQueue: (d.syncQueue || []).filter(i => !succeededQueueIds.has(i.id)) };
+      const update = {
+        ...d,
+        syncQueue: (d.syncQueue || [])
+          // Remove anything that succeeded.
+          .filter(i => !succeededQueueIds.has(i.id))
+          // For anything that failed this round, bump its attempt counter —
+          // after MAX_SYNC_ATTEMPTS, stop retrying and mark it "failed" so
+          // it shows up in Diagnostics instead of silently re-trying forever.
+          .map(i => {
+            if (!failedQueueIds.has(i.id)) return i;
+            const attempts = (i.attempts || 0) + 1;
+            return attempts >= MAX_SYNC_ATTEMPTS
+              ? { ...i, attempts, status: "failed" }
+              : { ...i, attempts, status: "pending" };
+          }),
+      };
       SYNC_TABLES.forEach(table => {
         update[table] = (d[table] || []).map(r => succeededEntityIds.includes(r.id) ? { ...r, sync_status: "synced" } : r);
       });
