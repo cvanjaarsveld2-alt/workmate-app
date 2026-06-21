@@ -15,6 +15,7 @@ import { CardScanner } from "../components/CardScanner";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
+import { logCrash } from "../components/ErrorBoundary";
 import {
   Card, Btn, Field, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm,
@@ -139,9 +140,15 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
     setShowForm(true);
     setTimeout(() => setScannedNotice(false), 5000);
     // The AI extraction succeeded even if the photo failed to upload — tell
-    // the user clearly rather than leaving a silently-missing photo.
+    // the user clearly, and log it where it's actually readable on a phone
+    // (Settings → Diagnostics → Recent crashes), since a toast is too small
+    // to read the full Supabase error message.
     if (extracted._photo_upload_error) {
-      setToast(`Card details saved, but the photo didn't upload: ${extracted._photo_upload_error}`);
+      setToast("Card saved — photo didn't upload, see Diagnostics");
+      logCrash({
+        screen: "Contacts (card photo upload)",
+        message: extracted._photo_upload_error,
+      });
     }
   }
 
@@ -236,7 +243,7 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
         email:    c.email || "",
         stage:    "New Lead",
         notes:    [c.notes, c.met_at ? `Originally met at ${c.met_at}${c.met_date ? ` on ${smartDate(c.met_date)}` : ""}` : ""].filter(Boolean).join("\n\n"),
-        source:   "Contact promotion",
+        source:   "contact_promotion",
         created_at: new Date().toISOString(),
         sync_status: "pending",
       };
