@@ -168,7 +168,11 @@ export function DiagnosticsScreen({ data, userId, isOnline, onBack }) {
           label="Sync queue (pending)"
           value={String(pending.length)}
           status={pending.length === 0 ? "ok" : pending.length > 50 ? "warn" : "idle"}
-          hint={pending.length > 50 ? "Large queue — something may be stuck." : null}
+          hint={
+            pending.length > 50 ? "Large queue — something may be stuck."
+            : pending.some(i => (i.attempts || 0) >= 2) ? `${pending.filter(i => (i.attempts || 0) >= 2).length} item(s) have failed and are retrying — will move to "failed" after 5 attempts.`
+            : null
+          }
         />
         <Row
           icon={AlertTriangle}
