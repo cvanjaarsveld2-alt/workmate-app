@@ -1,7 +1,7 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight } from "lucide-react";
+import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, Send, Mail } from "lucide-react";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
@@ -35,6 +35,7 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting]       = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [notesPack, setNotesPack] = useState(null); // { blob, url, filename } — PDF ready to preview/share
   const { confirm, dialog } = useConfirm();
   const notes    = data.notes    || [];
   const contacts = data.contacts || [];
@@ -166,21 +167,91 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
         onProgress: ({ percent }) => setExportProgress(percent),
       };
       if (format === "pdf") {
-        await exportNotesPDF(selected, exportOptions);
+        // PDF now builds in memory and opens the preview/share sheet instead
+        // of auto-downloading — same one-tap flow as the Expenses finance pack.
+        const { blob, filename } = await exportNotesPDF(selected, exportOptions);
+        const url = URL.createObjectURL(blob);
+        setNotesPack({ blob, url, filename, count: selected.length });
+        exitSelectMode();
       } else if (format === "excel") {
         await exportNotesExcel(selected, exportOptions);
+        setToast(`Exported ${selected.length} note${selected.length !== 1 ? "s" : ""} ✓`);
+        exitSelectMode();
       } else if (format === "both") {
-        await exportNotesPDF(selected, { ...exportOptions, onProgress: ({ percent }) => setExportProgress(Math.round(percent / 2)) });
+        const { blob, filename } = await exportNotesPDF(selected, { ...exportOptions, onProgress: ({ percent }) => setExportProgress(Math.round(percent / 2)) });
         await exportNotesExcel(selected, { ...exportOptions, onProgress: ({ percent }) => setExportProgress(50 + Math.round(percent / 2)) });
+        const url = URL.createObjectURL(blob);
+        setNotesPack({ blob, url, filename, count: selected.length });
+        setToast("Excel downloaded — PDF ready below");
+        exitSelectMode();
       }
-      setToast(`Exported ${selected.length} note${selected.length !== 1 ? "s" : ""} ✓`);
-      exitSelectMode();
     } catch (e) {
       console.error("Export failed:", e);
       setToast("Export failed: " + (e.message || "unknown error"));
     }
     setExporting(false);
     setExportProgress(0);
+  }
+
+  function closeNotesPack() {
+    if (notesPack?.url) URL.revokeObjectURL(notesPack.url);
+    setNotesPack(null);
+  }
+
+  function previewNotesPack() {
+    if (!notesPack) return;
+    window.open(notesPack.url, "_blank");
+  }
+
+  // Native share sheet — pick Mail, Outlook, WhatsApp, Drive, whatever
+  // management actually uses. Falls back to a plain download on desktop.
+  async function shareNotesPack() {
+    if (!notesPack) return;
+    const { blob, filename, count } = notesPack;
+    const file = new File([blob], filename, { type: "application/pdf" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          title: "PowerMate Field Notes Report",
+          text: `Field notes report — ${count} note${count !== 1 ? "s" : ""}.`,
+          files: [file],
+        });
+      } catch (e) {
+        if (e.name !== "AbortError") console.warn("Share failed:", e);
+      }
+    } else {
+      const a = document.createElement("a");
+      a.href = notesPack.url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setToast("PDF downloaded — attach it to your email manually");
+    }
+  }
+
+  function emailNotesPack() {
+    if (!notesPack) return;
+    const { filename, count, url } = notesPack;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    const body = `Hi,
+
+Please find attached the field notes report covering ${count} note${count !== 1 ? "s" : ""}.
+
+The PDF (${filename}) includes a summary by client and full detail for each note.
+
+Kind regards`;
+
+    setToast("PDF downloaded — attach it to the email that just opened");
+    setTimeout(() => {
+      window.open(`mailto:?subject=${encodeURIComponent("Field Notes Report")}&body=${encodeURIComponent(body)}`, "_blank");
+    }, 500);
   }
 
   async function saveNote() {
@@ -449,6 +520,65 @@ export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, 
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+
+      {/* ── Field Notes Report ready: preview, share, or email ── */}
+      <AnimatePresence>
+        {notesPack && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={closeNotesPack}
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+            <motion.div
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col">
+
+              <div className="flex justify-center pt-2.5 pb-1">
+                <div className="w-12 h-1 rounded-full bg-slate-300" />
+              </div>
+
+              <div className="px-5 pt-2 pb-3 flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-base font-black text-slate-900">Field Notes Report Ready</p>
+                  <p className="text-xs text-slate-500 truncate">{notesPack.count} note{notesPack.count !== 1 ? "s" : ""} · {notesPack.filename}</p>
+                </div>
+                <button onClick={closeNotesPack} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="px-4 pb-3">
+                <div className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50" style={{ aspectRatio: "1 / 1.2" }}>
+                  <iframe src={notesPack.url} title="Field notes report preview" className="w-full h-full" />
+                </div>
+                <p className="text-xs text-slate-400 mt-1.5 text-center">Scroll to review · {notesPack.filename}</p>
+              </div>
+
+              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+                <button onClick={shareNotesPack}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
+                  style={{ background: "#8B1A1A" }}>
+                  <Send size={16} /> Share / Send (Mail, Outlook, iCloud, WhatsApp…)
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={previewNotesPack}
+                    className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+                    <FileDown size={14} /> Open PDF
+                  </button>
+                  <button onClick={emailNotesPack}
+                    className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+                    <Mail size={14} /> Email
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 text-center pt-0.5 leading-relaxed">
+                  <strong>Share</strong> opens your device's share sheet — pick any email app to send to management.
+                </p>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── Note detail sheet ── */}
       <DetailSheet
