@@ -297,9 +297,9 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
 
   onProgress({ step: "save", percent: 95 });
   const fname = autoFilename("Notes", selectedNotes.length, customName) + ".pdf";
-  doc.save(fname);
+  const blob = doc.output("blob");
   onProgress({ step: "done", percent: 100 });
-  return fname;
+  return { blob, filename: fname };
 }
 
 // ─── Excel Export ────────────────────────────────────────────────────────────
