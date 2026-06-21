@@ -146,85 +146,119 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
   onProgress({ step: "cover", percent: 15 });
 
   const totalNotes = selectedNotes.length;
+  doc.addPage();
+  let cursorY = margin;
+  const pageBottom = pageHeight - 14; // leave room for the footer line
+
+  function drawFooter() {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(180, 180, 190);
+    doc.text(`PowerMate · Power Works (Pty) Ltd · Generated ${smartDate(todayISO())}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+  }
+
+  // Ensure at least `needed` mm remain on the current page — if not, start a
+  // fresh one. Used before anything that shouldn't be split awkwardly
+  // (a note's header, a photo block, etc).
+  function ensureRoom(needed) {
+    if (cursorY + needed > pageBottom) {
+      drawFooter();
+      doc.addPage();
+      cursorY = margin;
+    }
+  }
+
   for (let i = 0; i < totalNotes; i++) {
     const n = selectedNotes[i];
-    doc.addPage();
-    let cursorY = margin;
 
+    // A divider between notes (skip before the very first one on a page).
+    if (cursorY > margin + 2) {
+      ensureRoom(14); // small header block always needs at least this much room
+      doc.setDrawColor(230, 230, 235);
+      doc.line(margin, cursorY, pageWidth - margin, cursorY);
+      cursorY += 6;
+    } else {
+      ensureRoom(14);
+    }
+
+    // Compact header row: urgency tag · client name · dates, all on one line
+    // where it fits, instead of a full-width colored banner per note.
     const urgColor = n.urgency === "Critical" ? [220, 38, 38]
                    : n.urgency === "Urgent"   ? [234, 88, 12]
                    : [100, 116, 139];
+    const urgLabel = `${(n.urgency || "Normal").toUpperCase()}${n.resolved ? " · RESOLVED" : ""}`;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    const urgWidth = doc.getTextWidth(urgLabel) + 6;
     doc.setFillColor(...urgColor);
-    doc.rect(0, 0, pageWidth, 12, "F");
+    doc.roundedRect(margin, cursorY - 3.2, urgWidth, 5.2, 1, 1, "F");
     doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text(`${(n.urgency || "Normal").toUpperCase()}${n.resolved ? " · RESOLVED" : ""}`, margin, 8);
-    doc.text(`Note ${i + 1} of ${totalNotes}`, pageWidth - margin, 8, { align: "right" });
+    doc.text(urgLabel, margin + 3, cursorY);
 
-    cursorY = 22;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(13);
     doc.setTextColor(BRAND.text);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text(n.client || "General Note", margin, cursorY);
-    cursorY += 8;
+    doc.text(n.client || "General Note", margin + urgWidth + 4, cursorY);
+    cursorY += 6;
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(120, 120, 130);
     const created = n.created_at ? new Date(n.created_at).toLocaleString("en-GB", {
       day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
     }) : "Date unknown";
-    doc.text(`Created: ${created}`, margin, cursorY);
-    if (n.resolve_by) {
-      doc.text(`Resolve by: ${smartDate(n.resolve_by)}`, margin + 70, cursorY);
-    }
-    if (n.resolved && n.resolved_at) {
-      doc.text(`Resolved: ${smartDate(n.resolved_at.slice(0, 10))}`, margin + 130, cursorY);
-    }
-    cursorY += 8;
+    let metaLine = `Created: ${created}`;
+    if (n.resolve_by) metaLine += `   ·   Resolve by: ${smartDate(n.resolve_by)}`;
+    if (n.resolved && n.resolved_at) metaLine += `   ·   Resolved: ${smartDate(n.resolved_at.slice(0, 10))}`;
+    doc.text(metaLine, margin, cursorY);
+    cursorY += 6;
 
-    // Linked contacts (NEW)
+    // Linked contacts
     const linked = getLinkedContacts(n, contacts);
     if (linked.length > 0) {
+      ensureRoom(linked.length * 4.5 + 8);
       doc.setFillColor(255, 228, 217);
       doc.setDrawColor(248, 213, 196);
-      doc.roundedRect(margin, cursorY - 4, contentW, linked.length * 5 + 8, 2, 2, "FD");
+      doc.roundedRect(margin, cursorY - 4, contentW, linked.length * 4.5 + 7, 2, 2, "FD");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       doc.setTextColor(124, 45, 18);
       doc.text(`Linked Contacts (${linked.length})`, margin + 3, cursorY);
-      cursorY += 5;
+      cursorY += 4.5;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       linked.forEach(c => {
         const line = `• ${c.name}${c.company ? ` — ${c.company}` : ""}${c.title ? `, ${c.title}` : ""}`;
         doc.text(line, margin + 3, cursorY);
         cursorY += 4;
       });
-      cursorY += 6;
+      cursorY += 5;
     }
 
-    doc.setTextColor(BRAND.text);
+    // Note text — measure first so we can break the page BEFORE starting the
+    // paragraph if it would otherwise be split right after its first line.
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     const noteLines = doc.splitTextToSize(n.note || "(empty)", contentW);
+    const noteBlockHeight = noteLines.length * 5;
+    ensureRoom(Math.min(noteBlockHeight, 30)); // at least the first few lines fit together
+    doc.setTextColor(BRAND.text);
     doc.text(noteLines, margin, cursorY);
-    cursorY += noteLines.length * 5.5 + 6;
+    cursorY += noteBlockHeight + 5;
 
     const photos = (n.media || []).filter(m => m.url && m.type !== "video");
     const videos = (n.media || []).filter(m => m.url && m.type === "video");
 
     if (photos.length > 0) {
+      ensureRoom(20);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.setTextColor(BRAND.text);
       doc.text(`Photos (${photos.length})`, margin, cursorY);
       cursorY += 5;
 
-      const photoW = 85;
-      const photoMaxH = 60;
+      const photoW = 70;
+      const photoMaxH = 50;
       const gap = 5;
       let col = 0;
 
@@ -248,12 +282,8 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
           renderW = photoMaxH * ratio;
         }
 
+        if (col === 0) ensureRoom(renderH + gap);
         const x = margin + col * (photoW + gap);
-
-        if (cursorY + renderH > pageHeight - 15) {
-          doc.addPage();
-          cursorY = margin;
-        }
 
         try {
           doc.addImage(dataUrl, "JPEG", x, cursorY, renderW, renderH, undefined, "FAST");
@@ -267,33 +297,32 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
           cursorY += renderH + gap;
         }
       }
-      if (col > 0) cursorY += 65;
-      cursorY += 4;
+      if (col > 0) cursorY += photoMaxH + gap;
+      cursorY += 3;
     }
 
     if (videos.length > 0) {
+      ensureRoom(videos.length * 5 + 8);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFontSize(9.5);
       doc.setTextColor(BRAND.text);
       doc.text(`Videos (${videos.length})`, margin, cursorY);
       cursorY += 5;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       videos.forEach((v, vi) => {
-        if (cursorY > pageHeight - 20) { doc.addPage(); cursorY = margin; }
+        ensureRoom(5);
         doc.setTextColor(0, 100, 200);
         doc.textWithLink(`▶ Video ${vi + 1} — click to view`, margin, cursorY, { url: v.url });
         cursorY += 5;
       });
     }
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(180, 180, 190);
-    doc.text(`PowerMate · Power Works (Pty) Ltd · Generated ${smartDate(todayISO())}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+    cursorY += 4; // breathing room before the next note's divider
 
     onProgress({ step: "page", percent: 15 + Math.round((i + 1) / totalNotes * 75) });
   }
+  drawFooter();
 
   onProgress({ step: "save", percent: 95 });
   const fname = autoFilename("Notes", selectedNotes.length, customName) + ".pdf";
