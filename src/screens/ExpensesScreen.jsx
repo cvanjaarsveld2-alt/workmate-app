@@ -642,6 +642,148 @@ Kind regards`;
 
   const unsubmittedCount = expenses.filter(e => e.status === "unsubmitted").length;
 
+  // The Add/Edit form, extracted so it can render in TWO places:
+  //   1. At the top of the page — for adding a NEW expense (when editId is null)
+  //   2. Inline, replacing the card being edited at its position in the list
+  //      — so editing never yanks the user's scroll position up to the top.
+  function renderExpenseForm() {
+    return (
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-base font-black text-slate-800">{editId ? "Edit Expense" : "New Expense"}</p>
+          {scannedNotice && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
+              <Sparkles size={12} /> AI extracted — please verify
+            </span>
+          )}
+        </div>
+
+        {/* Slips: till on the left, payment on the right */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <p className="text-xs font-bold text-slate-500 mb-1.5">Till slip</p>
+            {receiptUrl ? (
+              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                <SignedReceiptImg stored={receiptUrl} className="w-full h-32 object-contain" />
+              </div>
+            ) : (
+              <button type="button"
+                onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
+                className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 transition-colors">
+                <Camera size={20} style={{ color: "#8B1A1A" }} />
+                <span className="text-xs font-bold text-slate-500">Scan till slip</span>
+              </button>
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 mb-1.5">
+              Payment slip <span className="text-slate-400 font-normal">(optional)</span>
+            </p>
+            {paymentSlipUrl ? (
+              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 relative">
+                <SignedReceiptImg stored={paymentSlipUrl} className="w-full h-32 object-contain" />
+                <button type="button" onClick={() => { setPaymentSlipUrl(null); setPaymentMismatch(null); }}
+                  className="absolute top-1 right-1 p-1 rounded-full bg-white/90 shadow text-slate-500 hover:text-red-600">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button type="button"
+                onClick={() => { setScannerMode("payment"); setShowScanner(true); }}
+                className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 transition-colors">
+                <Camera size={20} style={{ color: "#8B1A1A" }} />
+                <span className="text-xs font-bold text-slate-500">Add payment slip</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {paymentMismatch && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+            <p className="text-xs font-bold text-amber-800">⚠ Amount mismatch</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Till slip says {fmtMoney(paymentMismatch.tillAmount, form.currency)},
+              payment slip says {fmtMoney(paymentMismatch.slipAmount, form.currency)}.
+              Please verify which is correct before saving.
+            </p>
+          </div>
+        )}
+
+        <Field label="Vendor" value={form.vendor} onChange={v => setForm(f => ({ ...f, vendor: v }))} placeholder="e.g. Engen Garage" />
+        <div className="grid grid-cols-2 gap-3">
+          <AmountField label="Amount (total)" value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} placeholder="0.00" required />
+          <div>
+            <label className="mb-1.5 block text-sm font-bold text-slate-500">Currency</label>
+            <select value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
+              className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[52px]">
+              {[
+                "ZAR", "USD", "GBP", "EUR",       // major
+                "GHS",                              // Ghanaian Cedi
+                "NGN", "KES", "TZS", "UGX",         // other Africa
+                "BWP", "NAD", "MWK", "MZN", "ZMW", // Southern Africa
+                "AED", "SAR", "INR", "CNY", "JPY", "AUD", "CAD", // common others
+              ].map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Manual ZAR override — appears whenever currency is not ZAR.
+            For currencies the ECB rate covers (USD/GBP/EUR/etc) this is
+            optional and overrides the auto rate if you fill it in. For
+            currencies the ECB doesn't cover (Cedi, Naira, etc) this is
+            the ONLY way to record the ZAR figure. */}
+        {form.currency && form.currency !== "ZAR" && (
+          <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
+            <label className="mb-1.5 block text-sm font-bold text-slate-600">
+              ZAR equivalent <span className="text-slate-400 font-normal">— what your bank/card actually charged you</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-bold text-slate-500 shrink-0">R</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={manualZAR}
+                onChange={e => setManualZAR(normaliseDecimalInput(e.target.value))}
+                placeholder="leave blank to use ECB rate"
+                className="flex-1 rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-none focus:border-red-300 min-h-[48px]"
+              />
+            </div>
+            <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+              Leave blank for USD/GBP/EUR/major currencies — the app fetches the official ECB rate automatically.
+              Fill in for Cedi, Naira and other African currencies, or to override the auto rate.
+            </p>
+          </div>
+        )}
+
+        <AmountField label="VAT amount (optional)" value={form.vat_amount} onChange={v => setForm(f => ({ ...f, vat_amount: v }))} placeholder="0.00" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Date" type="date" value={form.expense_date} onChange={v => setForm(f => ({ ...f, expense_date: v }))} />
+          <Field label="Time (optional)" type="time" value={form.expense_time} onChange={v => setForm(f => ({ ...f, expense_time: v }))} />
+        </div>
+        <SelectField label="Category" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} options={CATEGORIES} />
+        <div>
+          <label className="mb-1.5 block text-sm font-bold text-slate-500">Payment Method</label>
+          <div className="grid grid-cols-3 gap-2">
+            {["Card", "Cash", "Account"].map(m => (
+              <button key={m} type="button" onClick={() => setForm(f => ({ ...f, payment_method: m }))}
+                className="rounded-xl py-2.5 text-sm font-bold border-2 transition-all min-h-[44px]"
+                style={form.payment_method === m
+                  ? { background: "#F7F3F3", color: "#8B1A1A", borderColor: "#8B1A1A" }
+                  : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Field label="Notes (optional)" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What was this for?" multiline />
+        <div className="flex gap-2">
+          <Btn className="flex-1" onClick={saveExpense}><Save size={15} />{editId ? "Update" : "Save Expense"}</Btn>
+          <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {dialog}
@@ -887,141 +1029,9 @@ Kind regards`;
       </AnimatePresence>
 
       <AnimatePresence>
-        {showForm && (
+        {showForm && !editId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-            <Card className="p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-base font-black text-slate-800">{editId ? "Edit Expense" : "New Expense"}</p>
-                {scannedNotice && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
-                    <Sparkles size={12} /> AI extracted — please verify
-                  </span>
-                )}
-              </div>
-
-              {/* Slips: till on the left, payment on the right */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <p className="text-xs font-bold text-slate-500 mb-1.5">Till slip</p>
-                  {receiptUrl ? (
-                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                      <SignedReceiptImg stored={receiptUrl} className="w-full h-32 object-contain" />
-                    </div>
-                  ) : (
-                    <button type="button"
-                      onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
-                      className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 transition-colors">
-                      <Camera size={20} style={{ color: "#8B1A1A" }} />
-                      <span className="text-xs font-bold text-slate-500">Scan till slip</span>
-                    </button>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-500 mb-1.5">
-                    Payment slip <span className="text-slate-400 font-normal">(optional)</span>
-                  </p>
-                  {paymentSlipUrl ? (
-                    <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 relative">
-                      <SignedReceiptImg stored={paymentSlipUrl} className="w-full h-32 object-contain" />
-                      <button type="button" onClick={() => { setPaymentSlipUrl(null); setPaymentMismatch(null); }}
-                        className="absolute top-1 right-1 p-1 rounded-full bg-white/90 shadow text-slate-500 hover:text-red-600">
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <button type="button"
-                      onClick={() => { setScannerMode("payment"); setShowScanner(true); }}
-                      className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 transition-colors">
-                      <Camera size={20} style={{ color: "#8B1A1A" }} />
-                      <span className="text-xs font-bold text-slate-500">Add payment slip</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {paymentMismatch && (
-                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
-                  <p className="text-xs font-bold text-amber-800">⚠ Amount mismatch</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    Till slip says {fmtMoney(paymentMismatch.tillAmount, form.currency)},
-                    payment slip says {fmtMoney(paymentMismatch.slipAmount, form.currency)}.
-                    Please verify which is correct before saving.
-                  </p>
-                </div>
-              )}
-
-              <Field label="Vendor" value={form.vendor} onChange={v => setForm(f => ({ ...f, vendor: v }))} placeholder="e.g. Engen Garage" />
-              <div className="grid grid-cols-2 gap-3">
-                <AmountField label="Amount (total)" value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} placeholder="0.00" required />
-                <div>
-                  <label className="mb-1.5 block text-sm font-bold text-slate-500">Currency</label>
-                  <select value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
-                    className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[52px]">
-                    {[
-                      "ZAR", "USD", "GBP", "EUR",       // major
-                      "GHS",                              // Ghanaian Cedi
-                      "NGN", "KES", "TZS", "UGX",         // other Africa
-                      "BWP", "NAD", "MWK", "MZN", "ZMW", // Southern Africa
-                      "AED", "SAR", "INR", "CNY", "JPY", "AUD", "CAD", // common others
-                    ].map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              {/* Manual ZAR override — appears whenever currency is not ZAR.
-                  For currencies the ECB rate covers (USD/GBP/EUR/etc) this is
-                  optional and overrides the auto rate if you fill it in. For
-                  currencies the ECB doesn't cover (Cedi, Naira, etc) this is
-                  the ONLY way to record the ZAR figure. */}
-              {form.currency && form.currency !== "ZAR" && (
-                <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
-                  <label className="mb-1.5 block text-sm font-bold text-slate-600">
-                    ZAR equivalent <span className="text-slate-400 font-normal">— what your bank/card actually charged you</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-bold text-slate-500 shrink-0">R</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={manualZAR}
-                      onChange={e => setManualZAR(normaliseDecimalInput(e.target.value))}
-                      placeholder="leave blank to use ECB rate"
-                      className="flex-1 rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-none focus:border-red-300 min-h-[48px]"
-                    />
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-                    Leave blank for USD/GBP/EUR/major currencies — the app fetches the official ECB rate automatically.
-                    Fill in for Cedi, Naira and other African currencies, or to override the auto rate.
-                  </p>
-                </div>
-              )}
-
-              <AmountField label="VAT amount (optional)" value={form.vat_amount} onChange={v => setForm(f => ({ ...f, vat_amount: v }))} placeholder="0.00" />
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Date" type="date" value={form.expense_date} onChange={v => setForm(f => ({ ...f, expense_date: v }))} />
-                <Field label="Time (optional)" type="time" value={form.expense_time} onChange={v => setForm(f => ({ ...f, expense_time: v }))} />
-              </div>
-              <SelectField label="Category" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} options={CATEGORIES} />
-              <div>
-                <label className="mb-1.5 block text-sm font-bold text-slate-500">Payment Method</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {["Card", "Cash", "Account"].map(m => (
-                    <button key={m} type="button" onClick={() => setForm(f => ({ ...f, payment_method: m }))}
-                      className="rounded-xl py-2.5 text-sm font-bold border-2 transition-all min-h-[44px]"
-                      style={form.payment_method === m
-                        ? { background: "#F7F3F3", color: "#8B1A1A", borderColor: "#8B1A1A" }
-                        : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <Field label="Notes (optional)" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What was this for?" multiline />
-              <div className="flex gap-2">
-                <Btn className="flex-1" onClick={saveExpense}><Save size={15} />{editId ? "Update" : "Save Expense"}</Btn>
-                <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
-              </div>
-            </Card>
+            {renderExpenseForm()}
           </motion.div>
         )}
       </AnimatePresence>
@@ -1043,6 +1053,15 @@ Kind regards`;
               </div>
               <div className="space-y-2">
                 {items.map(ex => {
+                  // ── Edit-in-place: form replaces this card at its exact
+                  // list position, so editing never jumps the page to the top.
+                  if (editId === ex.id) {
+                    return (
+                      <motion.div key={ex.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        {renderExpenseForm()}
+                      </motion.div>
+                    );
+                  }
                   const cc = CATEGORY_COLORS[ex.category] || CATEGORY_COLORS.Other;
                   const sc = STATUS_COLORS[ex.status] || STATUS_COLORS.unsubmitted;
                   const isSelected = selectedIds.has(ex.id);
