@@ -235,16 +235,48 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
       cursorY += 5;
     }
 
-    // Note text — measure first so we can break the page BEFORE starting the
-    // paragraph if it would otherwise be split right after its first line.
+    // Note text — measure first. If the note is short, this just confirms it
+    // fits on the current page. If it's long enough to need a page of its
+    // own, start it fresh rather than letting the bottom of it run off the
+    // page (jsPDF does not auto-wrap a block across pages — anything placed
+    // below the page boundary is silently never rendered).
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10.5);
     const noteLines = doc.splitTextToSize(n.note || "(empty)", contentW);
     const noteBlockHeight = noteLines.length * 5;
-    ensureRoom(Math.min(noteBlockHeight, 30)); // at least the first few lines fit together
-    doc.setTextColor(BRAND.text);
-    doc.text(noteLines, margin, cursorY);
-    cursorY += noteBlockHeight + 5;
+    const roomLeft = pageBottom - cursorY;
+
+    if (noteBlockHeight > roomLeft) {
+      if (noteBlockHeight <= pageBottom - margin) {
+        // The whole note fits on a fresh page — move it there entirely so
+        // it isn't split awkwardly.
+        ensureRoom(noteBlockHeight);
+      }
+      // else: the note is longer than a full page on its own. There's no
+      // way to avoid a split, so let it start here — jsPDF will at least
+      // render what fits on THIS page; the remainder still needs handling
+      // below (see the chunked fallback).
+    }
+
+    // Render in page-sized chunks so a very long note properly continues
+    // onto additional pages instead of being cut off.
+    let lineIdx = 0;
+    while (lineIdx < noteLines.length) {
+      const roomNow = pageBottom - cursorY;
+      const linesThatFit = Math.max(1, Math.floor(roomNow / 5));
+      const chunk = noteLines.slice(lineIdx, lineIdx + linesThatFit);
+      doc.setTextColor(BRAND.text);
+      doc.text(chunk, margin, cursorY);
+      cursorY += chunk.length * 5;
+      lineIdx += chunk.length;
+      if (lineIdx < noteLines.length) {
+        // More text remains — it didn't fit, continue on a fresh page.
+        drawFooter();
+        doc.addPage();
+        cursorY = margin;
+      }
+    }
+    cursorY += 5;
 
     const photos = (n.media || []).filter(m => m.url && m.type !== "video");
     const videos = (n.media || []).filter(m => m.url && m.type === "video");
