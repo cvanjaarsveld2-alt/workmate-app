@@ -154,6 +154,40 @@ function AmountField({ label, value, onChange, placeholder = "0.00", required = 
   );
 }
 
+// ─── Duplicate detection ─────────────────────────────────────────────────────
+// Purely informational — never blocks a save. Flags expenses that look like
+// they might be the same purchase entered twice: same vendor (case/space
+// insensitive), same amount (within a few cents to absorb rounding), and a
+// date within ±1 day of each other.
+//
+// Returns a Set of expense IDs that have at least one likely duplicate
+// elsewhere in the list. Pure function — call with the full expenses array,
+// recompute whenever the list changes (cheap: O(n²) but n is small per user).
+function findLikelyDuplicateIds(expenses) {
+  const flagged = new Set();
+  const norm = s => (s || "").trim().toLowerCase();
+  const amtClose = (a, b) => Math.abs(parseFloat(a || 0) - parseFloat(b || 0)) < 0.05;
+  const dateClose = (a, b) => {
+    if (!a || !b) return false;
+    const da = new Date(a + "T12:00:00");
+    const db = new Date(b + "T12:00:00");
+    return Math.abs(da - db) <= 86400000; // within 1 day
+  };
+
+  for (let i = 0; i < expenses.length; i++) {
+    for (let j = i + 1; j < expenses.length; j++) {
+      const a = expenses[i], b = expenses[j];
+      if (!a.vendor || !b.vendor) continue; // no vendor on either side — too weak a signal to flag
+      if (norm(a.vendor) !== norm(b.vendor)) continue;
+      if (!amtClose(a.amount, b.amount)) continue;
+      if (!dateClose(a.expense_date, b.expense_date)) continue;
+      flagged.add(a.id);
+      flagged.add(b.id);
+    }
+  }
+  return flagged;
+}
+
 function financePeriod(isoDate) {
   if (!isoDate) return null;
   const d = new Date(isoDate + "T12:00:00");
@@ -555,6 +589,10 @@ Kind regards`;
     }, 500);
   }
 
+  // Computed from the FULL list (not the filtered view) so a duplicate is
+  // still flagged correctly even if a filter happens to be hiding its match.
+  const duplicateIds = findLikelyDuplicateIds(expenses);
+
   const filtered = expenses
     .filter(e => filterCat === "All" || e.category === filterCat)
     .filter(e => !search || [e.vendor, e.category, e.notes].some(x => x?.toLowerCase().includes(search.toLowerCase())))
@@ -655,6 +693,25 @@ Kind regards`;
       >
         {detailExpense && (
           <>
+            {/* Possible duplicate warning — informational only, doesn't block anything */}
+            {duplicateIds.has(detailExpense.id) && (() => {
+              const match = expenses.find(e =>
+                e.id !== detailExpense.id &&
+                duplicateIds.has(e.id) &&
+                (e.vendor || "").trim().toLowerCase() === (detailExpense.vendor || "").trim().toLowerCase() &&
+                Math.abs(parseFloat(e.amount || 0) - parseFloat(detailExpense.amount || 0)) < 0.05
+              );
+              return (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+                  <p className="text-xs font-bold text-amber-800">⚠ Possible duplicate</p>
+                  <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                    Same vendor and amount as another expense{match?.expense_date ? ` dated ${smartDate(match.expense_date)}` : ""}.
+                    {" "}This is just a heads-up — nothing's blocked. Check both before submitting if you're not sure.
+                  </p>
+                </div>
+              );
+            })()}
+
             {/* ZAR equivalent (if foreign currency) */}
             {detailExpense.currency && detailExpense.currency !== "ZAR" && detailExpense.amount_zar > 0 && (
               <div className="rounded-xl bg-green-50 border border-green-100 p-3">
@@ -1021,6 +1078,7 @@ Kind regards`;
                               <span className="inline-block rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: sc.bg, color: sc.text }}>{sc.label}</span>
                               {ex.receipt_url && <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">📄 Slip</span>}
                               {ex.payment_slip_url && <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">💳 Card slip</span>}
+                              {duplicateIds.has(ex.id) && <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">⚠ Possible duplicate</span>}
                               {ex.sync_status === "pending" && <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Syncing…</span>}
                             </div>
                           </div>
