@@ -245,7 +245,7 @@ export async function buildExpensePDF({ expenses, submitter, periodLabel }) {
   const CM_TO_PT = 28.346;
   const SLOT_SIZE = 7.87 * CM_TO_PT; // ≈ 223.1pt — the fixed square per spec
   const GRID_GAP  = 16;              // gap between slots, in pt
-  const CAPTION_H = 28;              // space reserved under each image for caption + link
+  const CAPTION_H = 46;              // space reserved under each image for kind label + wrapped caption + link
 
   // Flatten every expense's slips into a single ordered list of "slots" —
   // this is what actually gets laid out 4-per-page, regardless of which
@@ -321,17 +321,26 @@ export async function buildExpensePDF({ expenses, submitter, periodLabel }) {
           doc.text("(no image)", x + 8, y + SLOT_SIZE / 2);
         }
 
-        // Caption + kind label below the square
+        // Caption block below the square: kind label, then caption (which
+        // may wrap to 2 lines), then the link — each on its own Y position
+        // so nothing overlaps.
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(BRAND_RED);
-        doc.text(slot.kind, x, y + SLOT_SIZE + 12);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(60, 60, 60);
-        doc.text(slot.caption, x, y + SLOT_SIZE + 22, { maxWidth: SLOT_SIZE });
+        doc.text(slot.kind, x, y + SLOT_SIZE + 11);
 
-        // Clickable link over the caption area for the high-res original.
-        doc.textWithLink("Open full size (14 days)", x, y + SLOT_SIZE + 22, { url: slot.url, maxWidth: SLOT_SIZE });
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(60, 60, 60);
+        const captionLines = doc.splitTextToSize(slot.caption, SLOT_SIZE);
+        doc.text(captionLines, x, y + SLOT_SIZE + 19);
+
+        // Link sits below the caption text, wherever that ends — wrapped
+        // captions get 2 lines of ~8.5pt each before the link starts.
+        const linkY = y + SLOT_SIZE + 19 + captionLines.length * 8.5;
+        doc.setFontSize(7.5);
+        doc.setTextColor(37, 99, 235);
+        doc.textWithLink("Open full size (14 days)", x, linkY, { url: slot.url, maxWidth: SLOT_SIZE });
       }
 
       // Footer
