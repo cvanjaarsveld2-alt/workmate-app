@@ -13,6 +13,17 @@ const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 days
 const API_BASE      = "https://api.frankfurter.app";
 const HISTORICAL_FUNCTION_URL = "https://hrqzqyfvbfzrfnuxovvr.supabase.co/functions/v1/historical-rate";
 
+import { supabase } from "../supabase";
+
+// Tracks the reason the MOST RECENT lookup failed, so callers that just get
+// `null` back can still show something more useful than a generic message
+// if they want to. Intentionally simple (module-level, not per-call) since
+// this is a UI nicety, not load-bearing logic.
+let lastFailureReason = null;
+export function getLastFxFailureReason() {
+  return lastFailureReason;
+}
+
 function loadCache() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
@@ -52,19 +63,45 @@ function shiftDate(iso, days) {
 // the save flow.
 async function getHistoricalRateFallback(from, date) {
   try {
+    // Supabase Edge Functions require a valid auth token by default — this
+    // was the actual cause of every call failing with 401 Unauthorized,
+    // before the function's own logic (and the exchangerate-api.com key)
+    // ever got a chance to run.
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+    if (!token) {
+      lastFailureReason = "Not signed in — please log out and back in.";
+      console.warn("[exchangeRate] No auth session — can't call historical-rate");
+      return null;
+    }
+
     const res = await fetch(HISTORICAL_FUNCTION_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
       body: JSON.stringify({ from, date }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      lastFailureReason = res.status === 401
+        ? "Authentication failed calling the rate function (HTTP 401) — try signing out and back in."
+        : `Rate function returned HTTP ${res.status}.`;
+      console.warn("[exchangeRate] Historical fallback HTTP error:", res.status);
+      return null;
+    }
     const json = await res.json();
     if (json.error) {
+      lastFailureReason = json.error === "EXCHANGERATE_API_KEY not configured"
+        ? "The historical rate API key isn't set up in Supabase yet."
+        : `Rate provider error: ${json.error}`;
       console.warn("[exchangeRate] Historical fallback failed:", json.error, json.detail);
       return null;
     }
+    lastFailureReason = null;
     return { rate: json.rate, rateDate: json.rateDate, source: json.source };
   } catch (e) {
+    lastFailureReason = "Network error reaching the rate function: " + (e.message || "unknown");
     console.warn("[exchangeRate] Historical fallback network error:", e.message);
     return null;
   }
