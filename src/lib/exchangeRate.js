@@ -1,12 +1,17 @@
-// ─── Exchange Rate (Frankfurter / ECB) ───────────────────────────────────────
+// ─── Exchange Rate (Frankfurter / ECB, with paid historical fallback) ───────
 // Converts foreign-currency expense amounts to ZAR using the European Central
-// Bank end-of-day rate for a given date. Handles weekends/holidays by walking
-// back up to 5 days. Caches in localStorage to avoid hammering the API.
+// Bank end-of-day rate for a given date — free, no key, and the strongest
+// "official" source for the ~30 major currencies it covers. For currencies
+// ECB doesn't track (Cedi, Naira, Kenyan Shilling, etc) or as a backfill for
+// historical accuracy, falls back to a paid Edge Function backed by
+// exchangerate-api.com's historical-data endpoint.
+// Caches in localStorage to avoid hammering either API.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CACHE_KEY     = "powermate_fx_cache_v1";
 const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 days
 const API_BASE      = "https://api.frankfurter.app";
+const HISTORICAL_FUNCTION_URL = "https://hrqzqyfvbfzrfnuxovvr.supabase.co/functions/v1/historical-rate";
 
 function loadCache() {
   try {
@@ -38,6 +43,31 @@ function shiftDate(iso, days) {
   const d = new Date(iso + "T12:00:00");
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+// Call the paid historical-rate Edge Function (exchangerate-api.com) for
+// currencies ECB doesn't cover, or dates ECB couldn't resolve. Returns
+// { rate, rateDate, source } or null on any failure — never throws, so a
+// missing/expired API key degrades to "no auto rate" rather than breaking
+// the save flow.
+async function getHistoricalRateFallback(from, date) {
+  try {
+    const res = await fetch(HISTORICAL_FUNCTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from, date }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (json.error) {
+      console.warn("[exchangeRate] Historical fallback failed:", json.error, json.detail);
+      return null;
+    }
+    return { rate: json.rate, rateDate: json.rateDate, source: json.source };
+  } catch (e) {
+    console.warn("[exchangeRate] Historical fallback network error:", e.message);
+    return null;
+  }
 }
 
 /**
@@ -79,7 +109,17 @@ export async function getRateToZAR(from, date) {
     }
   }
 
-  // All attempts failed (offline, unsupported currency, etc).
+  // ECB/Frankfurter doesn't have this currency or date — fall back to the
+  // paid historical-rate source, which has genuine accuracy for the EXACT
+  // requested date rather than approximating with "today's rate."
+  const fallback = await getHistoricalRateFallback(from, targetDate);
+  if (fallback) {
+    cache[cacheKey] = { data: fallback, fetchedAt: Date.now() };
+    saveCache(cache);
+    return fallback;
+  }
+
+  // All attempts failed (offline, unsupported currency, no API key set, etc).
   // Fall back to "today" if available, else give up cleanly.
   if (from !== "ZAR" && targetDate !== isoToday()) {
     const todayResult = await getRateToZAR(from, isoToday());
