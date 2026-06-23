@@ -35,6 +35,7 @@ import { EquipmentScreen } from "./screens/EquipmentScreen";
 import { ExpensesScreen }  from "./screens/ExpensesScreen";
 import { MoreScreen }      from "./screens/MoreScreen";
 import { DiagnosticsScreen } from "./screens/DiagnosticsScreen";
+import { BackfillZARScreen } from "./screens/BackfillZARScreen";
 import { ErrorBoundary as ScreenErrorBoundary } from "./components/ErrorBoundary";
 
 class ErrorBoundary extends React.Component {
@@ -71,7 +72,7 @@ export default function PowerWorksApp() {
     // Notifications open the app at /?screen=Followups etc — honour that on load.
     try {
       const p = new URLSearchParams(window.location.search).get("screen");
-      const valid = ["Home", "Clients", "Contacts", "Followups", "Notes", "Equipment", "Quotes", "Expenses", "More", "Diagnostics"];
+      const valid = ["Home", "Clients", "Contacts", "Followups", "Notes", "Equipment", "Quotes", "Expenses", "More", "Diagnostics", "BackfillZAR"];
       if (p && valid.includes(p)) return p;
     } catch (e) { /* ignore */ }
     return "Home";
@@ -406,7 +407,8 @@ export default function PowerWorksApp() {
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
-    Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} />,
+    Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} onBackfill={() => navigate("BackfillZAR")} />,
+    BackfillZAR: <BackfillZARScreen data={data} setData={setData} userId={session.user.id} onBack={() => navigate("Expenses")} />,
   };
 
   return (
