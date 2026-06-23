@@ -12,7 +12,7 @@ import { Card, Btn } from "../components/ui";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
 import { genId, smartDate } from "../lib/helpers";
-import { convertToZAR } from "../lib/exchangeRate";
+import { convertToZAR, getLastFxFailureReason } from "../lib/exchangeRate";
 
 function fmtMoney(amount, currency = "ZAR") {
   const sym = currency === "ZAR" ? "R" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : "";
@@ -30,6 +30,7 @@ export function BackfillZARScreen({ data, setData, userId, onBack }) {
   );
 
   const [statuses, setStatuses] = useState({}); // id -> "working" | "done" | "failed" | "manual"
+  const [failReasons, setFailReasons] = useState({}); // id -> the actual reason it failed
   const [manualValues, setManualValues] = useState({}); // id -> string being typed
   const [runningAll, setRunningAll] = useState(false);
 
@@ -72,6 +73,7 @@ export function BackfillZARScreen({ data, setData, userId, onBack }) {
       setStatuses(s => ({ ...s, [expense.id]: "done" }));
     } else {
       setStatuses(s => ({ ...s, [expense.id]: "failed" }));
+      setFailReasons(r => ({ ...r, [expense.id]: getLastFxFailureReason() || "No rate available for that date/currency." }));
     }
   }
 
@@ -155,7 +157,8 @@ export function BackfillZARScreen({ data, setData, userId, onBack }) {
                     <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
                       {status === "failed" && (
                         <p className="text-xs text-amber-700 flex items-center gap-1.5">
-                          <AlertCircle size={12} /> No rate found for that date — enter the real amount below.
+                          <AlertCircle size={12} className="shrink-0" />
+                          {failReasons[e.id] || "No rate found for that date — enter the real amount below."}
                         </p>
                       )}
                       <div className="flex items-center gap-2">
