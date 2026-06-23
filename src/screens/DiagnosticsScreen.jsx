@@ -51,7 +51,7 @@ function Row({ icon: Icon, label, value, status, hint }) {
   );
 }
 
-export function DiagnosticsScreen({ data, userId, isOnline, onBack }) {
+export function DiagnosticsScreen({ data, userId, isOnline, onBack, onBackfill }) {
   const { confirm, dialog } = useConfirm();
   const [funcStatus, setFuncStatus] = useState({});
   const [checking,   setChecking]   = useState(false);
@@ -182,6 +182,27 @@ export function DiagnosticsScreen({ data, userId, isOnline, onBack }) {
           hint={failed.length > 0 ? "These won't sync without intervention. See breakdown below." : null}
         />
       </Card>
+
+      {/* ── Backfill ZAR shortcut ── */}
+      {(() => {
+        const missingZAR = (data.expenses || []).filter(e => e.currency && e.currency !== "ZAR" && (!e.amount_zar || e.amount_zar <= 0));
+        if (missingZAR.length === 0) return null;
+        return (
+          <Card className="p-0 overflow-hidden">
+            <button onClick={onBackfill}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px]">
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={18} className="text-amber-500" />
+                <div>
+                  <p className="text-base font-bold text-slate-800">Backfill ZAR</p>
+                  <p className="text-xs text-slate-400">{missingZAR.length} foreign-currency expense{missingZAR.length !== 1 ? "s" : ""} missing a ZAR amount</p>
+                </div>
+              </div>
+              <span className="shrink-0 w-2.5 h-2.5 rounded-full bg-amber-500" />
+            </button>
+          </Card>
+        );
+      })()}
 
       {/* ── Failed sync breakdown ── */}
       {failed.length > 0 && (
