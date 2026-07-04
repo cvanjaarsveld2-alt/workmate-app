@@ -91,12 +91,18 @@ async function extractCardData(imageBase64) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 export function CardScanner({ userId, onExtracted, onCancel }) {
-  const [step, setStep]       = useState("choose"); // choose | processing | review | error
-  const [error, setError]     = useState("");
-  const [progress, setProgress] = useState("");
+  const [step, setStep]           = useState("choose");
+  const [error, setError]         = useState("");
+  const [progress, setProgress]   = useState("");
   const [cardImageUrl, setCardImageUrl] = useState(null);
-  const cameraInputRef = useRef(null);
+  const cameraInputRef  = useRef(null);
   const galleryInputRef = useRef(null);
+
+  // Auto-open camera immediately on mount
+  React.useEffect(() => {
+    const t = setTimeout(() => cameraInputRef.current?.click(), 100);
+    return () => clearTimeout(t);
+  }, []);
 
   async function handleFileSelected(file) {
     if (!file) return;
@@ -185,29 +191,22 @@ export function CardScanner({ userId, onExtracted, onCancel }) {
 
           {step === "choose" && (
             <motion.div key="choose" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="space-y-3">
-              <p className="text-sm text-slate-500 mb-3">
-                Take a photo or upload an existing one. AI will extract the contact details automatically.
-              </p>
+              className="py-6 flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
+                <Camera size={30} style={{ color: "#8B1A1A" }} />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-700">Opening camera…</p>
+                <p className="text-xs text-slate-400 mt-1">Point at a business card and take the photo</p>
+              </div>
               <button onClick={triggerCamera}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-slate-200 hover:border-red-300 transition-colors text-left min-h-[68px]">
-                <div className="w-11 h-11 rounded-xl bg-red-100 text-red-700 flex items-center justify-center shrink-0">
-                  <Camera size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-black text-slate-900">Take Photo</p>
-                  <p className="text-xs text-slate-500">Use camera to snap the card</p>
-                </div>
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
+                style={{ background: "#8B1A1A" }}>
+                <Camera size={16} /> Open Camera
               </button>
               <button onClick={triggerGallery}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-slate-200 hover:border-red-300 transition-colors text-left min-h-[68px]">
-                <div className="w-11 h-11 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                  <ImageIcon size={20} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-black text-slate-900">Upload Photo</p>
-                  <p className="text-xs text-slate-500">Pick an existing photo from gallery</p>
-                </div>
+                className="text-xs font-bold text-slate-400 py-2 px-4 min-h-[44px]">
+                Use a photo from my gallery instead
               </button>
             </motion.div>
           )}
