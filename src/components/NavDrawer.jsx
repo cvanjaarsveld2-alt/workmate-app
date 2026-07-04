@@ -67,22 +67,22 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
             className="fixed top-0 left-0 bottom-0 z-[71] w-[82%] max-w-[320px] bg-white shadow-2xl flex flex-col">
 
             {/* Brand header — PowerWorks red */}
-            <div className="px-5 pt-12 pb-5 flex items-center justify-between"
+            <div className="px-5 pt-12 pb-4 flex items-end justify-between"
               style={{ background: "linear-gradient(135deg, #8B1A1A 0%, #6B1414 100%)" }}>
-              <div className="flex items-center gap-3">
-                <img
-                  src={BRAND.logo}
-                  alt="Power Works"
-                  className="h-10 object-contain"
-                  onError={e => e.target.style.display = "none"}
-                />
-                <div>
-                  <p className="text-base font-black text-white leading-tight">PowerMate</p>
-                  <p className="text-xs text-white/60 leading-tight">Power Works (Pty) Ltd</p>
-                </div>
-              </div>
+              <img
+                src={BRAND.logo}
+                alt="Power Works"
+                className="h-9 w-auto object-contain object-left"
+                style={{ maxWidth: 180 }}
+                onError={e => {
+                  e.target.style.display = "none";
+                  e.target.nextSibling.style.display = "block";
+                }}
+              />
+              {/* Fallback if logo fails to load */}
+              <p className="text-lg font-black text-white tracking-wide hidden">PowerMate</p>
               <button onClick={onClose}
-                className="w-8 h-8 rounded-full flex items-center justify-center"
+                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mb-0.5"
                 style={{ background: "rgba(255,255,255,0.15)" }}>
                 <X size={16} className="text-white" />
               </button>
