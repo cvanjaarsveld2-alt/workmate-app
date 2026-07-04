@@ -10,11 +10,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2, XCircle, Minus, ChevronDown, ChevronUp,
   Settings, Save, CheckSquare, AlertTriangle, Car, X,
-  FileText, ChevronRight, RotateCcw,
+  FileText, ChevronRight, RotateCcw, FileDown, Send,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
+import { buildVehicleCheckPDF } from "../lib/vehicleCheckPDF";
 import {
   Card, Btn, Field, Toast, Empty, PageHeader, useConfirm,
 } from "../components/ui";
@@ -263,11 +264,12 @@ function SettingsPanel({ settings, onSave, onClose }) {
 export function VehicleCheckScreen({ data, setData, userId }) {
   const [selectedDate, setSelectedDate] = useState(todayISO());
   const [showSettings, setShowSettings] = useState(false);
-  const [settings, setSettings] = useState(loadVehicleSettings);
-  const [toast, setToast] = useState("");
-  const [issueSheet, setIssueSheet] = useState(null); // { item, date }
+  const [settings, setSettings]         = useState(loadVehicleSettings);
+  const [toast, setToast]               = useState("");
+  const [issueSheet, setIssueSheet]     = useState(null);
   const [collapsedSections, setCollapsedSections] = useState({});
-  const { confirm, dialog } = useConfirm();
+  const [pdfPack, setPdfPack]           = useState(null);
+  const { confirm, dialog }             = useConfirm();
 
   const weekDays = useMemo(() => weekDates(selectedDate), [selectedDate]);
   const checks = data.vehicleChecks || {};
@@ -393,6 +395,47 @@ export function VehicleCheckScreen({ data, setData, userId }) {
   const issueCount   = allItems.filter(i => todayData.items[i]?.status === "issue").length;
   const allGood      = checkedCount === allItems.length && issueCount === 0;
 
+  // ── PDF export ──────────────────────────────────────────────────────────────
+  async function exportPDF() {
+    setToast("Building inspection report...");
+    try {
+      const { blob, filename, ref } = await buildVehicleCheckPDF({
+        checkDate: selectedDate,
+        dayData:   getDayData(selectedDate),
+        settings,
+        checklist: CHECKLIST,
+      });
+      const url = URL.createObjectURL(blob);
+      setPdfPack({ blob, url, filename, ref });
+      setToast("");
+    } catch (e) {
+      console.error("PDF build failed:", e);
+      setToast("Could not build PDF — try again");
+    }
+  }
+
+  function closePdfPack() {
+    if (pdfPack?.url) URL.revokeObjectURL(pdfPack.url);
+    setPdfPack(null);
+  }
+
+  async function sharePdfPack() {
+    if (!pdfPack) return;
+    const file = new File([pdfPack.blob], pdfPack.filename, { type: "application/pdf" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ title: `Vehicle Inspection ${pdfPack.ref}`, files: [file] });
+      } catch (e) {
+        if (e.name !== "AbortError") console.warn("Share failed:", e);
+      }
+    } else {
+      const a = document.createElement("a");
+      a.href = pdfPack.url; a.download = pdfPack.filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setToast("PDF downloaded");
+    }
+  }
+
   // ── Today or past? ──────────────────────────────────────────────────────────
   const isToday = selectedDate === todayISO();
 
@@ -425,17 +468,72 @@ export function VehicleCheckScreen({ data, setData, userId }) {
         )}
       </AnimatePresence>
 
+      {/* ── PDF preview sheet ── */}
+      <AnimatePresence>
+        {pdfPack && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={closePdfPack}
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+            <motion.div
+              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col">
+              <div className="flex justify-center pt-2.5 pb-1">
+                <div className="w-12 h-1 rounded-full bg-slate-300" />
+              </div>
+              <div className="px-5 pt-2 pb-3 flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-base font-black text-slate-900">Inspection Report Ready</p>
+                  <p className="text-xs text-slate-500 truncate">{pdfPack.ref} · {smartDate(selectedDate)}</p>
+                </div>
+                <button onClick={closePdfPack} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="px-4 pb-3 flex-1 min-h-0">
+                <div className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50" style={{ height: 320 }}>
+                  <iframe src={pdfPack.url} title="Inspection report preview" className="w-full h-full" />
+                </div>
+                <p className="text-xs text-slate-400 mt-1.5 text-center">{pdfPack.filename}</p>
+              </div>
+              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+                <button onClick={sharePdfPack}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
+                  style={{ background: "#8B1A1A" }}>
+                  <Send size={16} /> Share (Mail, WhatsApp, iCloud, Outlook...)
+                </button>
+                <button onClick={() => window.open(pdfPack.url, "_blank")}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+                  <FileDown size={14} /> Open PDF
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-2">
         <PageHeader
           title="Vehicle Checklist"
           subtitle={`${settings.vehicle}${settings.registration ? ` · ${settings.registration}` : ""}`}
         />
-        <button
-          onClick={() => setShowSettings(true)}
-          className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 hover:bg-slate-50 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0">
-          <Settings size={18} />
-        </button>
+        <div className="flex gap-2 shrink-0">
+          {checkedCount > 0 && (
+            <button
+              onClick={exportPDF}
+              className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 hover:bg-slate-50 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              title="Export as PDF">
+              <FileDown size={18} />
+            </button>
+          )}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 hover:bg-slate-50 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <Settings size={18} />
+          </button>
+        </div>
       </div>
 
       {/* ── Vehicle identity card ── */}
