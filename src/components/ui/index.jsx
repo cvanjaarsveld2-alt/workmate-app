@@ -1,18 +1,19 @@
 // ─── Core UI Components ───────────────────────────────────────────────────────
-// All reusable primitives used across every screen in PowerMate
-// Import what you need: import { Card, Btn, Field } from "../components/ui"
+// All reusable primitives used across every screen in PowerMate.
+// Upgraded UI: sharper typography, stronger brand presence, consistent spacing.
+// New: PhotoField — a universal photo add/view/replace widget for all screens.
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Users, ChevronDown } from "lucide-react";
+import { Search, X, Users, ChevronDown, Camera, Plus, ImageIcon } from "lucide-react";
 import { BRAND, STAGE_COLORS, NOTE_URGENCY } from "../../lib/constants";
 import { daysDiff, smartDate } from "../../lib/helpers";
 
-// ─── Card ───────────────────────────────────────────────────────────────────── 
+// ─── Card ─────────────────────────────────────────────────────────────────────
 export function Card({ children, className = "", onClick }) {
   return (
     <div
-      className={`bg-white rounded-2xl shadow-sm border border-slate-100 ${onClick ? "cursor-pointer active:scale-[0.98] transition-transform" : ""} ${className}`}
+      className={`bg-white rounded-2xl shadow-sm border border-slate-100 ${onClick ? "cursor-pointer active:scale-[0.985] transition-transform" : ""} ${className}`}
       onClick={onClick}>
       {children}
     </div>
@@ -33,6 +34,7 @@ export function Btn({ children, onClick, disabled, variant = "solid", className 
     secondary: { background: BRAND.light, color: BRAND.primary },
     success:   { background: "#16A34A", color: "#fff" },
     warning:   { background: "#D97706", color: "#fff" },
+    ghost:     { background: "transparent", color: "#64748B", border: "2px solid #E2E8F0" },
   };
   return (
     <button
@@ -48,7 +50,7 @@ export function Btn({ children, onClick, disabled, variant = "solid", className 
 
 // ─── Field ────────────────────────────────────────────────────────────────────
 export function Field({ label, value, onChange, placeholder = "", type = "text", multiline = false, required = false, maxLength }) {
-  const cls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors";
+  const cls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]";
   return (
     <div>
       {label && (
@@ -57,7 +59,7 @@ export function Field({ label, value, onChange, placeholder = "", type = "text",
         </label>
       )}
       {multiline
-        ? <textarea value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={4} maxLength={maxLength || 5000} className={cls + " resize-none"} />
+        ? <textarea value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={4} maxLength={maxLength || 5000} className={cls + " resize-none min-h-[96px]"} />
         : <input type={type} value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength || 500} className={cls} />
       }
       {maxLength && (value || "").length > maxLength * 0.85 && (
@@ -67,7 +69,7 @@ export function Field({ label, value, onChange, placeholder = "", type = "text",
   );
 }
 
-// ─── SelectField ────────────────────────────────────────────────────────────── 
+// ─── SelectField ──────────────────────────────────────────────────────────────
 export function SelectField({ label, value, onChange, options }) {
   return (
     <div>
@@ -78,6 +80,118 @@ export function SelectField({ label, value, onChange, options }) {
         className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]">
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
+    </div>
+  );
+}
+
+// ─── PhotoField ───────────────────────────────────────────────────────────────
+// Universal photo widget. Used on Notes, Equipment, Contacts, Clients, etc.
+// Shows existing photos in a thumbnail grid.
+// "Add" opens the provided onAdd callback (typically a scanner or file picker).
+// Tapping a photo calls onView(index).
+// Holding (or using the × button) calls onRemove(index).
+//
+// Props:
+//   photos:    array of { url, caption? } objects (resolved URLs)
+//   onAdd:     () => void — called when the user taps "Add photo"
+//   onView:    (index) => void — called when user taps a photo
+//   onRemove:  (index) => void — called when user removes a photo (optional)
+//   label:     string — section label (default "Photos")
+//   compact:   bool — single row, no grid (for tight form areas)
+export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Photos", compact = false, disabled = false }) {
+  const hasPhotos = photos.length > 0;
+
+  if (compact) {
+    // Horizontal scroll row — used in form contexts
+    return (
+      <div>
+        {label && <p className="mb-1.5 text-sm font-bold text-slate-500">{label}</p>}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {photos.map((p, i) => (
+            <div key={i} className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50">
+              <button type="button" onClick={() => onView?.(i)} className="absolute inset-0">
+                <img src={p.url} alt={p.caption || `Photo ${i + 1}`} className="w-full h-full object-cover" />
+              </button>
+              {onRemove && (
+                <button type="button" onClick={() => onRemove(i)}
+                  className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
+                  <X size={10} className="text-white" />
+                </button>
+              )}
+            </div>
+          ))}
+          {!disabled && onAdd && (
+            <button type="button" onClick={onAdd}
+              className="shrink-0 w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 active:scale-95 transition-all">
+              <Camera size={18} style={{ color: "#8B1A1A" }} />
+              <span className="text-[10px] font-bold text-slate-400">Add</span>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Grid layout — used in detail / full section views
+  return (
+    <div>
+      {label && (
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-black text-slate-400 uppercase tracking-wider">{label}</p>
+          {!disabled && onAdd && (
+            <button type="button" onClick={onAdd}
+              className="flex items-center gap-1 text-xs font-bold rounded-lg px-2.5 py-1.5 min-h-[32px]"
+              style={{ color: "#8B1A1A", background: "#F7F3F3" }}>
+              <Camera size={12} /> Add photo
+            </button>
+          )}
+        </div>
+      )}
+      {hasPhotos ? (
+        <div className="grid grid-cols-2 gap-2">
+          {photos.map((p, i) => (
+            <div key={i} className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50" style={{ aspectRatio: "4/3" }}>
+              <button type="button" onClick={() => onView?.(i)} className="absolute inset-0 w-full h-full">
+                <img src={p.url} alt={p.caption || `Photo ${i + 1}`} className="w-full h-full object-cover" />
+              </button>
+              {p.caption && (
+                <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-black/50">
+                  <p className="text-[10px] text-white font-medium leading-tight truncate">{p.caption}</p>
+                </div>
+              )}
+              {onRemove && (
+                <button type="button" onClick={() => onRemove(i)}
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center active:bg-red-600/80">
+                  <X size={11} className="text-white" />
+                </button>
+              )}
+            </div>
+          ))}
+          {!disabled && onAdd && (
+            <button type="button" onClick={onAdd}
+              className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-2 hover:border-red-300 hover:bg-red-50 active:scale-95 transition-all"
+              style={{ aspectRatio: "4/3" }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+                <Camera size={18} style={{ color: "#8B1A1A" }} />
+              </div>
+              <span className="text-xs font-bold text-slate-400">Add photo</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        !disabled && onAdd && (
+          <button type="button" onClick={onAdd}
+            className="w-full h-24 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center gap-3 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+              <Camera size={18} style={{ color: "#8B1A1A" }} />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-slate-600">Add a photo</p>
+              <p className="text-xs text-slate-400 mt-0.5">Tap to open camera</p>
+            </div>
+          </button>
+        )
+      )}
     </div>
   );
 }
@@ -167,62 +281,77 @@ export function SearchBar({ value, onChange, placeholder = "Search…" }) {
 
 // ─── FilterPills ──────────────────────────────────────────────────────────────
 export function FilterPills({ options, value, onChange, dangerValue }) {
+  const scrollRef = useRef(null);
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
-      {options.map(o => (
-        <button key={o} onClick={() => onChange(o)}
-          className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition-all min-h-[40px] ${value === o ? "text-white" : "bg-white border border-slate-200 text-slate-500"}`}
-          style={value === o ? { background: o === dangerValue ? "#DC2626" : o === "Due Soon" ? "#D97706" : BRAND.primary } : {}}>
-          {o}
-        </button>
-      ))}
+    <div className="relative">
+      <div ref={scrollRef} className="flex gap-2 overflow-x-auto pb-1 scroll-smooth" style={{ scrollbarWidth: "none" }}>
+        {options.map(o => (
+          <button key={o} onClick={() => onChange(o)}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition-all min-h-[40px] ${value === o ? "text-white shadow-sm" : "bg-white border border-slate-200 text-slate-500 hover:border-slate-300"}`}
+            style={value === o ? {
+              background: o === dangerValue ? "#DC2626" : o === "Due Soon" ? "#D97706" : BRAND.primary
+            } : {}}>
+            {o}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-// ─── Toast ──────────────────────────────────────────────────────────────────── 
-export function Toast({ message, onDone, type = "success" }) {
-  // Longer messages (like detailed error text) get more time on screen —
-  // a one-word "Saved" doesn't need the same 2.4s as a full error sentence.
-  const duration = Math.min(2400 + Math.max(0, (message?.length || 0) - 20) * 60, 6000);
-  useEffect(() => { const t = setTimeout(onDone, duration); return () => clearTimeout(t); }, []);
-  const bg = type === "error" ? "#DC2626" : BRAND.primary;
+// ─── Toast ────────────────────────────────────────────────────────────────────
+export function Toast({ message, onDone }) {
+  const duration = Math.max(2200, Math.min(message.length * 55, 6000));
+  useEffect(() => {
+    const t = setTimeout(onDone, duration);
+    return () => clearTimeout(t);
+  }, [message]);
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
-      className="fixed bottom-24 left-4 z-50 rounded-2xl px-5 py-3.5 text-sm font-bold text-white shadow-lg"
-      style={{ background: bg, maxWidth: "calc(100vw - 32px)", textAlign: "left" }}>
-      {type === "success" ? "✓ " : "✗ "}{message}
+      initial={{ opacity: 0, y: 16, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+      className="fixed bottom-24 left-4 right-4 z-50 flex justify-start pointer-events-none"
+      style={{ maxWidth: "calc(100vw - 2rem)" }}>
+      <div
+        className="rounded-2xl px-4 py-3 shadow-lg max-w-sm w-full"
+        style={{ background: "#1e293b", color: "#fff" }}>
+        <p className="text-sm font-bold leading-snug whitespace-normal break-words">{message}</p>
+      </div>
     </motion.div>
   );
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
-export function Empty({ title, text, icon: Icon = Users }) {
+// ─── Empty ────────────────────────────────────────────────────────────────────
+export function Empty({ title, text, icon: Icon }) {
   return (
-    <div className="rounded-2xl bg-white border border-slate-100 p-10 text-center">
-      <div className="mx-auto mb-3 w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: BRAND.light }}>
-        <Icon size={24} style={{ color: BRAND.primary }} />
-      </div>
-      <p className="font-bold text-slate-800 text-base">{title}</p>
-      <p className="mt-1 text-sm text-slate-400">{text}</p>
+    <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
+      {Icon && (
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: BRAND.light }}>
+          <Icon size={28} style={{ color: BRAND.primary }} />
+        </div>
+      )}
+      <p className="text-base font-black text-slate-700 mb-1">{title}</p>
+      {text && <p className="text-sm text-slate-400 leading-relaxed max-w-[240px]">{text}</p>}
     </div>
   );
 }
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
-export function StatCard({ label, value, sub, color = BRAND.primary, icon: Icon }) {
+export function StatCard({ label, value, sub, color, icon: Icon }) {
   return (
     <Card className="p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</p>
-          <p className="mt-1 text-2xl font-black" style={{ color }}>{value}</p>
-          {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider truncate">{label}</p>
+          <p className="mt-1 text-2xl font-black leading-none" style={{ color: color || BRAND.primary }}>{value}</p>
+          {sub && <p className="mt-1 text-xs text-slate-400 leading-snug">{sub}</p>}
         </div>
         {Icon && (
-          <div className="rounded-xl p-2.5" style={{ background: BRAND.light }}>
-            <Icon size={18} style={{ color }} />
+          <div className="rounded-xl p-2.5 shrink-0" style={{ background: BRAND.light }}>
+            <Icon size={18} style={{ color: color || BRAND.primary }} />
           </div>
         )}
       </div>
@@ -253,9 +382,25 @@ export function NavTab({ icon: Icon, label, active, onClick, badge }) {
 // ─── PageHeader ───────────────────────────────────────────────────────────────
 export function PageHeader({ title, subtitle }) {
   return (
-    <div className="mb-5">
-      <h1 className="text-2xl font-black text-slate-900 tracking-tight">{title}</h1>
-      {subtitle && <p className="mt-0.5 text-sm text-slate-400">{subtitle}</p>}
+    <div className="mb-2">
+      <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{title}</h1>
+      {subtitle && <p className="mt-0.5 text-sm text-slate-400 leading-snug">{subtitle}</p>}
+    </div>
+  );
+}
+
+// ─── SectionHeader ────────────────────────────────────────────────────────────
+// Lightweight section divider with optional action button
+export function SectionHeader({ title, action, onAction }) {
+  return (
+    <div className="flex items-center justify-between mb-2 mt-1">
+      <p className="text-xs font-black text-slate-400 uppercase tracking-wider">{title}</p>
+      {action && onAction && (
+        <button onClick={onAction} className="text-xs font-bold py-1 px-2.5 rounded-lg min-h-[28px]"
+          style={{ color: BRAND.primary, background: BRAND.light }}>
+          {action}
+        </button>
+      )}
     </div>
   );
 }
@@ -323,8 +468,8 @@ export function StagePill({ stage }) {
 export function ServiceBadge({ dueDate }) {
   const d = daysDiff(dueDate);
   if (d === null) return null;
-  if (d < 0)  return <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">⚠️ Overdue</span>;
-  if (d <= 3) return <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-700">Due in {d}d</span>;
+  if (d < 0)   return <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">⚠️ Overdue</span>;
+  if (d <= 3)  return <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-700">Due in {d}d</span>;
   if (d <= 14) return <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">Due {smartDate(dueDate)}</span>;
   return <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">{smartDate(dueDate)}</span>;
 }
