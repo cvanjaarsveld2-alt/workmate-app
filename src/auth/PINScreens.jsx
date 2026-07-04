@@ -1,16 +1,16 @@
 // ─── PIN Screens ─────────────────────────────────────────────────────────────
 // PINSetupScreen: first-time 6-digit PIN creation
-// PINLockScreen:  lock screen shown on every app open (iPhone lock style)
+// PINLockScreen:  lock screen shown on every app open
 //
-// Design: iPhone lock-screen aesthetic — dark gradient, circular numpad,
-// 6 dots, NO backspace button, shake on wrong PIN, lockout after 6 fails.
+// Design matches the PowerMate app: light #F7F3F3 background, deep red brand
+// colour, white card panel, PowerWorks logo, rounded rectangle keys — NOT a
+// dark phone lock-screen style. This feels like it belongs to the same app.
 //
-// ⚠️  PIN HELPER FUNCTIONS are inlined here to avoid import mismatches.
-//    If your pinHelpers.js exports them all correctly, you can re-add the
-//    import and remove the inline section below. But inlining is safer.
+// All PIN helpers are inlined — no dependency on pinHelpers.js.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Delete } from "lucide-react";
 
 const PIN_LENGTH   = 6;
 const MAX_ATTEMPTS = 6;
@@ -20,24 +20,18 @@ const SESSION_KEY  = "pm_session_unlocked";
 
 // ─── Inlined PIN helpers ──────────────────────────────────────────────────────
 async function _hashPIN(pin) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(pin + "powermate_salt_v1");
-  const hashBuf = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  const data = new TextEncoder().encode(pin + "powermate_salt_v1");
+  const buf  = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
-
 async function savePINHash(pin) {
-  const hash = await _hashPIN(pin);
-  localStorage.setItem(STORAGE_KEY, hash);
+  localStorage.setItem(STORAGE_KEY, await _hashPIN(pin));
 }
-
 async function verifyPIN(pin) {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return false;
-  const hash = await _hashPIN(pin);
-  return hash === stored;
+  return (await _hashPIN(pin)) === stored;
 }
-
 function getPINHash()          { return localStorage.getItem(STORAGE_KEY); }
 function getPINAttempts()      { return parseInt(localStorage.getItem(ATTEMPTS_KEY) || "0", 10); }
 function incrementPINAttempts(){ localStorage.setItem(ATTEMPTS_KEY, String(getPINAttempts() + 1)); }
@@ -45,43 +39,64 @@ function resetPINAttempts()    { localStorage.removeItem(ATTEMPTS_KEY); }
 function isSessionUnlocked()   { return sessionStorage.getItem(SESSION_KEY) === "1"; }
 function markSessionUnlocked() { sessionStorage.setItem(SESSION_KEY, "1"); }
 
-// ─── Dot indicator ────────────────────────────────────────────────────────────
-function PINDots({ entered, length = PIN_LENGTH, shake = false }) {
+// ─── Brand colours (match the rest of the app) ───────────────────────────────
+const RED   = "#8B1A1A";
+const LIGHT = "#F7F3F3";
+
+// ─── Dot indicators ───────────────────────────────────────────────────────────
+function PINDots({ entered, shake }) {
   return (
     <motion.div
-      className="flex items-center justify-center gap-4"
-      animate={shake ? { x: [0, -10, 10, -10, 10, 0] } : {}}
-      transition={{ duration: 0.4 }}>
-      {Array.from({ length }).map((_, i) => (
-        <div
+      className="flex items-center justify-center gap-3"
+      animate={shake ? { x: [0, -8, 8, -8, 8, 0] } : {}}
+      transition={{ duration: 0.35 }}
+    >
+      {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+        <motion.div
           key={i}
-          className="w-4 h-4 rounded-full transition-all duration-150"
-          style={{
-            background: i < entered ? "#FFFFFF" : "rgba(255,255,255,0.25)",
-            transform: i < entered ? "scale(1.1)" : "scale(1)",
+          animate={{
+            scale:      i < entered ? 1.15 : 1,
+            background: i < entered ? RED : "#E2E8F0",
           }}
+          transition={{ duration: 0.12 }}
+          className="w-3.5 h-3.5 rounded-full"
         />
       ))}
     </motion.div>
   );
 }
 
-// ─── Numpad key ───────────────────────────────────────────────────────────────
+// ─── Numpad key — rounded rectangle, white card style ────────────────────────
 function NumKey({ digit, sub, onPress, disabled }) {
   return (
-    <button
+    <motion.button
+      whileTap={{ scale: 0.93 }}
       onClick={() => !disabled && onPress(String(digit))}
       disabled={disabled}
-      className="flex flex-col items-center justify-center w-20 h-20 rounded-full transition-all active:scale-95 select-none"
-      style={{
-        background: "rgba(255,255,255,0.12)",
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
-        border: "1px solid rgba(255,255,255,0.08)",
-      }}>
-      <span className="text-3xl font-light text-white leading-none">{digit}</span>
-      {sub && <span className="text-[9px] font-bold text-white/50 tracking-[0.2em] mt-0.5">{sub}</span>}
-    </button>
+      className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm select-none transition-colors active:bg-slate-50"
+      style={{ width: 80, height: 72 }}
+    >
+      <span className="text-2xl font-bold text-slate-900 leading-none">{digit}</span>
+      {sub
+        ? <span className="text-[9px] font-bold text-slate-400 tracking-[0.18em] mt-1">{sub}</span>
+        : <span className="h-[13px]" />
+      }
+    </motion.button>
+  );
+}
+
+// ─── Backspace key ────────────────────────────────────────────────────────────
+function BackspaceKey({ onPress, disabled }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.93 }}
+      onClick={() => !disabled && onPress()}
+      disabled={disabled}
+      className="flex items-center justify-center rounded-2xl select-none transition-colors active:bg-slate-100"
+      style={{ width: 80, height: 72, background: "transparent" }}
+    >
+      <Delete size={22} className="text-slate-400" />
+    </motion.button>
   );
 }
 
@@ -90,20 +105,20 @@ const NUMPAD = [
   [{ d: 1, s: "" },     { d: 2, s: "ABC" },  { d: 3, s: "DEF" }],
   [{ d: 4, s: "GHI" },  { d: 5, s: "JKL" },  { d: 6, s: "MNO" }],
   [{ d: 7, s: "PQRS" }, { d: 8, s: "TUV" },  { d: 9, s: "WXYZ" }],
-  [null,                 { d: 0, s: "" },      null],
 ];
 
-// ─── Shared PIN input view ────────────────────────────────────────────────────
+// ─── Shared PIN entry view ────────────────────────────────────────────────────
 function PINView({ title, subtitle, onSubmit, error, onForgot }) {
   const [entered, setEntered] = useState("");
   const [shake, setShake]     = useState(false);
-  const prevError = useRef(null);
+  const prevError              = useRef(null);
 
+  // Shake + clear on new error
   useEffect(() => {
     if (error && error !== prevError.current) {
       setShake(true);
       setEntered("");
-      setTimeout(() => setShake(false), 500);
+      setTimeout(() => setShake(false), 400);
     }
     prevError.current = error;
   }, [error]);
@@ -113,65 +128,102 @@ function PINView({ title, subtitle, onSubmit, error, onForgot }) {
     const next = entered + digit;
     setEntered(next);
     if (next.length === PIN_LENGTH) {
-      setTimeout(() => {
-        onSubmit(next);
-        setEntered("");
-      }, 80);
+      setTimeout(() => { onSubmit(next); setEntered(""); }, 80);
     }
+  }
+
+  function del() {
+    setEntered(e => e.slice(0, -1));
   }
 
   return (
     <div
-      className="fixed inset-0 flex flex-col items-center justify-between py-16 px-6"
-      style={{ background: "linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}>
-
-      {/* Top — logo + title */}
-      <div className="flex flex-col items-center gap-6 pt-8">
+      className="fixed inset-0 flex flex-col items-center justify-between overflow-auto"
+      style={{ background: LIGHT }}
+    >
+      {/* ── Top: logo + headings ── */}
+      <div className="flex flex-col items-center pt-16 pb-4 px-6">
+        {/* PowerWorks logo */}
         <img
-          src="/icon-192.png"
-          alt="PowerMate"
-          className="w-16 h-16 rounded-2xl shadow-2xl"
-          onError={e => { e.target.style.display = "none"; }}
+          src="/logo.png"
+          alt="Power Works"
+          className="h-14 object-contain mb-6"
+          onError={e => {
+            e.target.style.display = "none";
+            e.target.nextSibling.style.display = "flex";
+          }}
         />
-        <div className="text-center">
-          <p className="text-white text-2xl font-semibold tracking-tight">{title}</p>
-          {subtitle && <p className="text-white/50 text-sm mt-1">{subtitle}</p>}
+        {/* Fallback wordmark if logo doesn't load */}
+        <div
+          className="hidden items-center justify-center rounded-2xl px-5 py-3 mb-6"
+          style={{ background: RED }}
+        >
+          <span className="text-white text-lg font-black tracking-wide">POWER<span style={{ color: "#FCA5A5" }}>MATE</span></span>
+        </div>
+
+        <h1 className="text-2xl font-black text-slate-900 tracking-tight text-center">{title}</h1>
+        {subtitle && (
+          <p className="mt-1.5 text-sm text-slate-400 text-center leading-snug">{subtitle}</p>
+        )}
+      </div>
+
+      {/* ── Middle: white card with dots + error ── */}
+      <div className="w-full px-6">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 px-8 py-8 flex flex-col items-center gap-5">
+          <PINDots entered={entered.length} shake={shake} />
+
+          <AnimatePresence mode="wait">
+            {error ? (
+              <motion.p
+                key={error}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="text-sm font-bold text-red-600 text-center leading-snug"
+              >
+                {error}
+              </motion.p>
+            ) : (
+              <motion.p
+                key="hint"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="text-sm text-slate-300 text-center"
+              >
+                {PIN_LENGTH} digits
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
-      {/* Middle — dots + error */}
-      <div className="flex flex-col items-center gap-4">
-        <PINDots entered={entered.length} shake={shake} />
-        <AnimatePresence mode="wait">
-          {error && (
-            <motion.p
-              key={error}
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="text-red-400 text-sm font-medium text-center max-w-[260px]">
-              {error}
-            </motion.p>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Bottom — numpad only, NO backspace */}
-      <div className="flex flex-col items-center gap-3">
+      {/* ── Bottom: numpad ── */}
+      <div className="flex flex-col items-center gap-3 pb-12 pt-6 px-6">
+        {/* Rows 1–3 */}
         {NUMPAD.map((row, ri) => (
-          <div key={ri} className="flex gap-6 items-center">
-            {row.map((key, ki) =>
-              key
-                ? <NumKey key={ki} digit={key.d} sub={key.s} onPress={press} />
-                : <div key={ki} className="w-20 h-20" />
-            )}
+          <div key={ri} className="flex gap-4">
+            {row.map(key => (
+              <NumKey key={key.d} digit={key.d} sub={key.s} onPress={press} />
+            ))}
           </div>
         ))}
 
+        {/* Bottom row: empty · 0 · backspace */}
+        <div className="flex gap-4">
+          {/* Empty placeholder */}
+          <div style={{ width: 80, height: 72 }} />
+          <NumKey digit={0} sub="" onPress={press} />
+          <BackspaceKey onPress={del} />
+        </div>
+
+        {/* Forgot PIN */}
         {onForgot && (
           <button
             onClick={onForgot}
-            className="mt-4 text-white/50 text-sm font-medium hover:text-white/80 transition-colors py-2 px-4">
+            className="mt-3 text-sm font-bold py-2 px-5 rounded-xl min-h-[44px] transition-colors"
+            style={{ color: RED }}
+          >
             Forgot PIN? Sign in again
           </button>
         )}
@@ -182,7 +234,7 @@ function PINView({ title, subtitle, onSubmit, error, onForgot }) {
 
 // ─── PIN Setup Screen ─────────────────────────────────────────────────────────
 export function PINSetupScreen({ onComplete }) {
-  const [stage, setStage] = useState("create"); // "create" | "confirm"
+  const [stage, setStage] = useState("create");
   const [first, setFirst] = useState("");
   const [error, setError] = useState("");
 
@@ -206,8 +258,10 @@ export function PINSetupScreen({ onComplete }) {
 
   return (
     <PINView
-      title={stage === "create" ? "Create a PIN" : "Confirm your PIN"}
-      subtitle={stage === "create" ? "6 digits to secure PowerMate" : "Enter the same PIN again"}
+      title={stage === "create" ? "Create your PIN" : "Confirm your PIN"}
+      subtitle={stage === "create"
+        ? "Choose 6 digits to secure PowerMate"
+        : "Enter the same PIN again to confirm"}
       onSubmit={stage === "create" ? handleCreate : handleConfirm}
       error={error}
     />
@@ -221,7 +275,7 @@ export function PINLockScreen({ onUnlock, onForgot }) {
   async function handleSubmit(pin) {
     const attempts = getPINAttempts();
     if (attempts >= MAX_ATTEMPTS) {
-      setError(`Too many attempts — tap "Forgot PIN" to sign in again`);
+      setError(`Too many attempts — tap "Forgot PIN" below`);
       return;
     }
     const ok = await verifyPIN(pin);
@@ -232,17 +286,18 @@ export function PINLockScreen({ onUnlock, onForgot }) {
     } else {
       incrementPINAttempts();
       const remaining = MAX_ATTEMPTS - getPINAttempts();
-      setError(remaining <= 2
-        ? `Incorrect PIN — ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining`
-        : "Incorrect PIN — try again"
+      setError(
+        remaining <= 2
+          ? `Incorrect PIN — ${remaining} attempt${remaining !== 1 ? "s" : ""} left`
+          : "Incorrect PIN — try again"
       );
     }
   }
 
   return (
     <PINView
-      title="Enter PIN"
-      subtitle="Unlock PowerMate"
+      title="Welcome back"
+      subtitle="Enter your PIN to open PowerMate"
       onSubmit={handleSubmit}
       error={error}
       onForgot={onForgot}
@@ -250,7 +305,5 @@ export function PINLockScreen({ onUnlock, onForgot }) {
   );
 }
 
-// ─── Re-export helpers for App.jsx ────────────────────────────────────────────
-// App.jsx calls these to decide whether to show the lock screen.
-// By exporting from here, pinHelpers.js becomes optional.
+// ─── Re-exports for App.jsx ───────────────────────────────────────────────────
 export { getPINHash, isSessionUnlocked, markSessionUnlocked };
