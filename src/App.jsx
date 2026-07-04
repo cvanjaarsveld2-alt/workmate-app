@@ -36,6 +36,7 @@ import { QuotesScreen }    from "./screens/QuotesScreen";
 import { NotesScreen }     from "./screens/NotesScreen";
 import { EquipmentScreen } from "./screens/EquipmentScreen";
 import { VehicleCheckScreen } from "./screens/VehicleCheckScreen";
+import { CalendarScreen }     from "./screens/CalendarScreen";
 import { ExpensesScreen }  from "./screens/ExpensesScreen";
 import { MoreScreen }      from "./screens/MoreScreen";
 import { DiagnosticsScreen } from "./screens/DiagnosticsScreen";
@@ -412,6 +413,7 @@ export default function PowerWorksApp() {
     Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     VehicleCheck: <VehicleCheckScreen data={data} setData={setData} userId={session.user.id} />,
+    Calendar:     <CalendarScreen     data={data} setData={setData} userId={session.user.id} />,
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
     Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} onBackfill={() => navigate("BackfillZAR")} />,
