@@ -372,14 +372,26 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
   const { showBanner: showReminderBanner, dismiss: dismissReminder } = useEndOfMonthReminder();
   const expenses = data.expenses || [];
 
-  // quickAddTrigger → open scanner immediately (camera-first)
+  // quickAddTrigger → open scanner OR enter select mode pre-filled with unsubmitted
   useEffect(() => {
     if (!quickAddTrigger) return;
     if (quickAddTrigger.screen !== "Expenses") return;
-    setEditId(null);
-    setShowForm(false);
-    setShowScanner(true);
-    setScannerMode("receipt");
+    if (quickAddTrigger.mode === "SelectMode") {
+      // Navigate from home "X expenses not submitted" — jump straight to select mode
+      // with all unsubmitted expenses pre-selected
+      const unsubmitted = (data.expenses || []).filter(e => e.status === "unsubmitted");
+      setSelectMode(true);
+      setSelectedIds(new Set(unsubmitted.map(e => e.id)));
+      setShowForm(false);
+      setShowScanner(false);
+      setEditId(null);
+    } else {
+      // Normal FAB tap — open camera scanner
+      setEditId(null);
+      setShowForm(false);
+      setShowScanner(true);
+      setScannerMode("receipt");
+    }
   }, [quickAddTrigger?.ts]);
 
   function resetForm() {
