@@ -174,7 +174,7 @@ export async function pushSyncQueue(syncQueue, setData) {
 
 export async function pullFromSupabase(uid, setData) {
   try {
-    const [a, b, c, d, e, f, g] = await Promise.all([
+    const [a, b, c, d, e, f, g, h] = await Promise.all([
       supabase.from("clients").select("id,user_id,company,division,contact,phone,email,location,branch,stage,sync_status,auto_created,source,notes,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("followups").select("id,user_id,client_id,client,branch,title,date,time,reminder,notes,completed,sync_status,auto_generated,created_at").eq("user_id", uid).order("date", { ascending: false }).limit(500),
       supabase.from("quotes").select("id,user_id,client_name,description,value,status,sent_date,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
@@ -182,6 +182,7 @@ export async function pullFromSupabase(uid, setData) {
       supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("contacts").select("id,user_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,amount_zar,exchange_rate,rate_date,rate_source,expense_date,expense_time,category,payment_method,notes,receipt_url,payment_slip_url,status,ai_extracted,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
+      supabase.from("vehicle_checks").select("id,user_id,check_date,vehicle,registration,driver,data,sync_status,created_at,updated_at").eq("user_id", uid).order("check_date", { ascending: false }).limit(365),
     ]);
 
     setData(prev => {
@@ -199,15 +200,26 @@ export async function pullFromSupabase(uid, setData) {
         return Array.from(serverMap.values());
       }
 
+      // vehicle_checks come back as rows; convert to date-keyed map for the screen
+      const vcRows = h.error ? null : (h.data || []);
+      const vcMap  = vcRows
+        ? vcRows.reduce((acc, row) => {
+            try { acc[row.check_date] = typeof row.data === "string" ? JSON.parse(row.data) : row.data; }
+            catch { acc[row.check_date] = row.data || {}; }
+            return acc;
+          }, {})
+        : prev.vehicleChecks;
+
       return {
         ...prev,
-        clients:   a.error ? prev.clients   : merge(a.data, prev.clients,   prev.syncQueue, "clients"),
-        followups: b.error ? prev.followups : merge(b.data, prev.followups, prev.syncQueue, "followups"),
-        quotes:    c.error ? prev.quotes    : merge(c.data, prev.quotes,    prev.syncQueue, "quotes"),
-        notes:     d.error ? prev.notes     : merge(d.data, prev.notes,     prev.syncQueue, "notes"),
-        equipment: e.error ? prev.equipment : merge(e.data, prev.equipment, prev.syncQueue, "equipment"),
-        contacts:  f.error ? prev.contacts  : merge(f.data, prev.contacts,  prev.syncQueue, "contacts"),
-        expenses:  g.error ? prev.expenses  : merge(g.data, prev.expenses,  prev.syncQueue, "expenses"),
+        clients:       a.error ? prev.clients       : merge(a.data, prev.clients,       prev.syncQueue, "clients"),
+        followups:     b.error ? prev.followups     : merge(b.data, prev.followups,     prev.syncQueue, "followups"),
+        quotes:        c.error ? prev.quotes        : merge(c.data, prev.quotes,        prev.syncQueue, "quotes"),
+        notes:         d.error ? prev.notes         : merge(d.data, prev.notes,         prev.syncQueue, "notes"),
+        equipment:     e.error ? prev.equipment     : merge(e.data, prev.equipment,     prev.syncQueue, "equipment"),
+        contacts:      f.error ? prev.contacts      : merge(f.data, prev.contacts,      prev.syncQueue, "contacts"),
+        expenses:      g.error ? prev.expenses      : merge(g.data, prev.expenses,      prev.syncQueue, "expenses"),
+        vehicleChecks: vcMap,
       };
     });
 
