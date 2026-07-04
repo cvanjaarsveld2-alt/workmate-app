@@ -83,7 +83,8 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
     if (!quickAddTrigger) return;
     if (quickAddTrigger.screen !== "Contacts") return;
     setEditId(null);
-    setShowForm(true);
+    setShowForm(false);
+    setShowScanner(true); // open camera immediately — scan a business card
   }, [quickAddTrigger?.ts]);
 
   // ── Global search handoff: carry the term into this screen's search box ──
