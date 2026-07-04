@@ -1,8 +1,10 @@
 // ─── Core UI Components ───────────────────────────────────────────────────────
-// All reusable primitives used across every screen in PowerMate.
-// Upgraded UI: sharper typography, stronger brand presence, consistent spacing.
-// New: PhotoField — a universal photo add/view/replace widget for all screens.
-
+// iPhone-first sizing pass:
+//   - All interactive elements min 56px tap target
+//   - Cards have stronger active press state
+//   - Bottom nav NavTab is 72px tall, full-width column tap zone
+//   - Form fields 56px min height
+//   - Buttons sized for thumb use
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, Users, ChevronDown, Camera, Plus, ImageIcon } from "lucide-react";
@@ -10,10 +12,16 @@ import { BRAND, STAGE_COLORS, NOTE_URGENCY } from "../../lib/constants";
 import { daysDiff, smartDate } from "../../lib/helpers";
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
+// Tappable cards get a strong iOS-style press state — background dims and
+// scales — so the user feels confident the tap registered.
 export function Card({ children, className = "", onClick }) {
   return (
     <div
-      className={`bg-white rounded-2xl shadow-sm border border-slate-100 ${onClick ? "cursor-pointer active:scale-[0.985] transition-transform" : ""} ${className}`}
+      className={`bg-white rounded-2xl shadow-sm border border-slate-100 ${
+        onClick
+          ? "cursor-pointer transition-all duration-100 active:scale-[0.975] active:bg-slate-50 active:shadow-none"
+          : ""
+      } ${className}`}
       onClick={onClick}>
       {children}
     </div>
@@ -21,11 +29,13 @@ export function Card({ children, className = "", onClick }) {
 }
 
 // ─── Btn ──────────────────────────────────────────────────────────────────────
+// All buttons are at least 56px tall — comfortable for a thumb on a moving
+// vehicle. The "sm" size stays at 48px for compact header buttons.
 export function Btn({ children, onClick, disabled, variant = "solid", className = "", type = "button", size = "md" }) {
   const sizes = {
-    sm: "px-4 py-2.5 text-sm rounded-xl min-h-[44px]",
-    md: "px-5 py-3.5 text-sm rounded-2xl min-h-[48px]",
-    lg: "px-6 py-4 text-base rounded-2xl min-h-[52px]",
+    sm: "px-4 py-3 text-sm rounded-xl min-h-[48px]",
+    md: "px-5 py-4 text-base rounded-2xl min-h-[56px]",
+    lg: "px-6 py-4 text-base rounded-2xl min-h-[60px]",
   };
   const vs = {
     solid:     { background: BRAND.primary, color: "#fff" },
@@ -41,7 +51,7 @@ export function Btn({ children, onClick, disabled, variant = "solid", className 
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center gap-2 font-bold transition-all active:scale-95 disabled:opacity-40 ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 font-bold transition-all active:scale-95 active:opacity-80 disabled:opacity-40 ${sizes[size]} ${className}`}
       style={vs[variant] || vs.solid}>
       {children}
     </button>
@@ -49,17 +59,18 @@ export function Btn({ children, onClick, disabled, variant = "solid", className 
 }
 
 // ─── Field ────────────────────────────────────────────────────────────────────
+// 56px min height — easy to tap accurately when the phone is bouncing.
 export function Field({ label, value, onChange, placeholder = "", type = "text", multiline = false, required = false, maxLength }) {
-  const cls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]";
+  const cls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[56px]";
   return (
     <div>
       {label && (
-        <label className="mb-1.5 block text-sm font-bold text-slate-500">
+        <label className="mb-2 block text-sm font-bold text-slate-500">
           {label}{required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
       {multiline
-        ? <textarea value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={4} maxLength={maxLength || 5000} className={cls + " resize-none min-h-[96px]"} />
+        ? <textarea value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} rows={4} maxLength={maxLength || 5000} className={cls + " resize-none min-h-[100px]"} />
         : <input type={type} value={value || ""} onChange={e => onChange(e.target.value)} placeholder={placeholder} maxLength={maxLength || 500} className={cls} />
       }
       {maxLength && (value || "").length > maxLength * 0.85 && (
@@ -73,11 +84,11 @@ export function Field({ label, value, onChange, placeholder = "", type = "text",
 export function SelectField({ label, value, onChange, options }) {
   return (
     <div>
-      {label && <label className="mb-1.5 block text-sm font-bold text-slate-500">{label}</label>}
+      {label && <label className="mb-2 block text-sm font-bold text-slate-500">{label}</label>}
       <select
         value={value || ""}
         onChange={e => onChange(e.target.value)}
-        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]">
+        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[56px]">
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
@@ -85,46 +96,32 @@ export function SelectField({ label, value, onChange, options }) {
 }
 
 // ─── PhotoField ───────────────────────────────────────────────────────────────
-// Universal photo widget. Used on Notes, Equipment, Contacts, Clients, etc.
-// Shows existing photos in a thumbnail grid.
-// "Add" opens the provided onAdd callback (typically a scanner or file picker).
-// Tapping a photo calls onView(index).
-// Holding (or using the × button) calls onRemove(index).
-//
-// Props:
-//   photos:    array of { url, caption? } objects (resolved URLs)
-//   onAdd:     () => void — called when the user taps "Add photo"
-//   onView:    (index) => void — called when user taps a photo
-//   onRemove:  (index) => void — called when user removes a photo (optional)
-//   label:     string — section label (default "Photos")
-//   compact:   bool — single row, no grid (for tight form areas)
 export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Photos", compact = false, disabled = false }) {
   const hasPhotos = photos.length > 0;
 
   if (compact) {
-    // Horizontal scroll row — used in form contexts
     return (
       <div>
-        {label && <p className="mb-1.5 text-sm font-bold text-slate-500">{label}</p>}
+        {label && <p className="mb-2 text-sm font-bold text-slate-500">{label}</p>}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {photos.map((p, i) => (
-            <div key={i} className="relative shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50">
+            <div key={i} className="relative shrink-0 w-24 h-24 rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50">
               <button type="button" onClick={() => onView?.(i)} className="absolute inset-0">
                 <img src={p.url} alt={p.caption || `Photo ${i + 1}`} className="w-full h-full object-cover" />
               </button>
               {onRemove && (
                 <button type="button" onClick={() => onRemove(i)}
-                  className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
-                  <X size={10} className="text-white" />
+                  className="absolute top-1 right-1 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center active:bg-red-600/80">
+                  <X size={12} className="text-white" />
                 </button>
               )}
             </div>
           ))}
           {!disabled && onAdd && (
             <button type="button" onClick={onAdd}
-              className="shrink-0 w-20 h-20 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 active:scale-95 transition-all">
-              <Camera size={18} style={{ color: "#8B1A1A" }} />
-              <span className="text-[10px] font-bold text-slate-400">Add</span>
+              className="shrink-0 w-24 h-24 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 active:bg-red-50 active:border-red-300 transition-colors">
+              <Camera size={20} style={{ color: "#8B1A1A" }} />
+              <span className="text-xs font-bold text-slate-400">Add</span>
             </button>
           )}
         </div>
@@ -132,7 +129,6 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
     );
   }
 
-  // Grid layout — used in detail / full section views
   return (
     <div>
       {label && (
@@ -140,9 +136,9 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
           <p className="text-xs font-black text-slate-400 uppercase tracking-wider">{label}</p>
           {!disabled && onAdd && (
             <button type="button" onClick={onAdd}
-              className="flex items-center gap-1 text-xs font-bold rounded-lg px-2.5 py-1.5 min-h-[32px]"
+              className="flex items-center gap-1.5 text-xs font-bold rounded-xl px-3 py-2 min-h-[40px]"
               style={{ color: "#8B1A1A", background: "#F7F3F3" }}>
-              <Camera size={12} /> Add photo
+              <Camera size={13} /> Add photo
             </button>
           )}
         </div>
@@ -161,18 +157,18 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
               )}
               {onRemove && (
                 <button type="button" onClick={() => onRemove(i)}
-                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center active:bg-red-600/80">
-                  <X size={11} className="text-white" />
+                  className="absolute top-1.5 right-1.5 w-8 h-8 rounded-full bg-black/60 flex items-center justify-center active:bg-red-600/80">
+                  <X size={13} className="text-white" />
                 </button>
               )}
             </div>
           ))}
           {!disabled && onAdd && (
             <button type="button" onClick={onAdd}
-              className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-2 hover:border-red-300 hover:bg-red-50 active:scale-95 transition-all"
+              className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-2 active:border-red-300 active:bg-red-50 transition-colors"
               style={{ aspectRatio: "4/3" }}>
-              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
-                <Camera size={18} style={{ color: "#8B1A1A" }} />
+              <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+                <Camera size={20} style={{ color: "#8B1A1A" }} />
               </div>
               <span className="text-xs font-bold text-slate-400">Add photo</span>
             </button>
@@ -181,9 +177,9 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
       ) : (
         !disabled && onAdd && (
           <button type="button" onClick={onAdd}
-            className="w-full h-24 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center gap-3 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
-              <Camera size={18} style={{ color: "#8B1A1A" }} />
+            className="w-full h-28 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center gap-3 active:border-red-300 active:bg-red-50 transition-colors">
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+              <Camera size={20} style={{ color: "#8B1A1A" }} />
             </div>
             <div className="text-left">
               <p className="text-sm font-bold text-slate-600">Add a photo</p>
@@ -218,40 +214,40 @@ export function ClientSelector({ label, value, onChange, clients = [], placehold
 
   return (
     <div ref={ref} className="relative">
-      {label && <label className="mb-1.5 block text-sm font-bold text-slate-500">{label}</label>}
+      {label && <label className="mb-2 block text-sm font-bold text-slate-500">{label}</label>}
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base text-left flex items-center justify-between outline-none focus:border-red-300 min-h-[52px] transition-colors">
+        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base text-left flex items-center justify-between outline-none focus:border-red-300 min-h-[56px] transition-colors">
         <span className={selected ? "text-slate-900 font-medium" : "text-slate-400"}>
           {selected ? `${selected.company}${selected.branch ? ` — ${selected.branch}` : ""}` : placeholder}
         </span>
-        <ChevronDown size={16} className="text-slate-400 shrink-0" />
+        <ChevronDown size={18} className="text-slate-400 shrink-0" />
       </button>
       <AnimatePresence>
         {open && (
           <motion.div
             initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-            className="absolute z-30 mt-1 w-full bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden max-h-60 flex flex-col">
+            className="absolute z-30 mt-1 w-full bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden max-h-64 flex flex-col">
             <div className="p-2 border-b border-slate-50">
               <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients…"
-                className="w-full rounded-lg bg-slate-50 px-3 py-2 text-sm outline-none" />
+                className="w-full rounded-lg bg-slate-50 px-3 py-2.5 text-sm outline-none min-h-[44px]" />
             </div>
             <div className="overflow-y-auto">
               <button type="button"
                 onClick={() => { onChange(null); setOpen(false); setSearch(""); }}
-                className="w-full text-left px-4 py-3 text-sm text-slate-400 hover:bg-slate-50 border-b border-slate-50">
+                className="w-full text-left px-4 py-3.5 text-sm text-slate-400 hover:bg-slate-50 border-b border-slate-50 min-h-[52px]">
                 — No client
               </button>
               {filtered.map(c => (
                 <button key={c.id} type="button"
                   onClick={() => { onChange(c.id); setOpen(false); setSearch(""); }}
-                  className={`w-full text-left px-4 py-3 text-sm hover:bg-slate-50 transition-colors ${c.id === value ? "font-bold text-red-700 bg-red-50" : "text-slate-800"}`}>
+                  className={`w-full text-left px-4 py-3.5 text-sm hover:bg-slate-50 transition-colors min-h-[52px] ${c.id === value ? "font-bold text-red-700 bg-red-50" : "text-slate-800"}`}>
                   <span className="font-bold">{c.company}</span>
                   {c.branch && <span className="text-slate-400 ml-1">— {c.branch}</span>}
                 </button>
               ))}
-              {filtered.length === 0 && <p className="px-4 py-3 text-sm text-slate-400">No clients found</p>}
+              {filtered.length === 0 && <p className="px-4 py-4 text-sm text-slate-400">No clients found</p>}
             </div>
           </motion.div>
         )}
@@ -264,15 +260,16 @@ export function ClientSelector({ label, value, onChange, clients = [], placehold
 export function SearchBar({ value, onChange, placeholder = "Search…" }) {
   return (
     <div className="relative">
-      <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
       <input
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border-2 border-slate-100 bg-white py-3 pl-10 pr-10 text-base outline-none focus:border-red-300 transition-colors min-h-[48px]" />
+        className="w-full rounded-xl border-2 border-slate-100 bg-white py-3.5 pl-11 pr-11 text-base outline-none focus:border-red-300 transition-colors min-h-[56px]" />
       {value && (
-        <button onClick={() => onChange("")} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 p-1">
-          <X size={15} />
+        <button onClick={() => onChange("")}
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-400">
+          <X size={16} />
         </button>
       )}
     </div>
@@ -280,21 +277,21 @@ export function SearchBar({ value, onChange, placeholder = "Search…" }) {
 }
 
 // ─── FilterPills ──────────────────────────────────────────────────────────────
+// Pills are taller (44px) so they're easy to tap while scrolling
 export function FilterPills({ options, value, onChange, dangerValue }) {
-  const scrollRef = useRef(null);
   return (
-    <div className="relative">
-      <div ref={scrollRef} className="flex gap-2 overflow-x-auto pb-1 scroll-smooth" style={{ scrollbarWidth: "none" }}>
-        {options.map(o => (
-          <button key={o} onClick={() => onChange(o)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition-all min-h-[40px] ${value === o ? "text-white shadow-sm" : "bg-white border border-slate-200 text-slate-500 hover:border-slate-300"}`}
-            style={value === o ? {
-              background: o === dangerValue ? "#DC2626" : o === "Due Soon" ? "#D97706" : BRAND.primary
-            } : {}}>
-            {o}
-          </button>
-        ))}
-      </div>
+    <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+      {options.map(o => (
+        <button key={o} onClick={() => onChange(o)}
+          className={`shrink-0 rounded-full px-5 py-2.5 text-sm font-bold transition-all min-h-[44px] ${
+            value === o ? "text-white shadow-sm" : "bg-white border border-slate-200 text-slate-500"
+          }`}
+          style={value === o ? {
+            background: o === dangerValue ? "#DC2626" : o === "Due Soon" ? "#D97706" : BRAND.primary
+          } : {}}>
+          {o}
+        </button>
+      ))}
     </div>
   );
 }
@@ -309,14 +306,13 @@ export function Toast({ message, onDone }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16, scale: 0.95 }}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+      exit={{ opacity: 0, y: 10, scale: 0.95 }}
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
-      className="fixed bottom-24 left-4 right-4 z-50 flex justify-start pointer-events-none"
+      className="fixed bottom-28 left-4 right-4 z-50 flex justify-start pointer-events-none"
       style={{ maxWidth: "calc(100vw - 2rem)" }}>
-      <div
-        className="rounded-2xl px-4 py-3 shadow-lg max-w-sm w-full"
+      <div className="rounded-2xl px-5 py-3.5 shadow-lg max-w-sm w-full"
         style={{ background: "#1e293b", color: "#fff" }}>
         <p className="text-sm font-bold leading-snug whitespace-normal break-words">{message}</p>
       </div>
@@ -327,14 +323,14 @@ export function Toast({ message, onDone }) {
 // ─── Empty ────────────────────────────────────────────────────────────────────
 export function Empty({ title, text, icon: Icon }) {
   return (
-    <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
+    <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
       {Icon && (
-        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: BRAND.light }}>
-          <Icon size={28} style={{ color: BRAND.primary }} />
+        <div className="w-18 h-18 rounded-2xl flex items-center justify-center mb-4" style={{ background: BRAND.light, width: 72, height: 72 }}>
+          <Icon size={30} style={{ color: BRAND.primary }} />
         </div>
       )}
-      <p className="text-base font-black text-slate-700 mb-1">{title}</p>
-      {text && <p className="text-sm text-slate-400 leading-relaxed max-w-[240px]">{text}</p>}
+      <p className="text-lg font-black text-slate-700 mb-1.5">{title}</p>
+      {text && <p className="text-sm text-slate-400 leading-relaxed max-w-[260px]">{text}</p>}
     </div>
   );
 }
@@ -346,12 +342,12 @@ export function StatCard({ label, value, sub, color, icon: Icon }) {
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider truncate">{label}</p>
-          <p className="mt-1 text-2xl font-black leading-none" style={{ color: color || BRAND.primary }}>{value}</p>
+          <p className="mt-1.5 text-2xl font-black leading-none" style={{ color: color || BRAND.primary }}>{value}</p>
           {sub && <p className="mt-1 text-xs text-slate-400 leading-snug">{sub}</p>}
         </div>
         {Icon && (
-          <div className="rounded-xl p-2.5 shrink-0" style={{ background: BRAND.light }}>
-            <Icon size={18} style={{ color: color || BRAND.primary }} />
+          <div className="rounded-xl p-3 shrink-0" style={{ background: BRAND.light }}>
+            <Icon size={20} style={{ color: color || BRAND.primary }} />
           </div>
         )}
       </div>
@@ -360,18 +356,20 @@ export function StatCard({ label, value, sub, color, icon: Icon }) {
 }
 
 // ─── NavTab ───────────────────────────────────────────────────────────────────
+// 72px tall, full-width column tap zone — the entire column is tappable,
+// not just the icon. Active state uses a pill under the icon.
 export function NavTab({ icon: Icon, label, active, onClick, badge }) {
   return (
     <button
       onClick={onClick}
-      className="relative flex flex-col items-center justify-center gap-0.5 rounded-xl py-2 text-[11px] font-bold transition-all min-h-[56px]"
-      style={{ color: active ? BRAND.primary : "#94A3B8" }}>
-      <div className={`rounded-xl p-2 transition-all ${active ? "bg-red-50" : ""}`}>
-        <Icon size={20} />
+      className="relative flex flex-col items-center justify-center gap-1 flex-1 transition-all"
+      style={{ minHeight: 72, color: active ? BRAND.primary : "#94A3B8" }}>
+      <div className={`rounded-2xl px-3 py-1.5 transition-all ${active ? "bg-red-50" : ""}`}>
+        <Icon size={22} />
       </div>
-      <span className="leading-none">{label}</span>
+      <span className="text-[11px] font-bold leading-none">{label}</span>
       {!!badge && (
-        <span className="absolute right-0.5 top-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] text-white font-black min-w-[18px] text-center">
+        <span className="absolute right-1 top-2 rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] text-white font-black min-w-[18px] text-center leading-none">
           {badge}
         </span>
       )}
@@ -384,19 +382,18 @@ export function PageHeader({ title, subtitle }) {
   return (
     <div className="mb-2">
       <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{title}</h1>
-      {subtitle && <p className="mt-0.5 text-sm text-slate-400 leading-snug">{subtitle}</p>}
+      {subtitle && <p className="mt-1 text-sm text-slate-400 leading-snug">{subtitle}</p>}
     </div>
   );
 }
 
 // ─── SectionHeader ────────────────────────────────────────────────────────────
-// Lightweight section divider with optional action button
 export function SectionHeader({ title, action, onAction }) {
   return (
     <div className="flex items-center justify-between mb-2 mt-1">
       <p className="text-xs font-black text-slate-400 uppercase tracking-wider">{title}</p>
       {action && onAction && (
-        <button onClick={onAction} className="text-xs font-bold py-1 px-2.5 rounded-lg min-h-[28px]"
+        <button onClick={onAction} className="text-xs font-bold py-2 px-3 rounded-xl min-h-[40px]"
           style={{ color: BRAND.primary, background: BRAND.light }}>
           {action}
         </button>
@@ -457,7 +454,7 @@ export function DataLoadingScreen() {
 export function StagePill({ stage }) {
   const c = STAGE_COLORS[stage] || STAGE_COLORS["New Lead"];
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold" style={{ background: c.bg, color: c.text }}>
+    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold" style={{ background: c.bg, color: c.text }}>
       <span className="w-2 h-2 rounded-full" style={{ background: c.dot }} />
       {stage}
     </span>
@@ -468,17 +465,17 @@ export function StagePill({ stage }) {
 export function ServiceBadge({ dueDate }) {
   const d = daysDiff(dueDate);
   if (d === null) return null;
-  if (d < 0)   return <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700">⚠️ Overdue</span>;
-  if (d <= 3)  return <span className="rounded-full bg-orange-100 px-2 py-1 text-xs font-bold text-orange-700">Due in {d}d</span>;
-  if (d <= 14) return <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-700">Due {smartDate(dueDate)}</span>;
-  return <span className="rounded-full bg-green-100 px-2 py-1 text-xs font-bold text-green-700">{smartDate(dueDate)}</span>;
+  if (d < 0)   return <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">Overdue</span>;
+  if (d <= 3)  return <span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-bold text-orange-700">Due in {d}d</span>;
+  if (d <= 14) return <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">Due {smartDate(dueDate)}</span>;
+  return <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-bold text-green-700">{smartDate(dueDate)}</span>;
 }
 
 // ─── UrgencyBadge ─────────────────────────────────────────────────────────────
 export function UrgencyBadge({ urgency = "Normal" }) {
   const u = NOTE_URGENCY[urgency] || NOTE_URGENCY.Normal;
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold border"
+    <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold border"
       style={{ background: u.bg, color: u.text, borderColor: u.border }}>
       <span className="w-2 h-2 rounded-full" style={{ background: u.dot }} />
       {urgency}
@@ -487,6 +484,7 @@ export function UrgencyBadge({ urgency = "Normal" }) {
 }
 
 // ─── ConfirmDialog ────────────────────────────────────────────────────────────
+// Buttons are 60px tall — hard to miss even in a panic delete situation
 export function ConfirmDialog({ message, onConfirm, onCancel, confirmLabel = "Delete", confirmVariant = "danger" }) {
   return (
     <motion.div
@@ -495,16 +493,16 @@ export function ConfirmDialog({ message, onConfirm, onCancel, confirmLabel = "De
       onClick={onCancel}>
       <motion.div
         initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
-        className="w-full max-w-sm bg-white rounded-2xl p-5 space-y-4 shadow-2xl"
+        className="w-full max-w-sm bg-white rounded-3xl p-5 space-y-4 shadow-2xl"
         onClick={e => e.stopPropagation()}>
-        <p className="text-base font-bold text-slate-800 text-center">{message}</p>
+        <p className="text-base font-bold text-slate-800 text-center pt-1">{message}</p>
         <div className="flex gap-3">
           <button onClick={onCancel}
-            className="flex-1 rounded-2xl border-2 border-slate-200 py-3.5 text-sm font-bold text-slate-600 active:scale-95 transition-transform">
+            className="flex-1 rounded-2xl border-2 border-slate-200 py-4 text-sm font-bold text-slate-600 active:scale-95 active:bg-slate-50 transition-all min-h-[60px]">
             Cancel
           </button>
           <button onClick={onConfirm}
-            className={`flex-1 rounded-2xl py-3.5 text-sm font-bold text-white active:scale-95 transition-transform ${confirmVariant === "danger" ? "bg-red-600" : "bg-green-600"}`}>
+            className={`flex-1 rounded-2xl py-4 text-sm font-bold text-white active:scale-95 active:opacity-80 transition-all min-h-[60px] ${confirmVariant === "danger" ? "bg-red-600" : "bg-green-600"}`}>
             {confirmLabel}
           </button>
         </div>
