@@ -7,7 +7,7 @@ import { logEvent } from "./helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { logCrash } from "../components/ErrorBoundary";
 
-const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses"];
+const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "calendar_events"];
 const MAX_SYNC_ATTEMPTS = 5; // after this many failed tries, give up and mark "failed"
 
 export async function pushItem(item) {
@@ -174,7 +174,7 @@ export async function pushSyncQueue(syncQueue, setData) {
 
 export async function pullFromSupabase(uid, setData) {
   try {
-    const [a, b, c, d, e, f, g, h] = await Promise.all([
+    const [a, b, c, d, e, f, g, h, cal] = await Promise.all([
       supabase.from("clients").select("id,user_id,company,division,contact,phone,email,location,branch,stage,sync_status,auto_created,source,notes,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("followups").select("id,user_id,client_id,client,branch,title,date,time,reminder,notes,completed,sync_status,auto_generated,created_at").eq("user_id", uid).order("date", { ascending: false }).limit(500),
       supabase.from("quotes").select("id,user_id,client_name,description,value,status,sent_date,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
@@ -183,6 +183,7 @@ export async function pullFromSupabase(uid, setData) {
       supabase.from("contacts").select("id,user_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,amount_zar,exchange_rate,rate_date,rate_source,expense_date,expense_time,category,payment_method,notes,receipt_url,payment_slip_url,status,ai_extracted,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
       supabase.from("vehicle_checks").select("id,user_id,check_date,vehicle,registration,driver,data,sync_status,created_at,updated_at").eq("user_id", uid).order("check_date", { ascending: false }).limit(365),
+      supabase.from("calendar_events").select("id,user_id,title,event_type,start_date,start_time,end_date,end_time,all_day,location,notes,client_id,client_name,reminders,color,sync_status,created_at,updated_at").eq("user_id", uid).order("start_date", { ascending: false }).limit(500),
     ]);
 
     setData(prev => {
@@ -220,6 +221,7 @@ export async function pullFromSupabase(uid, setData) {
         contacts:      f.error ? prev.contacts      : merge(f.data, prev.contacts,      prev.syncQueue, "contacts"),
         expenses:      g.error ? prev.expenses      : merge(g.data, prev.expenses,      prev.syncQueue, "expenses"),
         vehicleChecks: vcMap,
+        calendarEvents: cal.error ? prev.calendarEvents : merge(cal.data, prev.calendarEvents, prev.syncQueue, "calendar_events"),
       };
     });
 
