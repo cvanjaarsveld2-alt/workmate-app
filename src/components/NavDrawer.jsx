@@ -14,7 +14,7 @@ const SECTIONS = [
     title: "MAIN",
     items: [
       { key: "Home",         label: "Dashboard",        icon: Home },
-      { key: "Calendar",     label: "Calendar",          icon: Calendar },
+      { key: "Calendar",     label: "Calendar",          icon: CalendarIcon },
       { key: "Clients",      label: "Clients",           icon: Users },
       { key: "Contacts",     label: "Contacts",          icon: UserPlus,  badgeKey: "leads" },
       { key: "Followups",    label: "Follow-ups",        icon: CalendarIcon, badgeKey: "overdueFU" },
