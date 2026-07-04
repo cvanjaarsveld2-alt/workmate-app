@@ -1,164 +1,222 @@
-// ─── PIN Screens ──────────────────────────────────────────────────────────────
-import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { Shield } from "lucide-react";
-import { BRAND } from "../lib/constants";
-import {
-  hashPIN,
-  getPINHash,
-  setSessionUnlocked,
-  incrementPINAttempts,
-  resetPINAttempts,
-  getLockoutRemaining,
-  setLockout,
-  PIN_MAX_ATTEMPTS,
-  PIN_LOCKOUT_MS,
-} from "../lib/pinHelpers";
-import { logEvent } from "../lib/helpers";
-import { PIN_KEY } from "../lib/constants";
+// ─── PIN Screens ─────────────────────────────────────────────────────────────
+// PINSetupScreen: first-time 6-digit PIN creation
+// PINLockScreen:  lock screen shown on every app open (iPhone lock style)
+//
+// Design intent: clean black/dark lock-screen aesthetic, large tap targets,
+// no backspace button (like iOS — tap a filled dot to clear, or just keep
+// going and it auto-handles errors on submit). Smooth feedback on wrong PIN.
+// ─────────────────────────────────────────────────────────────────────────────
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { savePINHash, verifyPIN, getPINHash, resetPINAttempts, getPINAttempts, incrementPINAttempts, isSessionUnlocked, markSessionUnlocked } from "../lib/pinHelpers";
 
-// ─── PINKeypad ────────────────────────────────────────────────────────────────
-export function PINKeypad({ pin, onDigit, onBack }) {
+const PIN_LENGTH = 6;
+const MAX_ATTEMPTS = 6;
+
+// ─── Dot indicator ─────────────────────────────────────────────────────────
+function PINDots({ entered, length = PIN_LENGTH, shake = false }) {
   return (
-    <>
-      <div className="flex justify-center gap-4 mb-8">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i}
-            className={`w-4 h-4 rounded-full transition-all ${i < pin.length ? "scale-125" : ""}`}
-            style={{ background: i < pin.length ? BRAND.primary : "#E2E8F0" }} />
-        ))}
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, "", 0, "⌫"].map((d, i) => (
-          <button key={i}
-            onClick={() => { if (d === "⌫") onBack(); else if (d !== "") onDigit(String(d)); }}
-            className={`h-[60px] rounded-2xl text-xl font-black transition-all active:scale-95 ${d === "" ? "invisible" : "bg-white shadow-sm border border-slate-100 text-slate-800 hover:border-red-200"}`}>
-            {d}
-          </button>
-        ))}
-      </div>
-    </>
+    <motion.div
+      className="flex items-center justify-center gap-4"
+      animate={shake ? { x: [0, -10, 10, -10, 10, 0] } : {}}
+      transition={{ duration: 0.4 }}>
+      {Array.from({ length }).map((_, i) => (
+        <div
+          key={i}
+          className="w-4 h-4 rounded-full transition-all duration-150"
+          style={{
+            background: i < entered
+              ? "#FFFFFF"
+              : "rgba(255,255,255,0.25)",
+            transform: i < entered ? "scale(1.1)" : "scale(1)",
+          }}
+        />
+      ))}
+    </motion.div>
   );
 }
 
-// ─── PINSetupScreen ───────────────────────────────────────────────────────────
-export function PINSetupScreen({ onComplete }) {
-  const [pin, setPIN]     = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [step, setStep]   = useState("set");
-  const [error, setError] = useState("");
+// ─── Numpad key ────────────────────────────────────────────────────────────
+function NumKey({ digit, sub, onPress, disabled }) {
+  return (
+    <button
+      onClick={() => !disabled && onPress(String(digit))}
+      disabled={disabled}
+      className="flex flex-col items-center justify-center w-20 h-20 rounded-full transition-all active:scale-95 select-none"
+      style={{
+        background: "rgba(255,255,255,0.12)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
+        border: "1px solid rgba(255,255,255,0.08)",
+      }}>
+      <span className="text-3xl font-light text-white leading-none">{digit}</span>
+      {sub && <span className="text-[9px] font-bold text-white/50 tracking-[0.2em] mt-0.5">{sub}</span>}
+    </button>
+  );
+}
 
-  function handleDigit(d) {
-    if (step === "set") {
-      const next = (pin + d).slice(0, 6);
-      setPIN(next);
-      if (next.length === 6) { setStep("confirm"); setError(""); }
-    } else {
-      const next = (confirm + d).slice(0, 6);
-      setConfirm(next);
-      if (next.length === 6) {
-        if (next === pin) savePIN(pin);
-        else { setError("PINs don't match. Try again."); setConfirm(""); setPIN(""); setStep("set"); }
-      }
+// ─── Numpad layout ─────────────────────────────────────────────────────────
+const NUMPAD = [
+  [{ d: 1, s: "" },    { d: 2, s: "ABC" },  { d: 3, s: "DEF" }],
+  [{ d: 4, s: "GHI" }, { d: 5, s: "JKL" }, { d: 6, s: "MNO" }],
+  [{ d: 7, s: "PQRS"},{ d: 8, s: "TUV" }, { d: 9, s: "WXYZ"}],
+  [null,               { d: 0, s: "" },     null],
+];
+
+// ─── Shared PIN input view ──────────────────────────────────────────────────
+function PINView({ title, subtitle, onSubmit, error, onForgot }) {
+  const [entered, setEntered] = useState("");
+  const [shake, setShake]     = useState(false);
+  const prevError = useRef(null);
+
+  useEffect(() => {
+    if (error && error !== prevError.current) {
+      setShake(true);
+      setEntered("");
+      setTimeout(() => setShake(false), 500);
+    }
+    prevError.current = error;
+  }, [error]);
+
+  function press(digit) {
+    if (entered.length >= PIN_LENGTH) return;
+    const next = entered + digit;
+    setEntered(next);
+    if (next.length === PIN_LENGTH) {
+      // Small delay so the last dot fills visually before submission
+      setTimeout(() => {
+        onSubmit(next);
+        setEntered("");
+      }, 80);
     }
   }
 
-  async function savePIN(p) {
-    localStorage.setItem(PIN_KEY, await hashPIN(p));
-    setSessionUnlocked();
+  return (
+    <div
+      className="fixed inset-0 flex flex-col items-center justify-between py-16 px-6"
+      style={{ background: "linear-gradient(160deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}>
+
+      {/* Top — logo + title */}
+      <div className="flex flex-col items-center gap-6 pt-8">
+        <img
+          src="/icon-192.png"
+          alt="PowerMate"
+          className="w-16 h-16 rounded-2xl shadow-2xl"
+          onError={e => { e.target.style.display = "none"; }}
+        />
+        <div className="text-center">
+          <p className="text-white text-2xl font-semibold tracking-tight">{title}</p>
+          {subtitle && <p className="text-white/50 text-sm mt-1">{subtitle}</p>}
+        </div>
+      </div>
+
+      {/* Middle — dots + error */}
+      <div className="flex flex-col items-center gap-4">
+        <PINDots entered={entered.length} shake={shake} />
+        <AnimatePresence mode="wait">
+          {error && (
+            <motion.p
+              key={error}
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="text-red-400 text-sm font-medium text-center max-w-[260px]">
+              {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Bottom — numpad */}
+      <div className="flex flex-col items-center gap-3">
+        {NUMPAD.map((row, ri) => (
+          <div key={ri} className="flex gap-6 items-center">
+            {row.map((key, ki) =>
+              key
+                ? <NumKey key={ki} digit={key.d} sub={key.s} onPress={press} />
+                : <div key={ki} className="w-20 h-20" />
+            )}
+          </div>
+        ))}
+
+        {onForgot && (
+          <button
+            onClick={onForgot}
+            className="mt-4 text-white/50 text-sm font-medium hover:text-white/80 transition-colors py-2 px-4">
+            Forgot PIN? Sign in again
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── PIN Setup Screen ──────────────────────────────────────────────────────
+export function PINSetupScreen({ onComplete }) {
+  const [stage, setStage]   = useState("create"); // "create" | "confirm"
+  const [first, setFirst]   = useState("");
+  const [error, setError]   = useState("");
+
+  function handleCreate(pin) {
+    setFirst(pin);
+    setStage("confirm");
+    setError("");
+  }
+
+  async function handleConfirm(pin) {
+    if (pin !== first) {
+      setError("PINs don't match — try again");
+      setStage("create");
+      setFirst("");
+      return;
+    }
+    await savePINHash(pin);
+    markSessionUnlocked();
     onComplete();
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6" style={{ background: BRAND.light }}>
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-xs">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: BRAND.primary }}>
-            <Shield size={28} color="white" />
-          </div>
-          <h1 className="text-xl font-black text-slate-900">{step === "set" ? "Set Your PIN" : "Confirm PIN"}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {step === "set" ? "Choose a 6-digit PIN to secure the app" : "Re-enter your PIN to confirm"}
-          </p>
-        </div>
-        {error && <div className="mb-4 rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-700">{error}</div>}
-        <PINKeypad
-          pin={step === "set" ? pin : confirm}
-          onDigit={handleDigit}
-          onBack={() => { if (step === "set") setPIN(p => p.slice(0, -1)); else setConfirm(c => c.slice(0, -1)); }}
-        />
-      </motion.div>
-    </div>
+    <PINView
+      title={stage === "create" ? "Create a PIN" : "Confirm your PIN"}
+      subtitle={stage === "create" ? "6 digits to secure PowerMate" : "Enter the same PIN again"}
+      onSubmit={stage === "create" ? handleCreate : handleConfirm}
+      error={error}
+    />
   );
 }
 
-// ─── PINLockScreen ────────────────────────────────────────────────────────────
+// ─── PIN Lock Screen ───────────────────────────────────────────────────────
 export function PINLockScreen({ onUnlock, onForgot }) {
-  const [pin, setPIN]         = useState("");
-  const [error, setError]     = useState("");
-  const [shake, setShake]     = useState(false);
-  const [lockoutMs, setLockoutMs] = useState(getLockoutRemaining());
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (lockoutMs <= 0) return;
-    const t = setInterval(() => {
-      const r = getLockoutRemaining();
-      setLockoutMs(r);
-      if (r <= 0) { setError(""); resetPINAttempts(); }
-    }, 1000);
-    return () => clearInterval(t);
-  }, [lockoutMs]);
-
-  async function handleDigit(d) {
-    if (lockoutMs > 0) return;
-    const next = (pin + d).slice(0, 6);
-    setPIN(next);
-    if (next.length === 6) {
-      if (await hashPIN(next) === getPINHash()) {
-        resetPINAttempts();
-        setSessionUnlocked();
-        onUnlock();
-      } else {
-        const attempts = incrementPINAttempts();
-        if (attempts >= PIN_MAX_ATTEMPTS) {
-          setLockout();
-          setLockoutMs(PIN_LOCKOUT_MS);
-          setError("Too many attempts. Locked for 5 minutes.");
-          logEvent("pin_locked_out", { attempts });
-        } else {
-          setError(`Incorrect PIN — ${PIN_MAX_ATTEMPTS - attempts} attempt${PIN_MAX_ATTEMPTS - attempts !== 1 ? "s" : ""} left`);
-        }
-        setShake(true);
-        setTimeout(() => { setShake(false); setPIN(""); }, 700);
-      }
+  async function handleSubmit(pin) {
+    const attempts = getPINAttempts();
+    if (attempts >= MAX_ATTEMPTS) {
+      setError(`Too many attempts — tap "Forgot PIN" to sign in again`);
+      return;
+    }
+    const ok = await verifyPIN(pin);
+    if (ok) {
+      resetPINAttempts();
+      markSessionUnlocked();
+      onUnlock();
+    } else {
+      incrementPINAttempts();
+      const remaining = MAX_ATTEMPTS - getPINAttempts();
+      setError(remaining <= 2
+        ? `Incorrect PIN — ${remaining} attempt${remaining !== 1 ? "s" : ""} remaining`
+        : "Incorrect PIN — try again"
+      );
     }
   }
 
-  const lockedOut = lockoutMs > 0;
-  const minutes   = Math.ceil(lockoutMs / 60000);
-
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-6" style={{ background: BRAND.light }}>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-xs">
-        <div className="mb-8 text-center">
-          <img src={BRAND.logo} alt="PW" className="mx-auto mb-4 h-12 object-contain" onError={e => e.target.style.display = "none"} />
-          <h1 className="text-xl font-black text-slate-900">{lockedOut ? "Locked Out" : "Enter PIN"}</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {lockedOut ? `Try again in ${minutes} minute${minutes !== 1 ? "s" : ""}` : "Unlock PowerMate"}
-          </p>
-        </div>
-        <motion.div animate={shake ? { x: [-8, 8, -8, 8, 0] } : {}} transition={{ duration: 0.4 }}>
-          {error && <div className="mb-4 rounded-xl bg-red-50 p-3 text-center text-sm font-bold text-red-700">{error}</div>}
-          <PINKeypad
-            pin={pin}
-            onDigit={handleDigit}
-            onBack={() => !lockedOut && setPIN(p => p.slice(0, -1))}
-          />
-        </motion.div>
-        <button onClick={onForgot} className="mt-6 w-full text-center text-sm font-bold text-slate-400 hover:text-red-600 transition-colors py-3">
-          Forgot PIN? Sign in again
-        </button>
-      </motion.div>
-    </div>
+    <PINView
+      title="Enter PIN"
+      subtitle="Unlock PowerMate"
+      onSubmit={handleSubmit}
+      error={error}
+      onForgot={onForgot}
+    />
   );
 }
