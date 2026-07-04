@@ -83,7 +83,7 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
   if (dueSoonEquip.length > 0)
     actionItems.push({ icon: "🛠️", text: `${dueSoonEquip.length} service${dueSoonEquip.length !== 1 ? "s" : ""} due within 7 days`, screen: "Equipment", color: "text-amber-700" });
   if (unsubmittedExp.length > 0)
-    actionItems.push({ icon: "🧾", text: `${unsubmittedExp.length} expense${unsubmittedExp.length !== 1 ? "s" : ""} not submitted (${money(unsubmittedTotal)})`, screen: "Expenses", color: "text-amber-700" });
+    actionItems.push({ icon: "🧾", text: `${unsubmittedExp.length} expense${unsubmittedExp.length !== 1 ? "s" : ""} not submitted (${money(unsubmittedTotal)})`, screen: "Expenses", selectMode: true, color: "text-amber-700" });
 
   const actionCount = actionItems.length;
   const todayList = todayFU.slice(0, 5);
@@ -135,7 +135,13 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
               {actionItems.map((item, i) => (
                 <button
                   key={i}
-                  onClick={() => setScreen(item.screen)}
+                  onClick={() => {
+                    if (item.selectMode && onQuickAdd) {
+                      onQuickAdd(item.screen + ":SelectMode");
+                    } else {
+                      setScreen(item.screen);
+                    }
+                  }}
                   className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 transition-colors min-h-[56px]">
                   <span className="text-lg shrink-0">{item.icon}</span>
                   <p className={`text-sm font-bold flex-1 ${item.color}`}>{item.text}</p>
