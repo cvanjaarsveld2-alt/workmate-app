@@ -5,7 +5,7 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Home, Users, UserPlus, Calendar, Clipboard, Wrench,
-  File as FileIcon, Receipt, Settings, LogOut, ChevronRight,
+  File as FileIcon, Receipt, Settings, LogOut, ChevronRight, Car,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
@@ -22,8 +22,9 @@ const SECTIONS = [
   {
     title: "FIELD",
     items: [
-      { key: "Notes",     label: "Field Notes", icon: Clipboard, badgeKey: "criticalNotes" },
-      { key: "Equipment", label: "Equipment",   icon: Wrench,    badgeKey: "overdueEquip" },
+      { key: "Notes",        label: "Field Notes",       icon: Clipboard, badgeKey: "criticalNotes" },
+      { key: "Equipment",    label: "Equipment",         icon: Wrench,    badgeKey: "overdueEquip" },
+      { key: "VehicleCheck", label: "Vehicle Checklist", icon: Car },
     ],
   },
   {
