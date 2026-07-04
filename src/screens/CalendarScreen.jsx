@@ -2,7 +2,7 @@
 // Full calendar: month grid, week strip, event list, add/edit form,
 // detail sheet, multi-reminder notifications, optional client linking.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState, useMemo, useEffect, useCallback } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, ChevronLeft, ChevronRight,
