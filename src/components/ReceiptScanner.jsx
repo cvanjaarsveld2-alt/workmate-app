@@ -39,8 +39,14 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
   const [preview, setPreview]   = useState(null);
   const [error, setError]       = useState("");
   const [debug, setDebug]       = useState([]); // visible step log for iOS
-  const cameraRef = useRef(null);
+  const cameraRef  = useRef(null);
   const galleryRef = useRef(null);
+
+  // Auto-open camera immediately on mount — no choice screen needed
+  React.useEffect(() => {
+    const t = setTimeout(() => cameraRef.current?.click(), 100);
+    return () => clearTimeout(t);
+  }, []);
 
   function log(msg) {
     const t = new Date().toLocaleTimeString();
@@ -164,26 +170,37 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
 
       {!busy && (
         <>
-          <p className="text-sm text-slate-500">
-            {slipType === "payment"
-              ? "Take a clear photo of the card payment slip — AI will read the amount to verify it matches the till total."
-              : "Take a clear photo of the slip — AI will read the amount, date, vendor and category for you to confirm."}
-          </p>
-          <div className="grid grid-cols-2 gap-2">
+          {!preview && (
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
+                <Camera size={30} style={{ color: "#8B1A1A" }} />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-700">Opening camera…</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {slipType === "payment" ? "Point at the card payment slip" : "Point at the till slip"}
+                </p>
+              </div>
+              <button onClick={() => cameraRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
+                style={{ background: "#8B1A1A" }}>
+                <Camera size={16} /> Open Camera
+              </button>
+              <button onClick={() => galleryRef.current?.click()}
+                className="text-xs font-bold text-slate-400 py-2 px-4 min-h-[44px]">
+                Use a photo from my gallery instead
+              </button>
+              <button onClick={onCancel} className="text-xs text-slate-300 py-1">
+                Cancel
+              </button>
+            </div>
+          )}
+          {preview && (
             <button onClick={() => cameraRef.current?.click()}
-              className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-slate-200 bg-slate-50 py-4 hover:border-red-300 hover:bg-red-50 transition-colors min-h-[88px]">
-              <Camera size={24} style={{ color: "#8B1A1A" }} />
-              <span className="text-sm font-bold text-slate-700">Camera</span>
+              className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold border-2 border-slate-200 text-slate-600 min-h-[52px]">
+              <Camera size={16} /> Retake photo
             </button>
-            <button onClick={() => galleryRef.current?.click()}
-              className="flex flex-col items-center gap-1.5 rounded-xl border-2 border-slate-200 bg-slate-50 py-4 hover:border-red-300 hover:bg-red-50 transition-colors min-h-[88px]">
-              <ImageIcon size={24} style={{ color: "#8B1A1A" }} />
-              <span className="text-sm font-bold text-slate-700">Gallery</span>
-            </button>
-          </div>
-          <button onClick={onCancel} className="w-full text-sm font-bold text-slate-400 py-2">
-            Enter manually instead
-          </button>
+          )}
         </>
       )}
 
