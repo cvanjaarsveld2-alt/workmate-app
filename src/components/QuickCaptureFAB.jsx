@@ -122,14 +122,13 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
         )}
       </AnimatePresence>
 
-      {/* FAB itself */}
+      {/* FAB itself — 64px: comfortable thumb target on iPhone */}
       <motion.button
         initial={false}
         animate={{ rotate: open ? 45 : 0 }}
         transition={{ type: "spring", stiffness: 300, damping: 22 }}
         onClick={() => {
           if (!open && isCameraFirst && primary) {
-            // On camera-first screens, tap → immediate camera (no menu needed)
             handleSelect(primary.key);
           } else {
             setOpen(o => !o);
@@ -140,15 +139,15 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
         style={{
           background: BRAND.primary,
           color: "white",
-          width: 52,
-          height: 52,
-          bottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)",
-          right: 18,
-          boxShadow: "0 4px 12px rgba(139,26,26,0.40), 0 1px 3px rgba(0,0,0,0.12)",
+          width: 64,
+          height: 64,
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+          right: 16,
+          boxShadow: "0 6px 16px rgba(139,26,26,0.45), 0 2px 4px rgba(0,0,0,0.15)",
         }}>
         {isCameraFirst && !open
-          ? <Camera size={22} strokeWidth={2} />
-          : <Plus size={22} strokeWidth={2.25} />}
+          ? <Camera size={26} strokeWidth={2} />
+          : <Plus size={26} strokeWidth={2.25} />}
       </motion.button>
     </>
   );
