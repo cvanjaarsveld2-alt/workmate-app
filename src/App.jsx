@@ -331,8 +331,10 @@ export default function PowerWorksApp() {
   }
 
   function handleQuickCapture(targetScreen) {
-    navigate(targetScreen);
-    setQuickAddTrigger({ screen: targetScreen, ts: Date.now() });
+    // targetScreen may be "Expenses:SelectMode" — parse screen name and optional mode
+    const [screenName, mode] = targetScreen.split(":");
+    navigate(screenName);
+    setQuickAddTrigger({ screen: screenName, mode: mode || null, ts: Date.now() });
   }
 
   // ── Android / browser back button support ──
