@@ -1,9 +1,10 @@
 // ─── Expenses Screen ──────────────────────────────────────────────────────────
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, Camera, Sparkles, Receipt,
-  Mail, CheckSquare, Square, FileDown, Send, ChevronRight, ExternalLink,
+  Mail, CheckSquare, Square, FileDown, Send, ChevronRight,
+  ChevronDown, ChevronUp, Bell,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
@@ -35,6 +36,7 @@ const CATEGORY_COLORS = {
   "Other":                 { bg: "#F1F5F9", text: "#64748B" },
 };
 
+// Status used internally — no longer shown as pills on cards
 const STATUS_COLORS = {
   unsubmitted: { bg: "#FEF3C7", text: "#92400E", label: "Unsubmitted" },
   submitted:   { bg: "#DBEAFE", text: "#1E40AF", label: "Submitted" },
@@ -44,24 +46,80 @@ const STATUS_COLORS = {
 // ⚠️ SET YOUR FINANCE DEPARTMENT EMAIL HERE
 const FINANCE_EMAIL = "vicky@pwrstart.com";
 
-// Receipts live in a PRIVATE bucket. We mint a short-lived signed URL on demand
-// (path is what's stored in receipt_url). Falls back to treating the value as a
-// full URL for any legacy rows saved before the bucket was made private.
+// ─── Calendar month grouping ─────────────────────────────────────────────────
+// Groups expenses by calendar month (1st → last day). Returns:
+//   key:   "2026-07" (stable sort key)
+//   label: "July 2026"
+//   start: "2026-07-01"
+//   end:   "2026-07-31"
+function calendarMonth(isoDate) {
+  if (!isoDate) return null;
+  const d = new Date(isoDate + "T12:00:00");
+  if (isNaN(d.getTime())) return null;
+  const year  = d.getFullYear();
+  const month = d.getMonth(); // 0-indexed
+  const key   = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const start = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+  const end   = new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
+  const label = d.toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
+  return { key, label, start, end };
+}
+
+// Current calendar month
+function currentCalendarMonth() {
+  return calendarMonth(new Date().toISOString().slice(0, 10));
+}
+
+// ─── End-of-month push notification reminder ─────────────────────────────────
+// Shows an in-app banner in the last 3 days of each calendar month,
+// reminding the user to submit their expenses to Vicky.
+// Uses localStorage to avoid showing more than once per month.
+function useEndOfMonthReminder() {
+  const [showBanner, setShowBanner] = useState(false);
+
+  useEffect(() => {
+    const today = new Date();
+    const year  = today.getFullYear();
+    const month = today.getMonth();
+    // Last day of this month
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const dayOfMonth = today.getDate();
+    const daysLeft = lastDay - dayOfMonth; // 0 = last day, 1 = second to last, etc.
+
+    if (daysLeft > 3) return; // Only show in last 3 days
+
+    const dismissKey = `expense_reminder_dismissed_${year}_${String(month + 1).padStart(2, "0")}`;
+    const alreadyDismissed = localStorage.getItem(dismissKey) === "1";
+    if (!alreadyDismissed) {
+      setShowBanner(true);
+    }
+
+    return undefined;
+  }, []);
+
+  function dismiss() {
+    const today = new Date();
+    const key = `expense_reminder_dismissed_${today.getFullYear()}_${String(today.getMonth() + 1).padStart(2, "0")}`;
+    localStorage.setItem(key, "1");
+    setShowBanner(false);
+  }
+
+  return { showBanner, dismiss };
+}
+
+// ─── Signed URL helper ───────────────────────────────────────────────────────
 async function signReceipt(pathOrUrl) {
   if (!pathOrUrl) return null;
-  if (pathOrUrl.startsWith("http")) return pathOrUrl; // legacy public URL
+  if (pathOrUrl.startsWith("http")) return pathOrUrl;
   try {
     const { data, error } = await supabase.storage
       .from("receipts")
-      .createSignedUrl(pathOrUrl, 60 * 60); // 1 hour
+      .createSignedUrl(pathOrUrl, 60 * 60);
     if (error) return null;
     return data?.signedUrl || null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
-// Thumbnail that resolves a signed URL for a private receipt path.
 function ReceiptThumb({ path, onClick }) {
   const [url, setUrl] = React.useState(null);
   React.useEffect(() => {
@@ -70,7 +128,11 @@ function ReceiptThumb({ path, onClick }) {
     return () => { alive = false; };
   }, [path]);
   if (!url) {
-    return <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0"><Receipt size={16} className="text-slate-300" /></div>;
+    return (
+      <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+        <Receipt size={16} className="text-slate-300" />
+      </div>
+    );
   }
   return (
     <button onClick={onClick} className="shrink-0 w-12 h-12 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
@@ -79,7 +141,6 @@ function ReceiptThumb({ path, onClick }) {
   );
 }
 
-// Full-size signed receipt image (used in the form preview).
 function SignedReceiptImg({ stored, className }) {
   const [url, setUrl] = React.useState(null);
   React.useEffect(() => {
@@ -88,54 +149,29 @@ function SignedReceiptImg({ stored, className }) {
     return () => { alive = false; };
   }, [stored]);
   if (!url) {
-    return <div className="w-full h-32 bg-slate-50 flex items-center justify-center"><Receipt size={24} className="text-slate-300" /></div>;
+    return (
+      <div className="w-full h-32 bg-slate-50 flex items-center justify-center">
+        <Receipt size={24} className="text-slate-300" />
+      </div>
+    );
   }
   return <img src={url} alt="Receipt" className={className} />;
 }
 
-// ─── Finance period: 26th → 25th cycle ──────────────────────────────────────
-// Power Works' expense period runs from the 26th of one month to the 25th of
-// the next. An expense dated the 25th itself belongs to the CLOSING period
-// (i.e. the one ending on that 25th).
-//
-// Given any ISO date, return:
-//   - key       a stable sort key like "2026-05-26" (period start)
-//   - label     human label like "26 May – 25 Jun 2026"
-//   - start     ISO date when the period started (the 26th)
-//   - end       ISO date when the period ends (the 25th)
-// ─── Decimal-safe amount input ──────────────────────────────────────────────
-// Some iPhones (locale-dependent) show a numeric keypad that uses a COMMA as
-// the decimal separator. HTML's type="number" only accepts a period, so on
-// those devices typing "1223,14" either gets rejected or silently mangled.
-// Fix: use a plain text input with inputMode="decimal" (still shows the
-// numeric keypad) and accept EITHER comma or period as the separator,
-// normalising to a period internally before it's ever parsed as a number.
-
-// Turn whatever the user typed (1223,14 / 1223.14 / 1 223,14) into a clean
-// string suitable for parseFloat — always period-separated, digits only.
+// ─── Decimal-safe amount input ───────────────────────────────────────────────
 function normaliseDecimalInput(raw) {
   if (raw === null || raw === undefined) return "";
   let s = String(raw);
-  // Strip anything that isn't a digit, comma, period, or leading minus.
   s = s.replace(/[^\d.,-]/g, "");
-  // If both a comma and a period appear, assume the comma was a thousands
-  // separator (e.g. "1,223.14") and just remove it.
   if (s.includes(",") && s.includes(".")) {
     s = s.replace(/,/g, "");
   } else {
-    // Only a comma present → it's being used as the decimal separator.
     s = s.replace(",", ".");
   }
-  // Collapse any accidental double periods from fast typing.
   s = s.replace(/\.(?=.*\.)/g, "");
   return s;
 }
 
-// A drop-in replacement for <Field type="number"> that works correctly on
-// comma-decimal iPhone keyboards. Displays exactly what the user typed
-// (so they can keep using a comma if that's their habit) but the value
-// handed back via onChange is always period-normalised and safe to
-// parseFloat() when saving.
 function AmountField({ label, value, onChange, placeholder = "0.00", required = false }) {
   return (
     <div>
@@ -155,14 +191,6 @@ function AmountField({ label, value, onChange, placeholder = "0.00", required = 
 }
 
 // ─── Duplicate detection ─────────────────────────────────────────────────────
-// Purely informational — never blocks a save. Flags expenses that look like
-// they might be the same purchase entered twice: same vendor (case/space
-// insensitive), same amount (within a few cents to absorb rounding), and a
-// date within ±1 day of each other.
-//
-// Returns a Set of expense IDs that have at least one likely duplicate
-// elsewhere in the list. Pure function — call with the full expenses array,
-// recompute whenever the list changes (cheap: O(n²) but n is small per user).
 function findLikelyDuplicateIds(expenses) {
   const flagged = new Set();
   const norm = s => (s || "").trim().toLowerCase();
@@ -171,13 +199,12 @@ function findLikelyDuplicateIds(expenses) {
     if (!a || !b) return false;
     const da = new Date(a + "T12:00:00");
     const db = new Date(b + "T12:00:00");
-    return Math.abs(da - db) <= 86400000; // within 1 day
+    return Math.abs(da - db) <= 86400000;
   };
-
   for (let i = 0; i < expenses.length; i++) {
     for (let j = i + 1; j < expenses.length; j++) {
       const a = expenses[i], b = expenses[j];
-      if (!a.vendor || !b.vendor) continue; // no vendor on either side — too weak a signal to flag
+      if (!a.vendor || !b.vendor) continue;
       if (norm(a.vendor) !== norm(b.vendor)) continue;
       if (!amtClose(a.amount, b.amount)) continue;
       if (!dateClose(a.expense_date, b.expense_date)) continue;
@@ -188,45 +215,137 @@ function findLikelyDuplicateIds(expenses) {
   return flagged;
 }
 
-function financePeriod(isoDate) {
-  if (!isoDate) return null;
-  const d = new Date(isoDate + "T12:00:00");
-  if (isNaN(d.getTime())) return null;
-
-  // If the day is 1..25, the period started on the 26th of the PREVIOUS month
-  // and ends on the 25th of THIS month. If the day is 26..31, the period
-  // started on the 26th of THIS month and ends on the 25th of NEXT month.
-  let startYear, startMonth; // 0-indexed month
-  if (d.getDate() <= 25) {
-    startYear  = d.getMonth() === 0 ? d.getFullYear() - 1 : d.getFullYear();
-    startMonth = d.getMonth() === 0 ? 11 : d.getMonth() - 1;
-  } else {
-    startYear  = d.getFullYear();
-    startMonth = d.getMonth();
-  }
-
-  const start = new Date(Date.UTC(startYear, startMonth, 26));
-  const end   = new Date(Date.UTC(startYear, startMonth + 1, 25));
-  const startISO = start.toISOString().slice(0, 10);
-  const endISO   = end.toISOString().slice(0, 10);
-
-  const opt = { day: "numeric", month: "short" };
-  const startLbl = start.toLocaleDateString("en-GB", opt);
-  const endLbl   = end.toLocaleDateString("en-GB", { ...opt, year: "numeric" });
-  return { key: startISO, label: `${startLbl} – ${endLbl}`, start: startISO, end: endISO };
-}
-
-// Period that contains today.
-function currentFinancePeriod() {
-  return financePeriod(new Date().toISOString().slice(0, 10));
-}
-
 function fmtMoney(amount, currency = "ZAR") {
   const sym = currency === "ZAR" ? "R" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : "";
   const n = parseFloat(amount || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return sym ? `${sym}${n}` : `${n} ${currency}`;
 }
 
+// ─── Collapsible month section ───────────────────────────────────────────────
+function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpenseForm,
+  selectMode, selectedIds, toggleSelect, setDetailExpense, fmtMoney, CATEGORY_COLORS, smartDate }) {
+
+  const [collapsed, setCollapsed] = useState(false);
+  const periodTotal = items.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
+  const isCurrent = monthKey === currentCalendarMonth()?.key;
+
+  return (
+    <div>
+      {/* Month header — tappable to collapse */}
+      <button
+        onClick={() => setCollapsed(c => !c)}
+        className="w-full flex items-center justify-between px-1 mb-2 group"
+      >
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-black text-slate-500 uppercase tracking-wider">{label}</p>
+          {isCurrent && (
+            <span className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide"
+              style={{ background: "#FEF3C7", color: "#92400E" }}>
+              Current
+            </span>
+          )}
+          <span className="text-xs text-slate-400 font-medium">{items.length} item{items.length !== 1 ? "s" : ""}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-black" style={{ color: "#8B1A1A" }}>{fmtMoney(periodTotal)}</p>
+          <div className="rounded-full p-0.5 bg-slate-100 group-hover:bg-slate-200 transition-colors">
+            {collapsed
+              ? <ChevronDown size={14} className="text-slate-400" />
+              : <ChevronUp size={14} className="text-slate-400" />}
+          </div>
+        </div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {!collapsed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-2 overflow-hidden"
+          >
+            {items.map(ex => {
+              if (editId === ex.id) {
+                return (
+                  <motion.div key={ex.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    {renderExpenseForm()}
+                  </motion.div>
+                );
+              }
+              const cc = CATEGORY_COLORS[ex.category] || CATEGORY_COLORS.Other;
+              const isSelected = selectedIds.has(ex.id);
+              return (
+                <Card key={ex.id}
+                  className={`overflow-hidden transition-all ${selectMode && isSelected ? "ring-2 ring-red-500" : ""} ${!selectMode ? "active:bg-slate-50 cursor-pointer" : ""}`}
+                  onClick={selectMode ? () => toggleSelect(ex.id) : () => setDetailExpense(ex)}>
+                  <div className="p-4">
+                    <div className="flex items-start gap-3">
+                      {selectMode && (
+                        <div className="shrink-0 mt-0.5">
+                          {isSelected
+                            ? <CheckSquare size={22} className="text-red-600" />
+                            : <Square size={22} className="text-slate-300" />}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <p className="text-lg font-black text-slate-900">{fmtMoney(ex.amount, ex.currency)}</p>
+                          <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: cc.bg, color: cc.text }}>{ex.category}</span>
+                          {ex.ai_extracted && <Sparkles size={12} className="text-purple-400" />}
+                        </div>
+                        {ex.currency && ex.currency !== "ZAR" && ex.amount_zar > 0 && (
+                          <p className="text-xs font-bold mt-0.5" style={{ color: "#15803D" }}>
+                            ≈ {fmtMoney(ex.amount_zar, "ZAR")}
+                          </p>
+                        )}
+                        {ex.vendor && <p className="text-sm font-bold text-slate-700 mt-1">{ex.vendor}</p>}
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <p className="text-xs text-slate-400">
+                            {ex.expense_date ? smartDate(ex.expense_date) : "No date"}
+                            {ex.expense_time ? ` · ${ex.expense_time}` : ""}
+                          </p>
+                          <span className="text-xs text-slate-300">·</span>
+                          <p className="text-xs text-slate-400">{ex.payment_method}</p>
+                        </div>
+                        {/* Pills row — slip badges + duplicate, but NO status pill */}
+                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          {ex.receipt_url && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">
+                              <Receipt size={10} /> Slip
+                            </span>
+                          )}
+                          {ex.payment_slip_url && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">
+                              💳 Card slip
+                            </span>
+                          )}
+                          {duplicateIds.has(ex.id) && (
+                            <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+                              ⚠ Possible duplicate
+                            </span>
+                          )}
+                          {ex.sync_status === "pending" && (
+                            <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+                              Syncing…
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {!selectMode && <ChevronRight size={18} className="text-slate-300 shrink-0 mt-1" />}
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
   const [showForm, setShowForm]       = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -236,27 +355,31 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
   const [toast, setToast]             = useState("");
   const [receiptUrl, setReceiptUrl]   = useState(null);
   const [paymentSlipUrl, setPaymentSlipUrl] = useState(null);
-  const [scannerMode, setScannerMode] = useState("receipt"); // "receipt" or "payment"
-  const [paymentMismatch, setPaymentMismatch] = useState(null); // { tillAmount, slipAmount }
+  const [scannerMode, setScannerMode] = useState("receipt");
+  const [paymentMismatch, setPaymentMismatch] = useState(null);
   const [scannedNotice, setScannedNotice] = useState(false);
   const [selectMode, setSelectMode]   = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
-  const [manualZAR, setManualZAR]     = useState(""); // for currencies ECB doesn't cover
-  const [detailExpense, setDetailExpense] = useState(null);   // the row whose sheet is open
-  const [viewerImages, setViewerImages] = useState(null);     // array of {url, caption} or null
+  const [manualZAR, setManualZAR]     = useState("");
+  const [detailExpense, setDetailExpense] = useState(null);
+  const [viewerImages, setViewerImages] = useState(null);
   const [form, setForm] = useState({
     vendor: "", amount: "", vat_amount: "", currency: "ZAR",
     expense_date: todayISO(), expense_time: "", category: "Other",
     payment_method: "Card", notes: "",
   });
   const { confirm, dialog } = useConfirm();
+  const { showBanner: showReminderBanner, dismiss: dismissReminder } = useEndOfMonthReminder();
   const expenses = data.expenses || [];
 
+  // quickAddTrigger → open scanner immediately (camera-first)
   useEffect(() => {
     if (!quickAddTrigger) return;
     if (quickAddTrigger.screen !== "Expenses") return;
     setEditId(null);
+    setShowForm(false);
     setShowScanner(true);
+    setScannerMode("receipt");
   }, [quickAddTrigger?.ts]);
 
   function resetForm() {
@@ -278,11 +401,9 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
 
   function handleScanComplete(extracted) {
     if (scannerMode === "payment") {
-      // Payment slip: keep the photo + cross-check the amount against the till slip
       setPaymentSlipUrl(extracted.receipt_url || null);
       const tillAmount = parseFloat(form.amount || 0);
       const slipAmount = parseFloat(extracted.amount || 0);
-      // Allow R0.50 rounding tolerance
       if (tillAmount > 0 && slipAmount > 0 && Math.abs(tillAmount - slipAmount) > 0.5) {
         setPaymentMismatch({ tillAmount, slipAmount });
       } else {
@@ -290,10 +411,9 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       }
       setShowScanner(false);
       setShowForm(true);
-      setScannerMode("receipt"); // reset for next time
+      setScannerMode("receipt");
       return;
     }
-    // Till slip (default): fill the form fields
     setForm({
       vendor:         extracted.vendor || "",
       amount:         extracted.amount ? String(extracted.amount) : "",
@@ -326,8 +446,6 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     });
     setReceiptUrl(ex.receipt_url || null);
     setPaymentSlipUrl(ex.payment_slip_url || null);
-    // If this expense was manually converted, prefill the manual ZAR field
-    // so the user can adjust it when re-editing.
     setManualZAR(ex.rate_source === "Manual entry" && ex.amount_zar ? String(ex.amount_zar) : "");
     setEditId(ex.id);
     setShowForm(true);
@@ -336,75 +454,70 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
 
   async function saveExpense() {
     if (!form.amount || parseFloat(form.amount) <= 0) { setToast("Enter a valid amount"); return; }
-    // Payment slip is OPTIONAL in all cases. (Some merchants don't issue one,
-    // and finance can verify card payments against the bank statement.)
 
-    // ZAR conversion logic:
-    //   1. ZAR currency? trivial (zar = amount, rate = 1).
-    //   2. Manual ZAR entered? use it (rate_source = "Manual entry").
-    //   3. Otherwise try ECB rate via Frankfurter.
-    //   4. If all fails, save without ZAR conversion (fields left null).
     let zarInfo = null;
     const manualZARNum = parseFloat(manualZAR);
     if (!form.currency || form.currency === "ZAR") {
-      zarInfo = { zar: parseFloat(form.amount), rate: 1, rateDate: form.expense_date || todayISO(), source: "n/a" };
+      zarInfo = { amount_zar: parseFloat(form.amount), exchange_rate: 1, rate_date: todayISO(), rate_source: "ZAR" };
     } else if (!isNaN(manualZARNum) && manualZARNum > 0) {
-      const amt = parseFloat(form.amount);
       zarInfo = {
-        zar: manualZARNum,
-        rate: amt > 0 ? manualZARNum / amt : 0,
-        rateDate: form.expense_date || todayISO(),
-        source: "Manual entry",
+        amount_zar: manualZARNum,
+        exchange_rate: manualZARNum / parseFloat(form.amount),
+        rate_date: todayISO(),
+        rate_source: "Manual entry",
       };
     } else {
-      setToast("Fetching exchange rate…");
-      zarInfo = await convertToZAR(form.amount, form.currency, form.expense_date || undefined);
-      // If ECB doesn't cover this currency, zarInfo will be null — that's fine,
-      // the expense saves with no ZAR conversion. User can edit and add manually.
+      try {
+        zarInfo = await convertToZAR(parseFloat(form.amount), form.currency, form.expense_date, userId);
+      } catch {
+        zarInfo = null;
+      }
     }
 
-    const clean = {
-      ...form,
-      amount: parseFloat(form.amount || 0),
-      vat_amount: parseFloat(form.vat_amount || 0),
-      expense_date: form.expense_date || null,
-      receipt_url: receiptUrl || null,
+    const now = new Date().toISOString();
+    const row = {
+      id:               editId || genId(),
+      user_id:          userId,
+      vendor:           form.vendor,
+      amount:           parseFloat(form.amount) || 0,
+      vat_amount:       parseFloat(form.vat_amount) || null,
+      currency:         form.currency || "ZAR",
+      amount_zar:       zarInfo?.amount_zar ?? null,
+      exchange_rate:    zarInfo?.exchange_rate ?? null,
+      rate_date:        zarInfo?.rate_date ?? null,
+      rate_source:      zarInfo?.rate_source ?? null,
+      expense_date:     form.expense_date || todayISO(),
+      expense_time:     form.expense_time || null,
+      category:         form.category || "Other",
+      payment_method:   form.payment_method || "Card",
+      notes:            form.notes || null,
+      receipt_url:      receiptUrl || null,
       payment_slip_url: paymentSlipUrl || null,
-      amount_zar:    zarInfo ? zarInfo.zar : null,
-      exchange_rate: zarInfo ? zarInfo.rate : null,
-      rate_date:     zarInfo ? zarInfo.rateDate : null,
-      rate_source:   zarInfo ? zarInfo.source : null,
+      status:           editId
+                          ? (expenses.find(e => e.id === editId)?.status || "unsubmitted")
+                          : "unsubmitted",
+      ai_extracted:     scannedNotice,
+      sync_status:      "pending",
+      created_at:       editId
+                          ? (expenses.find(e => e.id === editId)?.created_at || now)
+                          : now,
+      updated_at:       now,
     };
 
-    if (editId) {
-      const existing = expenses.find(e => e.id === editId);
-      const updated = { ...existing, ...clean, ai_extracted: existing.ai_extracted, updated_at: new Date().toISOString(), sync_status: "pending" };
-      setData(d => ({
-        ...d,
-        expenses: (d.expenses || []).map(e => e.id === editId ? updated : e),
-        syncQueue: [{ id: genId(), table: "expenses", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-      }));
-      await offlineSave("expenses", updated);
-      setToast("Expense updated");
-      triggerImmediateSync();
-    } else {
-      const item = {
-        id: genId(), user_id: userId, ...clean,
-        status: "unsubmitted",
-        ai_extracted: scannedNotice,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        sync_status: "pending",
-      };
-      setData(d => ({
-        ...d,
-        expenses: [item, ...(d.expenses || [])],
-        syncQueue: [{ id: genId(), table: "expenses", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-      }));
-      await offlineSave("expenses", item);
-      setToast("Expense saved");
-      triggerImmediateSync();
-    }
+    setData(d => ({
+      ...d,
+      expenses: editId
+        ? (d.expenses || []).map(e => e.id === editId ? row : e)
+        : [row, ...(d.expenses || [])],
+      syncQueue: [{
+        id: genId(), table: "expenses",
+        action: editId ? "update" : "insert",
+        data: row, status: "pending", created_at: now,
+      }, ...(d.syncQueue || [])],
+    }));
+    offlineSave("expenses", row);
+    setToast(editId ? "Expense updated ✓" : "Expense saved ✓");
+    triggerImmediateSync();
     resetForm();
   }
 
@@ -415,7 +528,10 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     setData(d => ({
       ...d,
       expenses: (d.expenses || []).filter(e => e.id !== id),
-      syncQueue: [{ id: genId(), table: "expenses", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+      syncQueue: [{
+        id: genId(), table: "expenses", action: "delete",
+        data: { id }, status: "pending", created_at: new Date().toISOString(),
+      }, ...(d.syncQueue || [])],
     }));
     setToast("Expense deleted");
     triggerImmediateSync();
@@ -429,19 +545,14 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     });
   }
 
-  // The built PDF lives here so the preview/share/email actions all reuse it.
-  // Cleared after the user closes the sheet.
-  const [financePack, setFinancePack] = React.useState(null); // { blob, url, filename, ref, periodLabel, totalZAR, count, ids }
+  const [financePack, setFinancePack] = React.useState(null);
 
   async function sendToFinance() {
     const selected = expenses.filter(e => selectedIds.has(e.id));
     if (selected.length === 0) { setToast("Select expenses to send"); return; }
-
     setToast("Building finance pack…");
-
-    // Use the first selected item's date for the period label on the cover.
     const sampleDate = selected[0]?.expense_date;
-    const period = sampleDate ? financePeriod(sampleDate) : currentFinancePeriod();
+    const period = sampleDate ? calendarMonth(sampleDate) : currentCalendarMonth();
 
     let pdfBlob, filename, ref;
     try {
@@ -458,25 +569,12 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       setToast("Couldn't build PDF — try again");
       return;
     }
-
     const totalZAR = selected.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
     const url = URL.createObjectURL(pdfBlob);
-    setFinancePack({
-      blob: pdfBlob,
-      url,
-      filename,
-      ref,
-      periodLabel: period?.label || "—",
-      totalZAR,
-      count: selected.length,
-      ids: Array.from(selectedIds),
-    });
+    setFinancePack({ blob: pdfBlob, url, filename, ref, periodLabel: period?.label || "—", totalZAR, count: selected.length, ids: Array.from(selectedIds) });
     setToast("");
   }
 
-  // Mark the included expenses as 'submitted' and trigger sync.
-  // Called only after the user actually shares/emails the pack — so they can
-  // back out of the preview without altering state.
   function markPackSubmitted() {
     if (!financePack) return;
     const ids = new Set(financePack.ids);
@@ -503,7 +601,6 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     setFinancePack(null);
   }
 
-  // Open one (or both) of an expense's slip images in the fullscreen viewer.
   async function openExpenseImages(ex, startWith = "till") {
     const items = [];
     const tillSigned = await signReceipt(ex.receipt_url);
@@ -515,35 +612,24 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     setViewerImages({ list: items, startIndex: startIdx });
   }
 
-  // — Preview: open the PDF in a new tab/window. Mobile: usually opens in the
-  // device PDF viewer; user can then share from there.
   function previewFinancePack() {
     if (!financePack) return;
     window.open(financePack.url, "_blank");
   }
 
-  // — Share: native share sheet on mobile (iOS / Android). Lets the user pick
-  // Mail, Outlook, iCloud Mail, WhatsApp, Files, AirDrop, etc.
   async function shareFinancePack() {
     if (!financePack) return;
     const { blob, filename, ref, totalZAR, periodLabel } = financePack;
     const file = new File([blob], filename, { type: "application/pdf" });
-    const shareData = {
-      title: `Expense Claim ${ref}`,
-      text: `Expense claim ${ref} — ${fmtMoney(totalZAR, "ZAR")} for ${periodLabel}.`,
-      files: [file],
-    };
-    // Feature-detect Web Share API with file support (iOS Safari ≥15, Android Chrome).
+    const shareData = { title: `Expense Claim ${ref}`, text: `Expense claim ${ref} — ${fmtMoney(totalZAR, "ZAR")} for ${periodLabel}.`, files: [file] };
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share(shareData);
-        markPackSubmitted(); // Share completed (or user cancelled — we can't tell).
+        markPackSubmitted();
       } catch (e) {
-        // User cancelled or share failed silently — don't mark submitted.
         if (e.name !== "AbortError") console.warn("Share failed:", e);
       }
     } else {
-      // Fallback: download the PDF so the user can attach it manually.
       const a = document.createElement("a");
       a.href = financePack.url;
       a.download = filename;
@@ -554,33 +640,13 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     }
   }
 
-  // — Email: open the user's mail client with a pre-filled message. The PDF
-  // is also downloaded so they can attach it (browsers can't auto-attach).
   function emailFinancePack() {
     if (!financePack) return;
     const { filename, ref, totalZAR, periodLabel, count, url } = financePack;
-
-    // Download the PDF first so it's in their Files / Downloads ready to attach.
     const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    const body = `Hi Vicky,
-
-Please find attached my expense claim ${ref}.
-
-Summary:
-  • ${count} item${count !== 1 ? "s" : ""}
-  • Period: ${periodLabel}
-  • Total claim: ${fmtMoney(totalZAR, "ZAR")}
-
-The attached PDF (${filename}) contains the full breakdown, totals by category, and all receipt images.
-
-Kind regards`;
-
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    const body = `Hi Vicky,\n\nPlease find attached my expense claim ${ref}.\n\nSummary:\n  • ${count} item${count !== 1 ? "s" : ""}\n  • Period: ${periodLabel}\n  • Total claim: ${fmtMoney(totalZAR, "ZAR")}\n\nThe attached PDF (${filename}) contains the full breakdown, totals by category, and all receipt images.\n\nKind regards`;
     const subject = encodeURIComponent(`Expense Claim ${ref} — ${fmtMoney(totalZAR, "ZAR")}`);
     setToast("PDF downloaded — attach it to the email that just opened");
     setTimeout(() => {
@@ -589,63 +655,47 @@ Kind regards`;
     }, 500);
   }
 
-  // Computed from the FULL list (not the filtered view) so a duplicate is
-  // still flagged correctly even if a filter happens to be hiding its match.
+  // ─── Derived state ─────────────────────────────────────────────────────────
   const duplicateIds = findLikelyDuplicateIds(expenses);
 
   const filtered = expenses
     .filter(e => filterCat === "All" || e.category === filterCat)
     .filter(e => !search || [e.vendor, e.category, e.notes].some(x => x?.toLowerCase().includes(search.toLowerCase())))
     .sort((a, b) => {
-      // Sort by month descending (newest month first), then within each month
-      // by date+time ASCENDING (oldest first — true chronological order).
       const da = a.expense_date || "";
       const db = b.expense_date || "";
-      // Within month grouping the rendering already groups by month;
-      // we sort the whole list ascending by date+time, then reverse-group.
       const dt = da.localeCompare(db);
       if (dt !== 0) return dt;
-      const ta = a.expense_time || "";
-      const tb = b.expense_time || "";
-      return ta.localeCompare(tb);
+      return (a.expense_time || "").localeCompare(b.expense_time || "");
     });
 
-  // Group by month
-  // Group by finance period (26th → 25th). Newest period at the top; within
-  // each period, items remain in true chronological order (oldest → newest).
-  const periodsInOrder = [];
-  const byPeriodMap = {};
+  // Group by calendar month
+  const monthsInOrder = [];
+  const byMonthMap = {};
   filtered.forEach(e => {
-    const period = e.expense_date ? financePeriod(e.expense_date) : null;
-    const key = period ? period.key : "no-date";
-    const label = period ? period.label : "No date";
-    if (!byPeriodMap[key]) {
-      byPeriodMap[key] = { label, items: [] };
-      periodsInOrder.push(key);
+    const m = e.expense_date ? calendarMonth(e.expense_date) : null;
+    const key   = m ? m.key   : "no-date";
+    const label = m ? m.label : "No date";
+    if (!byMonthMap[key]) {
+      byMonthMap[key] = { label, items: [] };
+      monthsInOrder.push(key);
     }
-    byPeriodMap[key].items.push(e);
+    byMonthMap[key].items.push(e);
   });
-  // No-date always sinks to the bottom; everything else sorts by period key DESC.
-  const orderedPeriodKeys = periodsInOrder
+  const orderedMonthKeys = monthsInOrder
     .filter(k => k !== "no-date")
-    .sort((a, b) => b.localeCompare(a)) // newest period first
-    .concat(periodsInOrder.includes("no-date") ? ["no-date"] : []);
+    .sort((a, b) => b.localeCompare(a))
+    .concat(monthsInOrder.includes("no-date") ? ["no-date"] : []);
 
-  // Total for the CURRENT finance period (26th–25th cycle).
-  const thisPeriod = currentFinancePeriod();
-  const totalThisPeriod = expenses
-    .filter(e => {
-      if (!e.expense_date) return false;
-      return e.expense_date >= thisPeriod.start && e.expense_date <= thisPeriod.end;
-    })
+  // Summary for header
+  const thisPeriod = currentCalendarMonth();
+  const totalThisMonth = expenses
+    .filter(e => e.expense_date && e.expense_date >= thisPeriod.start && e.expense_date <= thisPeriod.end)
     .reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
 
   const unsubmittedCount = expenses.filter(e => e.status === "unsubmitted").length;
 
-  // The Add/Edit form, extracted so it can render in TWO places:
-  //   1. At the top of the page — for adding a NEW expense (when editId is null)
-  //   2. Inline, replacing the card being edited at its position in the list
-  //      — so editing never yanks the user's scroll position up to the top.
+  // ─── Expense form (rendered at top for new, inline for edit) ────────────────
   function renderExpenseForm() {
     return (
       <Card className="p-4 space-y-3">
@@ -653,24 +703,34 @@ Kind regards`;
           <p className="text-base font-black text-slate-800">{editId ? "Edit Expense" : "New Expense"}</p>
           {scannedNotice && (
             <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-1 text-xs font-bold text-purple-700">
-              <Sparkles size={12} /> AI extracted — please verify
+              <Sparkles size={12} /> AI extracted — verify
             </span>
           )}
         </div>
 
-        {/* Slips: till on the left, payment on the right */}
+        {/* Slip photos — big tap targets with camera icon, easy to replace */}
         <div className="grid grid-cols-2 gap-2">
           <div>
             <p className="text-xs font-bold text-slate-500 mb-1.5">Till slip</p>
             {receiptUrl ? (
-              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+              <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                 <SignedReceiptImg stored={receiptUrl} className="w-full h-32 object-contain" />
+                {/* Overlay: tap anywhere to re-scan */}
+                <button type="button"
+                  onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
+                  className="absolute inset-0 flex items-end justify-center pb-2 bg-black/0 hover:bg-black/20 active:bg-black/30 transition-colors">
+                  <span className="rounded-full bg-black/50 text-white text-[10px] font-bold px-2 py-1 flex items-center gap-1">
+                    <Camera size={10} /> Replace
+                  </span>
+                </button>
               </div>
             ) : (
               <button type="button"
                 onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
-                className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 transition-colors">
-                <Camera size={20} style={{ color: "#8B1A1A" }} />
+                className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+                  <Camera size={18} style={{ color: "#8B1A1A" }} />
+                </div>
                 <span className="text-xs font-bold text-slate-500">Scan till slip</span>
               </button>
             )}
@@ -680,18 +740,28 @@ Kind regards`;
               Payment slip <span className="text-slate-400 font-normal">(optional)</span>
             </p>
             {paymentSlipUrl ? (
-              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 relative">
+              <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                 <SignedReceiptImg stored={paymentSlipUrl} className="w-full h-32 object-contain" />
-                <button type="button" onClick={() => { setPaymentSlipUrl(null); setPaymentMismatch(null); }}
-                  className="absolute top-1 right-1 p-1 rounded-full bg-white/90 shadow text-slate-500 hover:text-red-600">
-                  <X size={14} />
-                </button>
+                <div className="absolute top-1 right-1 flex gap-1">
+                  <button type="button"
+                    onClick={() => { setScannerMode("payment"); setShowScanner(true); }}
+                    className="p-1.5 rounded-full bg-black/50 text-white">
+                    <Camera size={11} />
+                  </button>
+                  <button type="button"
+                    onClick={() => { setPaymentSlipUrl(null); setPaymentMismatch(null); }}
+                    className="p-1.5 rounded-full bg-black/50 text-white">
+                    <X size={11} />
+                  </button>
+                </div>
               </div>
             ) : (
               <button type="button"
                 onClick={() => { setScannerMode("payment"); setShowScanner(true); }}
-                className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 hover:border-red-300 hover:bg-red-50 transition-colors">
-                <Camera size={20} style={{ color: "#8B1A1A" }} />
+                className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+                  <Camera size={18} style={{ color: "#8B1A1A" }} />
+                </div>
                 <span className="text-xs font-bold text-slate-500">Add payment slip</span>
               </button>
             )}
@@ -702,9 +772,8 @@ Kind regards`;
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
             <p className="text-xs font-bold text-amber-800">⚠ Amount mismatch</p>
             <p className="text-xs text-amber-700 mt-0.5">
-              Till slip says {fmtMoney(paymentMismatch.tillAmount, form.currency)},
-              payment slip says {fmtMoney(paymentMismatch.slipAmount, form.currency)}.
-              Please verify which is correct before saving.
+              Till slip says {fmtMoney(paymentMismatch.tillAmount, form.currency)}, payment slip says {fmtMoney(paymentMismatch.slipAmount, form.currency)}.
+              Verify which is correct before saving.
             </p>
           </div>
         )}
@@ -716,41 +785,25 @@ Kind regards`;
             <label className="mb-1.5 block text-sm font-bold text-slate-500">Currency</label>
             <select value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
               className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[52px]">
-              {[
-                "ZAR", "USD", "GBP", "EUR",       // major
-                "GHS",                              // Ghanaian Cedi
-                "NGN", "KES", "TZS", "UGX",         // other Africa
-                "BWP", "NAD", "MWK", "MZN", "ZMW", // Southern Africa
-                "AED", "SAR", "INR", "CNY", "JPY", "AUD", "CAD", // common others
-              ].map(c => <option key={c} value={c}>{c}</option>)}
+              {["ZAR","USD","GBP","EUR","GHS","NGN","KES","TZS","UGX","BWP","NAD","MWK","MZN","ZMW","AED","SAR","INR","CNY","JPY","AUD","CAD"].map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
 
-        {/* Manual ZAR override — appears whenever currency is not ZAR.
-            For currencies the ECB rate covers (USD/GBP/EUR/etc) this is
-            optional and overrides the auto rate if you fill it in. For
-            currencies the ECB doesn't cover (Cedi, Naira, etc) this is
-            the ONLY way to record the ZAR figure. */}
         {form.currency && form.currency !== "ZAR" && (
           <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
             <label className="mb-1.5 block text-sm font-bold text-slate-600">
-              ZAR equivalent <span className="text-slate-400 font-normal">— what your bank/card actually charged you</span>
+              ZAR equivalent <span className="text-slate-400 font-normal">— what your bank actually charged</span>
             </label>
             <div className="flex items-center gap-2">
               <span className="text-base font-bold text-slate-500 shrink-0">R</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={manualZAR}
+              <input type="text" inputMode="decimal" value={manualZAR}
                 onChange={e => setManualZAR(normaliseDecimalInput(e.target.value))}
                 placeholder="leave blank to use ECB rate"
-                className="flex-1 rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-none focus:border-red-300 min-h-[48px]"
-              />
+                className="flex-1 rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-none focus:border-red-300 min-h-[48px]" />
             </div>
             <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
-              Leave blank for USD/GBP/EUR/major currencies — the app fetches the official ECB rate automatically.
-              Fill in for Cedi, Naira and other African currencies, or to override the auto rate.
+              Leave blank for USD/GBP/EUR — the app fetches the ECB rate. Fill in for Cedi, Naira, etc.
             </p>
           </div>
         )}
@@ -784,12 +837,13 @@ Kind regards`;
     );
   }
 
+  // ─── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
-      {/* ── Expense detail sheet (opens on card tap) ── */}
+      {/* ── Expense detail sheet ── */}
       <DetailSheet
         open={!!detailExpense}
         onClose={() => setDetailExpense(null)}
@@ -810,11 +864,16 @@ Kind regards`;
               <button onClick={() => openExpenseImages(detailExpense, "payment")}
                 className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
                 style={{ background: "#7C2D12" }}>
-                💳 View payment slip
+                💳 Payment slip
               </button>
             )}
             {!detailExpense.receipt_url && !detailExpense.payment_slip_url && (
-              <p className="text-sm text-slate-500 text-center py-2">No slip photos on this expense</p>
+              <button
+                onClick={() => { setDetailExpense(null); startEdit(detailExpense); setScannerMode("receipt"); setShowScanner(true); setShowForm(false); }}
+                className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
+                style={{ background: "#8B1A1A" }}>
+                <Camera size={15} /> Add slip photo
+              </button>
             )}
           </div>
         )}
@@ -835,26 +894,22 @@ Kind regards`;
       >
         {detailExpense && (
           <>
-            {/* Possible duplicate warning — informational only, doesn't block anything */}
             {duplicateIds.has(detailExpense.id) && (() => {
               const match = expenses.find(e =>
                 e.id !== detailExpense.id &&
-                duplicateIds.has(e.id) &&
-                (e.vendor || "").trim().toLowerCase() === (detailExpense.vendor || "").trim().toLowerCase() &&
-                Math.abs(parseFloat(e.amount || 0) - parseFloat(detailExpense.amount || 0)) < 0.05
+                (e.vendor || "").trim().toLowerCase() === (detailExpense.vendor || "").trim().toLowerCase()
               );
               return (
                 <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
                   <p className="text-xs font-bold text-amber-800">⚠ Possible duplicate</p>
-                  <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                  <p className="text-xs text-amber-700 mt-0.5">
                     Same vendor and amount as another expense{match?.expense_date ? ` dated ${smartDate(match.expense_date)}` : ""}.
-                    {" "}This is just a heads-up — nothing's blocked. Check both before submitting if you're not sure.
+                    Check both before submitting.
                   </p>
                 </div>
               );
             })()}
 
-            {/* ZAR equivalent (if foreign currency) */}
             {detailExpense.currency && detailExpense.currency !== "ZAR" && detailExpense.amount_zar > 0 && (
               <div className="rounded-xl bg-green-50 border border-green-100 p-3">
                 <p className="text-xs font-bold text-green-700 uppercase tracking-wider">ZAR equivalent</p>
@@ -879,10 +934,10 @@ Kind regards`;
               </div>
             )}
 
-            {/* Inline slip previews — big, tappable */}
+            {/* Inline receipt previews with re-scan overlays */}
             {(detailExpense.receipt_url || detailExpense.payment_slip_url) && (
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Receipt photos · tap to enlarge</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Receipts · tap to enlarge</p>
                 <div className={`grid gap-2 ${detailExpense.receipt_url && detailExpense.payment_slip_url ? "grid-cols-2" : "grid-cols-1"}`}>
                   {detailExpense.receipt_url && (
                     <button onClick={() => openExpenseImages(detailExpense, "till")}
@@ -914,31 +969,24 @@ Kind regards`;
       {/* ── Fullscreen image viewer ── */}
       <AnimatePresence>
         {viewerImages && (
-          <ImageViewer
-            images={viewerImages.list}
-            startIndex={viewerImages.startIndex || 0}
-            onClose={() => setViewerImages(null)}
-          />
+          <ImageViewer images={viewerImages.list} startIndex={viewerImages.startIndex || 0} onClose={() => setViewerImages(null)} />
         )}
       </AnimatePresence>
 
-      {/* ── Finance Pack ready: preview, share, or email ── */}
+      {/* ── Finance Pack ── */}
       <AnimatePresence>
         {financePack && (
           <>
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={closeFinancePack}
               className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
               className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col">
-
               <div className="flex justify-center pt-2.5 pb-1">
                 <div className="w-12 h-1 rounded-full bg-slate-300" />
               </div>
-
               <div className="px-5 pt-2 pb-3 flex items-center justify-between">
                 <div className="min-w-0">
                   <p className="text-base font-black text-slate-900">Finance Pack Ready</p>
@@ -948,16 +996,12 @@ Kind regards`;
                   <X size={20} />
                 </button>
               </div>
-
-              {/* Embedded preview */}
               <div className="px-4 pb-3">
                 <div className="rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50" style={{ aspectRatio: "1 / 1.2" }}>
                   <iframe src={financePack.url} title="Finance pack preview" className="w-full h-full" />
                 </div>
                 <p className="text-xs text-slate-400 mt-1.5 text-center">Pinch / scroll to review · {financePack.filename}</p>
               </div>
-
-              {/* Action buttons */}
               <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
                 <button onClick={shareFinancePack}
                   className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
@@ -974,28 +1018,54 @@ Kind regards`;
                     <Mail size={14} /> Email to Vicky
                   </button>
                 </div>
-                <p className="text-xs text-slate-400 text-center pt-0.5 leading-relaxed">
-                  <strong>Share</strong> opens your device's share sheet — pick any email app.
-                  Expenses are marked submitted after you share or email.
-                </p>
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
 
+      {/* ── End-of-month reminder banner ── */}
+      <AnimatePresence>
+        {showReminderBanner && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="rounded-2xl border-2 p-3.5 flex items-start gap-3"
+            style={{ background: "#FFF7ED", borderColor: "#FED7AA" }}>
+            <div className="rounded-xl p-2 shrink-0" style={{ background: "#FEF3C7" }}>
+              <Bell size={16} style={{ color: "#D97706" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black text-amber-800">Submit your expenses</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                End of month is coming — {unsubmittedCount} unsubmitted expense{unsubmittedCount !== 1 ? "s" : ""}. Send your pack to Vicky before month-end.
+              </p>
+            </div>
+            <button onClick={dismissReminder} className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-100 shrink-0">
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Header ── */}
       {!selectMode ? (
         <div className="flex items-center justify-between gap-2">
-          <PageHeader title="Expenses" subtitle={`${fmtMoney(totalThisPeriod)} this period (${thisPeriod.label}) · ${unsubmittedCount} unsubmitted`} />
+          <PageHeader
+            title="Expenses"
+            subtitle={`${fmtMoney(totalThisMonth)} this month · ${unsubmittedCount} to submit`}
+          />
           <div className="flex gap-2">
             {expenses.length > 0 && (
               <Btn size="sm" variant="secondary" onClick={() => { setSelectMode(true); setSelectedIds(new Set()); }}>
                 <Mail size={14} /> Send
               </Btn>
             )}
-            <Btn size="sm" onClick={() => { if (showForm || showScanner || editId) resetForm(); else setShowScanner(true); }}>
-              {(showForm || showScanner || editId) ? <X size={15} /> : <Plus size={15} />}
-              {(showForm || showScanner || editId) ? "Cancel" : "Add"}
+            <Btn size="sm" onClick={() => {
+              if (showForm || showScanner || editId) { resetForm(); }
+              else { setShowScanner(true); setScannerMode("receipt"); }
+            }}>
+              {(showForm || showScanner || editId) ? <X size={15} /> : <Camera size={15} />}
+              {(showForm || showScanner || editId) ? "Cancel" : "Scan"}
             </Btn>
           </div>
         </div>
@@ -1017,17 +1087,22 @@ Kind regards`;
         </div>
       )}
 
+      {/* ── Scanner ── */}
       <AnimatePresence>
         {showScanner && (
           <ReceiptScanner
             userId={userId}
             slipType={scannerMode === "payment" ? "payment" : "till"}
             onExtracted={handleScanComplete}
-            onCancel={() => { setShowScanner(false); setShowForm(true); setScannerMode("receipt"); }}
+            onCancel={() => {
+              setShowScanner(false);
+              if (!editId) setShowForm(true);
+            }}
           />
         )}
       </AnimatePresence>
 
+      {/* ── New expense form (top, only when not editing) ── */}
       <AnimatePresence>
         {showForm && !editId && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
@@ -1039,76 +1114,35 @@ Kind regards`;
       <SearchBar value={search} onChange={setSearch} placeholder="Search vendor, category…" />
       <FilterPills options={["All", ...CATEGORIES]} value={filterCat} onChange={setFilterCat} dangerValue={null} />
 
-      {filtered.length === 0 && <Empty title="No expenses yet" text="Snap a receipt and let AI capture the details." icon={Receipt} />}
+      {filtered.length === 0 && (
+        <Empty
+          title="No expenses yet"
+          text="Tap Scan to photograph a receipt — AI fills in the details."
+          icon={Receipt}
+        />
+      )}
 
-      <div className="space-y-4">
-        {orderedPeriodKeys.map(periodKey => {
-          const { label, items } = byPeriodMap[periodKey];
-          const periodTotal = items.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
+      {/* ── Expense list grouped by calendar month, collapsible ── */}
+      <div className="space-y-5">
+        {orderedMonthKeys.map(monthKey => {
+          const { label, items } = byMonthMap[monthKey];
           return (
-            <div key={periodKey}>
-              <div className="flex items-center justify-between px-1 mb-2">
-                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">{label}</p>
-                <p className="text-sm font-black" style={{ color: "#8B1A1A" }}>{fmtMoney(periodTotal)}</p>
-              </div>
-              <div className="space-y-2">
-                {items.map(ex => {
-                  // ── Edit-in-place: form replaces this card at its exact
-                  // list position, so editing never jumps the page to the top.
-                  if (editId === ex.id) {
-                    return (
-                      <motion.div key={ex.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                        {renderExpenseForm()}
-                      </motion.div>
-                    );
-                  }
-                  const cc = CATEGORY_COLORS[ex.category] || CATEGORY_COLORS.Other;
-                  const sc = STATUS_COLORS[ex.status] || STATUS_COLORS.unsubmitted;
-                  const isSelected = selectedIds.has(ex.id);
-                  return (
-                    <Card key={ex.id}
-                      className={`overflow-hidden transition-all ${selectMode && isSelected ? "ring-2 ring-red-500" : ""} ${!selectMode ? "active:bg-slate-50 cursor-pointer" : ""}`}
-                      onClick={selectMode ? () => toggleSelect(ex.id) : () => setDetailExpense(ex)}>
-                      <div className="p-4">
-                        <div className="flex items-start gap-3">
-                          {selectMode && (
-                            <div className="shrink-0 mt-0.5">
-                              {isSelected ? <CheckSquare size={22} className="text-red-600" /> : <Square size={22} className="text-slate-300" />}
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-baseline gap-2 flex-wrap">
-                              <p className="text-lg font-black text-slate-900">{fmtMoney(ex.amount, ex.currency)}</p>
-                              <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: cc.bg, color: cc.text }}>{ex.category}</span>
-                              {ex.ai_extracted && <Sparkles size={12} className="text-purple-400" />}
-                            </div>
-                            {ex.currency && ex.currency !== "ZAR" && ex.amount_zar > 0 && (
-                              <p className="text-xs font-bold mt-0.5" style={{ color: "#15803D" }}>
-                                ≈ {fmtMoney(ex.amount_zar, "ZAR")}
-                              </p>
-                            )}
-                            {ex.vendor && <p className="text-sm font-bold text-slate-700 mt-1">{ex.vendor}</p>}
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <p className="text-xs text-slate-400">{ex.expense_date ? smartDate(ex.expense_date) : "No date"}{ex.expense_time ? ` · ${ex.expense_time}` : ""}</p>
-                              <span className="text-xs text-slate-300">·</span>
-                              <p className="text-xs text-slate-400">{ex.payment_method}</p>
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                              <span className="inline-block rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: sc.bg, color: sc.text }}>{sc.label}</span>
-                              {ex.receipt_url && <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">📄 Slip</span>}
-                              {ex.payment_slip_url && <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600">💳 Card slip</span>}
-                              {duplicateIds.has(ex.id) && <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">⚠ Possible duplicate</span>}
-                              {ex.sync_status === "pending" && <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Syncing…</span>}
-                            </div>
-                          </div>
-                          {!selectMode && <ChevronRight size={18} className="text-slate-300 shrink-0 mt-1" />}
-                        </div>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
+            <MonthSection
+              key={monthKey}
+              monthKey={monthKey}
+              label={label}
+              items={items}
+              duplicateIds={duplicateIds}
+              editId={editId}
+              renderExpenseForm={renderExpenseForm}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              toggleSelect={toggleSelect}
+              setDetailExpense={setDetailExpense}
+              fmtMoney={fmtMoney}
+              CATEGORY_COLORS={CATEGORY_COLORS}
+              smartDate={smartDate}
+            />
           );
         })}
       </div>
