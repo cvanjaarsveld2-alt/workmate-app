@@ -59,8 +59,7 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
   );
   // Use ZAR equivalent so mixed-currency periods sum sensibly.
   const expMonthTotal     = expThisMonth.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
-  const unsubmittedExp    = expenses.filter(e => e.status === "unsubmitted");
-  const unsubmittedTotal  = unsubmittedExp.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
+
 
   const quoteConversion = sentQuotes > 0 ? Math.round((acceptedQ / sentQuotes) * 100) : 0;
 
@@ -82,8 +81,7 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
     actionItems.push({ icon: "🔧", text: `${overdueEquip.length} equipment service${overdueEquip.length !== 1 ? "s" : ""} overdue`, screen: "Equipment", color: "text-orange-700" });
   if (dueSoonEquip.length > 0)
     actionItems.push({ icon: "🛠️", text: `${dueSoonEquip.length} service${dueSoonEquip.length !== 1 ? "s" : ""} due within 7 days`, screen: "Equipment", color: "text-amber-700" });
-  if (unsubmittedExp.length > 0)
-    actionItems.push({ icon: "🧾", text: `${unsubmittedExp.length} expense${unsubmittedExp.length !== 1 ? "s" : ""} not submitted (${money(unsubmittedTotal)})`, screen: "Expenses", selectMode: true, color: "text-amber-700" });
+
 
   const actionCount = actionItems.length;
   const todayList = todayFU.slice(0, 5);
@@ -210,7 +208,7 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
           <StatCard label="Won Revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} />
         </button>
         <button onClick={() => setScreen("Expenses")} className="text-left">
-          <StatCard label="Expenses (period)" value={money(expMonthTotal)} sub={unsubmittedExp.length > 0 ? `${unsubmittedExp.length} unsubmitted` : "all submitted"} color="#7C2D12" icon={Receipt} />
+          <StatCard label="Expenses (period)" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} />
         </button>
       </div>
 
