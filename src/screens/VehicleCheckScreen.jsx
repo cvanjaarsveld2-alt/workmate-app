@@ -461,7 +461,7 @@ export function VehicleCheckScreen({ data, setData, userId }) {
             <button onClick={() => setShowSettings(true)}
               className="text-xs font-bold px-3 py-1.5 rounded-xl min-h-[36px]"
               style={{ background: "#FEE2E2", color: "#8B1A1A" }}>
-              Set up →
+              Set up &rarr;
             </button>
           )}
         </div>
@@ -554,8 +554,7 @@ export function VehicleCheckScreen({ data, setData, userId }) {
       </motion.button>
 
       <p className="text-xs text-slate-400 text-center -mt-2 leading-relaxed">
-        Tap the button above if everything checks out today.{"\n"}
-        Or tap any item below to mark issues individually.
+        Tap the button above if everything checks out today. Or tap any item below to mark issues individually.
       </p>
 
       {/* ── Checklist sections ── */}
@@ -703,8 +702,8 @@ export function VehicleCheckScreen({ data, setData, userId }) {
           <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">How it works</p>
           <div className="space-y-2">
             {[
-              ["✅", "Tap "All Good" if everything is fine — one tap, done."],
-              ["👇", "Or tap individual items: circle → OK → Issue → N/A → clear."],
+              ["✅", 'Tap "All Good" if everything is fine — one tap, done.'],
+              ["👇", "Or tap individual items: circle, OK, Issue, N/A, then clear."],
               ["⚠️", "Issues prompt you to describe the problem. Report immediately."],
               ["⚙️", "Tap the settings icon to set your vehicle, registration and name."],
             ].map(([icon, text]) => (
