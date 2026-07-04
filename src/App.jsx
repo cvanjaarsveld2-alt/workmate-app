@@ -14,7 +14,10 @@ import { todayISO, logEvent, genId } from "./lib/helpers";
 import { LOCAL_STORAGE_KEY, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY, BRAND } from "./lib/constants";
 import { pushSyncQueue, pullFromSupabase, setupRealtimeSync, registerSyncHandlers, triggerImmediateSync } from "./lib/sync";
 import { requestNotificationPermission, scheduleNotificationsViaSW, buildNotificationItems } from "./lib/notifications";
-import { getPINHash, loadPINHash, isSessionUnlocked, resetPINAttempts } from "./lib/pinHelpers";
+// PIN helpers — imported from PINScreens which inlines them to avoid build issues
+import { getPINHash, isSessionUnlocked, markSessionUnlocked } from "./auth/PINScreens";
+// resetPINAttempts is just a localStorage clear — inlined here to remove the pinHelpers dependency
+function resetPINAttempts() { localStorage.removeItem("pm_pin_attempts"); }
 
 import { AuthScreen }    from "./auth/AuthScreen";
 import { PINSetupScreen, PINLockScreen } from "./auth/PINScreens";
@@ -127,9 +130,9 @@ export default function PowerWorksApp() {
 
   useEffect(() => {
     if (!session) return;
-    async function checkPIN() {
+    function checkPIN() {
       if (isSessionUnlocked()) { setPinState("unlocked"); return; }
-      const hash = await loadPINHash();
+      const hash = getPINHash(); // synchronous localStorage read
       if (!hash) { setPinState("setup"); return; }
       setPinState("locked");
     }
