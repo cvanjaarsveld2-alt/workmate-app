@@ -2,9 +2,22 @@
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, X, Save, Edit2, Trash2, Camera, Sparkles, Receipt,
-  Mail, CheckSquare, Square, FileDown, Send, ChevronRight,
-  ChevronDown, ChevronUp, Bell,
+  X,
+  Save,
+  Edit2,
+  Trash2,
+  Camera,
+  Sparkles,
+  Receipt,
+  Mail,
+  CheckSquare,
+  Square,
+  FileDown,
+  Send,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Bell,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
