@@ -7,7 +7,7 @@
 //   - Buttons sized for thumb use
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, Users, ChevronDown, Camera, Plus, ImageIcon } from "lucide-react";
+import { Search, X, ChevronDown, Camera } from "lucide-react";
 import { BRAND, STAGE_COLORS, NOTE_URGENCY } from "../../lib/constants";
 import { daysDiff, smartDate } from "../../lib/helpers";
 
