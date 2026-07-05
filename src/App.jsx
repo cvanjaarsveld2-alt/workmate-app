@@ -134,13 +134,33 @@ export default function PowerWorksApp() {
         const { supabase: sb } = await import("./supabase");
         const { data: membership } = await sb
           .from("team_members")
-          .select("team_id")
+          .select("team_id, role")
           .eq("user_id", session.user.id)
           .maybeSingle();
         if (!membership?.team_id) return;
         setTeamId(membership.team_id);
-        const { data: rows } = await sb.rpc("get_team_member_emails", { p_team_id: membership.team_id });
-        if (rows) setTeamMembers(rows);
+
+        // Try RPC first (requires 21_team_stage2.sql to have been run)
+        const { data: rows, error: rpcError } = await sb
+          .rpc("get_team_member_emails", { p_team_id: membership.team_id });
+
+        if (!rpcError && rows) {
+          setTeamMembers(rows);
+        } else {
+          // Fallback: load from team_members directly (no emails)
+          const { data: basicRows } = await sb
+            .from("team_members")
+            .select("user_id, role, joined_at")
+            .eq("team_id", membership.team_id);
+          if (basicRows) {
+            setTeamMembers(basicRows.map(r => ({
+              ...r,
+              email: r.user_id === session.user.id
+                ? session.user.email
+                : `Member ${r.user_id.slice(0, 8)}`,
+            })));
+          }
+        }
       } catch (e) { console.warn("Team load failed:", e); }
     }
     loadTeamState();
