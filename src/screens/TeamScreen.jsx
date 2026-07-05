@@ -57,11 +57,14 @@ function MemberDashboard({ member, data, members, currentUserId, userEmail, team
   const allClients   = data.clients   || [];
   const allContacts  = data.contacts  || [];
 
-  // Filter everything by this member's user_id
-  const memberFollowups = allFollowups.filter(f => f.user_id === member.user_id);
-  const memberLeads     = allLeads.filter(l => l.user_id === member.user_id);
+  // Filter by owned OR assigned to this member
+  const memberFollowups = allFollowups.filter(f => f.user_id === member.user_id || f.assigned_to_user_id === member.user_id);
+  const memberLeads     = allLeads.filter(l => l.user_id === member.user_id || l.assigned_to_user_id === member.user_id);
   const memberNotes     = allNotes.filter(n => n.user_id === member.user_id);
   const memberExpenses  = allExpenses.filter(e => e.user_id === member.user_id);
+  // Clients and contacts assigned to this member
+  const assignedClients  = allClients.filter(c => c.assigned_to_user_id === member.user_id);
+  const assignedContacts = allContacts.filter(c => c.assigned_to_user_id === member.user_id);
 
   const todayFU        = memberFollowups.filter(f => !f.completed && f.date === today);
   const overdueFU      = memberFollowups.filter(f => !f.completed && f.date < today);
@@ -111,10 +114,10 @@ function MemberDashboard({ member, data, members, currentUserId, userEmail, team
   // ── Drill-through view ─────────────────────────────────────────────────────
   if (drillSection) {
     const sectionData = {
-      leads:     memberLeads,
+      leads:     memberLeads.filter(l => !["Won","Lost"].includes(l.stage || "New")),
       followups: memberFollowups.filter(f => !f.completed),
-      clients:   allClients.filter(c => c.user_id === member.user_id),
-      contacts:  allContacts.filter(c => c.user_id === member.user_id),
+      clients:   assignedClients,
+      contacts:  assignedContacts,
     }[drillSection] || [];
 
     const sectionLabel = { leads: "Leads", followups: "Follow-ups", clients: "Clients", contacts: "Contacts" }[drillSection];
@@ -251,23 +254,23 @@ function MemberDashboard({ member, data, members, currentUserId, userEmail, team
         </button>
         <button onClick={() => setDrillSection("clients")} className="text-left">
           <Card className="p-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clients</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Assigned Clients</p>
             <p className="text-2xl font-black mt-1" style={{ color: "#5B21B6" }}>
-              {allClients.filter(c => c.user_id === member.user_id).length}
+              {assignedClients.length}
             </p>
             <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-              View all <ChevronRight size={11} className="text-slate-300" />
+              shared to them <ChevronRight size={11} className="text-slate-300" />
             </p>
           </Card>
         </button>
         <button onClick={() => setDrillSection("contacts")} className="text-left">
           <Card className="p-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contacts</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Assigned Contacts</p>
             <p className="text-2xl font-black mt-1" style={{ color: "#A16207" }}>
-              {allContacts.filter(c => c.user_id === member.user_id).length}
+              {assignedContacts.length}
             </p>
             <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-              View all <ChevronRight size={11} className="text-slate-300" />
+              shared to them <ChevronRight size={11} className="text-slate-300" />
             </p>
           </Card>
         </button>
@@ -623,9 +626,14 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
 
     const memberActivity = members.map(m => ({
       ...m,
-      openLeads: leads.filter(l => l.user_id === m.user_id && !["Won","Lost"].includes(l.stage || "New")).length,
-      todayFU:   followups.filter(f => f.user_id === m.user_id && !f.completed && f.date === today).length,
-      overdueFU: followups.filter(f => f.user_id === m.user_id && !f.completed && f.date < today).length,
+      // Owned by this member
+      openLeads:    leads.filter(l => l.user_id === m.user_id && !["Won","Lost"].includes(l.stage || "New")).length,
+      todayFU:      followups.filter(f => f.user_id === m.user_id && !f.completed && f.date === today).length,
+      overdueFU:    followups.filter(f => f.user_id === m.user_id && !f.completed && f.date < today).length,
+      // Assigned to this member by others
+      assignedLeads:   leads.filter(l => l.assigned_to_user_id === m.user_id && l.user_id !== m.user_id && !["Won","Lost"].includes(l.stage || "New")).length,
+      assignedClients: clients.filter(c => c.assigned_to_user_id === m.user_id && c.user_id !== m.user_id).length,
+      assignedFU:      followups.filter(f => f.assigned_to_user_id === m.user_id && f.user_id !== m.user_id && !f.completed).length,
     }));
 
     return { activeLeads, wonLeads, openFU, overdueFU, todayFU, pendingQuotes, wonRevenue, pipeline, totalInPipeline, memberActivity };
@@ -824,7 +832,10 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
                     {m.todayFU > 0 && <span className="text-[10px] font-bold text-blue-600">{m.todayFU} task{m.todayFU !== 1 ? "s" : ""} today</span>}
                     {m.overdueFU > 0 && <span className="text-[10px] font-bold text-red-600">{m.overdueFU} overdue</span>}
                     {m.openLeads > 0 && <span className="text-[10px] font-bold text-purple-600">{m.openLeads} lead{m.openLeads !== 1 ? "s" : ""}</span>}
-                    {m.todayFU === 0 && m.overdueFU === 0 && m.openLeads === 0 && (
+                    {(m.assignedLeads || 0) > 0 && <span className="text-[10px] font-bold text-amber-600">{m.assignedLeads} assigned lead{m.assignedLeads !== 1 ? "s" : ""}</span>}
+                    {(m.assignedClients || 0) > 0 && <span className="text-[10px] font-bold text-teal-600">{m.assignedClients} shared client{m.assignedClients !== 1 ? "s" : ""}</span>}
+                    {(m.assignedFU || 0) > 0 && <span className="text-[10px] font-bold text-indigo-600">{m.assignedFU} assigned task{m.assignedFU !== 1 ? "s" : ""}</span>}
+                    {m.todayFU === 0 && m.overdueFU === 0 && m.openLeads === 0 && !(m.assignedLeads) && !(m.assignedClients) && !(m.assignedFU) && (
                       <span className="text-[10px] text-slate-400">No activity today</span>
                     )}
                   </div>
