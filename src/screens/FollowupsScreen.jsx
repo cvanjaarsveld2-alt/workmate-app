@@ -7,7 +7,9 @@ import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { triggerImmediateSync } from "../lib/sync";
+import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
+import { MemberSelector } from "../components/MemberSelector";
 import {
   Card, Btn, Field, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
@@ -76,13 +78,13 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo }) {
   );
 }
 
-export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
+export function FollowupsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger }) {
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter]     = useState("By Client");
   const [editId, setEditId]     = useState(null);
   const [toast, setToast]       = useState("");
   const [sendInfo, setSendInfo] = useState(null);
-  const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "" });
+  const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "", assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
   const followups = data.followups || [];
@@ -100,13 +102,13 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
   }, [quickAddTrigger?.ts]);
 
   function resetForm() {
-    setForm({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "" });
+    setForm({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "", assigned_to_user_id: null, assigned_to: "" });
     setEditId(null);
     setShowForm(false);
   }
 
   function startEdit(f) {
-    setForm({ title: f.title || "", client_id: f.client_id || "", date: f.date || todayISO(), time: f.time || "09:00", reminder: f.reminder || "morning", notes: f.notes || "", linked_note_id: f.linked_note_id || "" });
+    setForm({ title: f.title || "", client_id: f.client_id || "", date: f.date || todayISO(), time: f.time || "09:00", reminder: f.reminder || "morning", notes: f.notes || "", linked_note_id: f.linked_note_id || "", assigned_to_user_id: f.assigned_to_user_id || null, assigned_to: f.assigned_to || "" });
     setEditId(f.id);
     setShowForm(true);
   }
@@ -133,6 +135,8 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
         notes: updated.notes || "",
         completed: !!updated.completed,
         linked_note_id: updated.linked_note_id || null,
+        assigned_to_user_id: updated.assigned_to_user_id || null,
+        assigned_to: updated.assigned_to || "",
         sync_status: "pending",
       };
       setData(d => ({
@@ -248,6 +252,22 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
           </select>
         </div>
         <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Any context…" multiline />
+
+        {/* Assign to team member */}
+        {teamMembers.length > 0 && (
+          <MemberSelector
+            label="Assign to"
+            value={form.assigned_to_user_id}
+            onChange={(uid, email) => setForm(f => ({
+              ...f,
+              assigned_to_user_id: uid,
+              assigned_to: uid ? (email?.split("@")[0] || email || "") : "",
+            }))}
+            members={teamMembers}
+            currentUserId={userId}
+          />
+        )}
+
         <div className="flex gap-2">
           <Btn className="flex-1" onClick={saveFollowup}><Save size={15} />{isEdit ? "Update" : "Add Follow-up"}</Btn>
           <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
