@@ -39,7 +39,7 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
   const [form, setForm] = useState({ client_name: "", description: "", value: "", status: "Pending" });
   const { confirm, dialog } = useConfirm();
   const [shareSheet, setShareSheet] = useState(null);
-  const quotes = data.quotes || [];
+  const quotes = (data.quotes || []).filter(q => q.user_id === userId);
 
   // ── Quick capture: open add form when FAB triggers this screen ──
   useEffect(() => {
