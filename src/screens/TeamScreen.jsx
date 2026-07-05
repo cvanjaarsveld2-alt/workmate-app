@@ -593,6 +593,43 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
     };
   }
 
+  // ── Team-wide stats (must be before all early returns — React hooks rule) ──
+  const teamStats = useMemo(() => {
+    const today       = todayISO();
+    const { start }   = getMonthRange();
+    const leads       = data?.leads     || [];
+    const followups   = data?.followups || [];
+    const clients     = data?.clients   || [];
+    const quotes      = data?.quotes    || [];
+
+    const activeLeads     = leads.filter(l => !["Won","Lost"].includes(l.stage || "New")).length;
+    const wonLeads        = leads.filter(l => l.stage === "Won").length;
+    const openFU          = followups.filter(f => !f.completed).length;
+    const overdueFU       = followups.filter(f => !f.completed && f.date < today).length;
+    const todayFU         = followups.filter(f => !f.completed && f.date === today).length;
+    const pendingQuotes   = quotes.filter(q => q.status === "Pending").length;
+    const wonRevenue      = quotes.filter(q => q.status === "Accepted").reduce((s, q) => s + parseFloat(q.value || 0), 0);
+
+    const pipeline = {
+      "New Lead":  clients.filter(c => (c.stage || "New Lead") === "New Lead").length,
+      "Contacted": clients.filter(c => c.stage === "Contacted").length,
+      "Quoted":    clients.filter(c => c.stage === "Quoted").length,
+      "Active":    clients.filter(c => c.stage === "Active").length,
+      "Won":       clients.filter(c => c.stage === "Won").length,
+      "Lost":      clients.filter(c => c.stage === "Lost").length,
+    };
+    const totalInPipeline = Object.values(pipeline).reduce((s, v) => s + v, 0);
+
+    const memberActivity = members.map(m => ({
+      ...m,
+      openLeads: leads.filter(l => l.user_id === m.user_id && !["Won","Lost"].includes(l.stage || "New")).length,
+      todayFU:   followups.filter(f => f.user_id === m.user_id && !f.completed && f.date === today).length,
+      overdueFU: followups.filter(f => f.user_id === m.user_id && !f.completed && f.date < today).length,
+    }));
+
+    return { activeLeads, wonLeads, openFU, overdueFU, todayFU, pendingQuotes, wonRevenue, pipeline, totalInPipeline, memberActivity };
+  }, [data, members]);
+
   // ── Viewing a member's dashboard ─────────────────────────────────────────
   if (viewingMember) {
     return (
@@ -690,46 +727,6 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
       </div>
     );
   }
-
-  // ── Team-wide stats ────────────────────────────────────────────────────────
-  const teamStats = useMemo(() => {
-    const today       = todayISO();
-    const { start }   = getMonthRange();
-    const leads       = data?.leads     || [];
-    const followups   = data?.followups || [];
-    const clients     = data?.clients   || [];
-    const quotes      = data?.quotes    || [];
-    const PIPELINE_STAGES = ["New Lead","Contacted","Quoted","Active","Won","Lost"];
-
-    const activeLeads     = leads.filter(l => !["Won","Lost"].includes(l.stage || "New")).length;
-    const wonLeads        = leads.filter(l => l.stage === "Won").length;
-    const openFU          = followups.filter(f => !f.completed).length;
-    const overdueFU       = followups.filter(f => !f.completed && f.date < today).length;
-    const todayFU         = followups.filter(f => !f.completed && f.date === today).length;
-    const pendingQuotes   = quotes.filter(q => q.status === "Pending").length;
-    const wonRevenue      = quotes.filter(q => q.status === "Accepted").reduce((s, q) => s + parseFloat(q.value || 0), 0);
-
-    // Pipeline breakdown
-    const pipeline = {
-      "New Lead":  clients.filter(c => (c.stage || "New Lead") === "New Lead").length,
-      "Contacted": clients.filter(c => c.stage === "Contacted").length,
-      "Quoted":    clients.filter(c => c.stage === "Quoted").length,
-      "Active":    clients.filter(c => c.stage === "Active").length,
-      "Won":       clients.filter(c => c.stage === "Won").length,
-      "Lost":      clients.filter(c => c.stage === "Lost").length,
-    };
-    const totalInPipeline = Object.values(pipeline).reduce((s, v) => s + v, 0);
-
-    // Per-member breakdown
-    const memberActivity = members.map(m => {
-      const mLeads = leads.filter(l => l.user_id === m.user_id && !["Won","Lost"].includes(l.stage || "New")).length;
-      const mFU    = followups.filter(f => f.user_id === m.user_id && !f.completed && f.date === today).length;
-      const mOver  = followups.filter(f => f.user_id === m.user_id && !f.completed && f.date < today).length;
-      return { ...m, openLeads: mLeads, todayFU: mFU, overdueFU: mOver };
-    });
-
-    return { activeLeads, wonLeads, openFU, overdueFU, todayFU, pendingQuotes, wonRevenue, pipeline, totalInPipeline, memberActivity };
-  }, [data, members]);
 
   // ── Has a team ─────────────────────────────────────────────────────────────
   return (
