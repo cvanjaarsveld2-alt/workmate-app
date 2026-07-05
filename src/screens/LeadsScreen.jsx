@@ -14,6 +14,7 @@ import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
+import { ShareSheet } from "../components/ShareSheet";
 import {
   Card, Btn, Field, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
@@ -282,7 +283,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [filterStage, setFilterStage] = useState("All");
   const [filterCat, setFilterCat]     = useState("All");
   const [toast, setToast]             = useState("");
-  const [reassigning, setReassigning] = useState(false);
+  const [shareSheet, setShareSheet]   = useState(null); // { id, title, type }
   const { confirm, dialog }           = useConfirm();
 
   const leads    = data.leads    || [];
@@ -437,6 +438,24 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
+      {/* Share sheet */}
+      <ShareSheet
+        open={!!shareSheet}
+        onClose={() => setShareSheet(null)}
+        record={shareSheet}
+        members={teamMembers}
+        currentUserId={userId}
+        userEmail={userEmail}
+        teamId={teamId}
+        onAssign={(uid, email) => {
+          if (shareSheet) reassignLead(
+            leads.find(l => l.id === shareSheet.id),
+            uid, email
+          );
+          setShareSheet(null);
+        }}
+      />
+
       {/* ── Detail sheet ── */}
       <DetailSheet
         open={!!detailLead}
@@ -478,6 +497,18 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
                 <Trash2 size={14} /> Delete
               </button>
             </div>
+            {/* Share button — only when team exists */}
+            {teamMembers.length > 0 && (
+              <button
+                onClick={() => {
+                  setShareSheet({ id: detailLead.id, title: detailLead.title, type: "lead" });
+                  setDetailLead(null);
+                }}
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold border-2 min-h-[52px]"
+                style={{ borderColor: "#8B1A1A", color: "#8B1A1A", background: "#FFF5F5" }}>
+                <Send size={15} /> Share with teammate
+              </button>
+            )}
           </div>
         )}
       >
