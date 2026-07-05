@@ -7,9 +7,14 @@
 import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  TrendingUp, TrendingDown, Users, Target, Award,
-  Calendar, Receipt, ChevronRight, BarChart2,
-  CheckCircle2, XCircle, Clock,
+  TrendingUp,
+  TrendingDown,
+  Users,
+  Target,
+  Award,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { BRAND, STAGE_COLORS } from "../lib/constants";
 import { smartDate, todayISO } from "../lib/helpers";
