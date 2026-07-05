@@ -1,4 +1,4 @@
-// ─── Team Screen ──────────────────────────────────────────────────────────────
+]// ─── Team Screen ──────────────────────────────────────────────────────────────
 // Manage the Power Works team. Admin can view invite code, see members,
 // change roles. Any user can join via invite code or create a new team.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ export function TeamScreen({ userId, userEmail, onTeamChange }) {
         .from("team_members")
         .select("team_id, role")
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
       if (!membership) { setTeam(null); setLoading(false); return; }
 
@@ -62,7 +62,7 @@ export function TeamScreen({ userId, userEmail, onTeamChange }) {
         .from("teams")
         .select("id, name, invite_code")
         .eq("id", membership.team_id)
-        .single();
+        .maybeSingle();
 
       setTeam(teamData);
 
@@ -84,19 +84,17 @@ export function TeamScreen({ userId, userEmail, onTeamChange }) {
     if (!teamName.trim()) return;
     setSaving(true);
     try {
-      // Create team
-      const { data: newTeam, error: te } = await supabase
-        .from("teams")
-        .insert({ name: teamName.trim() })
-        .select()
-        .single();
+      // Use security definer function to bypass RLS chicken-and-egg
+      const { data: newTeamJson, error: te } = await supabase
+        .rpc("create_team_for_user", {
+          p_name: teamName.trim(),
+          p_user_id: userId,
+        });
       if (te) throw te;
 
-      // Add creator as admin
-      const { error: me } = await supabase
-        .from("team_members")
-        .insert({ team_id: newTeam.id, user_id: userId, role: "admin" });
-      if (me) throw me;
+      const newTeam = typeof newTeamJson === "string"
+        ? JSON.parse(newTeamJson)
+        : newTeamJson;
 
       // Migrate existing data to this team
       await migrateToTeam(newTeam.id);
