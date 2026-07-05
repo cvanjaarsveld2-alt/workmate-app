@@ -1,5 +1,5 @@
 // ─── Follow-ups Screen ────────────────────────────────────────────────────────
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, Check, Calendar, Send } from "lucide-react";
 import { BRAND, REMINDER_OPTIONS } from "../lib/constants";
@@ -82,7 +82,7 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
   const [editId, setEditId]     = useState(null);
   const [toast, setToast]       = useState("");
   const [sendInfo, setSendInfo] = useState(null);
-  const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "" });
+  const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "" });
   const { confirm, dialog } = useConfirm();
 
   const followups = data.followups || [];
@@ -100,13 +100,13 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
   }, [quickAddTrigger?.ts]);
 
   function resetForm() {
-    setForm({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "" });
+    setForm({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "" });
     setEditId(null);
     setShowForm(false);
   }
 
   function startEdit(f) {
-    setForm({ title: f.title || "", client_id: f.client_id || "", date: f.date || todayISO(), time: f.time || "09:00", reminder: f.reminder || "morning", notes: f.notes || "" });
+    setForm({ title: f.title || "", client_id: f.client_id || "", date: f.date || todayISO(), time: f.time || "09:00", reminder: f.reminder || "morning", notes: f.notes || "", linked_note_id: f.linked_note_id || "" });
     setEditId(f.id);
     setShowForm(true);
   }
@@ -132,6 +132,7 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
         reminder: updated.reminder || "morning",
         notes: updated.notes || "",
         completed: !!updated.completed,
+        linked_note_id: updated.linked_note_id || null,
         sync_status: "pending",
       };
       setData(d => ({
@@ -190,13 +191,51 @@ export function FollowupsScreen({ data, setData, userId, quickAddTrigger }) {
     triggerImmediateSync();
   }
 
+  // ── Notes filtered by selected client ────────────────────────────────────
+  const notes = data.notes || [];
+  const clientNotes = useMemo(() => {
+    if (!form.client_id) return notes;
+    const client = clients.find(c => c.id === form.client_id);
+    if (!client) return notes;
+    return notes.filter(n => n.client === client.company || n.client_id === form.client_id);
+  }, [notes, form.client_id, clients]);
+
   // ── Shared form: rendered at top for NEW, in-place for EDIT ──
   function renderFollowupForm(isEdit) {
+    const linkedNote = notes.find(n => n.id === form.linked_note_id);
     return (
       <Card className="p-4 space-y-3">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Follow-up" : "New Follow-up"}</p>
         <Field label="What to follow up on" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. Call mine buyer re quote" required />
-        <ClientSelector label="Client" value={form.client_id} onChange={v => setForm(f => ({ ...f, client_id: v }))} clients={clients} />
+        <ClientSelector label="Client" value={form.client_id} onChange={v => setForm(f => ({ ...f, client_id: v, linked_note_id: "" }))} clients={clients} />
+
+        {/* ── Linked note dropdown ── */}
+        <div>
+          <label className="mb-1.5 block text-sm font-bold text-slate-500">
+            Linked note <span className="text-slate-400 font-normal">(optional)</span>
+          </label>
+          <select
+            value={form.linked_note_id}
+            onChange={e => setForm(f => ({ ...f, linked_note_id: e.target.value }))}
+            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[56px]">
+            <option value="">— No linked note</option>
+            {clientNotes.map(n => (
+              <option key={n.id} value={n.id}>
+                {n.client ? `${n.client}: ` : ""}{(n.note || "").slice(0, 60)}{(n.note || "").length > 60 ? "…" : ""}
+              </option>
+            ))}
+            {clientNotes.length === 0 && notes.length > 0 && (
+              <option disabled>No notes for this client yet</option>
+            )}
+          </select>
+          {linkedNote && (
+            <div className="mt-2 rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5">
+              <p className="text-xs font-bold text-amber-700 mb-0.5">Linked note</p>
+              <p className="text-xs text-amber-800 leading-snug line-clamp-3">{linkedNote.note}</p>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-2 gap-3">
           <Field label="Date" type="date" value={form.date} onChange={v => setForm(f => ({ ...f, date: v }))} />
           <Field label="Time" type="time" value={form.time} onChange={v => setForm(f => ({ ...f, time: v }))} />
