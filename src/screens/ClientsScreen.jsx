@@ -3,9 +3,10 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, Check,
-  ChevronDown, ChevronUp, Phone, Clipboard, Send,
+  ChevronDown, ChevronUp, Phone, Clipboard, Send, Share2,
 } from "lucide-react";
 import { MemberSelector } from "../components/MemberSelector";
+import { ShareSheet } from "../components/ShareSheet";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS, NOTE_URGENCY, STAGE_COLORS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
@@ -340,6 +341,7 @@ function CategoryBadge({ catId, size = "sm" }) {
   const [showNoteForm, setShowNoteForm] = useState(null);
   const [filterStage, setFilterStage]   = useState("All");
   const [filterCat, setFilterCat]       = useState("All");
+  const [shareSheet, setShareSheet]     = useState(null);
   const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
@@ -522,6 +524,33 @@ function CategoryBadge({ catId, size = "sm" }) {
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+
+      {/* Share sheet */}
+      <ShareSheet
+        open={!!shareSheet}
+        onClose={() => setShareSheet(null)}
+        record={shareSheet}
+        members={teamMembers}
+        currentUserId={userId}
+        userEmail={userEmail}
+        teamId={teamId}
+        onAssign={(uid, email) => {
+          if (!shareSheet || !uid) return;
+          const client = clients.find(c => c.id === shareSheet.id);
+          if (!client) return;
+          const now = new Date().toISOString();
+          const updated = { ...client, assigned_to_user_id: uid, assigned_to: email?.split("@")[0] || email, sync_status: "pending", updated_at: now };
+          setData(d => ({
+            ...d,
+            clients: (d.clients || []).map(c => c.id === shareSheet.id ? updated : c),
+            syncQueue: [{ id: genId(), table: "clients", action: "update", data: updated, status: "pending", created_at: now }, ...(d.syncQueue || [])],
+          }));
+          triggerImmediateSync();
+          setToast(`Client shared with ${email?.split("@")[0] || email}`);
+          setShareSheet(null);
+        }}
+      />
+
       <AnimatePresence>
         {sendInfo && (
           <SendCompanyInfoSheet
@@ -677,6 +706,14 @@ function CategoryBadge({ catId, size = "sm" }) {
                           )}
                         </div>
                         <div className="flex gap-2 shrink-0">
+                          {teamMembers.length > 0 && (
+                            <button
+                              onClick={() => setShareSheet({ id: c.id, title: `${c.company}${c.branch ? ` — ${c.branch}` : ""}`, type: "client" })}
+                              className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-purple-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              title="Share with teammate">
+                              <Share2 size={15} />
+                            </button>
+                          )}
                           <button onClick={() => startEdit(c)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={15} /></button>
                           <button onClick={() => deleteClient(c.id, c.company)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={15} /></button>
                         </div>
