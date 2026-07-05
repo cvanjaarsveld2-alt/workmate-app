@@ -262,7 +262,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
       </div>
 
       <Field label="Notes" value={form.notes} onChange={f("notes")}
-        placeholder="Context, details, what was discussed&hellip;" multiline />
+        placeholder="Context, details, what was discussed…" multiline />
 
       {(form.stage === "Won" || form.stage === "Lost") && (
         <Field label={form.stage === "Won" ? "Win notes" : "Loss reason"}
