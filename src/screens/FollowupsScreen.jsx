@@ -92,7 +92,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
   const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "", assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
-  const followups = data.followups || [];
+  const followups = (data.followups || []).filter(f => f.user_id === userId);
   const clients   = data.clients   || [];
   const today     = todayISO();
   const nextWeek  = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
