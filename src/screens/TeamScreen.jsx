@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, Copy, Check, Crown, UserMinus, Plus,
   RefreshCw, LogOut, Shield, AlertTriangle, X,
-  ChevronRight, ArrowLeft, Calendar, TrendingUp,
+  ChevronRight, ChevronDown, ChevronUp, ArrowLeft, Calendar, TrendingUp,
   Receipt, Clipboard, Wrench, Send,
 } from "lucide-react";
 import { supabase } from "../supabase";
@@ -410,6 +410,7 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
   const [copied, setCopied]           = useState(false);
   const [showCreate, setShowCreate]   = useState(false);
   const [showJoin, setShowJoin]       = useState(false);
+  const [showManage, setShowManage]   = useState(false);
   const [teamName, setTeamName]       = useState("Power Works (Pty) Ltd");
   const [inviteInput, setInviteInput] = useState("");
   const [saving, setSaving]           = useState(false);
@@ -835,63 +836,89 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
         </div>
       </Card>
 
-      {/* Invite code card */}
-      <Card className="p-4">
-        <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Invite Code</p>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="flex-1 rounded-xl bg-slate-50 border-2 border-slate-100 px-4 py-3 min-h-[52px] flex items-center">
-            <p className="text-2xl font-black tracking-[0.25em] text-slate-900">{team.invite_code}</p>
-          </div>
-          <button onClick={copyCode}
-            className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 transition-colors"
-            style={{ background: copied ? "#DCFCE7" : "#F7F3F3" }}>
-            {copied ? <Check size={20} className="text-green-600" /> : <Copy size={20} style={{ color: BRAND.primary }} />}
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Btn onClick={shareInviteLink} size="sm">
-            <Send size={13} /> Share invite
-          </Btn>
-          {myRole === "admin" && (
-            <Btn variant="ghost" size="sm" onClick={regenerateInviteCode}>
-              <RefreshCw size={13} /> New code
-            </Btn>
-          )}
-        </div>
-        <p className="text-xs text-slate-400 mt-2.5 text-center leading-relaxed">
-          Share this code with colleagues. They enter it in Team to join.
+      {/* Manage toggle — collapses invite code + shared sections */}
+      <button onClick={() => setShowManage(s => !s)}
+        className="w-full flex items-center justify-between px-1">
+        <p className="text-xs font-black text-slate-400 uppercase tracking-wider">
+          Team Settings
         </p>
-      </Card>
-
-      {/* What's shared */}
-      <Card className="p-4">
-        <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Shared across team</p>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { label: "Clients",     shared: true },
-            { label: "Contacts",    shared: true },
-            { label: "Quotes",      shared: true },
-            { label: "Follow-ups",  shared: true },
-            { label: "Leads",       shared: true },
-            { label: "Field Notes", shared: true },
-            { label: "Equipment",   shared: true },
-            { label: "Expenses",    shared: false, note: "Always private" },
-          ].map(item => (
-            <div key={item.label} className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
-                style={{ background: item.shared ? "#DCFCE7" : "#F1F5F9" }}>
-                {item.shared
-                  ? <Check size={10} className="text-green-600" />
-                  : <X size={8} className="text-slate-400" />}
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-slate-700 leading-tight">{item.label}</p>
-                {item.note && <p className="text-[10px] text-slate-400">{item.note}</p>}
-              </div>
-            </div>
-          ))}
+        <div className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 min-h-[36px]"
+          style={{ background: "#F7F3F3" }}>
+          <p className="text-xs font-bold" style={{ color: BRAND.primary }}>
+            {showManage ? "Hide" : "Invite code & settings"}
+          </p>
+          {showManage
+            ? <ChevronUp size={13} style={{ color: BRAND.primary }} />
+            : <ChevronDown size={13} style={{ color: BRAND.primary }} />}
         </div>
-      </Card>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {showManage && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
+            className="overflow-hidden space-y-4">
+
+            {/* Invite code card */}
+            <Card className="p-4">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Invite Code</p>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex-1 rounded-xl bg-slate-50 border-2 border-slate-100 px-4 py-3 min-h-[52px] flex items-center">
+                  <p className="text-2xl font-black tracking-[0.25em] text-slate-900">{team.invite_code}</p>
+                </div>
+                <button onClick={copyCode}
+                  className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 transition-colors"
+                  style={{ background: copied ? "#DCFCE7" : "#F7F3F3" }}>
+                  {copied ? <Check size={20} className="text-green-600" /> : <Copy size={20} style={{ color: BRAND.primary }} />}
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Btn onClick={shareInviteLink} size="sm">
+                  <Send size={13} /> Share invite
+                </Btn>
+                {myRole === "admin" && (
+                  <Btn variant="ghost" size="sm" onClick={regenerateInviteCode}>
+                    <RefreshCw size={13} /> New code
+                  </Btn>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-2.5 text-center leading-relaxed">
+                Share this code with colleagues. They enter it in Team to join.
+              </p>
+            </Card>
+
+            {/* What's shared */}
+            <Card className="p-4">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Shared across team</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: "Clients",     shared: true },
+                  { label: "Contacts",    shared: true },
+                  { label: "Quotes",      shared: true },
+                  { label: "Follow-ups",  shared: true },
+                  { label: "Leads",       shared: true },
+                  { label: "Field Notes", shared: true },
+                  { label: "Equipment",   shared: true },
+                  { label: "Expenses",    shared: false, note: "Always private" },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
+                      style={{ background: item.shared ? "#DCFCE7" : "#F1F5F9" }}>
+                      {item.shared
+                        ? <Check size={10} className="text-green-600" />
+                        : <X size={8} className="text-slate-400" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-700 leading-tight">{item.label}</p>
+                      {item.note && <p className="text-[10px] text-slate-400">{item.note}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Members list */}
       <Card className="overflow-hidden">
