@@ -45,6 +45,7 @@ import { AnalyticsScreen }       from "./screens/AnalyticsScreen";
 import { LeadsScreen }           from "./screens/LeadsScreen";
 import { TeamScreen }            from "./screens/TeamScreen";
 import { NotificationsScreen }   from "./screens/NotificationsScreen";
+import { SharedInboxScreen }     from "./screens/SharedInboxScreen";
 import { ExpensesScreen }  from "./screens/ExpensesScreen";
 import { MoreScreen }      from "./screens/MoreScreen";
 import { DiagnosticsScreen } from "./screens/DiagnosticsScreen";
@@ -85,7 +86,7 @@ export default function PowerWorksApp() {
     // Notifications open the app at /?screen=Followups etc — honour that on load.
     try {
       const p = new URLSearchParams(window.location.search).get("screen");
-      const valid = ["Home", "Clients", "Contacts", "Followups", "Notes", "Equipment", "Quotes", "Expenses", "More", "Diagnostics", "BackfillZAR"];
+      const valid = ["Home", "Clients", "Contacts", "Followups", "Notes", "Equipment", "Quotes", "Expenses", "More", "Diagnostics", "BackfillZAR", "Analytics", "Leads", "Team", "VehicleCheck", "Notifications", "SharedInbox"];
       if (p && valid.includes(p)) return p;
     } catch (e) { /* ignore */ }
     return "Home";
@@ -494,6 +495,7 @@ export default function PowerWorksApp() {
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
     Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} onBackfill={() => navigate("BackfillZAR")} />,
     Notifications: <NotificationsScreen userId={session.user.id} onNavigate={navigate} onMarkRead={() => setUnreadCount(0)} />,
+    SharedInbox:   <SharedInboxScreen  userId={session.user.id} onBack={() => navigate("Notifications")} onAccepted={() => { triggerImmediateSync(); navigate("Notifications"); }} />,
   };
 
   return (
