@@ -83,6 +83,19 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
     return `${days}d ago`;
   }
 
+  async function clearAll() {
+    try {
+      await supabase
+        .from("team_notifications")
+        .delete()
+        .eq("to_user_id", userId);
+      setNotifications([]);
+      setToast("Activity cleared");
+    } catch (e) {
+      setToast("Could not clear — try again");
+    }
+  }
+
   return (
     <div className="space-y-4">
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
@@ -116,7 +129,16 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
         </Card>
       </button>
 
-      <p className="text-xs font-black text-slate-400 uppercase tracking-wider px-1">Activity</p>
+      {/* Activity header with Clear All */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Activity</p>
+        {notifications.length > 0 && (
+          <button onClick={clearAll}
+            className="text-xs font-bold text-slate-400 hover:text-red-500 transition-colors py-1 px-2 min-h-[36px]">
+            Clear all
+          </button>
+        )}
+      </div>
 
       {loading ? (
         <div className="space-y-3">
