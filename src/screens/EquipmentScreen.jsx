@@ -44,7 +44,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
   const [form, setForm] = useState({ name: "", type: "", make: "", model: "", serial: "", location: "", client: "", service_due: "", notes: "" });
   const [pendingMedia, setPendingMedia] = useState([]);
   const { confirm, dialog } = useConfirm();
-  const equipment = data.equipment || [];
+  const equipment = (data.equipment || []).filter(e => e.user_id === userId);
 
   useEffect(() => {
     if (!quickAddTrigger) return;
