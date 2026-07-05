@@ -81,6 +81,89 @@ function MemberDashboard({ member, data, onBack }) {
     .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
     .slice(0, 5);
 
+  const [drillSection, setDrillSection] = useState(null); // null | "leads" | "followups" | "clients" | "contacts"
+
+  const allClients  = data.clients  || [];
+  const allContacts = data.contacts || [];
+
+  // ── Drill-through view ─────────────────────────────────────────────────────
+  if (drillSection) {
+    const sectionData = {
+      leads:     memberLeads,
+      followups: memberFollowups.filter(f => !f.completed),
+      clients:   allClients.filter(c => c.user_id === member.user_id),
+      contacts:  allContacts.filter(c => c.user_id === member.user_id),
+    }[drillSection] || [];
+
+    const sectionLabel = { leads: "Leads", followups: "Follow-ups", clients: "Clients", contacts: "Contacts" }[drillSection];
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setDrillSection(null)}
+            className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <ArrowLeft size={18} />
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-black text-slate-900">{sectionLabel}</p>
+            <p className="text-xs text-slate-400 truncate">{member.email}</p>
+          </div>
+        </div>
+
+        {sectionData.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-sm font-bold text-slate-500">No {sectionLabel.toLowerCase()} for this member yet.</p>
+          </Card>
+        ) : (
+          <Card className="divide-y divide-slate-50 overflow-hidden">
+            {sectionData.map(item => {
+              if (drillSection === "leads") return (
+                <div key={item.id} className="px-4 py-3.5 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 leading-tight">{item.title}</p>
+                    {item.client_name && <p className="text-xs text-slate-400 mt-0.5">{item.client_name}</p>}
+                  </div>
+                  <span className="text-xs font-bold shrink-0 rounded-full px-2.5 py-1"
+                    style={{ background: "#EDE9FE", color: "#5B21B6" }}>{item.stage || "New"}</span>
+                </div>
+              );
+              if (drillSection === "followups") return (
+                <div key={item.id} className="px-4 py-3.5 flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 leading-tight">{item.title}</p>
+                    {item.client && <p className="text-xs text-slate-400 mt-0.5">{item.client}</p>}
+                  </div>
+                  <span className="text-xs font-bold shrink-0 rounded-full px-2.5 py-1"
+                    style={item.date < todayISO()
+                      ? { background: "#FEE2E2", color: "#991B1B" }
+                      : { background: "#F1F5F9", color: "#64748B" }}>
+                    {smartDate(item.date)}
+                  </span>
+                </div>
+              );
+              if (drillSection === "clients") return (
+                <div key={item.id} className="px-4 py-3.5">
+                  <p className="text-sm font-bold text-slate-800">{item.company}</p>
+                  {item.branch && <p className="text-xs text-slate-400 mt-0.5">{item.branch}</p>}
+                  <span className="text-xs font-bold rounded-full px-2 py-0.5 mt-1 inline-block"
+                    style={{ background: "#DBEAFE", color: "#1E40AF" }}>{item.stage || "New Lead"}</span>
+                </div>
+              );
+              if (drillSection === "contacts") return (
+                <div key={item.id} className="px-4 py-3.5">
+                  <p className="text-sm font-bold text-slate-800">{item.name}</p>
+                  {item.company && <p className="text-xs text-slate-400 mt-0.5">{item.company}</p>}
+                  {item.phone && <p className="text-xs text-slate-400">{item.phone}</p>}
+                </div>
+              );
+              return null;
+            })}
+          </Card>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Back header */}
@@ -98,34 +181,52 @@ function MemberDashboard({ member, data, onBack }) {
         </div>
       </div>
 
-      {/* Stats grid */}
+      {/* Tappable stats grid — each card drills into the full list */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="p-4">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Tasks</p>
-          <p className="text-2xl font-black mt-1" style={{ color: todayFU.length > 0 ? BRAND.primary : "#16A34A" }}>
-            {todayFU.length}
-          </p>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {todayFU.length === 0 ? "all clear" : "follow-ups due"}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Leads</p>
-          <p className="text-2xl font-black mt-1" style={{ color: "#0E7490" }}>{openLeads.length}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{wonLeads.length} won</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Overdue</p>
-          <p className="text-2xl font-black mt-1" style={{ color: overdueFU.length > 0 ? "#DC2626" : "#16A34A" }}>
-            {overdueFU.length}
-          </p>
-          <p className="text-xs text-slate-400 mt-0.5">follow-ups</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Expenses (month)</p>
-          <p className="text-xl font-black mt-1" style={{ color: "#7C2D12" }}>{money(monthExpTotal)}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{monthExpenses.length} item{monthExpenses.length !== 1 ? "s" : ""}</p>
-        </Card>
+        <button onClick={() => setDrillSection("followups")} className="text-left">
+          <Card className="p-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Tasks</p>
+            <p className="text-2xl font-black mt-1" style={{ color: todayFU.length > 0 ? BRAND.primary : "#16A34A" }}>
+              {todayFU.length}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+              {todayFU.length === 0 ? "all clear" : "follow-ups due"}
+              <ChevronRight size={11} className="text-slate-300" />
+            </p>
+          </Card>
+        </button>
+        <button onClick={() => setDrillSection("leads")} className="text-left">
+          <Card className="p-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Leads</p>
+            <p className="text-2xl font-black mt-1" style={{ color: "#0E7490" }}>{openLeads.length}</p>
+            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+              {wonLeads.length} won
+              <ChevronRight size={11} className="text-slate-300" />
+            </p>
+          </Card>
+        </button>
+        <button onClick={() => setDrillSection("clients")} className="text-left">
+          <Card className="p-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clients</p>
+            <p className="text-2xl font-black mt-1" style={{ color: "#5B21B6" }}>
+              {allClients.filter(c => c.user_id === member.user_id).length}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+              View all <ChevronRight size={11} className="text-slate-300" />
+            </p>
+          </Card>
+        </button>
+        <button onClick={() => setDrillSection("contacts")} className="text-left">
+          <Card className="p-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contacts</p>
+            <p className="text-2xl font-black mt-1" style={{ color: "#A16207" }}>
+              {allContacts.filter(c => c.user_id === member.user_id).length}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+              View all <ChevronRight size={11} className="text-slate-300" />
+            </p>
+          </Card>
+        </button>
       </div>
 
       {/* Completion rate */}
