@@ -29,7 +29,7 @@ const SECTIONS = [
     items: [
       { key: "Home",      label: "Dashboard",   icon: Home },
       { key: "Analytics", label: "Analytics",    icon: BarChart2 },
-      { key: "Leads",     label: "Leads",        icon: TrendingUp },
+      { key: "Leads",     label: "Opportunities", icon: TrendingUp },
       { key: "Clients",   label: "Clients",      icon: Users },
       { key: "Contacts",  label: "Contacts",     icon: UserPlus,     badgeKey: "leads" },
       { key: "Followups", label: "Follow-ups",   icon: CalendarIcon, badgeKey: "overdueFU" },
