@@ -1,9 +1,13 @@
 // ─── PowerMate App ────────────────────────────────────────────────────────────
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Home, Users, Calendar, File as FileIcon,
-  Clipboard, Wrench, Settings, UserPlus, Search, Menu, Receipt, Plus,
+  Home,
+  Calendar,
+  Settings,
+  Search,
+  Menu,
+  Plus,
 } from "lucide-react";
 
 import { supabase } from "./supabase";
