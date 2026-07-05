@@ -691,6 +691,46 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
     );
   }
 
+  // ── Team-wide stats ────────────────────────────────────────────────────────
+  const teamStats = useMemo(() => {
+    const today       = todayISO();
+    const { start }   = getMonthRange();
+    const leads       = data?.leads     || [];
+    const followups   = data?.followups || [];
+    const clients     = data?.clients   || [];
+    const quotes      = data?.quotes    || [];
+    const PIPELINE_STAGES = ["New Lead","Contacted","Quoted","Active","Won","Lost"];
+
+    const activeLeads     = leads.filter(l => !["Won","Lost"].includes(l.stage || "New")).length;
+    const wonLeads        = leads.filter(l => l.stage === "Won").length;
+    const openFU          = followups.filter(f => !f.completed).length;
+    const overdueFU       = followups.filter(f => !f.completed && f.date < today).length;
+    const todayFU         = followups.filter(f => !f.completed && f.date === today).length;
+    const pendingQuotes   = quotes.filter(q => q.status === "Pending").length;
+    const wonRevenue      = quotes.filter(q => q.status === "Accepted").reduce((s, q) => s + parseFloat(q.value || 0), 0);
+
+    // Pipeline breakdown
+    const pipeline = {
+      "New Lead":  clients.filter(c => (c.stage || "New Lead") === "New Lead").length,
+      "Contacted": clients.filter(c => c.stage === "Contacted").length,
+      "Quoted":    clients.filter(c => c.stage === "Quoted").length,
+      "Active":    clients.filter(c => c.stage === "Active").length,
+      "Won":       clients.filter(c => c.stage === "Won").length,
+      "Lost":      clients.filter(c => c.stage === "Lost").length,
+    };
+    const totalInPipeline = Object.values(pipeline).reduce((s, v) => s + v, 0);
+
+    // Per-member breakdown
+    const memberActivity = members.map(m => {
+      const mLeads = leads.filter(l => l.user_id === m.user_id && !["Won","Lost"].includes(l.stage || "New")).length;
+      const mFU    = followups.filter(f => f.user_id === m.user_id && !f.completed && f.date === today).length;
+      const mOver  = followups.filter(f => f.user_id === m.user_id && !f.completed && f.date < today).length;
+      return { ...m, openLeads: mLeads, todayFU: mFU, overdueFU: mOver };
+    });
+
+    return { activeLeads, wonLeads, openFU, overdueFU, todayFU, pendingQuotes, wonRevenue, pipeline, totalInPipeline, memberActivity };
+  }, [data, members]);
+
   // ── Has a team ─────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
@@ -701,6 +741,102 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
         title={team.name}
         subtitle={`${members.length} member${members.length !== 1 ? "s" : ""} · ${myRole === "admin" ? "You are admin" : "Member"}`}
       />
+
+      {/* ── Team Dashboard ── */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-4">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Tasks</p>
+          <p className="text-2xl font-black mt-1" style={{ color: teamStats.todayFU > 0 ? BRAND.primary : "#16A34A" }}>
+            {teamStats.todayFU}
+          </p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {teamStats.overdueFU > 0 ? `${teamStats.overdueFU} overdue` : "follow-ups due"}
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Leads</p>
+          <p className="text-2xl font-black mt-1" style={{ color: "#5B21B6" }}>{teamStats.activeLeads}</p>
+          <p className="text-xs text-slate-400 mt-0.5">{teamStats.wonLeads} won</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pending Quotes</p>
+          <p className="text-2xl font-black mt-1" style={{ color: "#B45309" }}>{teamStats.pendingQuotes}</p>
+          <p className="text-xs text-slate-400 mt-0.5">awaiting response</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Won Revenue</p>
+          <p className="text-xl font-black mt-1 leading-tight" style={{ color: "#16A34A" }}>{money(teamStats.wonRevenue)}</p>
+          <p className="text-xs text-slate-400 mt-0.5">accepted quotes</p>
+        </Card>
+      </div>
+
+      {/* ── Sales Pipeline ── */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Sales Pipeline</p>
+          <p className="text-xs text-slate-400">{teamStats.totalInPipeline} total</p>
+        </div>
+        <div className="space-y-2">
+          {[
+            { label: "New Lead",  color: "#92400E", bg: "#FEF3C7" },
+            { label: "Contacted", color: "#1E40AF", bg: "#DBEAFE" },
+            { label: "Quoted",    color: "#5B21B6", bg: "#EDE9FE" },
+            { label: "Active",    color: "#0E7490", bg: "#CFFAFE" },
+            { label: "Won",       color: "#16A34A", bg: "#DCFCE7" },
+          ].map(({ label, color }) => {
+            const count = teamStats.pipeline[label] || 0;
+            const pct   = teamStats.totalInPipeline > 0 ? (count / teamStats.totalInPipeline) * 100 : 0;
+            return (
+              <div key={label} className="flex items-center gap-3">
+                <p className="w-20 text-sm font-bold shrink-0" style={{ color }}>{label}</p>
+                <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                  <motion.div className="h-full rounded-full" style={{ background: color }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.5 }} />
+                </div>
+                <span className="text-sm font-black text-slate-600 w-6 text-right">{count}</span>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* ── Member activity strip ── */}
+      <Card className="p-4">
+        <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Team Activity Today</p>
+        <div className="space-y-2.5">
+          {teamStats.memberActivity.map(m => {
+            const name = m.email?.split("@")[0] || "Member";
+            const isMe = m.user_id === userId;
+            return (
+              <button key={m.user_id}
+                onClick={() => myRole === "admin" ? setViewingMember(m) : null}
+                className="w-full flex items-center gap-3 min-h-[44px]"
+                style={{ cursor: myRole === "admin" ? "pointer" : "default" }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0"
+                  style={{ background: m.role === "admin" ? "#A16207" : BRAND.primary }}>
+                  {(m.email || "?").slice(0, 2).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">
+                    {name.charAt(0).toUpperCase() + name.slice(1)}{isMe ? " (me)" : ""}
+                  </p>
+                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                    {m.todayFU > 0 && <span className="text-[10px] font-bold text-blue-600">{m.todayFU} task{m.todayFU !== 1 ? "s" : ""} today</span>}
+                    {m.overdueFU > 0 && <span className="text-[10px] font-bold text-red-600">{m.overdueFU} overdue</span>}
+                    {m.openLeads > 0 && <span className="text-[10px] font-bold text-purple-600">{m.openLeads} lead{m.openLeads !== 1 ? "s" : ""}</span>}
+                    {m.todayFU === 0 && m.overdueFU === 0 && m.openLeads === 0 && (
+                      <span className="text-[10px] text-slate-400">No activity today</span>
+                    )}
+                  </div>
+                </div>
+                {myRole === "admin" && <ChevronRight size={14} className="text-slate-300 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
 
       {/* Invite code card */}
       <Card className="p-4">
