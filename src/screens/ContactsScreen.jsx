@@ -11,6 +11,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
+import { ShareSheet } from "../components/ShareSheet";
 import { CardScanner } from "../components/CardScanner";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
@@ -59,7 +60,7 @@ function ExpandableText({ text, limit = 100, className = "" }) {
   );
 }
 
-export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchSeed }) {
+export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]       = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [editId, setEditId]           = useState(null);
@@ -70,6 +71,7 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
   const [scannedNotice, setScannedNotice] = useState(false);
   const [detailContact, setDetailContact] = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
+  const [shareSheet, setShareSheet]     = useState(null);
   const [form, setForm] = useState({
     name: "", company: "", title: "", email: "", phone: "",
     met_at: "", met_date: todayISO(), notes: "", status: "lead",
@@ -359,6 +361,32 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
+      {/* Share sheet */}
+      <ShareSheet
+        open={!!shareSheet}
+        onClose={() => setShareSheet(null)}
+        record={shareSheet}
+        members={teamMembers}
+        currentUserId={userId}
+        userEmail={userEmail}
+        teamId={teamId}
+        onAssign={(uid, email) => {
+          if (!shareSheet || !uid) return;
+          const contact = contacts.find(c => c.id === shareSheet.id);
+          if (!contact) return;
+          const now = new Date().toISOString();
+          const updated = { ...contact, assigned_to_user_id: uid, assigned_to: email?.split("@")[0] || email, sync_status: "pending", updated_at: now };
+          setData(d => ({
+            ...d,
+            contacts: (d.contacts || []).map(c => c.id === shareSheet.id ? updated : c),
+            syncQueue: [{ id: genId(), table: "contacts", action: "update", data: updated, status: "pending", created_at: now }, ...(d.syncQueue || [])],
+          }));
+          triggerImmediateSync();
+          setToast(`Contact shared with ${email?.split("@")[0] || email}`);
+          setShareSheet(null);
+        }}
+      />
+
       {/* ── Contact detail sheet ── */}
       <DetailSheet
         open={!!detailContact}
@@ -403,6 +431,13 @@ export function ContactsScreen({ data, setData, userId, quickAddTrigger, searchS
               className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-red-100 bg-white text-red-600 min-h-[48px]">
               <Trash2 size={14} /> Delete
             </button>
+            {teamMembers.length > 0 && (
+              <button onClick={() => { setShareSheet({ id: detailContact.id, title: detailContact.name, type: "contact" }); setDetailContact(null); }}
+                className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 min-h-[48px] col-span-2"
+                style={{ borderColor: "#8B1A1A", color: "#8B1A1A", background: "#FFF5F5" }}>
+                <Share2 size={14} /> Share with teammate
+              </button>
+            )}
           </>
         )}
       >
