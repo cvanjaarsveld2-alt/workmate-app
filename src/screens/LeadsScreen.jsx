@@ -153,7 +153,14 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
   return (
     <Card className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-base font-black text-slate-800">{isEdit ? "Edit Lead" : "New Lead"}</p>
+        <p className="text-base font-black text-slate-800">{isEdit ? "Edit Opportunity" : "New Opportunity"}</p>
+        {!isEdit && (
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-3 py-2.5">
+            <p className="text-xs text-amber-700 leading-snug">
+              <span className="font-black">For existing clients only.</span> Use this when a current client wants something new — e.g. Glencore already buys jacks but now wants Ausco brakes. For brand new clients, use the <span className="font-bold">Clients</span> screen.
+            </p>
+          </div>
+        )}
         <button onClick={onCancel} className="p-2 rounded-lg text-slate-400 min-w-[36px] min-h-[36px] flex items-center justify-center">
           <X size={16} />
         </button>
@@ -266,7 +273,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
 
       <div className="flex gap-2">
         <Btn className="flex-1" onClick={() => onSave(form)} disabled={!form.title.trim()}>
-          <Save size={15} /> {isEdit ? "Update" : "Save Lead"}
+          <Save size={15} /> {isEdit ? "Update" : "Save Opportunity"}
         </Btn>
         <Btn variant="ghost" onClick={onCancel}>Cancel</Btn>
       </div>
@@ -340,7 +347,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
       });
     }
 
-    setToast(editLead ? "Lead updated" : "Lead captured");
+    setToast(editLead ? "Opportunity updated" : "Opportunity captured");
     setShowForm(false);
     setEditLead(null);
     setDetailLead(null);
@@ -378,7 +385,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
         fromEmail: userEmail,
       });
     }
-    setToast(`Lead assigned to ${assignedName}`);
+    setToast(`Opportunity assigned to ${assignedName}`);
     setReassigning(false);
   }
 
@@ -392,7 +399,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
       syncQueue: [{ id: genId(), table: "leads", action: "delete", data: { id }, status: "pending", created_at: now }, ...(d.syncQueue || [])],
     }));
     setDetailLead(null);
-    setToast("Lead deleted");
+    setToast("Opportunity deleted");
     triggerImmediateSync();
   }
 
@@ -576,12 +583,12 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-2">
         <PageHeader
-          title="Leads"
-          subtitle={`${activeLeads} active · ${wonLeads} won${wonValue > 0 ? ` · ${money(wonValue)}` : ""}`}
+          title="Opportunities"
+          subtitle={`${activeLeads} active · ${wonLeads} won${wonValue > 0 ? " · " + money(wonValue) : ""} · cross-sell at existing clients`}
         />
         <Btn size="sm" onClick={() => { setEditLead(null); setShowForm(s => !s); }}>
           {showForm ? <X size={15} /> : <Plus size={15} />}
-          {showForm ? "Cancel" : "Add Lead"}
+          {showForm ? "Cancel" : "Add Opportunity"}
         </Btn>
       </div>
 
@@ -645,9 +652,9 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
       {/* ── Lead list ── */}
       {filtered.length === 0 ? (
         <Empty
-          title={leads.length === 0 ? "No leads yet" : "No leads match your filters"}
+          title={leads.length === 0 ? "No opportunities yet" : "No opportunities match your filters"}
           text={leads.length === 0
-            ? "Tap Add Lead to capture a new sales opportunity on-site."
+            ? "Use this screen for new opportunities at existing clients — e.g. Glencore already buys jacks but now wants Ausco brakes. For brand new clients, use the Clients screen."
             : "Try clearing the filters above."}
           icon={TrendingUp}
         />
