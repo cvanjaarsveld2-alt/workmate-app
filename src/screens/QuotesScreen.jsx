@@ -1,11 +1,12 @@
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Save, Edit2, Trash2, File as FileIcon } from "lucide-react";
+import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2 } from "lucide-react";
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
+import { ShareSheet } from "../components/ShareSheet";
 import { Card, Btn, Field, SelectField, SearchBar, FilterPills, Toast, Empty, PageHeader, useConfirm } from "../components/ui";
 
 // ─── Show-more text (full info on tap, no silent clipping) ──────────────────
@@ -29,7 +30,7 @@ function ExpandableText({ text, limit = 110, className = "" }) {
   );
 }
 
-export function QuotesScreen({ data, setData, userId, quickAddTrigger, searchSeed }) {
+export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]       = useState(false);
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -37,6 +38,7 @@ export function QuotesScreen({ data, setData, userId, quickAddTrigger, searchSee
   const [toast, setToast]             = useState("");
   const [form, setForm] = useState({ client_name: "", description: "", value: "", status: "Pending" });
   const { confirm, dialog } = useConfirm();
+  const [shareSheet, setShareSheet] = useState(null);
   const quotes = data.quotes || [];
 
   // ── Quick capture: open add form when FAB triggers this screen ──
@@ -108,6 +110,21 @@ export function QuotesScreen({ data, setData, userId, quickAddTrigger, searchSee
   return (
     <div className="space-y-4">
       {dialog}
+      <ShareSheet
+        open={!!shareSheet}
+        onClose={() => setShareSheet(null)}
+        record={shareSheet}
+        members={teamMembers}
+        currentUserId={userId}
+        userEmail={userEmail}
+        teamId={teamId}
+        onAssign={(uid, email) => {
+          if (!shareSheet || !uid) return;
+          const now = new Date().toISOString();
+          setToast("Quote shared with " + (email?.split("@")[0] || email));
+          setShareSheet(null);
+        }}
+      />
       <div className="flex items-center justify-between">
         <PageHeader title="Quotes" subtitle={`${quotes.length} total · ${formatCurrency(totalValue)}`} />
         <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
@@ -154,6 +171,9 @@ export function QuotesScreen({ data, setData, userId, quickAddTrigger, searchSee
                   {q.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  {teamMembers.length > 0 && (
+                    <button onClick={() => setShareSheet({ id: q.id, title: q.client_name || "Quote", type: "quote" })} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-purple-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" title="Share with teammate"><Share2 size={15} /></button>
+                  )}
                   <button onClick={() => startEdit(q)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={15} /></button>
                   <button onClick={() => deleteQuote(q.id, q.client_name)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={15} /></button>
                 </div>
