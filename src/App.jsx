@@ -102,6 +102,8 @@ export default function PowerWorksApp() {
     clients: [], followups: [], quotes: [], notes: [], equipment: [], contacts: [], expenses: [], syncQueue: [],
   });
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
+  const [teamId, setTeamId]       = useState(null);
+  const [teamMembers, setTeamMembers] = useState([]);
 
   useEffect(() => {
     let mounted = true;
@@ -123,6 +125,26 @@ export default function PowerWorksApp() {
   useEffect(() => {
     registerSyncHandlers(setData, () => data.syncQueue);
   }, [data.syncQueue]);
+
+  // Load team membership on login
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    async function loadTeamState() {
+      try {
+        const { supabase: sb } = await import("./supabase");
+        const { data: membership } = await sb
+          .from("team_members")
+          .select("team_id")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        if (!membership?.team_id) return;
+        setTeamId(membership.team_id);
+        const { data: rows } = await sb.rpc("get_team_member_emails", { p_team_id: membership.team_id });
+        if (rows) setTeamMembers(rows);
+      } catch (e) { console.warn("Team load failed:", e); }
+    }
+    loadTeamState();
+  }, [session?.user?.id]);
 
   // Diagnostics screen dispatches this when the user taps "Clear failed".
   useEffect(() => {
@@ -420,8 +442,18 @@ export default function PowerWorksApp() {
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     VehicleCheck: <VehicleCheckScreen data={data} setData={setData} userId={session.user.id} />,
     Analytics:    <AnalyticsScreen    data={data} onNavigate={navigate} />,
-    Leads:        <LeadsScreen        data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} quickAddTrigger={quickAddTrigger} />,
-    Team:         <TeamScreen         userId={session.user.id} userEmail={session.user.email} data={data} onTeamChange={tid => { if (tid) triggerImmediateSync(); }} />,
+    Leads:        <LeadsScreen        data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} />,
+    Team:         <TeamScreen         userId={session.user.id} userEmail={session.user.email} data={data} onTeamChange={async (tid) => {
+      setTeamId(tid);
+      if (tid) {
+        triggerImmediateSync();
+        // Load team members for the assignment dropdowns
+        try {
+          const { data: rows } = await import("./supabase").then(m => m.supabase.rpc("get_team_member_emails", { p_team_id: tid }));
+          if (rows) setTeamMembers(rows);
+        } catch (e) { console.warn("Could not load team members:", e); }
+      }
+    }} />,
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
     Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} onBackfill={() => navigate("BackfillZAR")} />,
