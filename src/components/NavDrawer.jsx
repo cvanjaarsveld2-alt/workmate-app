@@ -5,7 +5,7 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Home, Users, UserPlus, Calendar as CalendarIcon, Clipboard, Wrench,
-  File as FileIcon, Receipt, Settings, LogOut, ChevronRight, Car, BarChart2,
+  File as FileIcon, Receipt, Settings, LogOut, ChevronRight, Car, BarChart2, TrendingUp,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
@@ -15,6 +15,7 @@ const SECTIONS = [
     items: [
       { key: "Home",      label: "Dashboard",   icon: Home },
       { key: "Analytics", label: "Analytics",    icon: BarChart2 },
+      { key: "Leads",     label: "Leads",        icon: TrendingUp },
       { key: "Clients",   label: "Clients",      icon: Users },
       { key: "Contacts",  label: "Contacts",     icon: UserPlus,     badgeKey: "leads" },
       { key: "Followups", label: "Follow-ups",   icon: CalendarIcon, badgeKey: "overdueFU" },
@@ -38,7 +39,8 @@ const SECTIONS = [
   {
     title: "MANAGE",
     items: [
-      { key: "More",      label: "Settings & More", icon: Settings, badgeKey: "pending" },
+      { key: "Team", label: "Team & Sharing", icon: Users },
+      { key: "More", label: "Settings & More", icon: Settings, badgeKey: "pending" },
     ],
   },
 ];
