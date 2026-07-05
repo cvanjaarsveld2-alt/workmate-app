@@ -8,9 +8,21 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  CheckCircle2, XCircle, Minus, ChevronDown, ChevronUp,
-  Settings, Save, CheckSquare, AlertTriangle, Car, X,
-  FileText, ChevronRight, RotateCcw, FileDown, Send,
+  CheckCircle2,
+  XCircle,
+  Minus,
+  ChevronDown,
+  ChevronUp,
+  Settings,
+  Save,
+  AlertTriangle,
+  Car,
+  X,
+  FileText,
+  ChevronRight,
+  RotateCcw,
+  FileDown,
+  Send,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
