@@ -178,8 +178,8 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             <p className="text-xs font-bold text-amber-800 mb-1">📱 iPhone/iPad — one-time setup</p>
             <p className="text-xs text-amber-700 leading-relaxed">
               Apple only allows notifications after you add PowerMate to your Home Screen:
-              tap the <strong>Share</strong> button → <strong>Add to Home Screen</strong> → open PowerMate
-              from the new icon → then tap Enable here. This is an Apple requirement for all web apps.
+              tap the <strong>Share</strong> button &rarr; <strong>Add to Home Screen</strong> &rarr; open PowerMate
+              from the new icon &rarr; then tap Enable here. This is an Apple requirement for all web apps.
             </p>
           </div>
         )}
