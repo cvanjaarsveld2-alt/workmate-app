@@ -461,6 +461,8 @@ export default function PowerWorksApp() {
     pendingQ:       flaggedQuotes,
     unsubmittedExp,
     pending:        pendingCount,
+    unread:         unreadCount,
+    sharedInbox:    unreadCount, // same count drives the inbox badge
   };
 
   if (loading)              return <Spinner />;
