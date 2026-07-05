@@ -421,7 +421,7 @@ export default function PowerWorksApp() {
     VehicleCheck: <VehicleCheckScreen data={data} setData={setData} userId={session.user.id} />,
     Analytics:    <AnalyticsScreen    data={data} onNavigate={navigate} />,
     Leads:        <LeadsScreen        data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} quickAddTrigger={quickAddTrigger} />,
-    Team:         <TeamScreen         userId={session.user.id} userEmail={session.user.email} onTeamChange={tid => { if (tid) triggerImmediateSync(); }} />,
+    Team:         <TeamScreen         userId={session.user.id} userEmail={session.user.email} data={data} onTeamChange={tid => { if (tid) triggerImmediateSync(); }} />,
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
     Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} onBackfill={() => navigate("BackfillZAR")} />,
