@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { supabase } from "../supabase";
 import { Card, Btn, Field, Toast, PageHeader, useConfirm } from "../components/ui";
+import { MemberSelector } from "../components/MemberSelector";
+import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate } from "../lib/helpers";
 
@@ -44,7 +46,7 @@ function RoleBadge({ role }) {
 }
 
 // ─── Member Dashboard ─────────────────────────────────────────────────────────
-function MemberDashboard({ member, data, onBack }) {
+function MemberDashboard({ member, data, members, currentUserId, userEmail, teamId, onBack }) {
   const { start, end } = getMonthRange();
   const today = todayISO();
 
@@ -84,6 +86,28 @@ function MemberDashboard({ member, data, onBack }) {
 
   const [drillSection, setDrillSection] = useState(null); // null | "leads" | "followups" | "clients" | "contacts"
 
+  // ── Reassign a record to another member ────────────────────────────────────
+  async function reassignRecord(table, recordId, recordTitle, recordType, newUserId, newEmail) {
+    if (!newUserId) return;
+    const { error } = await supabase
+      .from(table)
+      .update({ assigned_to_user_id: newUserId, assigned_to: newEmail?.split("@")[0] || newEmail })
+      .eq("id", recordId);
+    if (error) { console.warn("Reassign failed:", error); return; }
+
+    if (newUserId !== currentUserId) {
+      await sendAssignmentNotification({
+        fromUserId: currentUserId,
+        toUserId: newUserId,
+        teamId,
+        recordType,
+        recordId,
+        recordTitle,
+        fromEmail: userEmail,
+      });
+    }
+  }
+
   // ── Drill-through view ─────────────────────────────────────────────────────
   if (drillSection) {
     const sectionData = {
@@ -116,31 +140,53 @@ function MemberDashboard({ member, data, onBack }) {
           <Card className="divide-y divide-slate-50 overflow-hidden">
             {sectionData.map(item => {
               if (drillSection === "leads") return (
-                <div key={item.id} className="px-4 py-3.5 flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-800 leading-tight">{item.title}</p>
-                    {item.client_name && <p className="text-xs text-slate-400 mt-0.5">{item.client_name}</p>}
+                <div key={item.id} className="px-4 py-3.5 space-y-2 border-b border-slate-50 last:border-0">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 leading-tight">{item.title}</p>
+                      {item.client_name && <p className="text-xs text-slate-400 mt-0.5">{item.client_name}</p>}
+                    </div>
+                    <span className="text-xs font-bold shrink-0 rounded-full px-2.5 py-1"
+                      style={{ background: "#EDE9FE", color: "#5B21B6" }}>{item.stage || "New"}</span>
                   </div>
-                  <span className="text-xs font-bold shrink-0 rounded-full px-2.5 py-1"
-                    style={{ background: "#EDE9FE", color: "#5B21B6" }}>{item.stage || "New"}</span>
+                  {members.length > 0 && (
+                    <MemberSelector
+                      value={item.assigned_to_user_id}
+                      onChange={(uid, email) => reassignRecord("leads", item.id, item.title, "lead", uid, email)}
+                      members={members}
+                      currentUserId={currentUserId}
+                      placeholder="Assign to a member"
+                    />
+                  )}
                 </div>
               );
               if (drillSection === "followups") return (
-                <div key={item.id} className="px-4 py-3.5 flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-800 leading-tight">{item.title}</p>
-                    {item.client && <p className="text-xs text-slate-400 mt-0.5">{item.client}</p>}
+                <div key={item.id} className="px-4 py-3.5 space-y-2 border-b border-slate-50 last:border-0">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-800 leading-tight">{item.title}</p>
+                      {item.client && <p className="text-xs text-slate-400 mt-0.5">{item.client}</p>}
+                    </div>
+                    <span className="text-xs font-bold shrink-0 rounded-full px-2.5 py-1"
+                      style={item.date < todayISO()
+                        ? { background: "#FEE2E2", color: "#991B1B" }
+                        : { background: "#F1F5F9", color: "#64748B" }}>
+                      {smartDate(item.date)}
+                    </span>
                   </div>
-                  <span className="text-xs font-bold shrink-0 rounded-full px-2.5 py-1"
-                    style={item.date < todayISO()
-                      ? { background: "#FEE2E2", color: "#991B1B" }
-                      : { background: "#F1F5F9", color: "#64748B" }}>
-                    {smartDate(item.date)}
-                  </span>
+                  {members.length > 0 && (
+                    <MemberSelector
+                      value={item.assigned_to_user_id}
+                      onChange={(uid, email) => reassignRecord("followups", item.id, item.title, "followup", uid, email)}
+                      members={members}
+                      currentUserId={currentUserId}
+                      placeholder="Assign to a member"
+                    />
+                  )}
                 </div>
               );
               if (drillSection === "clients") return (
-                <div key={item.id} className="px-4 py-3.5">
+                <div key={item.id} className="px-4 py-3.5 border-b border-slate-50 last:border-0">
                   <p className="text-sm font-bold text-slate-800">{item.company}</p>
                   {item.branch && <p className="text-xs text-slate-400 mt-0.5">{item.branch}</p>}
                   <span className="text-xs font-bold rounded-full px-2 py-0.5 mt-1 inline-block"
@@ -148,7 +194,7 @@ function MemberDashboard({ member, data, onBack }) {
                 </div>
               );
               if (drillSection === "contacts") return (
-                <div key={item.id} className="px-4 py-3.5">
+                <div key={item.id} className="px-4 py-3.5 border-b border-slate-50 last:border-0">
                   <p className="text-sm font-bold text-slate-800">{item.name}</p>
                   {item.company && <p className="text-xs text-slate-400 mt-0.5">{item.company}</p>}
                   {item.phone && <p className="text-xs text-slate-400">{item.phone}</p>}
@@ -553,6 +599,10 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
       <MemberDashboard
         member={viewingMember}
         data={data || {}}
+        members={members}
+        currentUserId={userId}
+        userEmail={userEmail}
+        teamId={team?.id}
         onBack={() => setViewingMember(null)}
       />
     );
