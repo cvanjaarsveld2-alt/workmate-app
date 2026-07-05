@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, User, Phone, Mail,
-  Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight, Send, ChevronRight,
+  Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight, Send, ChevronRight, Share2,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
