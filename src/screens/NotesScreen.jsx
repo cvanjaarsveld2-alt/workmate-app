@@ -1,11 +1,12 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, Send, Mail } from "lucide-react";
+import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, Send, Mail, Share2 } from "lucide-react";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
+import { ShareSheet } from "../components/ShareSheet";
 import { scheduleNotificationsViaSW } from "../lib/notifications";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, UrgencyBadge, useConfirm, ClientSelector } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
@@ -14,7 +15,7 @@ import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { exportNotesPDF, exportNotesExcel } from "../NotesExport";
 
-export function NotesScreen({ data, setData, userId, isOnline, quickAddTrigger, searchSeed }) {
+export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], isOnline, quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]         = useState(false);
   const [editId, setEditId]             = useState(null);
   const [search, setSearch]             = useState("");
@@ -519,6 +520,30 @@ Kind regards`;
   return (
     <div className="space-y-4">
       {dialog}
+    <ShareSheet
+        open={!!shareSheet}
+        onClose={() => setShareSheet(null)}
+        record={shareSheet}
+        members={teamMembers}
+        currentUserId={userId}
+        userEmail={userEmail}
+        teamId={teamId}
+        onAssign={(uid, email) => {
+          if (!shareSheet || !uid) return;
+          const note = notes.find(n => n.id === shareSheet.id);
+          if (!note) return;
+          const now = new Date().toISOString();
+          const updated = { ...note, assigned_to_user_id: uid, sync_status: "pending" };
+          setData(d => ({
+            ...d,
+            notes: (d.notes || []).map(n => n.id === shareSheet.id ? updated : n),
+            syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: now }, ...(d.syncQueue || [])],
+          }));
+          triggerImmediateSync();
+          setToast("Note shared with " + (email?.split("@")[0] || email));
+          setShareSheet(null);
+        }}
+      />
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
       {/* ── Field Notes Report ready: preview, share, or email ── */}
