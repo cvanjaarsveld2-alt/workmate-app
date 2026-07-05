@@ -7,7 +7,7 @@ import { logEvent } from "./helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { logCrash } from "../components/ErrorBoundary";
 
-const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "calendar_events"];
+const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads"];
 const MAX_SYNC_ATTEMPTS = 5; // after this many failed tries, give up and mark "failed"
 
 export async function pushItem(item) {
@@ -174,16 +174,18 @@ export async function pushSyncQueue(syncQueue, setData) {
 
 export async function pullFromSupabase(uid, setData) {
   try {
-    const [a, b, c, d, e, f, g, h, cal] = await Promise.all([
-      supabase.from("clients").select("id,user_id,company,division,contact,phone,email,location,branch,stage,sync_status,auto_created,source,notes,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-      supabase.from("followups").select("id,user_id,client_id,client,branch,title,date,time,reminder,notes,completed,sync_status,auto_generated,created_at").eq("user_id", uid).order("date", { ascending: false }).limit(500),
-      supabase.from("quotes").select("id,user_id,client_name,description,value,status,sent_date,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
+    const [a, b, c, d, leads_res, e, f, g, h] = await Promise.all([
+      // Shared tables — RLS returns own rows OR team rows automatically
+      supabase.from("clients").select("id,user_id,team_id,company,division,contact,phone,email,location,branch,stage,sync_status,auto_created,source,notes,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
+      supabase.from("followups").select("id,user_id,team_id,client_id,client,branch,title,date,time,reminder,notes,completed,linked_note_id,sync_status,auto_generated,created_at").order("date", { ascending: false }).limit(500),
+      supabase.from("quotes").select("id,user_id,team_id,client_name,description,value,status,sent_date,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
+      supabase.from("contacts").select("id,user_id,team_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
+      supabase.from("leads").select("id,user_id,team_id,title,description,categories,client_id,client_name,contact_id,contact_name,captured_by,assigned_to,stage,estimated_value,lead_date,follow_up_date,closed_date,notes,outcome_notes,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
+      // Private tables — still filtered by user_id
       supabase.from("notes").select("id,user_id,client,client_id,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("equipment").select("id,user_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
-      supabase.from("contacts").select("id,user_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").eq("user_id", uid).order("created_at", { ascending: false }).limit(500),
       supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,amount_zar,exchange_rate,rate_date,rate_source,expense_date,expense_time,category,payment_method,notes,receipt_url,payment_slip_url,status,ai_extracted,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
       supabase.from("vehicle_checks").select("id,user_id,check_date,vehicle,registration,driver,data,sync_status,created_at,updated_at").eq("user_id", uid).order("check_date", { ascending: false }).limit(365),
-      supabase.from("calendar_events").select("id,user_id,title,event_type,start_date,start_time,end_date,end_time,all_day,location,notes,client_id,client_name,reminders,color,sync_status,created_at,updated_at").eq("user_id", uid).order("start_date", { ascending: false }).limit(500),
     ]);
 
     setData(prev => {
@@ -216,12 +218,12 @@ export async function pullFromSupabase(uid, setData) {
         clients:       a.error ? prev.clients       : merge(a.data, prev.clients,       prev.syncQueue, "clients"),
         followups:     b.error ? prev.followups     : merge(b.data, prev.followups,     prev.syncQueue, "followups"),
         quotes:        c.error ? prev.quotes        : merge(c.data, prev.quotes,        prev.syncQueue, "quotes"),
-        notes:         d.error ? prev.notes         : merge(d.data, prev.notes,         prev.syncQueue, "notes"),
-        equipment:     e.error ? prev.equipment     : merge(e.data, prev.equipment,     prev.syncQueue, "equipment"),
-        contacts:      f.error ? prev.contacts      : merge(f.data, prev.contacts,      prev.syncQueue, "contacts"),
+        contacts:      d.error ? prev.contacts      : merge(d.data, prev.contacts,      prev.syncQueue, "contacts"),
+        leads:         leads_res.error ? prev.leads : merge(leads_res.data, prev.leads, prev.syncQueue, "leads"),
+        notes:         e.error ? prev.notes         : merge(e.data, prev.notes,         prev.syncQueue, "notes"),
+        equipment:     f.error ? prev.equipment     : merge(f.data, prev.equipment,     prev.syncQueue, "equipment"),
         expenses:      g.error ? prev.expenses      : merge(g.data, prev.expenses,      prev.syncQueue, "expenses"),
         vehicleChecks: vcMap,
-        calendarEvents: cal.error ? prev.calendarEvents : merge(cal.data, prev.calendarEvents, prev.syncQueue, "calendar_events"),
       };
     });
 
