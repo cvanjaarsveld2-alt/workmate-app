@@ -148,7 +148,7 @@ Powerworks — Built for Industry`.trim();
             <div className="text-center py-6">
               <FileText size={32} className="text-slate-300 mx-auto mb-2" />
               <p className="text-sm font-bold text-slate-500">No documents uploaded yet</p>
-              <p className="text-xs text-slate-400 mt-1">Go to More → Company Documents to upload your company profile and brochures.</p>
+              <p className="text-xs text-slate-400 mt-1">Go to More &rarr; Company Documents to upload your company profile and brochures.</p>
             </div>
           ) : (
             <div className="space-y-2">
