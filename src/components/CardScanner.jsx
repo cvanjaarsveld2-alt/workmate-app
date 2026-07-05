@@ -1,9 +1,9 @@
 // ─── Business Card Scanner ────────────────────────────────────────────────────
 // Camera/gallery picker + AI extraction via Supabase Edge Function
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect} from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, Image as ImageIcon, X, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Camera, X, Loader2, AlertCircle } from "lucide-react";
 import { supabase } from "../supabase";
 import { genId } from "../lib/helpers";
 
