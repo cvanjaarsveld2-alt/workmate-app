@@ -114,34 +114,28 @@ export function TeamScreen({ userId, userEmail, onTeamChange }) {
     if (!code) return;
     setSaving(true);
     try {
-      // Find team by invite code
-      const { data: foundTeam, error: fe } = await supabase
-        .from("teams")
-        .select("id, name")
-        .eq("invite_code", code)
-        .single();
-      if (fe || !foundTeam) throw new Error("Invalid invite code — check it and try again");
+      // Use security definer function — handles lookup, dupe check, and insert atomically
+      const { data: teamJson, error: je } = await supabase
+        .rpc("join_team_by_code", {
+          p_invite_code: code,
+          p_user_id: userId,
+        });
 
-      // Check not already a member
-      const { data: existing } = await supabase
-        .from("team_members")
-        .select("id")
-        .eq("team_id", foundTeam.id)
-        .eq("user_id", userId)
-        .single();
-      if (existing) throw new Error("You are already in this team");
+      if (je) {
+        // Surface the database error message directly
+        const msg = je.message || "";
+        if (msg.includes("Invalid invite code")) throw new Error("Invalid invite code — check it and try again");
+        if (msg.includes("Already a member")) throw new Error("You are already in this team");
+        throw new Error(msg || "Could not join team");
+      }
 
-      // Join
-      const { error: je } = await supabase
-        .from("team_members")
-        .insert({ team_id: foundTeam.id, user_id: userId, role: "member" });
-      if (je) throw je;
+      const joinedTeam = typeof teamJson === "string" ? JSON.parse(teamJson) : teamJson;
 
       // Migrate existing data to this team
-      await migrateToTeam(foundTeam.id);
+      await migrateToTeam(joinedTeam.id);
 
-      setToast(`Joined ${foundTeam.name}!`);
-      onTeamChange?.(foundTeam.id);
+      setToast(`Joined ${joinedTeam.name}!`);
+      onTeamChange?.(joinedTeam.id);
       await loadTeam();
       setShowJoin(false);
       setInviteInput("");
