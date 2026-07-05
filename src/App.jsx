@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home, Users, Calendar, File as FileIcon,
-  Clipboard, Wrench, Settings, UserPlus, Search, Menu, Receipt,
+  Clipboard, Wrench, Settings, UserPlus, Search, Menu, Receipt, Plus,
 } from "lucide-react";
 
 import { supabase } from "./supabase";
