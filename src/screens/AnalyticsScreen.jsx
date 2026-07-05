@@ -141,7 +141,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
   const currentQKey = getQuarter(todayISO())?.key;
   const prevQKey    = quarters[quarters.length - 2]?.key;
 
-  // ── Quarterly new leads ───────────────────────────────────────────────────
+  // ── Quarterly new clients (by created_at) ───────────────────────────────────────────────────
   const leadsByQuarter = useMemo(() => {
     const map = {};
     clients.forEach(c => {
