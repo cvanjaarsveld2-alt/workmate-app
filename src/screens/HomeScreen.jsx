@@ -19,7 +19,7 @@ function money(n) {
 
 export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
   const today     = todayISO();
-  const clients   = data.clients   || [];  // team-wide — intentional
+  const clients   = (data.clients   || []).filter(c => c.user_id === user?.id);
   const quotes    = (data.quotes    || []).filter(q => q.user_id === user?.id);
   const followups = (data.followups || []).filter(f => f.user_id === user?.id);
   const equipment = data.equipment || [];
