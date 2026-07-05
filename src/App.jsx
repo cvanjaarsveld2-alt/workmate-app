@@ -8,6 +8,7 @@ import {
   Search,
   Menu,
   Plus,
+  Bell,
 } from "lucide-react";
 
 import { supabase } from "./supabase";
@@ -39,10 +40,11 @@ import { FollowupsScreen } from "./screens/FollowupsScreen";
 import { QuotesScreen }    from "./screens/QuotesScreen";
 import { NotesScreen }     from "./screens/NotesScreen";
 import { EquipmentScreen } from "./screens/EquipmentScreen";
-import { VehicleCheckScreen } from "./screens/VehicleCheckScreen";
-import { AnalyticsScreen }    from "./screens/AnalyticsScreen";
-import { LeadsScreen }        from "./screens/LeadsScreen";
-import { TeamScreen }         from "./screens/TeamScreen";
+import { VehicleCheckScreen }    from "./screens/VehicleCheckScreen";
+import { AnalyticsScreen }       from "./screens/AnalyticsScreen";
+import { LeadsScreen }           from "./screens/LeadsScreen";
+import { TeamScreen }            from "./screens/TeamScreen";
+import { NotificationsScreen }   from "./screens/NotificationsScreen";
 import { ExpensesScreen }  from "./screens/ExpensesScreen";
 import { MoreScreen }      from "./screens/MoreScreen";
 import { DiagnosticsScreen } from "./screens/DiagnosticsScreen";
@@ -102,8 +104,9 @@ export default function PowerWorksApp() {
     clients: [], followups: [], quotes: [], notes: [], equipment: [], contacts: [], expenses: [], syncQueue: [],
   });
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
-  const [teamId, setTeamId]       = useState(null);
+  const [teamId, setTeamId]           = useState(null);
   const [teamMembers, setTeamMembers] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -129,6 +132,7 @@ export default function PowerWorksApp() {
   // Load team membership on login
   useEffect(() => {
     if (!session?.user?.id) return;
+    let pollInterval;
     async function loadTeamState() {
       try {
         const { supabase: sb } = await import("./supabase");
@@ -140,14 +144,12 @@ export default function PowerWorksApp() {
         if (!membership?.team_id) return;
         setTeamId(membership.team_id);
 
-        // Try RPC first (requires 21_team_stage2.sql to have been run)
         const { data: rows, error: rpcError } = await sb
           .rpc("get_team_member_emails", { p_team_id: membership.team_id });
 
         if (!rpcError && rows) {
           setTeamMembers(rows);
         } else {
-          // Fallback: load from team_members directly (no emails)
           const { data: basicRows } = await sb
             .from("team_members")
             .select("user_id, role, joined_at")
@@ -161,9 +163,24 @@ export default function PowerWorksApp() {
             })));
           }
         }
+
+        // Poll unread notification count every 30s
+        async function checkUnread() {
+          try {
+            const { count } = await sb
+              .from("team_notifications")
+              .select("id", { count: "exact", head: true })
+              .eq("to_user_id", session.user.id)
+              .eq("read", false);
+            setUnreadCount(count || 0);
+          } catch {}
+        }
+        checkUnread();
+        pollInterval = setInterval(checkUnread, 30000);
       } catch (e) { console.warn("Team load failed:", e); }
     }
     loadTeamState();
+    return () => clearInterval(pollInterval);
   }, [session?.user?.id]);
 
   // Diagnostics screen dispatches this when the user taps "Clear failed".
@@ -476,7 +493,7 @@ export default function PowerWorksApp() {
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
     Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} onBackfill={() => navigate("BackfillZAR")} />,
-    BackfillZAR: <BackfillZARScreen data={data} setData={setData} userId={session.user.id} onBack={() => navigate("Expenses")} />,
+    Notifications: <NotificationsScreen userId={session.user.id} onNavigate={navigate} onMarkRead={() => setUnreadCount(0)} />,
   };
 
   return (
@@ -530,11 +547,27 @@ export default function PowerWorksApp() {
                 })()
             }
 
-            <button onClick={() => setSearchOpen(true)}
-              className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
-              aria-label="Search">
-              <Search size={20} />
-            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              {/* Bell — only show when in a team */}
+              {teamId && (
+                <button onClick={() => navigate("Notifications")}
+                  className="relative p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  aria-label="Notifications">
+                  <Bell size={20} />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white"
+                      style={{ background: "#DC2626" }}>
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+              )}
+              <button onClick={() => setSearchOpen(true)}
+                className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                aria-label="Search">
+                <Search size={20} />
+              </button>
+            </div>
           </div>
         </header>
 
