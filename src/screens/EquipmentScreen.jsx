@@ -1,10 +1,11 @@
 // ─── Equipment Screen ─────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip, ChevronRight } from "lucide-react";
+import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip, ChevronRight, Share2 } from "lucide-react";
 import { smartDate, genId, uploadPhotoToSupabase, daysDiff } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
+import { ShareSheet } from "../components/ShareSheet";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, ServiceBadge, useConfirm } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
@@ -31,10 +32,11 @@ function ExpandableText({ text, limit = 110, className = "" }) {
   );
 }
 
-export function EquipmentScreen({ data, setData, userId, isOnline, quickAddTrigger, searchSeed }) {
+export function EquipmentScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], isOnline, quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch]     = useState("");
   const [detailEq, setDetailEq] = useState(null);
+  const [shareSheet, setShareSheet] = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
   const [filter, setFilter]     = useState("All");
   const [editId, setEditId]     = useState(null);
@@ -204,6 +206,30 @@ export function EquipmentScreen({ data, setData, userId, isOnline, quickAddTrigg
   return (
     <div className="space-y-4">
       {dialog}
+      <ShareSheet
+        open={!!shareSheet}
+        onClose={() => setShareSheet(null)}
+        record={shareSheet}
+        members={teamMembers}
+        currentUserId={userId}
+        userEmail={userEmail}
+        teamId={teamId}
+        onAssign={(uid, email) => {
+          if (!shareSheet || !uid) return;
+          const eq = (data.equipment || []).find(e => e.id === shareSheet.id);
+          if (!eq) return;
+          const now = new Date().toISOString();
+          const updated = { ...eq, sync_status: "pending" };
+          setData(d => ({
+            ...d,
+            equipment: (d.equipment || []).map(e => e.id === shareSheet.id ? updated : e),
+            syncQueue: [{ id: genId(), table: "equipment", action: "update", data: updated, status: "pending", created_at: now }, ...(d.syncQueue || [])],
+          }));
+          triggerImmediateSync();
+          setToast("Equipment shared with " + (email?.split("@")[0] || email));
+          setShareSheet(null);
+        }}
+      />
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
       {/* ── Equipment detail sheet ── */}
