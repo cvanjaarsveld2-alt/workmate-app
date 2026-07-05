@@ -18,6 +18,8 @@ import {
   Car,
   BarChart2,
   TrendingUp,
+  Inbox,
+  Bell,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
@@ -51,8 +53,10 @@ const SECTIONS = [
   {
     title: "MANAGE",
     items: [
-      { key: "Team", label: "Team & Sharing", icon: Users },
-      { key: "More", label: "Settings & More", icon: Settings, badgeKey: "pending" },
+      { key: "SharedInbox",   label: "Shared with me",  icon: Inbox,    badgeKey: "sharedInbox" },
+      { key: "Notifications", label: "Notifications",   icon: Bell,     badgeKey: "unread" },
+      { key: "Team",          label: "Team & Sharing",  icon: Users },
+      { key: "More",          label: "Settings & More", icon: Settings, badgeKey: "pending" },
     ],
   },
 ];
