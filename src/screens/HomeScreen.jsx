@@ -19,9 +19,9 @@ function money(n) {
 
 export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
   const today     = todayISO();
-  const clients   = data.clients   || [];
-  const quotes    = data.quotes    || [];
-  const followups = data.followups || [];
+  const clients   = data.clients   || [];  // team-wide — intentional
+  const quotes    = (data.quotes    || []).filter(q => q.user_id === user?.id);
+  const followups = (data.followups || []).filter(f => f.user_id === user?.id);
   const equipment = data.equipment || [];
   const notes     = data.notes     || [];
   const expenses  = data.expenses  || [];
