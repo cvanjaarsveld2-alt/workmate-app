@@ -1,7 +1,7 @@
 // ─── Follow-ups Screen ────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Save, Edit2, Trash2, Check, Calendar, Send } from "lucide-react";
+import { Plus, X, Save, Edit2, Trash2, Check, Calendar, Send, Share2 } from "lucide-react";
 import { BRAND, REMINDER_OPTIONS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
@@ -16,7 +16,7 @@ import {
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 
-function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo }) {
+function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShare, showShare }) {
   const [expanded, setExpanded] = useState(false);
   const isOverdue = !f.completed && f.date < today;
   const reminder  = REMINDER_OPTIONS.find(o => o.value === f.reminder);
@@ -71,6 +71,9 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo }) {
         </div>
         <div className="flex flex-col gap-2 shrink-0">
           {isOverdue && <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-600 whitespace-nowrap">Overdue</span>}
+          {showShare && (
+            <button onClick={onShare} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-purple-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" title="Share with teammate"><Share2 size={14} /></button>
+          )}
           <button onClick={onEdit} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={14} /></button>
           <button onClick={onDelete} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={14} /></button>
         </div>
@@ -85,6 +88,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
   const [editId, setEditId]     = useState(null);
   const [toast, setToast]       = useState("");
   const [sendInfo, setSendInfo] = useState(null);
+  const [shareSheet, setShareSheet] = useState(null);
   const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "", assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
@@ -288,6 +292,8 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
     }
     return (
       <FollowupCard key={f.id} f={f} today={today} onToggle={() => toggleDone(f.id)} onEdit={() => startEdit(f)} onDelete={() => deleteFollowup(f.id)}
+        showShare={teamMembers.length > 0}
+        onShare={() => setShareSheet({ id: f.id, title: f.title, type: "followup" })}
         onSendInfo={() => {
           const client = clients.find(c => c.id === f.client_id);
           setSendInfo({ name: f.client || client?.contact || "", email: client?.email || "", phone: f.clientPhone || client?.phone || "" });
@@ -331,6 +337,33 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
   return (
     <div className="space-y-4">
       {dialog}
+
+      {/* Share sheet */}
+      <ShareSheet
+        open={!!shareSheet}
+        onClose={() => setShareSheet(null)}
+        record={shareSheet}
+        members={teamMembers}
+        currentUserId={userId}
+        userEmail={userEmail}
+        teamId={teamId}
+        onAssign={(uid, email) => {
+          if (!shareSheet || !uid) return;
+          const fu = followups.find(f => f.id === shareSheet.id);
+          if (!fu) return;
+          const now = new Date().toISOString();
+          const updated = { ...fu, assigned_to_user_id: uid, assigned_to: email?.split("@")[0] || email, sync_status: "pending" };
+          setData(d => ({
+            ...d,
+            followups: (d.followups || []).map(f => f.id === shareSheet.id ? updated : f),
+            syncQueue: [{ id: genId(), table: "followups", action: "update", data: updated, status: "pending", created_at: now }, ...(d.syncQueue || [])],
+          }));
+          triggerImmediateSync();
+          setToast(`Follow-up shared with ${email?.split("@")[0] || email}`);
+          setShareSheet(null);
+        }}
+      />
+
       <AnimatePresence>
         {sendInfo && (
           <SendCompanyInfoSheet
