@@ -4,12 +4,19 @@
 // - Assigned to a team member to follow up
 // - Moves through: New > Assigned > In Progress > Quoted > Won | Lost
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, X, Save, Edit2, Trash2, ChevronRight,
-  User, Users, Tag, TrendingUp, CheckCircle2,
-  XCircle, ArrowRight, UserCheck,
+  Plus,
+  X,
+  Save,
+  Edit2,
+  Trash2,
+  ChevronRight,
+  Users,
+  TrendingUp,
+  ArrowRight,
+  UserCheck,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
