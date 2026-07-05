@@ -2,9 +2,9 @@
 // Capture a receipt photo (camera or gallery), compress, upload to Storage,
 // and call the scan-receipt Edge Function for AI extraction.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect} from "react";
 import { motion } from "framer-motion";
-import { Camera, Image as ImageIcon, Loader2, X, Sparkles } from "lucide-react";
+import { Camera, Loader2, X, Sparkles } from "lucide-react";
 import { supabase } from "../supabase";
 import { genId } from "../lib/helpers";
 import { Card, Btn } from "../components/ui";
