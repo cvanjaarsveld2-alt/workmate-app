@@ -53,6 +53,7 @@ function MemberDashboard({ member, data, onBack }) {
   const allNotes     = data.notes     || [];
   const allExpenses  = data.expenses  || [];
   const allClients   = data.clients   || [];
+  const allContacts  = data.contacts  || [];
 
   // Filter everything by this member's user_id
   const memberFollowups = allFollowups.filter(f => f.user_id === member.user_id);
@@ -82,9 +83,6 @@ function MemberDashboard({ member, data, onBack }) {
     .slice(0, 5);
 
   const [drillSection, setDrillSection] = useState(null); // null | "leads" | "followups" | "clients" | "contacts"
-
-  const allClients  = data.clients  || [];
-  const allContacts = data.contacts || [];
 
   // ── Drill-through view ─────────────────────────────────────────────────────
   if (drillSection) {
