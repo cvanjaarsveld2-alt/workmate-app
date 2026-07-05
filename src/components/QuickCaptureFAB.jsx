@@ -5,8 +5,14 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, X, Clipboard, Calendar, Users, File as FileIcon,
-  Wrench, UserPlus, Receipt, Camera, Scan,
+  Plus,
+  Clipboard,
+  Calendar,
+  Users,
+  File as FileIcon,
+  Wrench,
+  Camera,
+  Scan,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
