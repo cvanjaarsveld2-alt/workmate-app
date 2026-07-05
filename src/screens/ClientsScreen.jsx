@@ -297,14 +297,48 @@ function ClientFollowupRow({ followup: f, setData }) {
 export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]         = useState(false);
   const [search, setSearch]             = useState("");
-  const [filterStage, setFilterStage]   = useState("All");
+// ─── Lead categories ──────────────────────────────────────────────────────────
+// Stored as a comma-separated string in the existing `division` column.
+const LEAD_CATEGORIES = [
+  { id: "jacks",     label: "Jacks",                    color: "#1E40AF", bg: "#DBEAFE" },
+  { id: "tyres",     label: "Tyre Handlers",             color: "#166534", bg: "#DCFCE7" },
+  { id: "starters",  label: "Starters",                  color: "#92400E", bg: "#FEF3C7" },
+  { id: "ausco",     label: "Ausco Brakes",              color: "#7C2D12", bg: "#FFE4D9" },
+  { id: "manifolds", label: "Axiom — Manifolds",         color: "#5B21B6", bg: "#EDE9FE" },
+  { id: "motors",    label: "Axiom — Motors",            color: "#0E7490", bg: "#CFFAFE" },
+  { id: "pumps",     label: "Axiom — Pumps",             color: "#065F46", bg: "#D1FAE5" },
+  { id: "coolers",   label: "Axiom — Coolers",           color: "#9F1239", bg: "#FFE4E6" },
+  { id: "other",     label: "Other",                     color: "#64748B", bg: "#F1F5F9" },
+];
+
+function parseCats(str) {
+  if (!str) return [];
+  return str.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function encodeCats(arr) {
+  return arr.join(",");
+}
+
+function CategoryBadge({ catId, size = "sm" }) {
+  const cat = LEAD_CATEGORIES.find(c => c.id === catId);
+  if (!cat) return null;
+  return (
+    <span className={`inline-flex items-center rounded-full font-bold ${size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"}`}
+      style={{ background: cat.bg, color: cat.color }}>
+      {cat.label}
+    </span>
+  );
+}
   const [editId, setEditId]             = useState(null);
   const [toast, setToast]               = useState("");
   const [sendInfo, setSendInfo]         = useState(null);
   const [expandedClient, setExpandedClient] = useState(null);
   const [showFollowupForm, setShowFollowupForm] = useState(null);
   const [showNoteForm, setShowNoteForm] = useState(null);
-  const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "" });
+  const [filterStage, setFilterStage]   = useState("All");
+  const [filterCat, setFilterCat]       = useState("All");
+  const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [] });
   const { confirm, dialog } = useConfirm();
 
   const clients   = data.clients   || [];
@@ -327,16 +361,17 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
 
 
   function resetForm() {
-    setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "" });
+    setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [] });
     setEditId(null);
     setShowForm(false);
   }
 
   async function saveClient() {
     if (!form.company.trim()) { setToast("Company name is required"); return; }
+    const formWithDivision = { ...form, division: encodeCats(form.categories) };
     if (editId) {
       const existing = clients.find(c => c.id === editId);
-      const updated  = { ...existing, ...form, sync_status: "pending" };
+      const updated  = { ...existing, ...formWithDivision, sync_status: "pending" };
       setData(d => ({
         ...d,
         clients:   (d.clients || []).map(c => c.id === editId ? updated : c),
@@ -346,7 +381,7 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
       setToast("Client updated");
     triggerImmediateSync();
     } else {
-      const item = { id: genId(), user_id: userId, ...form, created_at: new Date().toISOString(), sync_status: "pending" };
+      const item = { id: genId(), user_id: userId, ...formWithDivision, created_at: new Date().toISOString(), sync_status: "pending" };
       setData(d => ({
         ...d,
         clients:   [item, ...(d.clients || [])],
@@ -384,7 +419,7 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
 
   // ── Edit-in-place: the edit form renders where the branch row is. ──
   function startEdit(c) {
-    setForm({ company: c.company || "", branch: c.branch || "", contact: c.contact || "", phone: c.phone || "", email: c.email || "", stage: c.stage || "New Lead", notes: c.notes || "" });
+    setForm({ company: c.company || "", branch: c.branch || "", contact: c.contact || "", phone: c.phone || "", email: c.email || "", stage: c.stage || "New Lead", notes: c.notes || "", categories: parseCats(c.division) });
     setEditId(c.id);
     setShowForm(false);
   }
@@ -416,6 +451,34 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
           <Field label="Email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="Email" type="email" />
         </div>
         <SelectField label="Pipeline Stage" value={form.stage} onChange={v => setForm(f => ({ ...f, stage: v }))} options={PIPELINE_STAGES} />
+
+        {/* ── Product / service categories ── */}
+        <div>
+          <label className="mb-2 block text-sm font-bold text-slate-500">
+            Categories <span className="text-slate-400 font-normal">(what do they need?)</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {LEAD_CATEGORIES.map(cat => {
+              const selected = form.categories.includes(cat.id);
+              return (
+                <button key={cat.id} type="button"
+                  onClick={() => setForm(f => ({
+                    ...f,
+                    categories: selected
+                      ? f.categories.filter(c => c !== cat.id)
+                      : [...f.categories, cat.id],
+                  }))}
+                  className="rounded-full px-3 py-1.5 text-xs font-bold border-2 transition-all min-h-[36px]"
+                  style={selected
+                    ? { background: cat.bg, color: cat.color, borderColor: cat.color }
+                    : { background: "white", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Notes about this client…" multiline />
         <div className="flex gap-2">
           <Btn className="flex-1" onClick={saveClient}><Save size={15} />{isEdit ? "Update" : "Add Client"}</Btn>
@@ -427,6 +490,7 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
 
   const filtered = clients
     .filter(c => filterStage === "All" || (c.stage || "New Lead") === filterStage)
+    .filter(c => filterCat === "All" || parseCats(c.division).includes(filterCat))
     .filter(c => !search || [c.company, c.branch, c.contact].some(f => f?.toLowerCase().includes(search.toLowerCase())));
 
   const grouped = filtered.reduce((a, c) => {
@@ -469,6 +533,11 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search clients…" />
       <FilterPills options={["All", ...PIPELINE_STAGES]} value={filterStage} onChange={setFilterStage} dangerValue="Lost" />
+      <FilterPills
+        options={["All", ...LEAD_CATEGORIES.map(c => c.label)]}
+        value={filterCat === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.id === filterCat)?.label || "All")}
+        onChange={v => setFilterCat(v === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.label === v)?.id || "All"))}
+      />
 
       {Object.keys(grouped).length === 0 && <Empty title="No clients found" text="Add your first client." />}
 
@@ -537,6 +606,14 @@ export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSe
                             <p className="text-sm font-bold text-slate-800">{c.branch || "Main Branch"}</p>
                             <StagePill stage={c.stage || "New Lead"} />
                           </div>
+                          {/* Category badges */}
+                          {c.division && parseCats(c.division).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {parseCats(c.division).map(catId => (
+                                <CategoryBadge key={catId} catId={catId} size="xs" />
+                              ))}
+                            </div>
+                          )}
                           {c.contact && <p className="text-sm text-slate-500 mt-0.5">{c.contact}</p>}
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
                             {c.phone && (
