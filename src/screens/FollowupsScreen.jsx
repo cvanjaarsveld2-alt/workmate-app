@@ -8,6 +8,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { triggerImmediateSync } from "../lib/sync";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
+import { ShareSheet } from "../components/ShareSheet";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import { MemberSelector } from "../components/MemberSelector";
 import {
