@@ -32,13 +32,14 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [selectMode, setSelectMode]     = useState(false);
   const [selectedIds, setSelectedIds]   = useState(new Set());
   const [detailNote, setDetailNote]     = useState(null);
+  const [shareSheet, setShareSheet]     = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting]       = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [notesPack, setNotesPack] = useState(null); // { blob, url, filename } — PDF ready to preview/share
   const { confirm, dialog } = useConfirm();
-  const notes    = data.notes    || [];
+  const notes    = (data.notes    || []).filter(n => n.user_id === userId);
   const contacts = data.contacts || [];
   const clients  = data.clients  || [];
   const today    = todayISO();
