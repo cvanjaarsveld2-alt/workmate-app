@@ -446,7 +446,14 @@ function CategoryBadge({ catId, size = "sm" }) {
   function renderClientForm(isEdit) {
     return (
       <Card className="p-4 space-y-3">
-        <p className="text-base font-black text-slate-800">{isEdit ? "Edit Client" : "New Client"}</p>
+        <p className="text-base font-black text-slate-800">{isEdit ? "Edit Client" : "New Lead / Client"}</p>
+        {!isEdit && (
+          <div className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5">
+            <p className="text-xs text-blue-700 leading-snug">
+              <span className="font-black">New to Power Works?</span> Add them here — stage starts as "New Lead" and moves forward as you work the deal. For a new opportunity at an existing client, use the <span className="font-bold">Leads</span> screen instead.
+            </p>
+          </div>
+        )}
         <Field label="Company Name" value={form.company} onChange={v => setForm(f => ({ ...f, company: v }))} placeholder="e.g. Anglo American" required />
         <Field label="Branch / Mine / Site" value={form.branch} onChange={v => setForm(f => ({ ...f, branch: v }))} placeholder="e.g. Mogalakwena Mine" />
         <Field label="Contact Person" value={form.contact} onChange={v => setForm(f => ({ ...f, contact: v }))} placeholder="Contact name" />
@@ -501,7 +508,7 @@ function CategoryBadge({ catId, size = "sm" }) {
         )}
 
         <div className="flex gap-2">
-          <Btn className="flex-1" onClick={saveClient}><Save size={15} />{isEdit ? "Update" : "Add Client"}</Btn>
+          <Btn className="flex-1" onClick={saveClient}><Save size={15} />{isEdit ? "Update" : "Add Lead"}</Btn>
           <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
         </div>
       </Card>
@@ -563,9 +570,9 @@ function CategoryBadge({ catId, size = "sm" }) {
       </AnimatePresence>
 
       <div className="flex items-center justify-between">
-        <PageHeader title="Clients" subtitle={`${clients.length} total`} />
+        <PageHeader title="Clients & Leads" subtitle={`${clients.length} total · add new clients here`} />
         <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
-          {(showForm || editId) ? <X size={15} /> : <Plus size={15} />}{(showForm || editId) ? "Cancel" : "Add Client"}
+          {(showForm || editId) ? <X size={15} /> : <Plus size={15} />}{(showForm || editId) ? "Cancel" : "Add Lead"}
         </Btn>
       </div>
 
@@ -586,7 +593,7 @@ function CategoryBadge({ catId, size = "sm" }) {
         onChange={v => setFilterCat(v === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.label === v)?.id || "All"))}
       />
 
-      {Object.keys(grouped).length === 0 && <Empty title="No clients found" text="Add your first client." />}
+      {Object.keys(grouped).length === 0 && <Empty title="No clients or leads found" text="Add new leads and clients here. Use the Leads screen for new opportunities at existing clients." />}
 
       <div className="space-y-3">
         {Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([cn, branches]) => {
