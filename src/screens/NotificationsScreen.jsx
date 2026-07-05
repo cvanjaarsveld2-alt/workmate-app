@@ -5,10 +5,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Check, Users, TrendingUp, Calendar, UserPlus } from "lucide-react";
+import { Bell, Check, Users, TrendingUp, Calendar, UserPlus, Inbox } from "lucide-react";
 import { supabase } from "../supabase";
 import { markNotificationsRead } from "../lib/teamNotifications";
-import { Card, PageHeader, Empty, Toast } from "../components/ui";
+import { Card, PageHeader, Empty, Toast, Btn } from "../components/ui";
 import { BRAND } from "../lib/constants";
 import { smartDate } from "../lib/helpers";
 
@@ -20,7 +20,18 @@ const TYPE_ICON = {
 };
 
 export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
-  const [notifications, setNotifications] = useState([]);
+      const [pendingShares, setPendingShares] = useState(0);
+
+      useEffect(() => {
+        // Check for pending shares (notifications not yet accepted)
+        supabase
+          .from("team_notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("to_user_id", userId)
+          .eq("accepted", false)
+          .then(({ count }) => setPendingShares(count || 0))
+          .catch(() => {});
+      }, [userId]);  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading]             = useState(true);
   const [toast, setToast]                 = useState("");
 
@@ -77,6 +88,35 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
       <PageHeader title="Notifications" subtitle="Records shared with you by your team" />
+
+      {/* Shared Inbox entry point */}
+      <button onClick={() => onNavigate?.("SharedInbox")}
+        className="w-full text-left">
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: pendingShares > 0 ? "#DCFCE7" : "#F7F3F3" }}>
+              <Inbox size={22} style={{ color: pendingShares > 0 ? "#16A34A" : BRAND.primary }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black text-slate-900">Shared with me</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {pendingShares > 0
+                  ? `${pendingShares} item${pendingShares !== 1 ? "s" : ""} waiting — tap to accept`
+                  : "Nothing pending — all caught up"}
+              </p>
+            </div>
+            {pendingShares > 0 && (
+              <span className="rounded-full px-2.5 py-1 text-xs font-black text-white shrink-0"
+                style={{ background: "#16A34A" }}>
+                {pendingShares}
+              </span>
+            )}
+          </div>
+        </Card>
+      </button>
+
+      <p className="text-xs font-black text-slate-400 uppercase tracking-wider px-1">Activity</p>
 
       {loading ? (
         <div className="space-y-3">
