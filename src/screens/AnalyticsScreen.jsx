@@ -528,20 +528,6 @@ export function AnalyticsScreen({ data, onNavigate }) {
         </Card>
       </div>
 
-      {/* ── Multi-user note ── */}
-      <Card className="p-4 border-2" style={{ borderColor: "#EDE9FE", background: "#F5F3FF" }}>
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#EDE9FE" }}>
-            <Users size={18} style={{ color: "#5B21B6" }} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-black" style={{ color: "#5B21B6" }}>Multi-user coming</p>
-            <p className="text-xs mt-1 leading-relaxed" style={{ color: "#6D28D9" }}>
-              These analytics currently reflect your data only. Multi-user team sharing (with roles: Admin, Sales, Field Tech) is being planned as a dedicated update. When live, this screen will aggregate across your whole team.
-            </p>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }
