@@ -5,7 +5,8 @@ import {
   Plus, X, Save, Edit2, Trash2, Check,
   ChevronDown, ChevronUp, Phone, Clipboard, Send,
 } from "lucide-react";
-import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS, NOTE_URGENCY } from "../lib/constants";
+import { MemberSelector } from "../components/MemberSelector";
+import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
@@ -294,7 +295,7 @@ function ClientFollowupRow({ followup: f, setData }) {
 }
 
 // ─── Main ClientsScreen ───────────────────────────────────────────────────────
-export function ClientsScreen({ data, setData, userId, quickAddTrigger, searchSeed }) {
+export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]         = useState(false);
   const [search, setSearch]             = useState("");
 // ─── Lead categories ──────────────────────────────────────────────────────────
@@ -338,7 +339,7 @@ function CategoryBadge({ catId, size = "sm" }) {
   const [showNoteForm, setShowNoteForm] = useState(null);
   const [filterStage, setFilterStage]   = useState("All");
   const [filterCat, setFilterCat]       = useState("All");
-  const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [] });
+  const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
   const clients   = data.clients   || [];
@@ -361,14 +362,14 @@ function CategoryBadge({ catId, size = "sm" }) {
 
 
   function resetForm() {
-    setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [] });
+    setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], assigned_to_user_id: null, assigned_to: "" });
     setEditId(null);
     setShowForm(false);
   }
 
   async function saveClient() {
     if (!form.company.trim()) { setToast("Company name is required"); return; }
-    const formWithDivision = { ...form, division: encodeCats(form.categories) };
+    const formWithDivision = { ...form, division: encodeCats(form.categories), assigned_to_user_id: form.assigned_to_user_id || null, assigned_to: form.assigned_to || "" };
     if (editId) {
       const existing = clients.find(c => c.id === editId);
       const updated  = { ...existing, ...formWithDivision, sync_status: "pending" };
@@ -419,7 +420,7 @@ function CategoryBadge({ catId, size = "sm" }) {
 
   // ── Edit-in-place: the edit form renders where the branch row is. ──
   function startEdit(c) {
-    setForm({ company: c.company || "", branch: c.branch || "", contact: c.contact || "", phone: c.phone || "", email: c.email || "", stage: c.stage || "New Lead", notes: c.notes || "", categories: parseCats(c.division) });
+    setForm({ company: c.company || "", branch: c.branch || "", contact: c.contact || "", phone: c.phone || "", email: c.email || "", stage: c.stage || "New Lead", notes: c.notes || "", categories: parseCats(c.division), assigned_to_user_id: c.assigned_to_user_id || null, assigned_to: c.assigned_to || "" });
     setEditId(c.id);
     setShowForm(false);
   }
@@ -480,6 +481,22 @@ function CategoryBadge({ catId, size = "sm" }) {
         </div>
 
         <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Notes about this client…" multiline />
+
+        {/* Assign to team member */}
+        {teamMembers.length > 0 && (
+          <MemberSelector
+            label="Assigned to"
+            value={form.assigned_to_user_id}
+            onChange={(uid, email) => setForm(f => ({
+              ...f,
+              assigned_to_user_id: uid,
+              assigned_to: uid ? (email?.split("@")[0] || email || "") : "",
+            }))}
+            members={teamMembers}
+            currentUserId={userId}
+          />
+        )}
+
         <div className="flex gap-2">
           <Btn className="flex-1" onClick={saveClient}><Save size={15} />{isEdit ? "Update" : "Add Client"}</Btn>
           <Btn variant="secondary" onClick={resetForm}>Cancel</Btn>
