@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { MemberSelector } from "../components/MemberSelector";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
+import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS, NOTE_URGENCY, STAGE_COLORS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { WhatsAppButton } from "../components/WhatsAppButton";
