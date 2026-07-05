@@ -191,52 +191,27 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
         </button>
       </div>
 
-      {/* ── Performance snapshot — tap to open Analytics ── */}
-      <button onClick={() => setScreen("Analytics")} className="w-full text-left">
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Performance</p>
-              <p className="text-sm font-black text-slate-900 mt-0.5">
-                {quoteConversion}% quote conversion · {sentQuotes} quoted
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-xl px-3 py-2 min-h-[40px]" style={{ background: BRAND.light }}>
-              <BarChart2 size={14} style={{ color: BRAND.primary }} />
-              <span className="text-xs font-bold" style={{ color: BRAND.primary }}>Analytics</span>
-              <ChevronRight size={12} style={{ color: BRAND.primary }} />
-            </div>
-          </div>
-          {/* Mini pipeline bar */}
-          <div className="space-y-1.5">
-            {[
-              { label: "Won",    count: acceptedQ,                                  color: "#16A34A" },
-              { label: "Quoted", count: sentQuotes - acceptedQ,                     color: "#5B21B6" },
-              { label: "Active", count: clients.filter(c => c.stage === "Active").length, color: "#0E7490" },
-            ].map(row => (
-              <div key={row.label} className="flex items-center gap-2">
-                <p className="text-[10px] font-bold w-12 shrink-0" style={{ color: row.color }}>{row.label}</p>
-                <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                  <motion.div className="h-full rounded-full"
-                    style={{ background: row.color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.max(row.count > 0 ? (row.count / Math.max(clients.length, 1)) * 100 : 0, row.count > 0 ? 8 : 0)}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
-                <p className="text-[10px] font-black text-slate-600 w-4 text-right">{row.count}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </button>
-
-      {/* ── Pipeline ── */}
+      {/* ── Pipeline + Analytics ── */}
+      {/* ── Pipeline + Analytics ── */}
       <Card className="p-4">
-        <button onClick={() => setScreen("Clients")} className="w-full flex items-center justify-between mb-3">
-          <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Sales Pipeline</p>
-          <p className="text-xs text-slate-400">{inPipeline} in pipeline{lostC > 0 ? ` · ${lostC} lost` : ""}</p>
-        </button>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <button onClick={() => setScreen("Clients")} className="text-xs font-black text-slate-500 uppercase tracking-wider">
+              Sales Pipeline
+            </button>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {inPipeline} in pipeline · {quoteConversion}% conversion
+              {lostC > 0 ? ` · ${lostC} lost` : ""}
+            </p>
+          </div>
+          <button onClick={() => setScreen("Analytics")}
+            className="flex items-center gap-1.5 rounded-xl px-3 py-2 min-h-[40px] shrink-0"
+            style={{ background: BRAND.light }}>
+            <BarChart2 size={14} style={{ color: BRAND.primary }} />
+            <span className="text-xs font-bold" style={{ color: BRAND.primary }}>Analytics</span>
+            <ChevronRight size={12} style={{ color: BRAND.primary }} />
+          </button>
+        </div>
         <div className="space-y-2.5">
           {PIPELINE_STAGES.filter(s => s !== "Lost").map(stage => {
             const count = pCount[stage] || 0;
