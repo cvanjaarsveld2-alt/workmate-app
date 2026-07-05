@@ -454,9 +454,9 @@ export default function PowerWorksApp() {
 
   const screens = {
     Home:      <HomeScreen      data={data} setScreen={navigate} user={session.user} onQuickAdd={handleQuickCapture} />,
-    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
-    Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
-    Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
+    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
+    Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
+    Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} />,
     Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
@@ -467,7 +467,6 @@ export default function PowerWorksApp() {
       setTeamId(tid);
       if (tid) {
         triggerImmediateSync();
-        // Load team members for the assignment dropdowns
         try {
           const { data: rows } = await import("./supabase").then(m => m.supabase.rpc("get_team_member_emails", { p_team_id: tid }));
           if (rows) setTeamMembers(rows);
