@@ -36,6 +36,7 @@ import { QuotesScreen }    from "./screens/QuotesScreen";
 import { NotesScreen }     from "./screens/NotesScreen";
 import { EquipmentScreen } from "./screens/EquipmentScreen";
 import { VehicleCheckScreen } from "./screens/VehicleCheckScreen";
+import { AnalyticsScreen }    from "./screens/AnalyticsScreen";
 import { ExpensesScreen }  from "./screens/ExpensesScreen";
 import { MoreScreen }      from "./screens/MoreScreen";
 import { DiagnosticsScreen } from "./screens/DiagnosticsScreen";
@@ -412,6 +413,7 @@ export default function PowerWorksApp() {
     Notes:     <NotesScreen     data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     VehicleCheck: <VehicleCheckScreen data={data} setData={setData} userId={session.user.id} />,
+    Analytics:    <AnalyticsScreen    data={data} onNavigate={navigate} />,
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
     Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} onBackfill={() => navigate("BackfillZAR")} />,
@@ -422,17 +424,55 @@ export default function PowerWorksApp() {
     <ErrorBoundary>
       <div className="min-h-screen pb-32" style={{ background: "#F7F3F3" }}>
 
-        {/* ── Top bar: hamburger + title + search ── */}
+        {/* ── Top bar: hamburger + screen title/logo + search ── */}
         <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100">
-          <div className="mx-auto max-w-2xl px-3 h-14 flex items-center justify-between">
+          <div className="mx-auto max-w-2xl px-3 h-14 flex items-center justify-between gap-2">
             <button onClick={() => setDrawerOpen(true)}
-              className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
               aria-label="Menu">
               <Menu size={22} />
             </button>
-            <img src={BRAND.logo} alt="PowerMate" className="h-7 object-contain opacity-90" onError={e => e.target.style.display = "none"} />
+
+            {/* Centre: logo on home, screen title + add hint on other screens */}
+            {screen === "Home"
+              ? <img src={BRAND.logo} alt="PowerMate" className="h-7 object-contain opacity-90" onError={e => e.target.style.display = "none"} />
+              : (() => {
+                  const SCREEN_LABELS = {
+                    Clients:      { label: "Clients",          addHint: "client" },
+                    Contacts:     { label: "Contacts",         addHint: "contact" },
+                    Followups:    { label: "Follow-ups",       addHint: "follow-up" },
+                    Notes:        { label: "Field Notes",      addHint: "note" },
+                    Equipment:    { label: "Equipment",        addHint: "item" },
+                    Quotes:       { label: "Quotes",           addHint: "quote" },
+                    Expenses:     { label: "Expenses",         addHint: "expense" },
+                    More:         { label: "Settings",         addHint: null },
+                    Diagnostics:  { label: "Diagnostics",      addHint: null },
+                    Analytics:    { label: "Analytics",        addHint: null },
+                    VehicleCheck: { label: "Vehicle Checks",   addHint: "check" },
+                    Calendar:     { label: "Calendar",         addHint: "event" },
+                    BackfillZAR:  { label: "Backfill ZAR",     addHint: null },
+                  };
+                  const meta = SCREEN_LABELS[screen] || { label: screen, addHint: null };
+                  return (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <p className="text-base font-black text-slate-900 truncate">{meta.label}</p>
+                      {meta.addHint && (
+                        <button
+                          onClick={() => handleQuickCapture(screen)}
+                          className="flex items-center gap-1 rounded-full px-2.5 py-1 min-h-[32px] shrink-0"
+                          style={{ background: "#F7F3F3", color: "#8B1A1A" }}
+                          aria-label={`Add ${meta.addHint}`}>
+                          <Plus size={13} strokeWidth={2.5} />
+                          <span className="text-xs font-bold">{meta.addHint}</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()
+            }
+
             <button onClick={() => setSearchOpen(true)}
-              className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
               aria-label="Search">
               <Search size={20} />
             </button>
