@@ -1,4 +1,4 @@
-]// ─── Team Screen ──────────────────────────────────────────────────────────────
+// ─── Team Screen ──────────────────────────────────────────────────────────────
 // Manage the Power Works team. Admin can view invite code, see members,
 // change roles. Any user can join via invite code or create a new team.
 // ─────────────────────────────────────────────────────────────────────────────
