@@ -7,7 +7,7 @@ import { logEvent } from "./helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { logCrash } from "../components/ErrorBoundary";
 
-const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads"];
+const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "team_notifications"];
 const MAX_SYNC_ATTEMPTS = 5; // after this many failed tries, give up and mark "failed"
 
 export async function pushItem(item) {
