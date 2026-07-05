@@ -4,8 +4,20 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  X, Home, Users, UserPlus, Calendar as CalendarIcon, Clipboard, Wrench,
-  File as FileIcon, Receipt, Settings, LogOut, ChevronRight, Car, BarChart2, TrendingUp,
+  X,
+  Home,
+  Users,
+  UserPlus,
+  Calendar as CalendarIcon,
+  Clipboard,
+  Wrench,
+  File as FileIcon,
+  Receipt,
+  Settings,
+  LogOut,
+  Car,
+  BarChart2,
+  TrendingUp,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
