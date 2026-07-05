@@ -6,8 +6,8 @@ import React from "react";
 import { motion } from "framer-motion";
 import {
   Calendar, ChevronRight, File as FileIcon,
-  TrendingUp, Wrench, Clipboard, CheckCircle2, ArrowRight,
-  Receipt, UserPlus, Plus, Users, BarChart2,
+  TrendingUp, CheckCircle2, ArrowRight,
+  Receipt, BarChart2,
 } from "lucide-react";
 import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
 import { todayISO, niceDate, daysDiff, smartDate } from "../lib/helpers";
@@ -87,13 +87,6 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
   const todayList = todayFU.slice(0, 5);
   const todayOverflow = Math.max(0, todayFU.length - 5);
 
-  const quickActions = [
-    { label: "Note",     icon: Clipboard, screen: "Notes",     bg: "#FEF3C7", color: "#92400E" },
-    { label: "Expense",  icon: Receipt,   screen: "Expenses",  bg: "#FFE4D9", color: "#7C2D12" },
-    { label: "Follow-up",icon: Calendar,  screen: "Followups", bg: "#CFFAFE", color: "#0E7490" },
-    { label: "Contact",  icon: UserPlus,  screen: "Contacts",  bg: "#FFE4D9", color: "#7C2D12" },
-  ];
-
   return (
     <div className="space-y-5">
 
@@ -105,51 +98,6 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
         </div>
         <img src={BRAND.logo} alt="PW" className="h-8 object-contain opacity-80" onError={e => e.target.style.display = "none"} />
       </div>
-
-      {/* ── Quick actions ── */}
-      <div className="grid grid-cols-4 gap-2">
-        {quickActions.map(qa => (
-          <button key={qa.label}
-            onClick={() => (onQuickAdd ? onQuickAdd(qa.screen) : setScreen(qa.screen))}
-            className="flex flex-col items-center gap-1.5 rounded-2xl bg-white border border-slate-100 shadow-sm py-3 hover:shadow-md transition-shadow min-h-[76px]">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: qa.bg, color: qa.color }}>
-              <qa.icon size={17} />
-            </div>
-            <span className="text-xs font-bold text-slate-600">{qa.label}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* ── Action Required ── */}
-      {actionItems.length > 0 && (
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-          <Card className="overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100" style={{ background: "#FEF2F2" }}>
-              <p className="text-xs font-black text-red-700 uppercase tracking-wider">
-                ⚡ Action Required ({actionCount})
-              </p>
-            </div>
-            <div className="divide-y divide-slate-50">
-              {actionItems.map((item, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    if (item.selectMode && onQuickAdd) {
-                      onQuickAdd(item.screen + ":SelectMode");
-                    } else {
-                      setScreen(item.screen);
-                    }
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 transition-colors min-h-[56px]">
-                  <span className="text-lg shrink-0">{item.icon}</span>
-                  <p className={`text-sm font-bold flex-1 ${item.color}`}>{item.text}</p>
-                  <ChevronRight size={16} className="text-slate-300 shrink-0" />
-                </button>
-              ))}
-            </div>
-          </Card>
-        </motion.div>
-      )}
 
       {/* ── Today's Schedule ── */}
       <Card className="overflow-hidden">
@@ -195,6 +143,37 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
           </div>
         )}
       </Card>
+
+      {/* ── Action Required ── */}
+      {actionItems.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
+          <Card className="overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100" style={{ background: "#FEF2F2" }}>
+              <p className="text-xs font-black text-red-700 uppercase tracking-wider">
+                ⚡ Action Required ({actionCount})
+              </p>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {actionItems.map((item, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    if (item.selectMode && onQuickAdd) {
+                      onQuickAdd(item.screen + ":SelectMode");
+                    } else {
+                      setScreen(item.screen);
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 transition-colors min-h-[56px]">
+                  <span className="text-lg shrink-0">{item.icon}</span>
+                  <p className={`text-sm font-bold flex-1 ${item.color}`}>{item.text}</p>
+                  <ChevronRight size={16} className="text-slate-300 shrink-0" />
+                </button>
+              ))}
+            </div>
+          </Card>
+        </motion.div>
+      )}
 
       {/* ── Stats Grid (tappable) ── */}
       <div className="grid grid-cols-2 gap-3">
