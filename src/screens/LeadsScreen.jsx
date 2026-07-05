@@ -4,27 +4,21 @@
 // - Assigned to a team member to follow up
 // - Moves through: New > Assigned > In Progress > Quoted > Won | Lost
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState, useMemo, useEffect} from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus,
-  X,
-  Save,
-  Edit2,
-  Trash2,
-  ChevronRight,
-  Users,
-  TrendingUp,
-  ArrowRight,
-  UserCheck,
+  Plus, X, Save, Edit2, Trash2, ChevronRight,
+  Users, TrendingUp, ArrowRight, UserCheck, Send,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
+import { sendAssignmentNotification } from "../lib/teamNotifications";
 import {
-  Card, Btn, Field, SelectField, SearchBar, FilterPills,
+  Card, Btn, Field, SearchBar, FilterPills,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
+import { MemberSelector } from "../components/MemberSelector";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 
 // ─── Lead stages ─────────────────────────────────────────────────────────────
@@ -99,6 +93,7 @@ function blankForm(userId, userEmail) {
     contact_name: "",
     captured_by: userEmail || "",
     assigned_to: "",
+    assigned_to_user_id: null,
     stage: "New",
     estimated_value: "",
     lead_date: todayISO(),
@@ -109,11 +104,10 @@ function blankForm(userId, userEmail) {
 }
 
 // ─── Lead form ────────────────────────────────────────────────────────────────
-function LeadForm({ initial, clients, contacts, onSave, onCancel, isEdit }) {
+function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSave, onCancel, isEdit }) {
   const [form, setForm] = useState({ ...initial });
   const f = key => v => setForm(s => ({ ...s, [key]: v }));
 
-  // Contacts filtered by selected client
   const clientContacts = useMemo(() => {
     if (!form.client_id) return contacts;
     const cl = clients.find(c => c.id === form.client_id);
@@ -126,7 +120,7 @@ function LeadForm({ initial, clients, contacts, onSave, onCancel, isEdit }) {
     setForm(s => ({
       ...s,
       client_id: clientId,
-      client_name: cl ? (cl.company + (cl.branch ? ` — ${cl.branch}` : "")) : "",
+      client_name: cl ? (cl.company + (cl.branch ? ` \u2014 ${cl.branch}` : "")) : "",
       contact_id: null,
       contact_name: "",
     }));
@@ -135,11 +129,7 @@ function LeadForm({ initial, clients, contacts, onSave, onCancel, isEdit }) {
   function handleContactChange(e) {
     const contactId = e.target.value || null;
     const contact = contacts.find(c => c.id === contactId);
-    setForm(s => ({
-      ...s,
-      contact_id: contactId,
-      contact_name: contact ? contact.name : "",
-    }));
+    setForm(s => ({ ...s, contact_id: contactId, contact_name: contact ? contact.name : "" }));
   }
 
   function toggleCat(id) {
@@ -151,11 +141,19 @@ function LeadForm({ initial, clients, contacts, onSave, onCancel, isEdit }) {
     }));
   }
 
+  function handleAssign(userId, email) {
+    setForm(s => ({
+      ...s,
+      assigned_to_user_id: userId,
+      assigned_to: userId ? (email?.split("@")[0] || email || "") : "",
+    }));
+  }
+
   return (
     <Card className="p-4 space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Lead" : "New Lead"}</p>
-        <button onClick={onCancel} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center">
+        <button onClick={onCancel} className="p-2 rounded-lg text-slate-400 min-w-[36px] min-h-[36px] flex items-center justify-center">
           <X size={16} />
         </button>
       </div>
@@ -163,7 +161,6 @@ function LeadForm({ initial, clients, contacts, onSave, onCancel, isEdit }) {
       <Field label="Lead title" value={form.title} onChange={f("title")}
         placeholder="e.g. Glencore Eland — tyre handler inquiry" required />
 
-      {/* Client + Contact */}
       <ClientSelector label="Client" value={form.client_id} onChange={handleClientChange} clients={clients} />
 
       <div>
@@ -218,13 +215,23 @@ function LeadForm({ initial, clients, contacts, onSave, onCancel, isEdit }) {
         </div>
       </div>
 
-      {/* Captured by / Assigned to */}
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Captured by" value={form.captured_by} onChange={f("captured_by")}
-          placeholder="Who found this?" />
+      {/* Captured by */}
+      <Field label="Captured by" value={form.captured_by} onChange={f("captured_by")}
+        placeholder="Who found this?" />
+
+      {/* Assigned to — MemberSelector if team exists, otherwise text field */}
+      {teamMembers.length > 0 ? (
+        <MemberSelector
+          label="Assign to"
+          value={form.assigned_to_user_id}
+          onChange={handleAssign}
+          members={teamMembers}
+          currentUserId={currentUserId}
+        />
+      ) : (
         <Field label="Assigned to" value={form.assigned_to} onChange={f("assigned_to")}
           placeholder="Who follows up?" />
-      </div>
+      )}
 
       {/* Dates */}
       <div className="grid grid-cols-2 gap-3">
@@ -247,14 +254,12 @@ function LeadForm({ initial, clients, contacts, onSave, onCancel, isEdit }) {
       </div>
 
       <Field label="Notes" value={form.notes} onChange={f("notes")}
-        placeholder="Context, details, what was discussed…" multiline />
+        placeholder="Context, details, what was discussed&hellip;" multiline />
 
       {(form.stage === "Won" || form.stage === "Lost") && (
         <Field label={form.stage === "Won" ? "Win notes" : "Loss reason"}
           value={form.outcome_notes} onChange={f("outcome_notes")}
-          placeholder={form.stage === "Won"
-            ? "What closed it? Key factors…"
-            : "Why was this lost? What can we learn?"}
+          placeholder={form.stage === "Won" ? "What closed it?" : "Why was this lost?"}
           multiline />
       )}
 
@@ -269,21 +274,22 @@ function LeadForm({ initial, clients, contacts, onSave, onCancel, isEdit }) {
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
-export function LeadsScreen({ data, setData, userId, userEmail, quickAddTrigger }) {
-  const [showForm, setShowForm]     = useState(false);
-  const [editLead, setEditLead]     = useState(null);
-  const [detailLead, setDetailLead] = useState(null);
-  const [search, setSearch]         = useState("");
+export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger }) {
+  const [showForm, setShowForm]       = useState(false);
+  const [editLead, setEditLead]       = useState(null);
+  const [detailLead, setDetailLead]   = useState(null);
+  const [search, setSearch]           = useState("");
   const [filterStage, setFilterStage] = useState("All");
-  const [filterCat, setFilterCat]   = useState("All");
-  const [toast, setToast]           = useState("");
-  const { confirm, dialog }         = useConfirm();
+  const [filterCat, setFilterCat]     = useState("All");
+  const [toast, setToast]             = useState("");
+  const [reassigning, setReassigning] = useState(false);
+  const { confirm, dialog }           = useConfirm();
 
   const leads    = data.leads    || [];
   const clients  = data.clients  || [];
   const contacts = data.contacts || [];
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!quickAddTrigger) return;
     if (quickAddTrigger.screen !== "Leads") return;
     setEditLead(null);
@@ -292,10 +298,12 @@ export function LeadsScreen({ data, setData, userId, userEmail, quickAddTrigger 
 
   function saveLead(form) {
     const now = new Date().toISOString();
-    const id = editLead?.id || genId();
+    const id  = editLead?.id || genId();
+    const prevAssignee = editLead?.assigned_to_user_id;
     const row = {
       id,
       user_id: userId,
+      team_id: teamId || null,
       ...form,
       categories: encodeCats(form.categories || []),
       sync_status: "pending",
@@ -316,10 +324,61 @@ export function LeadsScreen({ data, setData, userId, userEmail, quickAddTrigger 
     }));
     offlineSave("leads", row);
     triggerImmediateSync();
+
+    // Fire notification if assigned to someone new
+    const newAssignee = form.assigned_to_user_id;
+    if (newAssignee && newAssignee !== prevAssignee && newAssignee !== userId) {
+      sendAssignmentNotification({
+        fromUserId: userId,
+        toUserId: newAssignee,
+        teamId,
+        recordType: "lead",
+        recordId: id,
+        recordTitle: form.title,
+        fromEmail: userEmail,
+      });
+    }
+
     setToast(editLead ? "Lead updated" : "Lead captured");
     setShowForm(false);
     setEditLead(null);
     setDetailLead(null);
+  }
+
+  async function reassignLead(lead, newUserId, newUserEmail) {
+    if (!newUserId) return;
+    setReassigning(true);
+    const now = new Date().toISOString();
+    const assignedName = newUserEmail?.split("@")[0] || newUserEmail || "";
+    const updated = {
+      ...lead,
+      assigned_to_user_id: newUserId,
+      assigned_to: assignedName,
+      sync_status: "pending",
+      updated_at: now,
+    };
+    setData(d => ({
+      ...d,
+      leads: (d.leads || []).map(l => l.id === lead.id ? updated : l),
+      syncQueue: [{ id: genId(), table: "leads", action: "update", data: updated, status: "pending", created_at: now }, ...(d.syncQueue || [])],
+    }));
+    offlineSave("leads", updated);
+    triggerImmediateSync();
+    setDetailLead(updated);
+
+    if (newUserId !== userId) {
+      await sendAssignmentNotification({
+        fromUserId: userId,
+        toUserId: newUserId,
+        teamId,
+        recordType: "lead",
+        recordId: lead.id,
+        recordTitle: lead.title,
+        fromEmail: userEmail,
+      });
+    }
+    setToast(`Lead assigned to ${assignedName}`);
+    setReassigning(false);
   }
 
   async function deleteLead(id) {
@@ -336,7 +395,6 @@ export function LeadsScreen({ data, setData, userId, userEmail, quickAddTrigger 
     triggerImmediateSync();
   }
 
-  // Quick stage advance from the card
   function advanceStage(lead) {
     const idx = LEAD_STAGES.indexOf(lead.stage || "New");
     if (idx >= LEAD_STAGES.length - 1) return;
@@ -354,7 +412,6 @@ export function LeadsScreen({ data, setData, userId, userEmail, quickAddTrigger 
     if (detailLead?.id === lead.id) setDetailLead(updated);
   }
 
-  // Filtered + sorted
   const filtered = useMemo(() => {
     return leads
       .filter(l => filterStage === "All" || l.stage === filterStage)
@@ -362,15 +419,14 @@ export function LeadsScreen({ data, setData, userId, userEmail, quickAddTrigger 
       .filter(l => !search || [l.title, l.client_name, l.assigned_to, l.captured_by, l.notes]
         .some(x => x?.toLowerCase().includes(search.toLowerCase())))
       .sort((a, b) => {
-        const stageOrder = { "New": 0, "Assigned": 1, "In Progress": 2, "Quoted": 3, "Won": 10, "Lost": 11 };
-        const sa = stageOrder[a.stage] ?? 5;
-        const sb = stageOrder[b.stage] ?? 5;
+        const order = { "New": 0, "Assigned": 1, "In Progress": 2, "Quoted": 3, "Won": 10, "Lost": 11 };
+        const sa = order[a.stage] ?? 5;
+        const sb = order[b.stage] ?? 5;
         if (sa !== sb) return sa - sb;
         return (b.created_at || "").localeCompare(a.created_at || "");
       });
   }, [leads, filterStage, filterCat, search]);
 
-  // Summary stats
   const activeLeads = leads.filter(l => !["Won", "Lost"].includes(l.stage)).length;
   const wonLeads    = leads.filter(l => l.stage === "Won").length;
   const wonValue    = leads.filter(l => l.stage === "Won")
@@ -389,7 +445,6 @@ export function LeadsScreen({ data, setData, userId, userEmail, quickAddTrigger 
         subtitle={[detailLead?.client_name, detailLead?.stage].filter(Boolean).join(" · ")}
         primaryActions={detailLead && (
           <div className="space-y-2">
-            {/* Advance stage button */}
             {!["Won", "Lost"].includes(detailLead.stage) && (
               <button onClick={() => advanceStage(detailLead)}
                 className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
@@ -398,6 +453,21 @@ export function LeadsScreen({ data, setData, userId, userEmail, quickAddTrigger 
                 Move to {LEAD_STAGES[LEAD_STAGES.indexOf(detailLead.stage) + 1]}
               </button>
             )}
+
+            {/* Reassign to team member */}
+            {teamMembers.length > 0 && (
+              <div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">Assign to</p>
+                <MemberSelector
+                  value={detailLead.assigned_to_user_id}
+                  onChange={(uid, email) => reassignLead(detailLead, uid, email)}
+                  members={teamMembers}
+                  currentUserId={userId}
+                  placeholder="Assign to a team member"
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => { setEditLead(detailLead); setDetailLead(null); setShowForm(true); }}
                 className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 text-slate-700 min-h-[48px]">
@@ -495,6 +565,8 @@ export function LeadsScreen({ data, setData, userId, userEmail, quickAddTrigger 
                 : blankForm(userId, userEmail)}
               clients={clients}
               contacts={contacts}
+              teamMembers={teamMembers}
+              currentUserId={userId}
               onSave={saveLead}
               onCancel={() => { setShowForm(false); setEditLead(null); }}
               isEdit={!!editLead}
