@@ -93,7 +93,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
   const { confirm, dialog } = useConfirm();
 
   const followups = (data.followups || []).filter(f => f.user_id === userId);
-  const clients   = data.clients   || [];
+  const clients   = (data.clients || []).filter(c => c.user_id === userId);
   const today     = todayISO();
   const nextWeek  = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
   const nextWeekStr = nextWeek.toISOString().slice(0, 10);
