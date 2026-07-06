@@ -808,44 +808,110 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
         </div>
       </Card>
 
-      {/* ── Member activity strip ── */}
-      <Card className="p-4">
-        <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Team Activity Today</p>
-        <div className="space-y-2.5">
+      {/* ── Per-member breakdown ── */}
+      <div>
+        <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 px-1">Team Members</p>
+        <div className="space-y-3">
           {teamStats.memberActivity.map(m => {
             const name = m.email?.split("@")[0] || "Member";
+            const displayName = name.charAt(0).toUpperCase() + name.slice(1);
             const isMe = m.user_id === userId;
+
+            // Count everything belonging to this member
+            const allClients  = data?.clients   || [];
+            const allContacts = data?.contacts  || [];
+            const allLeads    = data?.leads     || [];
+            const allFU       = data?.followups || [];
+            const allNotes    = data?.notes     || [];
+
+            const myClients  = allClients.filter(c => c.user_id === m.user_id);
+            const myContacts = allContacts.filter(c => c.user_id === m.user_id);
+            const myLeads    = allLeads.filter(l => l.user_id === m.user_id);
+            const myOpenFU   = allFU.filter(f => f.user_id === m.user_id && !f.completed);
+            const myNotes    = allNotes.filter(n => n.user_id === m.user_id);
+            const wonLeads   = myLeads.filter(l => l.stage === "Won").length;
+            const activeLeads = myLeads.filter(l => !["Won","Lost"].includes(l.stage || "New")).length;
+
             return (
-              <button key={m.user_id}
-                onClick={() => myRole === "admin" ? setViewingMember(m) : null}
-                className="w-full flex items-center gap-3 min-h-[44px]"
-                style={{ cursor: myRole === "admin" ? "pointer" : "default" }}>
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0"
-                  style={{ background: m.role === "admin" ? "#A16207" : BRAND.primary }}>
-                  {(m.email || "?").slice(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">
-                    {name.charAt(0).toUpperCase() + name.slice(1)}{isMe ? " (me)" : ""}
-                  </p>
-                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                    {m.todayFU > 0 && <span className="text-[10px] font-bold text-blue-600">{m.todayFU} task{m.todayFU !== 1 ? "s" : ""} today</span>}
-                    {m.overdueFU > 0 && <span className="text-[10px] font-bold text-red-600">{m.overdueFU} overdue</span>}
-                    {m.openLeads > 0 && <span className="text-[10px] font-bold text-purple-600">{m.openLeads} lead{m.openLeads !== 1 ? "s" : ""}</span>}
-                    {(m.assignedLeads || 0) > 0 && <span className="text-[10px] font-bold text-amber-600">{m.assignedLeads} assigned lead{m.assignedLeads !== 1 ? "s" : ""}</span>}
-                    {(m.assignedClients || 0) > 0 && <span className="text-[10px] font-bold text-teal-600">{m.assignedClients} shared client{m.assignedClients !== 1 ? "s" : ""}</span>}
-                    {(m.assignedFU || 0) > 0 && <span className="text-[10px] font-bold text-indigo-600">{m.assignedFU} assigned task{m.assignedFU !== 1 ? "s" : ""}</span>}
-                    {m.todayFU === 0 && m.overdueFU === 0 && m.openLeads === 0 && !(m.assignedLeads) && !(m.assignedClients) && !(m.assignedFU) && (
-                      <span className="text-[10px] text-slate-400">No activity today</span>
-                    )}
+              <Card key={m.user_id} className="overflow-hidden">
+                {/* Member header — tappable for admin */}
+                <button
+                  onClick={() => myRole === "admin" ? setViewingMember(m) : null}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 border-b border-slate-50"
+                  style={{ cursor: myRole === "admin" ? "pointer" : "default" }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0"
+                    style={{ background: m.role === "admin" ? "#A16207" : BRAND.primary }}>
+                    {(m.email || "?").slice(0, 2).toUpperCase()}
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-black text-slate-900">
+                        {displayName}{isMe ? " (me)" : ""}
+                      </p>
+                      <RoleBadge role={m.role} />
+                    </div>
+                    <p className="text-xs text-slate-400 truncate">{m.email}</p>
+                  </div>
+                  {myRole === "admin" && <ChevronRight size={14} className="text-slate-300 shrink-0" />}
+                </button>
+
+                {/* Stats grid */}
+                <div className="grid grid-cols-4 divide-x divide-slate-50">
+                  {[
+                    { label: "Clients",   value: myClients.length,  color: BRAND.primary },
+                    { label: "Contacts",  value: myContacts.length, color: "#0E7490" },
+                    { label: "Open FU",   value: myOpenFU.length,   color: myOpenFU.length > 0 ? "#DC2626" : "#16A34A" },
+                    { label: "Leads",     value: activeLeads,        color: "#5B21B6" },
+                  ].map(stat => (
+                    <div key={stat.label} className="flex flex-col items-center py-3 px-2">
+                      <p className="text-lg font-black leading-none" style={{ color: stat.color }}>{stat.value}</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5 text-center leading-tight">{stat.label}</p>
+                    </div>
+                  ))}
                 </div>
-                {myRole === "admin" && <ChevronRight size={14} className="text-slate-300 shrink-0" />}
-              </button>
+
+                {/* Recent clients captured by this member */}
+                {myClients.length > 0 && (
+                  <div className="border-t border-slate-50">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-4 pt-2.5 pb-1">Recent clients</p>
+                    <div className="divide-y divide-slate-50">
+                      {myClients
+                        .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
+                        .slice(0, 3)
+                        .map(c => (
+                          <div key={c.id} className="flex items-center gap-2 px-4 py-2.5">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-slate-800 truncate">{c.company}</p>
+                              {c.branch && <p className="text-[10px] text-slate-400 truncate">{c.branch}</p>}
+                            </div>
+                            <span className="text-[10px] font-bold rounded-full px-2 py-0.5 shrink-0"
+                              style={{
+                                background: c.stage === "Won" ? "#DCFCE7" : c.stage === "Contacted" ? "#DBEAFE" : "#FEF3C7",
+                                color: c.stage === "Won" ? "#166534" : c.stage === "Contacted" ? "#1E40AF" : "#92400E",
+                              }}>
+                              {c.stage || "New Lead"}
+                            </span>
+                          </div>
+                        ))}
+                      {myClients.length > 3 && (
+                        <p className="text-[10px] text-slate-400 text-center py-2">
+                          +{myClients.length - 3} more
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {myClients.length === 0 && (
+                  <div className="border-t border-slate-50 px-4 py-3">
+                    <p className="text-xs text-slate-400">No clients captured yet</p>
+                  </div>
+                )}
+              </Card>
             );
           })}
         </div>
-      </Card>
+      </div>
 
       {/* Manage toggle — collapses invite code + shared sections */}
       <button onClick={() => setShowManage(s => !s)}
