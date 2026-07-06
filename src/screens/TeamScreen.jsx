@@ -116,11 +116,14 @@ function MemberDashboard({ member, data, members, currentUserId, userEmail, team
     const sectionData = {
       leads:     memberLeads.filter(l => !["Won","Lost"].includes(l.stage || "New")),
       followups: memberFollowups.filter(f => !f.completed),
-      clients:   assignedClients,
-      contacts:  assignedContacts,
+      clients:   allClients.filter(c => c.user_id === member.user_id),
+      contacts:  allContacts.filter(c => c.user_id === member.user_id),
     }[drillSection] || [];
 
-    const sectionLabel = { leads: "Leads", followups: "Follow-ups", clients: "Clients", contacts: "Contacts" }[drillSection];
+    const sectionLabel = {
+      leads: "Opportunities", followups: "Follow-ups",
+      clients: "Clients", contacts: "Contacts"
+    }[drillSection];
 
     return (
       <div className="space-y-4">
@@ -230,47 +233,47 @@ function MemberDashboard({ member, data, members, currentUserId, userEmail, team
 
       {/* Tappable stats grid — each card drills into the full list */}
       <div className="grid grid-cols-2 gap-3">
-        <button onClick={() => setDrillSection("followups")} className="text-left">
+        <button onClick={() => setDrillSection("clients")} className="text-left">
           <Card className="p-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Tasks</p>
-            <p className="text-2xl font-black mt-1" style={{ color: todayFU.length > 0 ? BRAND.primary : "#16A34A" }}>
-              {todayFU.length}
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Clients</p>
+            <p className="text-2xl font-black mt-1" style={{ color: BRAND.primary }}>
+              {allClients.filter(c => c.user_id === member.user_id).length}
             </p>
             <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-              {todayFU.length === 0 ? "all clear" : "follow-ups due"}
+              View all <ChevronRight size={11} className="text-slate-300" />
+            </p>
+          </Card>
+        </button>
+        <button onClick={() => setDrillSection("contacts")} className="text-left">
+          <Card className="p-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contacts</p>
+            <p className="text-2xl font-black mt-1" style={{ color: "#0E7490" }}>
+              {allContacts.filter(c => c.user_id === member.user_id).length}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+              View all <ChevronRight size={11} className="text-slate-300" />
+            </p>
+          </Card>
+        </button>
+        <button onClick={() => setDrillSection("followups")} className="text-left">
+          <Card className="p-4">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Open Follow-ups</p>
+            <p className="text-2xl font-black mt-1" style={{ color: overdueFU.length > 0 ? "#DC2626" : "#16A34A" }}>
+              {memberFollowups.filter(f => !f.completed).length}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+              {overdueFU.length > 0 ? `${overdueFU.length} overdue` : "all on track"}
               <ChevronRight size={11} className="text-slate-300" />
             </p>
           </Card>
         </button>
         <button onClick={() => setDrillSection("leads")} className="text-left">
           <Card className="p-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Leads</p>
-            <p className="text-2xl font-black mt-1" style={{ color: "#0E7490" }}>{openLeads.length}</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Opportunities</p>
+            <p className="text-2xl font-black mt-1" style={{ color: "#5B21B6" }}>{openLeads.length}</p>
             <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
               {wonLeads.length} won
               <ChevronRight size={11} className="text-slate-300" />
-            </p>
-          </Card>
-        </button>
-        <button onClick={() => setDrillSection("clients")} className="text-left">
-          <Card className="p-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Assigned Clients</p>
-            <p className="text-2xl font-black mt-1" style={{ color: "#5B21B6" }}>
-              {assignedClients.length}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-              shared to them <ChevronRight size={11} className="text-slate-300" />
-            </p>
-          </Card>
-        </button>
-        <button onClick={() => setDrillSection("contacts")} className="text-left">
-          <Card className="p-4">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Assigned Contacts</p>
-            <p className="text-2xl font-black mt-1" style={{ color: "#A16207" }}>
-              {assignedContacts.length}
-            </p>
-            <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
-              shared to them <ChevronRight size={11} className="text-slate-300" />
             </p>
           </Card>
         </button>
@@ -855,18 +858,21 @@ export function TeamScreen({ userId, userEmail, data, onTeamChange }) {
                   {myRole === "admin" && <ChevronRight size={14} className="text-slate-300 shrink-0" />}
                 </button>
 
-                {/* Stats grid */}
+                {/* Stats grid — tappable, takes you into member dashboard */}
                 <div className="grid grid-cols-4 divide-x divide-slate-50">
                   {[
-                    { label: "Clients",   value: myClients.length,  color: BRAND.primary },
-                    { label: "Contacts",  value: myContacts.length, color: "#0E7490" },
-                    { label: "Open FU",   value: myOpenFU.length,   color: myOpenFU.length > 0 ? "#DC2626" : "#16A34A" },
-                    { label: "Leads",     value: activeLeads,        color: "#5B21B6" },
+                    { label: "Clients",  value: myClients.length,  color: BRAND.primary },
+                    { label: "Contacts", value: myContacts.length, color: "#0E7490" },
+                    { label: "Open FU",  value: myOpenFU.length,   color: myOpenFU.length > 0 ? "#DC2626" : "#16A34A" },
+                    { label: "Leads",    value: activeLeads,        color: "#5B21B6" },
                   ].map(stat => (
-                    <div key={stat.label} className="flex flex-col items-center py-3 px-2">
+                    <button key={stat.label}
+                      onClick={() => myRole === "admin" ? setViewingMember(m) : null}
+                      className="flex flex-col items-center py-3 px-2 w-full transition-colors active:bg-slate-50"
+                      style={{ cursor: myRole === "admin" ? "pointer" : "default" }}>
                       <p className="text-lg font-black leading-none" style={{ color: stat.color }}>{stat.value}</p>
                       <p className="text-[10px] font-bold text-slate-400 mt-0.5 text-center leading-tight">{stat.label}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
 
