@@ -345,7 +345,7 @@ function CategoryBadge({ catId, size = "sm" }) {
   const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
-  const clients   = data.clients   || [];
+  const clients   = (data.clients || []).filter(c => c.user_id === userId);
   const followups = data.followups || [];
   const notes     = data.notes     || [];
   const today     = todayISO();
