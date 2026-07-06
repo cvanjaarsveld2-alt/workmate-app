@@ -294,8 +294,8 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const { confirm, dialog }           = useConfirm();
 
   const leads    = data.leads    || [];
-  const clients  = data.clients  || [];
-  const contacts = data.contacts || [];
+  const clients  = (data.clients  || []).filter(c => c.user_id === userId);
+  const contacts = (data.contacts || []).filter(c => c.user_id === userId);
 
   useEffect(() => {
     if (!quickAddTrigger) return;
