@@ -483,7 +483,7 @@ export default function PowerWorksApp() {
     VehicleCheck: <VehicleCheckScreen data={data} setData={setData} userId={session.user.id} />,
     Analytics:    <AnalyticsScreen    data={data} onNavigate={navigate} />,
     Leads:        <LeadsScreen        data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} />,
-    Team:         <TeamScreen         userId={session.user.id} userEmail={session.user.email} data={data} onTeamChange={async (tid) => {
+    Team:         <TeamScreen         userId={session.user.id} userEmail={session.user.email} data={data} setData={setData} onTeamChange={async (tid) => {
       setTeamId(tid);
       if (tid) {
         triggerImmediateSync();
