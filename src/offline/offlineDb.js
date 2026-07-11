@@ -3,9 +3,16 @@
 // IndexedDB wrapper for PowerMate offline storage.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const DB_NAME = "powermate_offline";
-const DB_VERSION = 4; // bumped for expenses store
-const STORES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "syncQueue"];
+const DB_NAME    = "powermate_offline";
+// FIX #7 — Bumped from 4 → 5 to trigger onupgradeneeded and create the
+// new "leads" and "vehicle_checks" stores. Without these stores, lead and
+// vehicle-check data was fetched from Supabase but never persisted offline —
+// both were silently lost on every page reload when offline.
+const DB_VERSION = 5;
+const STORES = [
+  "clients", "followups", "quotes", "notes", "equipment",
+  "contacts", "expenses", "leads", "vehicle_checks", "syncQueue",
+];
 
 let _db = null;
 
@@ -79,7 +86,7 @@ export async function offlineDelete(store, id) {
       const tx = db.transaction(store, "readwrite");
       tx.objectStore(store).delete(id);
       tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
+      tx.onerror    = () => resolve();
     });
   } catch (e) {
     console.warn(`[PowerMate offline] offlineDelete failed for ${store}:`, e);
@@ -93,7 +100,7 @@ export async function offlineClear(store) {
       const tx = db.transaction(store, "readwrite");
       tx.objectStore(store).clear();
       tx.oncomplete = () => resolve();
-      tx.onerror = () => resolve();
+      tx.onerror    = () => resolve();
     });
   } catch (e) {
     console.warn(`[PowerMate offline] offlineClear failed for ${store}:`, e);
@@ -104,10 +111,10 @@ export async function offlineCount(store) {
   try {
     const db = await openDB();
     return new Promise((resolve) => {
-      const tx = db.transaction(store, "readonly");
+      const tx  = db.transaction(store, "readonly");
       const req = tx.objectStore(store).count();
       req.onsuccess = (e) => resolve(e.target.result || 0);
-      req.onerror = () => resolve(0);
+      req.onerror   = () => resolve(0);
     });
   } catch (e) {
     return 0;
