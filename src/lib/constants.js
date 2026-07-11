@@ -58,13 +58,19 @@ export const REMINDER_OPTIONS = [
 ];
 
 // ─── PIN ──────────────────────────────────────────────────────────────────────
-export const PIN_KEY            = "powermate_pin_hash";
-export const PIN_UNLOCKED_KEY   = "powermate_pin_unlocked";
-export const PIN_ATTEMPTS_KEY   = "powermate_pin_attempts";
-export const PIN_LOCKOUT_KEY    = "powermate_pin_lockout_until";
-export const PIN_MAX_ATTEMPTS   = 5;
-export const PIN_LOCKOUT_MS     = 5 * 60 * 1000; // 5 minutes
+// FIX #1 — These must match the keys PINScreens.jsx actually writes to storage.
+// Previous values ("powermate_pin_hash" / "powermate_pin_unlocked") did not
+// match what PINScreens.jsx used ("pm_pin_hash" / "pm_session_unlocked"),
+// which meant logout() cleared the *wrong* keys — leaving the PIN and the
+// unlocked session marker in storage. On the next page load the PIN screen
+// was silently bypassed, giving access to the previous user's data.
+export const PIN_KEY          = "pm_pin_hash";        // was "powermate_pin_hash"
+export const PIN_UNLOCKED_KEY = "pm_session_unlocked"; // was "powermate_pin_unlocked"
+export const PIN_ATTEMPTS_KEY = "pm_pin_attempts";
+export const PIN_LOCKOUT_KEY  = "pm_pin_lockout_until";
+export const PIN_MAX_ATTEMPTS = 5;
+export const PIN_LOCKOUT_MS   = 5 * 60 * 1000; // 5 minutes
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
-export const LOCAL_STORAGE_KEY  = "powermate_v2_data";
-export const MAX_FILE_SIZE_MB   = 50;
+export const LOCAL_STORAGE_KEY = "powermate_v2_data";
+export const MAX_FILE_SIZE_MB  = 50;
