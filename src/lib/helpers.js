@@ -1,6 +1,16 @@
 // ─── Date Helpers ─────────────────────────────────────────────────────────────
+
+// FIX #5 — Previously used new Date().toISOString().slice(0,10) which returns
+// the UTC date. For South African users (UTC+2) this meant the function
+// returned *yesterday's* date from 22:00–00:00 local time every night,
+// causing follow-up and escalation checks to be wrong for 2 hours per day.
+// Now uses the local calendar date so it matches what the user sees on screen.
 export function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export function niceDate(d) {
@@ -56,7 +66,14 @@ export function fileToBase64(file) {
 }
 
 export async function compressImage(file, maxWidth = 1600, quality = 0.78) {
-  if (file.type.startsWith("video/")) return fileToBase64(file);
+  // FIX #14 — Videos must NOT be base64-encoded here; they can be 100MB+.
+  // Callers that need to upload video should use uploadPhotoToSupabase directly
+  // with the raw File object (the storage SDK accepts Blob/File).
+  // We still fall back for non-image types other than video so nothing breaks.
+  if (file.type.startsWith("video/")) {
+    console.warn("[compress] Video passed to compressImage — return null so caller uploads raw.");
+    return null; // caller must handle null and upload the File directly
+  }
   return new Promise((resolve) => {
     const img = new window.Image();
     const url = URL.createObjectURL(file);
@@ -77,25 +94,34 @@ export async function compressImage(file, maxWidth = 1600, quality = 0.78) {
 // ─── Supabase Storage Upload ──────────────────────────────────────────────────
 import { supabase } from "../supabase";
 
-export async function uploadPhotoToSupabase(base64, path) {
+export async function uploadPhotoToSupabase(base64OrFile, path) {
   try {
     console.log("[Photo] Starting upload to path:", path);
 
-    if (!base64 || !base64.startsWith("data:")) {
-      console.warn("[Photo] Invalid base64 data — skipping upload");
-      return null;
-    }
+    let blob;
+    let mimeType = "image/jpeg";
 
-    // Convert base64 data URL to blob — robust method that works on iPhone Safari
-    const parts      = base64.split(",");
-    const mimeMatch  = parts[0].match(/:(.*?);/);
-    const mimeType   = mimeMatch ? mimeMatch[1] : "image/jpeg";
-    const byteString = atob(parts[1]);
-    const byteArray  = new Uint8Array(byteString.length);
-    for (let i = 0; i < byteString.length; i++) {
-      byteArray[i] = byteString.charCodeAt(i);
+    if (base64OrFile instanceof File || base64OrFile instanceof Blob) {
+      // Direct file upload (e.g. video) — no base64 conversion needed
+      blob = base64OrFile;
+      mimeType = base64OrFile.type || mimeType;
+    } else {
+      // base64 data URL
+      const base64 = base64OrFile;
+      if (!base64 || !base64.startsWith("data:")) {
+        console.warn("[Photo] Invalid base64 data — skipping upload");
+        return null;
+      }
+      const parts      = base64.split(",");
+      const mimeMatch  = parts[0].match(/:(.*?);/);
+      mimeType         = mimeMatch ? mimeMatch[1] : "image/jpeg";
+      const byteString = atob(parts[1]);
+      const byteArray  = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) {
+        byteArray[i] = byteString.charCodeAt(i);
+      }
+      blob = new Blob([byteArray], { type: mimeType });
     }
-    const blob = new Blob([byteArray], { type: mimeType });
 
     console.log("[Photo] Blob created:", blob.size, "bytes,", mimeType);
 
