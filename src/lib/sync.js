@@ -8,7 +8,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { logCrash } from "../components/ErrorBoundary";
 
 const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "team_notifications"];
-const MAX_SYNC_ATTEMPTS = 5; // after this many failed tries, give up and mark "failed"
+const MAX_SYNC_ATTEMPTS = 5;
 
 export async function pushItem(item) {
   try {
@@ -36,14 +36,10 @@ export async function pushItem(item) {
     }
     return { ok: true };
   } catch (e) {
-    // Verbose log makes failed-sync triage immediate.
     const detail = {
       code: e?.code, message: e?.message, details: e?.details, hint: e?.hint,
     };
     console.warn(`[Sync] FAILED ${item.table} ${item.action}`, detail, "\n  payload:", item.data);
-    // Also write to the on-device crash log so it's readable from
-    // Settings → Diagnostics without needing the browser console (which is
-    // painful to reach on a phone).
     logCrash({
       screen: `Sync (${item.table} ${item.action})`,
       message: `${detail.message || "Unknown error"}${detail.code ? ` [${detail.code}]` : ""}${detail.hint ? ` — hint: ${detail.hint}` : ""}`,
@@ -56,8 +52,12 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
   await offlineSave(table, item);
 
   if (isOnline) {
-    const success = await pushItem({ table, action, data: item });
-    if (success) {
+    // FIX #2 — pushItem returns {ok: boolean}, not a boolean.
+    // The previous `if (success)` was always truthy even on failure because
+    // JS objects are always truthy. This meant failed syncs were silently
+    // discarded: the record was marked "synced" and removed from the queue.
+    const result = await pushItem({ table, action, data: item });
+    if (result.ok) {
       const synced = { ...item, sync_status: "synced" };
       await offlineSave(table, synced);
       setData(d => ({
@@ -67,6 +67,7 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
       }));
       return synced;
     }
+    // Fall through to queue the item for retry
   }
 
   const queueItem = {
@@ -148,11 +149,7 @@ export async function pushSyncQueue(syncQueue, setData) {
       const update = {
         ...d,
         syncQueue: (d.syncQueue || [])
-          // Remove anything that succeeded.
           .filter(i => !succeededQueueIds.has(i.id))
-          // For anything that failed this round, bump its attempt counter —
-          // after MAX_SYNC_ATTEMPTS, stop retrying and mark it "failed" so
-          // it shows up in Diagnostics instead of silently re-trying forever.
           .map(i => {
             if (!failedQueueIds.has(i.id)) return i;
             const attempts = (i.attempts || 0) + 1;
@@ -175,13 +172,11 @@ export async function pushSyncQueue(syncQueue, setData) {
 export async function pullFromSupabase(uid, setData) {
   try {
     const [a, b, c, d, leads_res, e, f, g, h] = await Promise.all([
-      // Shared tables — RLS returns own rows OR team rows automatically
       supabase.from("clients").select("id,user_id,team_id,company,division,contact,phone,email,location,branch,stage,sync_status,auto_created,source,notes,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("followups").select("id,user_id,team_id,client_id,client,branch,title,date,time,reminder,notes,completed,linked_note_id,sync_status,auto_generated,created_at").order("date", { ascending: false }).limit(500),
       supabase.from("quotes").select("id,user_id,team_id,client_name,description,value,status,sent_date,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("contacts").select("id,user_id,team_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("leads").select("id,user_id,team_id,title,description,categories,client_id,client_name,contact_id,contact_name,captured_by,assigned_to,stage,estimated_value,lead_date,follow_up_date,closed_date,notes,outcome_notes,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
-      // Private tables — still filtered by user_id
       supabase.from("notes").select("id,user_id,team_id,client,client_id,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("equipment").select("id,user_id,team_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,amount_zar,exchange_rate,rate_date,rate_source,expense_date,expense_time,category,payment_method,notes,receipt_url,payment_slip_url,status,ai_extracted,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
@@ -203,7 +198,6 @@ export async function pullFromSupabase(uid, setData) {
         return Array.from(serverMap.values());
       }
 
-      // vehicle_checks come back as rows; convert to date-keyed map for the screen
       const vcRows = h.error ? null : (h.data || []);
       const vcMap  = vcRows
         ? vcRows.reduce((acc, row) => {
@@ -234,29 +228,41 @@ export async function pullFromSupabase(uid, setData) {
   }
 }
 
+// FIX #12 — Team tables: remove user_id filter so realtime events from other
+// team members are also received. RLS on Supabase ensures only permitted rows
+// are returned; the filter here was over-restricting the realtime stream.
+const TEAM_TABLES = new Set(["clients", "followups", "quotes", "contacts", "notes", "equipment", "leads"]);
+
 export function setupRealtimeSync(uid, setData) {
-  const channels = SYNC_TABLES.map(table =>
-    supabase
+  const channels = SYNC_TABLES.map(table => {
+    const channelConfig = {
+      event:  "*",
+      schema: "public",
+      table,
+    };
+    // Private tables stay filtered to the current user; shared tables receive
+    // all RLS-permitted rows so team members' changes propagate immediately.
+    if (!TEAM_TABLES.has(table)) {
+      channelConfig.filter = `user_id=eq.${uid}`;
+    }
+
+    return supabase
       .channel(`rt_${table}_${uid}`)
-      .on("postgres_changes", {
-        event:  "*",
-        schema: "public",
-        table,
-        filter: `user_id=eq.${uid}`,
-      }, payload => {
+      .on("postgres_changes", channelConfig, payload => {
         setData(prev => {
-          const current = prev[table] || [];
+          const dataKey = table === "team_notifications" ? "teamNotifications" : table;
+          const current = prev[dataKey] || [];
 
           if (payload.eventType === "INSERT") {
             const exists = current.find(r => r.id === payload.new.id);
             if (exists) {
               return {
                 ...prev,
-                [table]: current.map(r => r.id === payload.new.id ? { ...r, sync_status: "synced" } : r),
+                [dataKey]: current.map(r => r.id === payload.new.id ? { ...r, sync_status: "synced" } : r),
                 syncQueue: (prev.syncQueue || []).filter(q => q.data?.id !== payload.new.id),
               };
             }
-            return { ...prev, [table]: [{ ...payload.new, sync_status: "synced" }, ...current] };
+            return { ...prev, [dataKey]: [{ ...payload.new, sync_status: "synced" }, ...current] };
           }
 
           if (payload.eventType === "UPDATE") {
@@ -264,38 +270,38 @@ export function setupRealtimeSync(uid, setData) {
             if (isPending) return prev;
             return {
               ...prev,
-              [table]: current.map(r => r.id === payload.new.id ? { ...payload.new, sync_status: "synced" } : r),
+              [dataKey]: current.map(r => r.id === payload.new.id ? { ...payload.new, sync_status: "synced" } : r),
             };
           }
 
           if (payload.eventType === "DELETE") {
             return {
               ...prev,
-              [table]: current.filter(r => r.id !== payload.old.id),
+              [dataKey]: current.filter(r => r.id !== payload.old.id),
             };
           }
 
           return prev;
         });
       })
-      .subscribe()
-  );
+      .subscribe();
+  });
 
   return () => channels.forEach(ch => supabase.removeChannel(ch));
 }
 
 let _globalSetData = null;
-let _globalGetQueue = null;
+let _globalQueueRef = null; // FIX #11 — use a ref object, not a closure rebuilt every render
 
-export function registerSyncHandlers(setData, getQueue) {
-  _globalSetData = setData;
-  _globalGetQueue = getQueue;
+export function registerSyncHandlers(setData, queueRef) {
+  _globalSetData  = setData;
+  _globalQueueRef = queueRef;
 }
 
 export async function triggerImmediateSync() {
-  if (!_globalSetData || !_globalGetQueue) return;
+  if (!_globalSetData || !_globalQueueRef) return;
   if (!navigator.onLine) return;
-  const queue = _globalGetQueue();
+  const queue = _globalQueueRef.current;
   if (!queue || queue.length === 0) return;
   await pushSyncQueue(queue, _globalSetData);
 }
