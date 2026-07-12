@@ -18,6 +18,7 @@ import { BRAND } from "../lib/constants";
 import { todayISO, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
+import { withTeamId } from "../lib/teamId";
 
 const TYPES = [
   { key: "call_out",    label: "Outgoing call",  icon: Phone,         bg: "#DBEAFE", color: "#1E40AF" },
@@ -28,7 +29,7 @@ const TYPES = [
   { key: "meeting",     label: "Meeting",        icon: Users,         bg: "#FFE4E6", color: "#BE123C" },
 ];
 
-export function ActivityLogger({ open, onClose, client, userId, data, setData }) {
+export function ActivityLogger({ open, onClose, client, userId, teamId, data, setData }) {
   const [step, setStep]             = useState("type"); // type | detail | followup | done
   const [actType, setActType]       = useState(null);
   const [summary, setSummary]       = useState("");
@@ -41,7 +42,7 @@ export function ActivityLogger({ open, onClose, client, userId, data, setData })
   function handleClose() { reset(); onClose(); }
 
   async function saveActivity() {
-    const item = {
+    const item = withTeamId({
       id: genId(),
       user_id: userId,
       client_id: client?.id,
@@ -52,7 +53,7 @@ export function ActivityLogger({ open, onClose, client, userId, data, setData })
       duration_mins: parseInt(duration) || null,
       created_at: new Date().toISOString(),
       sync_status: "pending",
-    };
+    }, teamId);
     setData(d => ({
       ...d,
       activities: [item, ...(d.activities || [])],
@@ -65,13 +66,13 @@ export function ActivityLogger({ open, onClose, client, userId, data, setData })
 
   async function saveFollowup() {
     if (!followupTitle.trim() || !followupDate) { setStep("done"); return; }
-    const item = {
+    const item = withTeamId({
       id: genId(), user_id: userId,
       client_id: client?.id, client: client?.company, branch: "",
       title: followupTitle.trim(), date: followupDate, time: "09:00",
       reminder: "morning", notes: outcome ? `Previous: ${outcome}` : "",
       completed: false, created_at: new Date().toISOString(), sync_status: "pending",
-    };
+    }, teamId);
     setData(d => ({
       ...d,
       followups: [item, ...(d.followups || [])],
