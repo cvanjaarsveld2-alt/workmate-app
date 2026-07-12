@@ -10,8 +10,9 @@ import { Calendar } from "lucide-react";
 import { todayISO, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
+import { withTeamId } from "../lib/teamId";
 
-export function NoteToFollowupBtn({ note, userId, data, setData, onDone }) {
+export function NoteToFollowupBtn({ note, userId, teamId, data, setData, onDone }) {
   const [creating, setCreating] = useState(false);
 
   async function convert() {
@@ -28,7 +29,7 @@ export function NoteToFollowupBtn({ note, userId, data, setData, onDone }) {
     })();
     const fuDate = note.resolve_by && note.resolve_by >= todayISO() ? note.resolve_by : tomorrow;
 
-    const item = {
+    const item = withTeamId({
       id: genId(),
       user_id: userId,
       client_id: note.client_id || null,
@@ -43,6 +44,7 @@ export function NoteToFollowupBtn({ note, userId, data, setData, onDone }) {
       linked_note_id: note.id,
       created_at: new Date().toISOString(),
       sync_status: "pending",
+    }, teamId);
     };
 
     setData(d => ({
