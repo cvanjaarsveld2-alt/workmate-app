@@ -642,7 +642,7 @@ function CategoryBadge({ catId, size = "sm" }) {
                   return (
                     <div key={c.id} className="px-4 py-3">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onNavigate?.("Client360", { clientId: c.id, returnTo: "Clients" })}>
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-bold text-slate-800">{c.branch || "Main Branch"}</p>
                             <StagePill stage={c.stage || "New Lead"} />
