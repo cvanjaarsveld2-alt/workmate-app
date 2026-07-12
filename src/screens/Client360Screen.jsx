@@ -14,6 +14,7 @@ import { BRAND, NOTE_URGENCY, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, daysDiff } from "../lib/helpers";
 import { Card, StagePill, UrgencyBadge, ServiceBadge, Toast } from "../components/ui";
 import { ShareToTeamModal } from "../components/ShareToTeamModal";
+import { ActivityLogger } from "../components/ActivityLogger";
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -113,6 +114,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
   const [activeTab, setActiveTab] = useState("timeline");
   const [toast, setToast] = useState("");
   const [shareTarget, setShareTarget] = useState(null);
+  const [activityOpen, setActivityOpen] = useState(false);
   const today = todayISO();
 
   const client = (data.clients||[]).find(c => c.id === clientId);
@@ -231,6 +233,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
         </div>
       </div>
       <div className="flex gap-2">
+        <ActionBtn icon={Plus} label="Log" onClick={()=>setActivityOpen(true)} color="#8B1A1A" bg="#F7F3F3"/>
         {client.phone&&<><ActionBtn icon={Phone} label="Call" onClick={()=>window.open(telLink(client.phone))} color="#1E40AF" bg="#DBEAFE"/>
           <ActionBtn icon={ExternalLink} label="WhatsApp" onClick={()=>window.open(whatsappLink(client.phone,`Hi ${client.contact||""}`))} color="#166534" bg="#DCFCE7"/></>}
         {client.email&&<ActionBtn icon={Mail} label="Email" onClick={()=>window.open(`mailto:${client.email}`)} color="#5B21B6" bg="#EDE9FE"/>}
@@ -260,6 +263,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
       <Card className="overflow-hidden"><div className="p-4">{renderTab()}</div></Card>
       <ShareToTeamModal open={!!shareTarget} onClose={()=>setShareTarget(null)} record={shareTarget}
         fromUserId={userId} fromEmail={userEmail} teamId={teamId} teamMembers={teamMembers}/>
+      <ActivityLogger open={activityOpen} onClose={()=>setActivityOpen(false)} client={client} userId={userId} teamId={teamId} data={data} setData={setData}/>
     </div>
   );
 }
