@@ -11,18 +11,6 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/service-worker.js')
-            .then(function(reg) {
-              console.log('Power Works SW registered:', reg.scope);
-            })
-            .catch(function(err) {
-              console.log('SW registration failed:', err);
-            });
-        });
-      }
-    </script>
+    <!-- SW registration moved to main.jsx (single registration point) -->
   </body>
 </html>
