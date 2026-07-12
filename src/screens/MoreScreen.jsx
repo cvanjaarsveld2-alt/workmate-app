@@ -1,6 +1,6 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
-import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt } from "lucide-react";
+import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
 import ReportExport from "../ReportExport";
@@ -251,6 +251,20 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
 
       {/* Company Documents */}
       <CompanyDocuments userId={userId} />
+
+      {/* Team Settings */}
+      <Card className="p-0 overflow-hidden">
+        <button onClick={() => setScreen("Team")}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px]">
+          <div className="flex items-center gap-3">
+            <Users size={18} className="text-slate-400" />
+            <div>
+              <p className="text-base font-bold text-slate-800">Team Settings</p>
+              <p className="text-xs text-slate-400">Invite, manage members, sharing</p>
+            </div>
+          </div>
+        </button>
+      </Card>
 
       {/* Backup */}
       <BackupExport data={data} />
