@@ -11,7 +11,9 @@ import {
   Users, TrendingUp, ArrowRight, UserCheck, Send,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { deleteRecord } from "../lib/deleteHelpers";
+import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { ShareSheet } from "../components/ShareSheet";
@@ -392,15 +394,9 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
   async function deleteLead(id) {
     const ok = await confirm("Delete this lead?", { confirmLabel: "Delete" });
     if (!ok) return;
-    const now = new Date().toISOString();
-    setData(d => ({
-      ...d,
-      leads: (d.leads || []).filter(l => l.id !== id),
-      syncQueue: [{ id: genId(), table: "leads", action: "delete", data: { id }, status: "pending", created_at: now }, ...(d.syncQueue || [])],
-    }));
+    await deleteRecord("leads", id, userId, setData);
     setDetailLead(null);
     setToast("Opportunity deleted");
-    triggerImmediateSync();
   }
 
   function advanceStage(lead) {
