@@ -10,7 +10,9 @@ import { ShareSheet } from "../components/ShareSheet";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS, NOTE_URGENCY, STAGE_COLORS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { deleteRecord } from "../lib/deleteHelpers";
+import { withTeamId } from "../lib/teamId";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
@@ -45,7 +47,7 @@ function ExpandableText({ text, limit = 100, className = "" }) {
 }
 
 // ─── Inline follow-up form (inside client card) ───────────────────────────────
-function InlineFollowupForm({ client, userId, setData, onDone }) {
+function InlineFollowupForm({ client, userId, teamId, setData, onDone }) {
   const [form, setForm] = useState({
     title: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "",
   });
@@ -297,7 +299,7 @@ function ClientFollowupRow({ followup: f, setData }) {
 }
 
 // ─── Main ClientsScreen ───────────────────────────────────────────────────────
-export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
+export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed, onNavigate, isOnline }) {
   const [showForm, setShowForm]         = useState(false);
   const [search, setSearch]             = useState("");
 // ─── Lead categories ──────────────────────────────────────────────────────────
@@ -385,7 +387,7 @@ function CategoryBadge({ catId, size = "sm" }) {
       setToast("Client updated");
     triggerImmediateSync();
     } else {
-      const item = { id: genId(), user_id: userId, ...formWithDivision, created_at: new Date().toISOString(), sync_status: "pending" };
+      const item = withTeamId({ id: genId(), user_id: userId, ...formWithDivision, created_at: new Date().toISOString(), sync_status: "pending" }, teamId);
       setData(d => ({
         ...d,
         clients:   [item, ...(d.clients || [])],
@@ -405,20 +407,10 @@ function CategoryBadge({ catId, size = "sm" }) {
       : `Delete ${companyName}? This cannot be undone.`;
     const ok = await confirm(message, { confirmLabel: "Delete" });
     if (!ok) return;
-
-    const now = new Date().toISOString();
-    setData(d => ({
-      ...d,
-      clients:   (d.clients   || []).filter(c => c.id !== id),
-      followups: (d.followups || []).filter(f => f.client_id !== id),
-      syncQueue: [
-        { id: genId(), table: "clients", action: "delete", data: { id }, status: "pending", created_at: now },
-        ...linkedFUs.map(f => ({ id: genId(), table: "followups", action: "delete", data: { id: f.id }, status: "pending", created_at: now })),
-        ...(d.syncQueue || []),
-      ],
-    }));
+    // FIX: deleteRecord clears React state + IndexedDB + queues server delete
+    await deleteRecord("clients", id, userId, setData);
+    for (const f of linkedFUs) { await deleteRecord("followups", f.id, userId, setData); }
     setToast(linkedFUs.length > 0 ? `Client + ${linkedFUs.length} follow-up${linkedFUs.length !== 1 ? "s" : ""} deleted` : "Client deleted");
-    triggerImmediateSync();
   }
 
   // ── Edit-in-place: the edit form renders where the branch row is. ──
@@ -747,7 +739,7 @@ function CategoryBadge({ catId, size = "sm" }) {
 
                               <AnimatePresence>
                                 {showFollowupForm === c.id && (
-                                  <InlineFollowupForm client={c} userId={userId} setData={setData} onDone={() => setShowFollowupForm(null)} />
+                                  <InlineFollowupForm client={c} userId={userId} teamId={teamId} setData={setData} onDone={() => setShowFollowupForm(null)} />
                                 )}
                               </AnimatePresence>
 
