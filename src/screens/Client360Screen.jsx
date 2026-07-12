@@ -397,7 +397,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
         <ActionBtn icon={Plus} label="Log" onClick={()=>setActivityOpen(true)} color="#8B1A1A" bg="#F7F3F3"/>
         {client.phone&&<>
           <ActionBtn icon={Phone} label="Call" onClick={()=>window.open(telLink(client.phone))} color="#1E40AF" bg="#DBEAFE"/>
-          <ActionBtn icon={ExternalLink} label="WhatsApp" onClick={()=>window.open(whatsappLink(client.phone,`Hi ${client.contact||\"\"}`))} color="#166534" bg="#DCFCE7"/>
+          <ActionBtn icon={ExternalLink} label="WhatsApp" onClick={()=>window.open(whatsappLink(client.phone,`Hi ${client.contact || ""}`))} color="#166534" bg="#DCFCE7"/>
         </>}
         {client.email&&<ActionBtn icon={Mail} label="Email" onClick={()=>window.open(`mailto:${client.email}`)} color="#5B21B6" bg="#EDE9FE"/>}
         {teamId&&<ActionBtn icon={Send} label="Share" onClick={()=>setShareTarget({id:client.id,title:client.company,type:"client"})} color="#92400E" bg="#FEF3C7"/>}
