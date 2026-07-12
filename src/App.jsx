@@ -19,10 +19,12 @@ import { todayISO, logEvent, genId } from "./lib/helpers";
 import { LOCAL_STORAGE_KEY, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY, BRAND } from "./lib/constants";
 import { pushSyncQueue, pullFromSupabase, setupRealtimeSync, registerSyncHandlers, triggerImmediateSync } from "./lib/sync";
 import { requestNotificationPermission, scheduleNotificationsViaSW, buildNotificationItems } from "./lib/notifications";
-// PIN helpers — imported from PINScreens which inlines them to avoid build issues
+import { runQuoteAutomations } from "./lib/quoteAutomation"; // NEW — quote auto-expire
 import { getPINHash, isSessionUnlocked, markSessionUnlocked } from "./auth/PINScreens";
-// resetPINAttempts is just a localStorage clear — inlined here to remove the pinHelpers dependency
-function resetPINAttempts() { localStorage.removeItem("pm_pin_attempts"); }
+function resetPINAttempts() {
+  localStorage.removeItem("pm_pin_attempts");
+  localStorage.removeItem("pm_pin_lockout_until"); // FIX: also clear lockout
+}
 
 import { AuthScreen }    from "./auth/AuthScreen";
 import { PINSetupScreen, PINLockScreen } from "./auth/PINScreens";
@@ -50,6 +52,11 @@ import { ExpensesScreen }  from "./screens/ExpensesScreen";
 import { MoreScreen }      from "./screens/MoreScreen";
 import { DiagnosticsScreen } from "./screens/DiagnosticsScreen";
 import { BackfillZARScreen } from "./screens/BackfillZARScreen";
+// ── NEW SCREENS ──
+import { Client360Screen }   from "./screens/Client360Screen";
+import { CalendarScreen }     from "./screens/CalendarScreen";
+import { TeamDashboardScreen } from "./screens/TeamDashboardScreen";
+
 import { ErrorBoundary as ScreenErrorBoundary } from "./components/ErrorBoundary";
 
 class ErrorBoundary extends React.Component {
@@ -83,10 +90,16 @@ export default function PowerWorksApp() {
   const [session,    setSession]    = useState(null);
   const [loading,    setLoading]    = useState(true);
   const [screen,     setScreen]     = useState(() => {
-    // Notifications open the app at /?screen=Followups etc — honour that on load.
     try {
       const p = new URLSearchParams(window.location.search).get("screen");
-      const valid = ["Home", "Clients", "Contacts", "Followups", "Notes", "Equipment", "Quotes", "Expenses", "More", "Diagnostics", "BackfillZAR", "Analytics", "Leads", "Team", "VehicleCheck", "Notifications", "SharedInbox"];
+      const valid = [
+        "Home", "Clients", "Contacts", "Followups", "Notes", "Equipment",
+        "Quotes", "Expenses", "More", "Diagnostics", "BackfillZAR",
+        "Analytics", "Leads", "Team", "VehicleCheck", "Notifications",
+        "SharedInbox",
+        // ── NEW ──
+        "Client360", "Calendar", "TeamDashboard",
+      ];
       if (p && valid.includes(p)) return p;
     } catch (e) { /* ignore */ }
     return "Home";
@@ -102,12 +115,20 @@ export default function PowerWorksApp() {
     "Notification" in window ? Notification.permission : "denied"
   );
   const [data, setData] = useState({
-    clients: [], followups: [], quotes: [], notes: [], equipment: [], contacts: [], expenses: [], syncQueue: [],
+    clients: [], followups: [], quotes: [], notes: [], equipment: [],
+    contacts: [], expenses: [], leads: [], activities: [], // NEW: activities
+    syncQueue: [],
   });
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
   const [teamId, setTeamId]           = useState(null);
   const [teamMembers, setTeamMembers] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [userRole, setUserRole]       = useState("member"); // NEW: for team dashboard
+  const [screenContext, setScreenContext] = useState({}); // NEW: for passing data between screens (e.g. clientId)
+
+  // ── FIX #10 + #11: Use a ref for syncQueue so callbacks always read current data ──
+  const syncQueueRef = useRef(data.syncQueue);
+  useEffect(() => { syncQueueRef.current = data.syncQueue; }, [data.syncQueue]);
 
   useEffect(() => {
     let mounted = true;
@@ -118,17 +139,13 @@ export default function PowerWorksApp() {
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
 
-  // Register the service worker (enables background push + offline).
-  useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/sw.js").catch(err => {
-      console.warn("Service worker registration failed:", err);
-    });
-  }, []);
+  // FIX #3: Single service worker registration — removed from index.html and here.
+  // Registration is in main.jsx only, pointing to /service-worker.js.
 
+  // FIX #11: Register sync handlers ONCE using the ref (not a closure rebuilt every render).
   useEffect(() => {
-    registerSyncHandlers(setData, () => data.syncQueue);
-  }, [data.syncQueue]);
+    registerSyncHandlers(setData, syncQueueRef);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load team membership on login
   useEffect(() => {
@@ -136,8 +153,7 @@ export default function PowerWorksApp() {
     let pollInterval;
     async function loadTeamState() {
       try {
-        const { supabase: sb } = await import("./supabase");
-        const { data: membership } = await sb
+        const { data: membership } = await supabase
           .from("team_members")
           .select("team_id, role")
           .eq("user_id", session.user.id)
@@ -145,13 +161,20 @@ export default function PowerWorksApp() {
         if (!membership?.team_id) return;
         setTeamId(membership.team_id);
 
-        const { data: rows, error: rpcError } = await sb
+        // NEW: track role for team dashboard access
+        if (membership.role === "admin" || membership.role === "owner") {
+          setUserRole("admin");
+        } else {
+          setUserRole("member");
+        }
+
+        const { data: rows, error: rpcError } = await supabase
           .rpc("get_team_member_emails", { p_team_id: membership.team_id });
 
         if (!rpcError && rows) {
           setTeamMembers(rows);
         } else {
-          const { data: basicRows } = await sb
+          const { data: basicRows } = await supabase
             .from("team_members")
             .select("user_id, role, joined_at")
             .eq("team_id", membership.team_id);
@@ -165,10 +188,9 @@ export default function PowerWorksApp() {
           }
         }
 
-        // Poll unread notification count every 30s
         async function checkUnread() {
           try {
-            const { count } = await sb
+            const { count } = await supabase
               .from("team_notifications")
               .select("id", { count: "exact", head: true })
               .eq("to_user_id", session.user.id)
@@ -184,7 +206,6 @@ export default function PowerWorksApp() {
     return () => clearInterval(pollInterval);
   }, [session?.user?.id]);
 
-  // Diagnostics screen dispatches this when the user taps "Clear failed".
   useEffect(() => {
     function onClearFailed() {
       setData(d => ({
@@ -200,7 +221,7 @@ export default function PowerWorksApp() {
     if (!session) return;
     function checkPIN() {
       if (isSessionUnlocked()) { setPinState("unlocked"); return; }
-      const hash = getPINHash(); // synchronous localStorage read
+      const hash = getPINHash();
       if (!hash) { setPinState("setup"); return; }
       setPinState("locked");
     }
@@ -215,18 +236,21 @@ export default function PowerWorksApp() {
       } catch (e) { console.warn("localStorage load failed:", e); }
 
       try {
-        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses"];
+        // FIX #7: Added leads + activities to offline restoration
+        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities"];
         const results = await Promise.all(tables.map(t => offlineGetAll(t)));
-        const [clients, followups, quotes, notes, equipment, contacts, expenses] = results;
+        const [clients, followups, quotes, notes, equipment, contacts, expenses, leads, activities] = results;
         setData(d => ({
           ...d,
-          ...(clients?.length   ? { clients }   : {}),
-          ...(followups?.length ? { followups } : {}),
-          ...(quotes?.length    ? { quotes }    : {}),
-          ...(notes?.length     ? { notes }     : {}),
-          ...(equipment?.length ? { equipment } : {}),
-          ...(contacts?.length  ? { contacts }  : {}),
-          ...(expenses?.length  ? { expenses }  : {}),
+          ...(clients?.length    ? { clients }    : {}),
+          ...(followups?.length  ? { followups }  : {}),
+          ...(quotes?.length     ? { quotes }     : {}),
+          ...(notes?.length      ? { notes }      : {}),
+          ...(equipment?.length  ? { equipment }  : {}),
+          ...(contacts?.length   ? { contacts }   : {}),
+          ...(expenses?.length   ? { expenses }   : {}),
+          ...(leads?.length      ? { leads }      : {}),
+          ...(activities?.length ? { activities }  : {}),
         }));
       } catch (e) { console.warn("IndexedDB load failed:", e); }
     }
@@ -260,12 +284,7 @@ export default function PowerWorksApp() {
     return () => clearTimeout(t);
   }, [data]);
 
-  // ── FIXED: urgency escalation for overdue notes ──
-  // Previously this ran on mount (before data had loaded, so it saw an empty
-  // list) and never queued the escalated notes for sync — they showed
-  // "Not synced" forever and other devices never saw the new urgency.
-  // Now it runs once data is loaded, queues sync entries, persists offline,
-  // and pushes immediately.
+  // Urgency escalation for overdue notes
   useEffect(() => {
     if (dataLoading) return;
     const today = todayISO();
@@ -304,6 +323,14 @@ export default function PowerWorksApp() {
     triggerImmediateSync();
   }, [dataLoading]); // eslint-disable-line
 
+  // NEW: Auto-expire stale quotes (runs once after data loads)
+  useEffect(() => {
+    if (dataLoading) return;
+    if ((data.quotes || []).length > 0) {
+      runQuoteAutomations(data, setData);
+    }
+  }, [dataLoading]); // eslint-disable-line
+
   useEffect(() => {
     if (!session) return;
     if (!isOnline) { setDataLoading(false); return; }
@@ -335,16 +362,18 @@ export default function PowerWorksApp() {
     return () => window.removeEventListener("powermate:sync_failed", handleSyncFail);
   }, []);
 
+  // FIX #6: Added data.notes to dependency array
   useEffect(() => {
     if (notifPermission !== "granted") return;
     scheduleNotificationsViaSW(buildNotificationItems(data.followups, data.equipment, data.notes));
-  }, [data.followups, data.equipment, notifPermission]);
+  }, [data.followups, data.equipment, data.notes, notifPermission]);
 
+  // FIX #10: Read from syncQueueRef so the 3-second-later callback gets the current queue
   useEffect(() => {
     if (!isOnline || !session) return;
     const pending = (data.syncQueue || []).filter(i => i.status === "pending");
     if (pending.length === 0) return;
-    const t = setTimeout(() => pushSyncQueue(data.syncQueue, setData), 3000);
+    const t = setTimeout(() => pushSyncQueue(syncQueueRef.current, setData), 3000);
     return () => clearTimeout(t);
   }, [isOnline, session, data.syncQueue?.length]);
 
@@ -355,12 +384,11 @@ export default function PowerWorksApp() {
     if (isOnline && wasOffline && session) {
       pullFromSupabase(session.user.id, setData);
       if ((data.syncQueue || []).some(i => i.status === "pending")) {
-        pushSyncQueue(data.syncQueue, setData);
+        pushSyncQueue(syncQueueRef.current, setData);
       }
     }
   }, [isOnline]);
 
-  // ── Keyboard shortcut for search (desktop) ──
   useEffect(() => {
     function handleKey(e) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
@@ -373,7 +401,7 @@ export default function PowerWorksApp() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [searchOpen]);
 
-  async function handleSyncNow() { setSyncing(true); await pushSyncQueue(data.syncQueue, setData); setSyncing(false); }
+  async function handleSyncNow() { setSyncing(true); await pushSyncQueue(syncQueueRef.current, setData); setSyncing(false); }
 
   async function handleRequestNotif() {
     const granted = await requestNotificationPermission();
@@ -381,42 +409,32 @@ export default function PowerWorksApp() {
     if (granted) scheduleNotificationsViaSW(buildNotificationItems(data.followups, data.equipment, data.notes));
   }
 
-  async function logout() {
+  // FIX #13: DRY — single logout function
+  async function clearAuthAndSignOut() {
     localStorage.removeItem(PIN_KEY);
     sessionStorage.removeItem(PIN_UNLOCKED_KEY);
     resetPINAttempts();
     try { await supabase.auth.signOut(); } catch (e) { console.warn("Sign out failed:", e); }
     setSession(null);
   }
-
-  async function forgotPIN() {
-    localStorage.removeItem(PIN_KEY);
-    sessionStorage.removeItem(PIN_UNLOCKED_KEY);
-    resetPINAttempts();
-    try { await supabase.auth.signOut(); } catch (e) { console.warn("Sign out failed:", e); }
-    setSession(null);
-  }
+  const logout    = clearAuthAndSignOut;
+  const forgotPIN = clearAuthAndSignOut;
 
   function handleQuickCapture(targetScreen) {
-    // targetScreen may be "Expenses:SelectMode" — parse screen name and optional mode
     const [screenName, mode] = targetScreen.split(":");
     navigate(screenName);
     setQuickAddTrigger({ screen: screenName, mode: mode || null, ts: Date.now() });
   }
 
-  // ── Android / browser back button support ──
-  // Each screen change pushes a history entry, so the phone's back button
-  // walks back through screens instead of exiting the app. If the search
-  // overlay is open, back closes it first.
-  function navigate(key) {
-    if (key === screen) return;
-    setSearchSeed(null); // normal navigation clears any pending search handoff
+  // NEW: navigate accepts an optional context object for passing data (e.g. clientId)
+  function navigate(key, ctx = {}) {
+    if (key === screen && Object.keys(ctx).length === 0) return;
+    setSearchSeed(null);
+    setScreenContext(ctx);
     window.history.pushState({ pmScreen: key }, "");
     setScreen(key);
   }
 
-  // ── Global search handoff: navigating from a search result carries the
-  // term into the destination screen's own search box ──
   function handleSearchNavigate(key, term) {
     navigate(key);
     setSearchSeed({ term: term || "", ts: Date.now() });
@@ -426,7 +444,6 @@ export default function PowerWorksApp() {
     if (!window.history.state?.pmScreen) {
       window.history.replaceState({ pmScreen: "Home" }, "");
     }
-    // Prevent accidental pull-to-refresh while scrolling lists (PWA polish).
     document.documentElement.style.overscrollBehaviorY = "contain";
     document.body.style.overscrollBehaviorY = "contain";
   }, []);
@@ -462,7 +479,7 @@ export default function PowerWorksApp() {
     unsubmittedExp,
     pending:        pendingCount,
     unread:         unreadCount,
-    sharedInbox:    unreadCount, // same count drives the inbox badge
+    sharedInbox:    unreadCount,
   };
 
   if (loading)              return <Spinner />;
@@ -474,7 +491,7 @@ export default function PowerWorksApp() {
 
   const screens = {
     Home:      <HomeScreen      data={data} setScreen={navigate} user={session.user} onQuickAdd={handleQuickCapture} />,
-    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
+    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} onNavigate={navigate} />,
     Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} />,
     Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
@@ -483,12 +500,13 @@ export default function PowerWorksApp() {
     VehicleCheck: <VehicleCheckScreen data={data} setData={setData} userId={session.user.id} />,
     Analytics:    <AnalyticsScreen    data={data} onNavigate={navigate} />,
     Leads:        <LeadsScreen        data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} />,
+    // FIX #16: use supabase directly instead of dynamic import
     Team:         <TeamScreen         userId={session.user.id} userEmail={session.user.email} data={data} setData={setData} onTeamChange={async (tid) => {
       setTeamId(tid);
       if (tid) {
         triggerImmediateSync();
         try {
-          const { data: rows } = await import("./supabase").then(m => m.supabase.rpc("get_team_member_emails", { p_team_id: tid }));
+          const { data: rows } = await supabase.rpc("get_team_member_emails", { p_team_id: tid });
           if (rows) setTeamMembers(rows);
         } catch (e) { console.warn("Could not load team members:", e); }
       }
@@ -496,15 +514,46 @@ export default function PowerWorksApp() {
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
     Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} onBackfill={() => navigate("BackfillZAR")} />,
+    // FIX #4: BackfillZAR was missing from this map
+    BackfillZAR: <BackfillZARScreen data={data} setData={setData} userId={session.user.id} onBack={() => navigate("Diagnostics")} />,
     Notifications: <NotificationsScreen userId={session.user.id} onNavigate={navigate} onMarkRead={() => setUnreadCount(0)} />,
-    SharedInbox:   <SharedInboxScreen  userId={session.user.id} onBack={() => navigate("Notifications")} onAccepted={() => { triggerImmediateSync(); navigate("Notifications"); }} />,
+    // Updated: SharedInbox now gets userEmail + teamId for response notifications
+    SharedInbox: <SharedInboxScreen userId={session.user.id} userEmail={session.user.email} teamId={teamId} onBack={() => navigate("Notifications")} onAccepted={() => { triggerImmediateSync(); navigate("Notifications"); }} />,
+
+    // ── NEW SCREENS ──
+    Client360: (
+      <Client360Screen
+        data={data} setData={setData}
+        userId={session.user.id} userEmail={session.user.email}
+        teamId={teamId} teamMembers={teamMembers}
+        clientId={screenContext.clientId}
+        onBack={() => navigate("Clients")}
+        onNavigate={navigate}
+      />
+    ),
+    Calendar: (
+      <CalendarScreen
+        data={data} setData={setData}
+        userId={session.user.id}
+        onNavigate={navigate}
+      />
+    ),
+    TeamDashboard: (
+      <TeamDashboardScreen
+        data={data}
+        teamMembers={teamMembers}
+        userId={session.user.id}
+        userRole={userRole}
+        onNavigate={navigate}
+      />
+    ),
   };
 
   return (
     <ErrorBoundary>
       <div className="min-h-screen pb-32" style={{ background: "#F7F3F3" }}>
 
-        {/* ── Top bar: hamburger + screen title/logo + search ── */}
+        {/* ── Top bar ── */}
         <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100">
           <div className="mx-auto max-w-2xl px-3 h-14 flex items-center justify-between gap-2">
             <button onClick={() => setDrawerOpen(true)}
@@ -513,24 +562,25 @@ export default function PowerWorksApp() {
               <Menu size={22} />
             </button>
 
-            {/* Centre: logo on home, screen title + add hint on other screens */}
             {screen === "Home"
               ? <img src={BRAND.logo} alt="PowerMate" className="h-7 object-contain opacity-90" onError={e => e.target.style.display = "none"} />
               : (() => {
                   const SCREEN_LABELS = {
-                    Clients:      { label: "Clients & Leads",  addHint: "lead / client" },
-                    Contacts:     { label: "Contacts",         addHint: "contact" },
-                    Followups:    { label: "Follow-ups",       addHint: "follow-up" },
-                    Notes:        { label: "Field Notes",      addHint: "note" },
-                    Equipment:    { label: "Equipment",        addHint: "item" },
-                    Quotes:       { label: "Quotes",           addHint: "quote" },
-                    Expenses:     { label: "Expenses",         addHint: "expense" },
-                    More:         { label: "Settings",         addHint: null },
-                    Diagnostics:  { label: "Diagnostics",      addHint: null },
-                    Analytics:    { label: "Analytics",        addHint: null },
-                    VehicleCheck: { label: "Vehicle Checks",   addHint: "check" },
-                    Calendar:     { label: "Calendar",         addHint: "event" },
-                    BackfillZAR:  { label: "Backfill ZAR",     addHint: null },
+                    Clients:       { label: "Clients & Leads",  addHint: "lead / client" },
+                    Contacts:      { label: "Contacts",         addHint: "contact" },
+                    Followups:     { label: "Follow-ups",       addHint: "follow-up" },
+                    Notes:         { label: "Field Notes",      addHint: "note" },
+                    Equipment:     { label: "Equipment",        addHint: "item" },
+                    Quotes:        { label: "Quotes",           addHint: "quote" },
+                    Expenses:      { label: "Expenses",         addHint: "expense" },
+                    More:          { label: "Settings",          addHint: null },
+                    Diagnostics:   { label: "Diagnostics",      addHint: null },
+                    Analytics:     { label: "Analytics",        addHint: null },
+                    VehicleCheck:  { label: "Vehicle Checks",   addHint: "check" },
+                    Calendar:      { label: "Calendar",         addHint: null },
+                    BackfillZAR:   { label: "Backfill ZAR",     addHint: null },
+                    Client360:     { label: "Client",           addHint: null },
+                    TeamDashboard: { label: "Team Dashboard",   addHint: null },
                   };
                   const meta = SCREEN_LABELS[screen] || { label: screen, addHint: null };
                   return (
@@ -552,7 +602,6 @@ export default function PowerWorksApp() {
             }
 
             <div className="flex items-center gap-1 shrink-0">
-              {/* Bell — only show when in a team */}
               {teamId && (
                 <button onClick={() => navigate("Notifications")}
                   className="relative p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -596,16 +645,8 @@ export default function PowerWorksApp() {
         </main>
 
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
-
         <QuickCaptureFAB currentScreen={screen} onTrigger={handleQuickCapture} />
-
-        <GlobalSearch
-          open={searchOpen}
-          onClose={() => setSearchOpen(false)}
-          data={data}
-          onNavigate={handleSearchNavigate}
-        />
-
+        <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} data={data} onNavigate={handleSearchNavigate} />
         <AnimatePresence>
           {syncError && <Toast message={syncError} type="error" onDone={() => setSyncError("")} />}
         </AnimatePresence>
