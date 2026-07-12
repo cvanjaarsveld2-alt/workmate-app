@@ -4,7 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, Send, Mail, Share2 } from "lucide-react";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { deleteRecord } from "../lib/deleteHelpers";
+import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { scheduleNotificationsViaSW } from "../lib/notifications";
@@ -324,7 +326,7 @@ Kind regards`;
       uploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
     }
 
-    const item = {
+    const item = withTeamId({
       id: noteId,
       user_id: userId,
       client_id:  form.client_id || null,
@@ -337,7 +339,7 @@ Kind regards`;
       resolved: false,
       created_at: new Date().toISOString(),
       sync_status: "pending",
-    };
+    }, teamId);
     setData(d => ({
       ...d,
       notes: [item, ...(d.notes || [])],
@@ -389,9 +391,8 @@ Kind regards`;
     const ok = await confirm("Delete this note?", { confirmLabel: "Delete" });
     if (!ok) return;
     if (editId === id) resetForm();
-    setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "notes", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], notes: (d.notes || []).filter(n => n.id !== id) }));
+    await deleteRecord("notes", id, userId, setData);
     setToast("Note deleted");
-    triggerImmediateSync();
   }
 
   async function deleteNoteMedia(noteId, mediaId) {
