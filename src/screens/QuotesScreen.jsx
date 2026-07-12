@@ -4,7 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2 } from "lucide-react";
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, genId } from "../lib/helpers";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { deleteRecord } from "../lib/deleteHelpers";
+import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { Card, Btn, Field, SelectField, SearchBar, FilterPills, Toast, Empty, PageHeader, useConfirm } from "../components/ui";
@@ -67,7 +69,7 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
       setToast("Quote updated");
       triggerImmediateSync();
     } else {
-      const item = { id: genId(), user_id: userId, ...form, value: parseFloat(form.value || 0), sent_date: todayISO(), created_at: new Date().toISOString(), sync_status: "pending" };
+      const item = withTeamId({ id: genId(), user_id: userId, ...form, value: parseFloat(form.value || 0), sent_date: todayISO(), created_at: new Date().toISOString(), sync_status: "pending" }, teamId);
       setData(d => ({ ...d, quotes: [item, ...(d.quotes || [])], syncQueue: [{ id: genId(), table: "quotes", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
       await offlineSave("quotes", item);
       setToast("Quote added");
@@ -80,9 +82,8 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
     const ok = await confirm(`Delete quote for ${name || "this client"}?`, { confirmLabel: "Delete" });
     if (!ok) return;
     if (editId === id) resetForm();
-    setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "quotes", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], quotes: (d.quotes || []).filter(q => q.id !== id) }));
+    await deleteRecord("quotes", id, userId, setData);
     setToast("Quote deleted");
-    triggerImmediateSync();
   }
 
   function startEdit(q) { setForm({ client_name: q.client_name || "", description: q.description || "", value: String(q.value || ""), status: q.status || "Pending" }); setEditId(q.id); setShowForm(true); }
