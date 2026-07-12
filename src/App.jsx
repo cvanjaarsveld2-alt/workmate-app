@@ -1,4 +1,4 @@
-a// ─── PowerMate App ────────────────────────────────────────────────────────────
+// ─── PowerMate App ────────────────────────────────────────────────────────────
 import React, { useEffect, useState, useCallback, useRef} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
