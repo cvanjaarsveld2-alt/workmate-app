@@ -45,7 +45,6 @@ export function NoteToFollowupBtn({ note, userId, teamId, data, setData, onDone 
       created_at: new Date().toISOString(),
       sync_status: "pending",
     }, teamId);
-    };
 
     setData(d => ({
       ...d,
