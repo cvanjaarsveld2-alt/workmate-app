@@ -15,7 +15,7 @@ import {
   Clock, CheckCircle2, Plus, Navigation,
   MessageSquare, Wrench, FileText,
 } from "lucide-react";
-import { BRAND, NOTE_URGENCY } from "../lib/constants";
+import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency } from "../lib/helpers";
 import { Card } from "../components/ui";
 
