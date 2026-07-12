@@ -74,23 +74,23 @@ function SectionHead({ icon: Icon, label, count, color, bg }) {
 }
 
 // ─── Client row ───────────────────────────────────────────────────────────────
-function ClientRow({ client, memberColor: color }) {
+function ClientRow({ client, memberColor: color, onOpen }) {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
+    <button onClick={onOpen} className="w-full flex items-center gap-3 py-3 border-b border-slate-50 last:border-0 text-left hover:bg-slate-50 disabled:cursor-default" disabled={!onOpen}>
       <MemberChip email={client._ownerEmail} userId={client.user_id} color={color} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-slate-900 truncate">{client.company}</p>
         <p className="text-xs text-slate-400 truncate">{[client.branch, client.contact].filter(Boolean).join(" · ")}</p>
       </div>
       <StagePill stage={client.stage || "New Lead"} />
-    </div>
+    </button>
   );
 }
 
 // ─── Contact row ──────────────────────────────────────────────────────────────
-function ContactRow({ contact, memberColor: color }) {
+function ContactRow({ contact, memberColor: color, onOpen }) {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
+    <button onClick={onOpen} className="w-full flex items-center gap-3 py-3 border-b border-slate-50 last:border-0 text-left hover:bg-slate-50 disabled:cursor-default" disabled={!onOpen}>
       <MemberChip email={contact._ownerEmail} userId={contact.user_id} color={color} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
@@ -100,29 +100,29 @@ function ContactRow({ contact, memberColor: color }) {
         style={{ background: "#EDE9FE", color: "#5B21B6" }}>
         {contact.status || "Lead"}
       </span>
-    </div>
+    </button>
   );
 }
 
 // ─── Lead row ─────────────────────────────────────────────────────────────────
-function LeadRow({ lead, memberColor: color }) {
+function LeadRow({ lead, memberColor: color, onOpen }) {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
+    <button onClick={onOpen} className="w-full flex items-center gap-3 py-3 border-b border-slate-50 last:border-0 text-left hover:bg-slate-50 disabled:cursor-default" disabled={!onOpen}>
       <MemberChip email={lead._ownerEmail} userId={lead.user_id} color={color} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-slate-900 truncate">{lead.title || lead.client_name}</p>
         <p className="text-xs text-slate-400 truncate">{lead.client_name}</p>
       </div>
       <StagePill stage={lead.stage || "New Lead"} />
-    </div>
+    </button>
   );
 }
 
 // ─── Follow-up row ────────────────────────────────────────────────────────────
-function FollowupRow({ fu, today, memberColor: color }) {
+function FollowupRow({ fu, today, memberColor: color, onOpen }) {
   const overdue = fu.date < today && !fu.completed;
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
+    <button onClick={onOpen} className="w-full flex items-center gap-3 py-3 border-b border-slate-50 last:border-0 text-left hover:bg-slate-50 disabled:cursor-default" disabled={!onOpen}>
       <MemberChip email={fu._ownerEmail} userId={fu.user_id} color={color} />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-slate-900 truncate">{fu.title}</p>
@@ -139,7 +139,7 @@ function FollowupRow({ fu, today, memberColor: color }) {
           </span>
         )}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -329,10 +329,10 @@ export function TeamDashboardScreen({
         ) : (
           <div className="px-4">
             <AnimatePresence>
-              {activeSection === "clients"  && displayed.map(r => <ClientRow   key={r.id} client={r}  memberColor={r._ownerColor} />)}
-              {activeSection === "contacts" && displayed.map(r => <ContactRow  key={r.id} contact={r} memberColor={r._ownerColor} />)}
-              {activeSection === "leads"    && displayed.map(r => <LeadRow     key={r.id} lead={r}    memberColor={r._ownerColor} />)}
-              {activeSection === "followups"&& displayed.map(r => <FollowupRow key={r.id} fu={r} today={today} memberColor={r._ownerColor} />)}
+              {activeSection === "clients"  && displayed.map(r => <ClientRow key={r.id} client={r} memberColor={r._ownerColor} onOpen={isAdmin ? () => onNavigate?.("Client360", { clientId: r.id, returnTo: "TeamDashboard" }) : undefined} />)}
+              {activeSection === "contacts" && displayed.map(r => <ContactRow key={r.id} contact={r} memberColor={r._ownerColor} onOpen={isAdmin ? () => onNavigate?.("TeamRecordDetail", { recordType: "contacts", recordId: r.id }) : undefined} />)}
+              {activeSection === "leads"    && displayed.map(r => <LeadRow key={r.id} lead={r} memberColor={r._ownerColor} onOpen={isAdmin ? () => onNavigate?.("TeamRecordDetail", { recordType: "leads", recordId: r.id }) : undefined} />)}
+              {activeSection === "followups"&& displayed.map(r => <FollowupRow key={r.id} fu={r} today={today} memberColor={r._ownerColor} onOpen={isAdmin ? () => onNavigate?.("TeamRecordDetail", { recordType: "followups", recordId: r.id }) : undefined} />)}
             </AnimatePresence>
 
             {rows.length > LIMIT && (
