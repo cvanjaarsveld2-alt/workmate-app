@@ -3,7 +3,9 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip, ChevronRight, Share2 } from "lucide-react";
 import { smartDate, genId, uploadPhotoToSupabase, daysDiff } from "../lib/helpers";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { deleteRecord } from "../lib/deleteHelpers";
+import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, ServiceBadge, useConfirm } from "../components/ui";
@@ -149,9 +151,8 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
     const ok = await confirm(`Delete ${name}?`, { confirmLabel: "Delete" });
     if (!ok) return;
     if (editId === id) resetForm();
-    setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "equipment", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], equipment: (d.equipment || []).filter(e => e.id !== id) }));
+    await deleteRecord("equipment", id, userId, setData);
     setToast("Equipment deleted");
-    triggerImmediateSync();
   }
 
   function startEdit(e) {
