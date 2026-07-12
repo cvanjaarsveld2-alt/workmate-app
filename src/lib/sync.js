@@ -91,29 +91,53 @@ export async function pushSyncQueue(syncQueue, setData) {
     const pending = (syncQueue || []).filter(i => i.status === "pending");
     if (pending.length === 0) return;
 
-    // FIX: Dedup by key, keeping the LATEST operation (by created_at), not by media count.
-    // Also handle action collisions: insert+delete = discard both; update+delete = delete only.
-    const bestByKey = new Map();
+    // FIX: Collapse ALL operations per record into one final action.
+    // Collect all operations per entity, sorted oldest→newest, then decide:
+    //   insert → update  = upsert with latest data
+    //   insert → delete  = discard all (never existed on server)
+    //   update → update  = latest update only
+    //   update → delete  = delete only
+    //   any chain ending in delete = delete (or discard if started with insert)
+    const groupsByKey = new Map();
+    const allQueueIds = new Map(); // key → [all queue item ids for this entity]
     for (const item of pending) {
       const key = `${item.table}:${item.data?.id}`;
-      const existing = bestByKey.get(key);
-      if (!existing) {
-        bestByKey.set(key, item);
-      } else {
-        // Keep whichever was created later
-        const existingTime = new Date(existing.created_at || 0).getTime();
-        const newTime      = new Date(item.created_at || 0).getTime();
-        if (newTime >= existingTime) {
-          // If we had an insert and now have a delete → discard both
-          if (existing.action === "insert" && item.action === "delete") {
-            bestByKey.delete(key);
-          } else {
-            bestByKey.set(key, item);
-          }
-        }
-      }
+      if (!groupsByKey.has(key)) { groupsByKey.set(key, []); allQueueIds.set(key, []); }
+      groupsByKey.get(key).push(item);
+      allQueueIds.get(key).push(item.id);
     }
-    const deduped = Array.from(bestByKey.values());
+
+    const collapsed = [];
+    const discardedQueueIds = new Set();
+
+    for (const [key, ops] of groupsByKey) {
+      // Sort by created_at ascending (oldest first)
+      ops.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+      const first = ops[0];
+      const last  = ops[ops.length - 1];
+      const hasInsert = ops.some(o => o.action === "insert");
+      const hasDelete = ops.some(o => o.action === "delete");
+
+      if (hasInsert && hasDelete) {
+        // Record was created and deleted offline — never reached server, discard all
+        allQueueIds.get(key).forEach(id => discardedQueueIds.add(id));
+        continue;
+      }
+      if (hasDelete) {
+        // Chain ends in delete — use the delete operation with latest data
+        collapsed.push(last.action === "delete" ? last : { ...last, action: "delete" });
+      } else if (hasInsert) {
+        // Insert followed by updates — upsert with the latest record data
+        collapsed.push({ ...last, action: "upsert", data: last.data });
+      } else {
+        // All updates — keep only the latest
+        collapsed.push(last);
+      }
+      // Mark all but the winner as discarded (for cleanup)
+      const winnerId = collapsed[collapsed.length - 1].id;
+      allQueueIds.get(key).forEach(id => { if (id !== winnerId) discardedQueueIds.add(id); });
+    }
+    const deduped = collapsed;
 
     const results = await Promise.allSettled(
       deduped.map(async item => {
@@ -150,7 +174,7 @@ export async function pushSyncQueue(syncQueue, setData) {
       const update = {
         ...d,
         syncQueue: (d.syncQueue || [])
-          .filter(i => !succeededQueueIds.has(i.id))
+          .filter(i => !succeededQueueIds.has(i.id) && !discardedQueueIds.has(i.id))
           .map(i => {
             if (!failedQueueIds.has(i.id)) return i;
             const attempts = (i.attempts || 0) + 1;
