@@ -5,7 +5,7 @@ const CACHE_NAME = "powermate-v2";
 const PRECACHE = [
   "/",
   "/index.html",
-  "/logo.png",
+  "/icons/icon-192.png",
 ];
 
 // ── Install: precache shell (graceful — missing files don't break install) ──
