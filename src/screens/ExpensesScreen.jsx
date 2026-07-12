@@ -240,9 +240,9 @@ function fmtMoney(amount, currency = "ZAR") {
 function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpenseForm,
   selectMode, selectedIds, toggleSelect, setDetailExpense, fmtMoney, CATEGORY_COLORS, smartDate }) {
 
-  const [collapsed, setCollapsed] = useState(false);
   const periodTotal = items.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
   const isCurrent = monthKey === currentCalendarMonth()?.key;
+  const [collapsed, setCollapsed] = useState(!isCurrent); // FIX: only current month starts expanded
 
   return (
     <div>
