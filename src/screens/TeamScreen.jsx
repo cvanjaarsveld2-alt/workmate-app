@@ -26,6 +26,7 @@ import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { triggerImmediateSync } from "../lib/sync";
+import { offlineSave } from "../offline/offlineDb";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function money(n) {
@@ -65,7 +66,7 @@ function timeAgo(isoDate) {
 }
 
 // ─── Member Dashboard (Admin only) ────────────────────────────────────────────
-function MemberDashboard({ member, data, members, currentUserId, userEmail, teamId, onBack }) {
+function MemberDashboard({ member, data, setData, members, currentUserId, userEmail, teamId, onBack }) {
   const today = todayISO();
   const { start, end } = getMonthRange();
 
@@ -89,20 +90,68 @@ function MemberDashboard({ member, data, members, currentUserId, userEmail, team
   const monthTotal = monthExp.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
 
   const [drillSection, setDrillSection] = useState(member._openSection || null);
+  const [assignmentStatus, setAssignmentStatus] = useState("");
 
   async function reassignRecord(table, recordId, recordTitle, recordType, newUserId, newEmail) {
-    if (!newUserId) return;
+    const records = data[table] || [];
+    const previous = records.find(record => record.id === recordId);
+    if (!previous) return;
+
+    const assignedName = newUserId ? (newEmail?.split("@")[0] || newEmail || "") : "";
+    const updated = {
+      ...previous,
+      assigned_to_user_id: newUserId || null,
+      assigned_to: assignedName,
+      sync_status: "pending",
+    };
+
+    // Update the dashboard immediately while the server request is running.
+    setData(current => ({
+      ...current,
+      [table]: (current[table] || []).map(record => record.id === recordId ? updated : record),
+    }));
+
     const { error } = await supabase
       .from(table)
-      .update({ assigned_to_user_id: newUserId, assigned_to: newEmail?.split("@")[0] || newEmail })
+      .update({
+        assigned_to_user_id: newUserId || null,
+        assigned_to: assignedName || null,
+        sync_status: "synced",
+      })
       .eq("id", recordId);
-    if (error) return;
-    if (newUserId !== currentUserId) {
-      await sendAssignmentNotification({
-        fromUserId: currentUserId, toUserId: newUserId, teamId,
-        recordType, recordId, recordTitle, fromEmail: userEmail,
-      });
+
+    if (error) {
+      // Restore the previous value if Supabase rejected the change.
+      setData(current => ({
+        ...current,
+        [table]: (current[table] || []).map(record => record.id === recordId ? previous : record),
+      }));
+      setAssignmentStatus("Could not change the assignment. Please try again.");
+      setTimeout(() => setAssignmentStatus(""), 3000);
+      return;
     }
+
+    const saved = { ...updated, sync_status: "synced" };
+    setData(current => ({
+      ...current,
+      [table]: (current[table] || []).map(record => record.id === recordId ? saved : record),
+    }));
+    await offlineSave(table, saved);
+
+    if (newUserId && newUserId !== currentUserId) {
+      try {
+        await sendAssignmentNotification({
+          fromUserId: currentUserId, toUserId: newUserId, teamId,
+          recordType, recordId, recordTitle, fromEmail: userEmail,
+        });
+      } catch (notificationError) {
+        console.warn("Assignment saved, but notification failed:", notificationError);
+      }
+    }
+
+    setAssignmentStatus(newUserId ? `Assigned to ${assignedName || "teammate"}` : "Assignment removed");
+    setTimeout(() => setAssignmentStatus(""), 2500);
+    triggerImmediateSync();
   }
 
   // ── Drill view ──────────────────────────────────────────────────────────────
@@ -128,6 +177,12 @@ function MemberDashboard({ member, data, members, currentUserId, userEmail, team
             <p className="text-xs text-slate-400 truncate">{member.email}</p>
           </div>
         </div>
+
+        {assignmentStatus && (
+          <div className={`rounded-xl px-4 py-3 text-sm font-bold ${assignmentStatus.startsWith("Could not") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+            {assignmentStatus}
+          </div>
+        )}
 
         {sectionData.length === 0 ? (
           <Card className="p-8 text-center">
@@ -633,6 +688,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange }) {
       <MemberDashboard
         member={viewingMember}
         data={data || {}}
+        setData={setData}
         members={members}
         currentUserId={userId}
         userEmail={userEmail}
