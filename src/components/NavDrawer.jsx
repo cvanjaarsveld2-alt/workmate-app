@@ -55,10 +55,10 @@ const SECTIONS = [
   {
     title: "MANAGE",
     items: [
-      { key: "TeamDashboard", label: "Team Dashboard",  icon: LayoutDashboard }, // NEW
+      { key: "TeamDashboard", label: "Team Overview",  icon: LayoutDashboard },
       { key: "SharedInbox",   label: "Shared with me",  icon: Inbox,    badgeKey: "sharedInbox" },
       { key: "Notifications", label: "Notifications",   icon: Bell,     badgeKey: "unread" },
-      { key: "Team",          label: "Team & Sharing",  icon: Users },
+      { key: "Team",          label: "Team Settings & Sharing",  icon: Users },
       { key: "More",          label: "Settings & More", icon: Settings, badgeKey: "pending" },
     ],
   },
