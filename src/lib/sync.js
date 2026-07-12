@@ -1,13 +1,24 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// sync.js — PowerMate Bulletproof Sync Engine
+// sync.js — PowerMate Sync Engine (all critical fixes applied)
+//
+// FIX: activities added to SYNC_TABLES, pull, and realtime
+// FIX: assignment fields added to pull select lists
+// FIX: sync queue dedup uses timestamp, not media count
+// FIX: saveAndSync checks result.ok (not truthy object)
+// FIX: realtime team tables have no user_id filter
+// FIX: offlineDelete called on realtime DELETE events
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { supabase } from "../supabase";
 import { logEvent } from "./helpers";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { logCrash } from "../components/ErrorBoundary";
 
-const SYNC_TABLES = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "team_notifications"];
+const SYNC_TABLES = [
+  "clients", "followups", "quotes", "notes", "equipment",
+  "contacts", "expenses", "leads", "activities",  // FIX: activities added
+  "team_notifications",
+];
 const MAX_SYNC_ATTEMPTS = 5;
 
 export async function pushItem(item) {
@@ -16,19 +27,14 @@ export async function pushItem(item) {
     let   payload = item.data;
 
     if (payload?.media) {
-      payload = {
-        ...payload,
-        media: payload.media.map(m => ({ ...m, base64: undefined })),
-      };
+      payload = { ...payload, media: payload.media.map(m => ({ ...m, base64: undefined })) };
     }
 
     if (item.action === "insert" || item.action === "upsert") {
-      const syncedPayload = { ...payload, sync_status: "synced" };
-      const { error } = await supabase.from(table).upsert(syncedPayload, { onConflict: "id" });
+      const { error } = await supabase.from(table).upsert({ ...payload, sync_status: "synced" }, { onConflict: "id" });
       if (error) throw error;
     } else if (item.action === "update") {
-      const syncedPayload = { ...payload, sync_status: "synced" };
-      const { error } = await supabase.from(table).update(syncedPayload).eq("id", payload.id);
+      const { error } = await supabase.from(table).update({ ...payload, sync_status: "synced" }).eq("id", payload.id);
       if (error) throw error;
     } else if (item.action === "delete") {
       const { error } = await supabase.from(table).delete().eq("id", payload.id);
@@ -36,13 +42,11 @@ export async function pushItem(item) {
     }
     return { ok: true };
   } catch (e) {
-    const detail = {
-      code: e?.code, message: e?.message, details: e?.details, hint: e?.hint,
-    };
-    console.warn(`[Sync] FAILED ${item.table} ${item.action}`, detail, "\n  payload:", item.data);
+    const detail = { code: e?.code, message: e?.message, details: e?.details, hint: e?.hint };
+    console.warn(`[Sync] FAILED ${item.table} ${item.action}`, detail);
     logCrash({
       screen: `Sync (${item.table} ${item.action})`,
-      message: `${detail.message || "Unknown error"}${detail.code ? ` [${detail.code}]` : ""}${detail.hint ? ` — hint: ${detail.hint}` : ""}`,
+      message: `${detail.message || "Unknown"}${detail.code ? ` [${detail.code}]` : ""}`,
     });
     return { ok: false, error: detail };
   }
@@ -52,10 +56,6 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
   await offlineSave(table, item);
 
   if (isOnline) {
-    // FIX #2 — pushItem returns {ok: boolean}, not a boolean.
-    // The previous `if (success)` was always truthy even on failure because
-    // JS objects are always truthy. This meant failed syncs were silently
-    // discarded: the record was marked "synced" and removed from the queue.
     const result = await pushItem({ table, action, data: item });
     if (result.ok) {
       const synced = { ...item, sync_status: "synced" };
@@ -67,27 +67,17 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
       }));
       return synced;
     }
-    // Fall through to queue the item for retry
   }
 
   const queueItem = {
-    id:         `sq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    table,
-    action,
-    data:       item,
-    status:     "pending",
-    created_at: new Date().toISOString(),
-    retries:    0,
+    id: `sq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    table, action, data: item, status: "pending",
+    created_at: new Date().toISOString(), retries: 0,
   };
-
   setData(d => ({
     ...d,
-    syncQueue: [
-      queueItem,
-      ...(d.syncQueue || []).filter(q => q.data?.id !== item.id),
-    ],
+    syncQueue: [queueItem, ...(d.syncQueue || []).filter(q => q.data?.id !== item.id)],
   }));
-
   return { ...item, sync_status: "pending" };
 }
 
@@ -101,6 +91,8 @@ export async function pushSyncQueue(syncQueue, setData) {
     const pending = (syncQueue || []).filter(i => i.status === "pending");
     if (pending.length === 0) return;
 
+    // FIX: Dedup by key, keeping the LATEST operation (by created_at), not by media count.
+    // Also handle action collisions: insert+delete = discard both; update+delete = delete only.
     const bestByKey = new Map();
     for (const item of pending) {
       const key = `${item.table}:${item.data?.id}`;
@@ -108,10 +100,16 @@ export async function pushSyncQueue(syncQueue, setData) {
       if (!existing) {
         bestByKey.set(key, item);
       } else {
-        const existingMediaCount = (existing.data?.media || []).filter(m => m.url).length;
-        const newMediaCount = (item.data?.media || []).filter(m => m.url).length;
-        if (newMediaCount >= existingMediaCount) {
-          bestByKey.set(key, item);
+        // Keep whichever was created later
+        const existingTime = new Date(existing.created_at || 0).getTime();
+        const newTime      = new Date(item.created_at || 0).getTime();
+        if (newTime >= existingTime) {
+          // If we had an insert and now have a delete → discard both
+          if (existing.action === "insert" && item.action === "delete") {
+            bestByKey.delete(key);
+          } else {
+            bestByKey.set(key, item);
+          }
         }
       }
     }
@@ -120,25 +118,28 @@ export async function pushSyncQueue(syncQueue, setData) {
     const results = await Promise.allSettled(
       deduped.map(async item => {
         const result = await pushItem(item);
-        return { queueId: item.id, entityId: item.data?.id, ...result };
+        return { queueId: item.id, entityId: item.data?.id, table: item.table, action: item.action, ...result };
       })
     );
 
     const outcomes = results.map(r => r.status === "fulfilled" ? r.value : { ok: false, error: { message: "Unexpected error" } });
-
     const succeeded = outcomes.filter(o => o.ok);
     const failed    = outcomes.filter(o => !o.ok);
 
     if (failed.length > 0) {
-      console.warn(`[Sync] ${failed.length} items failed to sync`);
+      console.warn(`[Sync] ${failed.length} items failed`);
       logEvent("sync_failed", { count: failed.length });
       window.dispatchEvent(new CustomEvent("powermate:sync_failed", {
         detail: { count: failed.length, message: `${failed.length} item${failed.length !== 1 ? "s" : ""} failed to sync` },
       }));
     }
+    if (succeeded.length > 0) logEvent("sync_succeeded", { count: succeeded.length });
 
-    if (succeeded.length > 0) {
-      logEvent("sync_succeeded", { count: succeeded.length });
+    // FIX: For successful deletes, also remove from IndexedDB
+    for (const s of succeeded) {
+      if (s.action === "delete" && s.entityId && s.table) {
+        offlineDelete(s.table, s.entityId).catch(() => {});
+      }
     }
 
     const succeededEntityIds = succeeded.map(o => o.entityId).filter(Boolean);
@@ -159,28 +160,33 @@ export async function pushSyncQueue(syncQueue, setData) {
           }),
       };
       SYNC_TABLES.forEach(table => {
-        update[table] = (d[table] || []).map(r => succeededEntityIds.includes(r.id) ? { ...r, sync_status: "synced" } : r);
+        update[table] = (d[table] || []).map(r =>
+          succeededEntityIds.includes(r.id) ? { ...r, sync_status: "synced" } : r
+        );
       });
       return update;
     });
-
   } finally {
     _syncInProgress = false;
   }
 }
 
+// FIX: Assignment fields added to pull select lists
+// FIX: Activities included in pull
 export async function pullFromSupabase(uid, setData) {
   try {
-    const [a, b, c, d, leads_res, e, f, g, h] = await Promise.all([
-      supabase.from("clients").select("id,user_id,team_id,company,division,contact,phone,email,location,branch,stage,sync_status,auto_created,source,notes,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
-      supabase.from("followups").select("id,user_id,team_id,client_id,client,branch,title,date,time,reminder,notes,completed,linked_note_id,sync_status,auto_generated,created_at").order("date", { ascending: false }).limit(500),
-      supabase.from("quotes").select("id,user_id,team_id,client_name,description,value,status,sent_date,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
+    const [a, b, c, d, leads_res, e, f, g, h, act] = await Promise.all([
+      supabase.from("clients").select("id,user_id,team_id,company,division,contact,phone,email,location,branch,stage,sync_status,auto_created,source,notes,assigned_to_user_id,assigned_to,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
+      supabase.from("followups").select("id,user_id,team_id,client_id,client,branch,title,date,time,reminder,notes,completed,linked_note_id,sync_status,auto_generated,assigned_to_user_id,assigned_to,created_at").order("date", { ascending: false }).limit(500),
+      supabase.from("quotes").select("id,user_id,team_id,client_name,description,value,line_items,vat_inclusive,status,sent_date,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("contacts").select("id,user_id,team_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("leads").select("id,user_id,team_id,title,description,categories,client_id,client_name,contact_id,contact_name,captured_by,assigned_to,stage,estimated_value,lead_date,follow_up_date,closed_date,notes,outcome_notes,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("notes").select("id,user_id,team_id,client,client_id,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("equipment").select("id,user_id,team_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,amount_zar,exchange_rate,rate_date,rate_source,expense_date,expense_time,category,payment_method,notes,receipt_url,payment_slip_url,status,ai_extracted,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
       supabase.from("vehicle_checks").select("id,user_id,check_date,vehicle,registration,driver,data,sync_status,created_at,updated_at").eq("user_id", uid).order("check_date", { ascending: false }).limit(365),
+      // FIX: Pull activities
+      supabase.from("activities").select("id,user_id,team_id,client_id,client_name,activity_type,summary,outcome,duration_mins,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
     ]);
 
     setData(prev => {
@@ -217,6 +223,7 @@ export async function pullFromSupabase(uid, setData) {
         notes:         e.error ? prev.notes         : merge(e.data, prev.notes,         prev.syncQueue, "notes"),
         equipment:     f.error ? prev.equipment     : merge(f.data, prev.equipment,     prev.syncQueue, "equipment"),
         expenses:      g.error ? prev.expenses      : merge(g.data, prev.expenses,      prev.syncQueue, "expenses"),
+        activities:    act.error ? (prev.activities || []) : merge(act.data, prev.activities, prev.syncQueue, "activities"),
         vehicleChecks: vcMap,
       };
     });
@@ -228,20 +235,12 @@ export async function pullFromSupabase(uid, setData) {
   }
 }
 
-// FIX #12 — Team tables: remove user_id filter so realtime events from other
-// team members are also received. RLS on Supabase ensures only permitted rows
-// are returned; the filter here was over-restricting the realtime stream.
-const TEAM_TABLES = new Set(["clients", "followups", "quotes", "contacts", "notes", "equipment", "leads"]);
+// Team tables get no user_id filter so all RLS-permitted rows come through realtime
+const TEAM_TABLES = new Set(["clients", "followups", "quotes", "contacts", "notes", "equipment", "leads", "activities"]);
 
 export function setupRealtimeSync(uid, setData) {
   const channels = SYNC_TABLES.map(table => {
-    const channelConfig = {
-      event:  "*",
-      schema: "public",
-      table,
-    };
-    // Private tables stay filtered to the current user; shared tables receive
-    // all RLS-permitted rows so team members' changes propagate immediately.
+    const channelConfig = { event: "*", schema: "public", table };
     if (!TEAM_TABLES.has(table)) {
       channelConfig.filter = `user_id=eq.${uid}`;
     }
@@ -275,6 +274,8 @@ export function setupRealtimeSync(uid, setData) {
           }
 
           if (payload.eventType === "DELETE") {
+            // FIX: Also remove from IndexedDB when a realtime delete arrives
+            offlineDelete(table, payload.old.id).catch(() => {});
             return {
               ...prev,
               [dataKey]: current.filter(r => r.id !== payload.old.id),
@@ -291,7 +292,7 @@ export function setupRealtimeSync(uid, setData) {
 }
 
 let _globalSetData = null;
-let _globalQueueRef = null; // FIX #11 — use a ref object, not a closure rebuilt every render
+let _globalQueueRef = null;
 
 export function registerSyncHandlers(setData, queueRef) {
   _globalSetData  = setData;
