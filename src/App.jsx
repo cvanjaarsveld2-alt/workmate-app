@@ -451,13 +451,27 @@ export default function PowerWorksApp() {
     setQuickAddTrigger({ screen: screenName, mode: mode || null, ts: Date.now() });
   }
 
-  // NEW: navigate accepts an optional context object for passing data (e.g. clientId)
+  // Navigate forward — pushes a new history entry
   function navigate(key, ctx = {}) {
     if (key === screen && Object.keys(ctx).length === 0) return;
     setSearchSeed(null);
     setScreenContext(ctx);
     window.history.pushState({ pmScreen: key }, "");
     setScreen(key);
+  }
+
+  // Navigate back — pops history so the device back button doesn't ping-pong.
+  // Used by onBack handlers (Client360 → Clients, Diagnostics → More, etc.)
+  function goBack(fallback = "Home") {
+    setSearchSeed(null);
+    if (window.history.length > 1) {
+      window.history.back(); // triggers popstate → setScreen from history
+    } else {
+      // No history to pop (e.g. direct URL load) — navigate to fallback
+      setScreenContext({});
+      window.history.replaceState({ pmScreen: fallback }, "");
+      setScreen(fallback);
+    }
   }
 
   function handleSearchNavigate(key, term) {
@@ -538,12 +552,12 @@ export default function PowerWorksApp() {
     }} />,
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
-    Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => navigate("More")} onBackfill={() => navigate("BackfillZAR")} />,
+    Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => goBack("More")} onBackfill={() => navigate("BackfillZAR")} />,
     // FIX #4: BackfillZAR was missing from this map
-    BackfillZAR: <BackfillZARScreen data={data} setData={setData} userId={session.user.id} onBack={() => navigate("Diagnostics")} />,
+    BackfillZAR: <BackfillZARScreen data={data} setData={setData} userId={session.user.id} onBack={() => goBack("Diagnostics")} />,
     Notifications: <NotificationsScreen userId={session.user.id} onNavigate={navigate} onMarkRead={() => setUnreadCount(0)} />,
     // Updated: SharedInbox now gets userEmail + teamId for response notifications
-    SharedInbox: <SharedInboxScreen userId={session.user.id} userEmail={session.user.email} teamId={teamId} onBack={() => navigate("Notifications")} onAccepted={() => { triggerImmediateSync(); navigate("Notifications"); }} />,
+    SharedInbox: <SharedInboxScreen userId={session.user.id} userEmail={session.user.email} teamId={teamId} onBack={() => goBack("Notifications")} onAccepted={() => { triggerImmediateSync(); navigate("Notifications"); }} />,
 
     // ── NEW SCREENS ──
     Client360: (
@@ -552,7 +566,7 @@ export default function PowerWorksApp() {
         userId={session.user.id} userEmail={session.user.email}
         teamId={teamId} teamMembers={teamMembers}
         clientId={screenContext.clientId}
-        onBack={() => navigate("Clients")}
+        onBack={() => goBack("Clients")}
         onNavigate={navigate}
       />
     ),
