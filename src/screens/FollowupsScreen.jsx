@@ -4,7 +4,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, Check, Calendar, Send, Share2 } from "lucide-react";
 import { BRAND, REMINDER_OPTIONS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { deleteRecord } from "../lib/deleteHelpers";
+import { withTeamId } from "../lib/teamId";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { triggerImmediateSync } from "../lib/sync";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
@@ -143,7 +145,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
         assigned_to_user_id: updated.assigned_to_user_id || null,
         assigned_to: updated.assigned_to || "",
         sync_status: "pending",
-      };
+      }, teamId);
       setData(d => ({
         ...d,
         followups: (d.followups || []).map(f => f.id === editId ? updated : f),
@@ -153,7 +155,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
       setToast("Follow-up updated");
       triggerImmediateSync();
     } else {
-      const item = {
+      const item = withTeamId({
         id: genId(), user_id: userId, ...form,
         client: clientName, branch: clientBranch,
         completed: false, created_at: new Date().toISOString(), sync_status: "pending",
@@ -195,9 +197,8 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
     const ok = await confirm("Delete this follow-up?", { confirmLabel: "Delete" });
     if (!ok) return;
     if (editId === id) resetForm();
-    setData(d => ({ ...d, syncQueue: [{ id: genId(), table: "followups", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])], followups: (d.followups || []).filter(f => f.id !== id) }));
+    await deleteRecord("followups", id, userId, setData);
     setToast("Follow-up deleted");
-    triggerImmediateSync();
   }
 
   // ── Notes filtered by selected client ────────────────────────────────────
