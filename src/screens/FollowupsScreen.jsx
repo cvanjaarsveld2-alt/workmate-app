@@ -145,7 +145,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
         assigned_to_user_id: updated.assigned_to_user_id || null,
         assigned_to: updated.assigned_to || "",
         sync_status: "pending",
-      }, teamId);
+      };
       setData(d => ({
         ...d,
         followups: (d.followups || []).map(f => f.id === editId ? updated : f),
@@ -159,7 +159,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
         id: genId(), user_id: userId, ...form,
         client: clientName, branch: clientBranch,
         completed: false, created_at: new Date().toISOString(), sync_status: "pending",
-      };
+      }, teamId);
       setData(d => ({
         ...d,
         followups: [item, ...(d.followups || [])],
