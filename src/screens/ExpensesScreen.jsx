@@ -20,7 +20,9 @@ import {
   Bell,
 } from "lucide-react";
 import { todayISO, smartDate, genId } from "../lib/helpers";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { deleteRecord } from "../lib/deleteHelpers";
+import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { ReceiptScanner } from "../components/ReceiptScanner";
@@ -550,16 +552,8 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     const ok = await confirm("Delete this expense?", { confirmLabel: "Delete" });
     if (!ok) return;
     if (editId === id) resetForm();
-    setData(d => ({
-      ...d,
-      expenses: (d.expenses || []).filter(e => e.id !== id),
-      syncQueue: [{
-        id: genId(), table: "expenses", action: "delete",
-        data: { id }, status: "pending", created_at: new Date().toISOString(),
-      }, ...(d.syncQueue || [])],
-    }));
+    await deleteRecord("expenses", id, userId, setData);
     setToast("Expense deleted");
-    triggerImmediateSync();
   }
 
   function toggleSelect(id) {
