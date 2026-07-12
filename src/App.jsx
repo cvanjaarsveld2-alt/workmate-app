@@ -1,4 +1,4 @@
-// ─── PowerMate App ────────────────────────────────────────────────────────────
+a// ─── PowerMate App ────────────────────────────────────────────────────────────
 import React, { useEffect, useState, useCallback, useRef} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -566,7 +566,7 @@ export default function PowerWorksApp() {
         userId={session.user.id} userEmail={session.user.email}
         teamId={teamId} teamMembers={teamMembers}
         clientId={screenContext.clientId}
-        onBack={() => goBack("Clients")}
+        onBack={() => goBack(screenContext.returnTo || "Clients")}
         onNavigate={navigate}
       />
     ),
