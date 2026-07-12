@@ -18,9 +18,9 @@ export function MediaPicker({ onAdd, disabled = false }) {
         continue;
       }
       try {
-        const base64  = await compressImage(file);
         const isVideo = file.type.startsWith("video/");
-        onAdd({ id: genId(), base64, isVideo, name: file.name, type: file.type, uploadStatus: "pending" });
+        const base64  = isVideo ? null : await compressImage(file);
+        onAdd({ id: genId(), base64, file: isVideo ? file : undefined, isVideo, name: file.name, type: file.type, uploadStatus: "pending" });
       } catch (e) {
         console.warn("Could not process file:", e);
       }
