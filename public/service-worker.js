@@ -8,12 +8,14 @@ const PRECACHE = [
   "/logo.png",
 ];
 
-// ── Install: precache shell ───────────────────────────────────────────────────
+// ── Install: precache shell (graceful — missing files don't break install) ──
 self.addEventListener("install", (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(async (cache) => {
+      for (const url of PRECACHE) {
+        try { await cache.add(url); } catch { console.warn("[SW] Precache skip:", url); }
+      }
+    }).then(() => self.skipWaiting())
   );
 });
 
