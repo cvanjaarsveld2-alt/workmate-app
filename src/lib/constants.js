@@ -72,5 +72,10 @@ export const PIN_MAX_ATTEMPTS = 5;
 export const PIN_LOCKOUT_MS   = 5 * 60 * 1000; // 5 minutes
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
+// FIX: User-scoped storage key — prevents cross-account data bleed
+export function localStorageKey(userId) {
+  return userId ? `powermate_v2_data_${userId}` : "powermate_v2_data";
+}
+// Legacy constant kept for backward compat during migration
 export const LOCAL_STORAGE_KEY = "powermate_v2_data";
 export const MAX_FILE_SIZE_MB  = 50;
