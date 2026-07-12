@@ -127,11 +127,21 @@ export async function pushSyncQueue(syncQueue, setData) {
         // Chain ends in delete — use the delete operation with latest data
         collapsed.push(last.action === "delete" ? last : { ...last, action: "delete" });
       } else if (hasInsert) {
-        // Insert followed by updates — upsert with the latest record data
-        collapsed.push({ ...last, action: "upsert", data: last.data });
+        // Insert followed by partial updates — merge oldest to newest so the
+        // upsert always retains required fields from the original insert.
+        const mergedData = ops.reduce(
+          (record, operation) => ({ ...record, ...(operation.data || {}) }),
+          {}
+        );
+        collapsed.push({ ...last, action: "upsert", data: mergedData });
       } else {
-        // All updates — keep only the latest
-        collapsed.push(last);
+        // Merge partial updates as well. This prevents an earlier unsynced
+        // field change being lost when a later toggle only sends one field.
+        const mergedData = ops.reduce(
+          (record, operation) => ({ ...record, ...(operation.data || {}) }),
+          {}
+        );
+        collapsed.push({ ...last, data: mergedData });
       }
       // Mark all but the winner as discarded (for cleanup)
       const winnerId = collapsed[collapsed.length - 1].id;
@@ -174,7 +184,18 @@ export async function pushSyncQueue(syncQueue, setData) {
       const update = {
         ...d,
         syncQueue: (d.syncQueue || [])
-          .filter(i => !succeededQueueIds.has(i.id) && !discardedQueueIds.has(i.id))
+          .filter(i => {
+            if (succeededQueueIds.has(i.id)) return false;
+            // Only remove superseded operations for an entity whose winning
+            // operation succeeded. Retain them when the winner failed so a
+            // retry never loses the original insert/full record payload.
+            const key = `${i.table}:${i.data?.id}`;
+            const winnerSucceeded = succeeded.some(s => {
+              const winner = deduped.find(d => d.id === s.queueId);
+              return winner && `${winner.table}:${winner.data?.id}` === key;
+            });
+            return !(discardedQueueIds.has(i.id) && winnerSucceeded);
+          })
           .map(i => {
             if (!failedQueueIds.has(i.id)) return i;
             const attempts = (i.attempts || 0) + 1;
