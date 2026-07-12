@@ -56,7 +56,7 @@ function InlineFollowupForm({ client, userId, teamId, setData, onDone }) {
   async function save() {
     if (!form.title.trim()) return;
     setSaving(true);
-    const item = {
+    const item = withTeamId({
       id: genId(), user_id: userId,
       client_id: client.id,
       client: client.company,
@@ -65,7 +65,7 @@ function InlineFollowupForm({ client, userId, teamId, setData, onDone }) {
       completed: false,
       created_at: new Date().toISOString(),
       sync_status: "pending",
-    };
+    }, teamId);
     setData(d => ({
       ...d,
       followups: [item, ...(d.followups || [])],
@@ -105,7 +105,7 @@ function InlineFollowupForm({ client, userId, teamId, setData, onDone }) {
 }
 
 // ─── Inline NOTE form (inside client card) — NEW ──────────────────────────────
-function InlineNoteForm({ client, userId, setData, onDone }) {
+function InlineNoteForm({ client, userId, teamId, setData, onDone }) {
   const [form, setForm] = useState({ note: "", urgency: "Normal", resolve_by: "" });
   const [saving, setSaving] = useState(false);
 
@@ -113,7 +113,7 @@ function InlineNoteForm({ client, userId, setData, onDone }) {
     if (!form.note.trim()) return;
     setSaving(true);
     const clientLabel = client.company + (client.branch ? ` — ${client.branch}` : "");
-    const item = {
+    const item = withTeamId({
       id: genId(),
       user_id: userId,
       client_id: client.id,
@@ -126,7 +126,7 @@ function InlineNoteForm({ client, userId, setData, onDone }) {
       resolved: false,
       created_at: new Date().toISOString(),
       sync_status: "pending",
-    };
+    }, teamId);
     setData(d => ({
       ...d,
       notes: [item, ...(d.notes || [])],
@@ -253,12 +253,7 @@ function ClientFollowupRow({ followup: f, setData }) {
   }
 
   async function deleteIt() {
-    setData(d => ({
-      ...d,
-      followups: (d.followups || []).filter(x => x.id !== f.id),
-      syncQueue: [{ id: genId(), table: "followups", action: "delete", data: { id: f.id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-    }));
-    triggerImmediateSync();
+    await deleteRecord("followups", f.id, f.user_id, setData);
   }
 
   function handleExpandToggle(e) {
@@ -770,7 +765,7 @@ function CategoryBadge({ catId, size = "sm" }) {
 
                               <AnimatePresence>
                                 {showNoteForm === c.id && (
-                                  <InlineNoteForm client={c} userId={userId} setData={setData} onDone={() => setShowNoteForm(null)} />
+                                  <InlineNoteForm client={c} userId={userId} teamId={teamId} setData={setData} onDone={() => setShowNoteForm(null)} />
                                 )}
                               </AnimatePresence>
 
