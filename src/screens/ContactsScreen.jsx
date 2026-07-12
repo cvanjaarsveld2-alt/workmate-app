@@ -233,7 +233,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
       clientId = existingClient.id;
     } else {
       clientId = genId();
-      clientItem = {
+      clientItem = withTeamId({
         id: clientId,
         user_id: userId,
         company:  c.company,
@@ -246,7 +246,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
         source:   "contact_promotion",
         created_at: new Date().toISOString(),
         sync_status: "pending",
-      };
+      }, teamId);
     }
 
     const updatedContact = {
