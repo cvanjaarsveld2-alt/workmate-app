@@ -9,6 +9,7 @@
 import { todayISO, genId } from "./helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "./sync";
+import { withTeamId } from "./teamId";
 
 function addBusinessDays(dateStr, days) {
   const d = new Date(dateStr + "T12:00:00");
@@ -22,11 +23,11 @@ function addBusinessDays(dateStr, days) {
 }
 
 // ── 1. Auto-create chase follow-up when quote is first saved ──────────────────
-export function autoCreateChaseFollowup(quote, userId, setData) {
+export function autoCreateChaseFollowup(quote, userId, setData, teamId = null) {
   const today = todayISO();
   const chaseDate = addBusinessDays(quote.sent_date || today, 3);
 
-  const item = {
+  const item = withTeamId({
     id: genId(),
     user_id: userId,
     client_id: null,
@@ -41,7 +42,7 @@ export function autoCreateChaseFollowup(quote, userId, setData) {
     auto_generated: true,
     created_at: new Date().toISOString(),
     sync_status: "pending",
-  };
+  }, teamId);
 
   setData(d => ({
     ...d,
