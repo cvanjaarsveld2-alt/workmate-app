@@ -582,7 +582,9 @@ export default function PowerWorksApp() {
         data={data}
         teamMembers={teamMembers}
         userId={session.user.id}
+        userEmail={session.user.email}
         userRole={userRole}
+        teamId={teamId}
         onNavigate={navigate}
       />
     ),
