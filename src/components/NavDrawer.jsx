@@ -1,6 +1,6 @@
 // ─── Navigation Drawer ────────────────────────────────────────────────────────
 // Slide-out drawer — grouped navigation, brand identity, sign out.
-// Upgraded: stronger brand header, more readable active states.
+// UPDATED: Added Calendar + Team Dashboard entries.
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Inbox,
   Bell,
+  LayoutDashboard, // NEW: for Team Dashboard
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
@@ -27,12 +28,13 @@ const SECTIONS = [
   {
     title: "MAIN",
     items: [
-      { key: "Home",      label: "Dashboard",   icon: Home },
-      { key: "Analytics", label: "Analytics",    icon: BarChart2 },
-      { key: "Leads",     label: "Opportunities", icon: TrendingUp },
-      { key: "Clients",   label: "Clients",      icon: Users },
-      { key: "Contacts",  label: "Contacts",     icon: UserPlus,     badgeKey: "leads" },
-      { key: "Followups", label: "Follow-ups",   icon: CalendarIcon, badgeKey: "overdueFU" },
+      { key: "Home",      label: "Dashboard",     icon: Home },
+      { key: "Analytics", label: "Analytics",      icon: BarChart2 },
+      { key: "Leads",     label: "Opportunities",  icon: TrendingUp },
+      { key: "Clients",   label: "Clients",        icon: Users },
+      { key: "Contacts",  label: "Contacts",       icon: UserPlus,     badgeKey: "leads" },
+      { key: "Followups", label: "Follow-ups",     icon: CalendarIcon, badgeKey: "overdueFU" },
+      { key: "Calendar",  label: "Calendar",       icon: CalendarIcon }, // NEW
     ],
   },
   {
@@ -53,6 +55,7 @@ const SECTIONS = [
   {
     title: "MANAGE",
     items: [
+      { key: "TeamDashboard", label: "Team Dashboard",  icon: LayoutDashboard }, // NEW
       { key: "SharedInbox",   label: "Shared with me",  icon: Inbox,    badgeKey: "sharedInbox" },
       { key: "Notifications", label: "Notifications",   icon: Bell,     badgeKey: "unread" },
       { key: "Team",          label: "Team & Sharing",  icon: Users },
@@ -85,7 +88,7 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
             transition={{ type: "spring", damping: 28, stiffness: 280 }}
             className="fixed top-0 left-0 bottom-0 z-[71] w-[82%] max-w-[320px] bg-white shadow-2xl flex flex-col">
 
-            {/* Brand header — PowerWorks red */}
+            {/* Brand header */}
             <div className="px-5 pt-12 pb-4 flex items-end justify-between"
               style={{ background: "linear-gradient(135deg, #8B1A1A 0%, #6B1414 100%)" }}>
               <img
@@ -98,7 +101,6 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
                   e.target.nextSibling.style.display = "block";
                 }}
               />
-              {/* Fallback if logo fails to load */}
               <p className="text-lg font-black text-white tracking-wide hidden">PowerMate</p>
               <button onClick={onClose}
                 className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mb-0.5"
@@ -125,7 +127,7 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
                           active ? "bg-red-50" : "hover:bg-slate-50"
                         }`}
                         style={{ width: "calc(100% - 8px)" }}>
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all ${active ? "" : ""}`}
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0`}
                           style={{ background: active ? "#F7F3F3" : "#F8FAFC" }}>
                           <item.icon size={16} style={{ color: active ? BRAND.primary : "#94A3B8" }} />
                         </div>
@@ -148,7 +150,7 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
                 </div>
               ))}
 
-              {/* Divider + sign out */}
+              {/* Sign out */}
               <div className="mt-3 mx-4 pt-3 border-t border-slate-100">
                 <button
                   onClick={() => { onClose(); onLogout?.(); }}
