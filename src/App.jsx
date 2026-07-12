@@ -233,15 +233,20 @@ export default function PowerWorksApp() {
     checkPIN();
   }, [session]);
 
+  // FIX: loadLocalData must wait for session so it reads the correct user-scoped data.
+  // Previously ran on mount with session=null, reading shared/legacy data.
   useEffect(() => {
+    if (!session?.user?.id) return;
+    const uid = session.user.id;
+    setOfflineUser(uid); // ensure IndexedDB is scoped to this user
+
     async function loadLocalData() {
       try {
-        const saved = localStorage.getItem(localStorageKey(session?.user?.id));
+        const saved = localStorage.getItem(localStorageKey(uid));
         if (saved) setData(d => ({ ...d, ...JSON.parse(saved) }));
       } catch (e) { console.warn("localStorage load failed:", e); }
 
       try {
-        // FIX #7: Added leads + activities to offline restoration
         const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities"];
         const results = await Promise.all(tables.map(t => offlineGetAll(t)));
         const [clients, followups, quotes, notes, equipment, contacts, expenses, leads, activities] = results;
@@ -260,7 +265,7 @@ export default function PowerWorksApp() {
       } catch (e) { console.warn("IndexedDB load failed:", e); }
     }
     loadLocalData();
-  }, []);
+  }, [session?.user?.id]);
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -416,10 +421,17 @@ export default function PowerWorksApp() {
 
   // FIX #13: DRY — single logout function
   async function clearAuthAndSignOut() {
+    // FIX: Warn if there's unsynced data that would be lost
+    const pendingItems = (data.syncQueue || []).filter(i => i.status === "pending");
+    if (pendingItems.length > 0) {
+      const sure = window.confirm(
+        `You have ${pendingItems.length} unsaved change${pendingItems.length !== 1 ? "s" : ""} that haven't synced yet. Signing out will delete them.\n\nSign out anyway?`
+      );
+      if (!sure) return;
+    }
     localStorage.removeItem(PIN_KEY);
     sessionStorage.removeItem(PIN_UNLOCKED_KEY);
     resetPINAttempts();
-    // FIX: Clear ALL user CRM data on logout (prevents cross-account bleed)
     await clearAllStores();
     if (session?.user?.id) localStorage.removeItem(localStorageKey(session.user.id));
     setData({
