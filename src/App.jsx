@@ -456,7 +456,7 @@ export default function PowerWorksApp() {
     if (key === screen && Object.keys(ctx).length === 0) return;
     setSearchSeed(null);
     setScreenContext(ctx);
-    window.history.pushState({ pmScreen: key }, "");
+    window.history.pushState({ pmScreen: key, pmContext: ctx }, "");
     setScreen(key);
   }
 
@@ -469,7 +469,7 @@ export default function PowerWorksApp() {
     } else {
       // No history to pop (e.g. direct URL load) — navigate to fallback
       setScreenContext({});
-      window.history.replaceState({ pmScreen: fallback }, "");
+      window.history.replaceState({ pmScreen: fallback, pmContext: {} }, "");
       setScreen(fallback);
     }
   }
@@ -481,7 +481,7 @@ export default function PowerWorksApp() {
 
   useEffect(() => {
     if (!window.history.state?.pmScreen) {
-      window.history.replaceState({ pmScreen: "Home" }, "");
+      window.history.replaceState({ pmScreen: "Home", pmContext: {} }, "");
     }
     document.documentElement.style.overscrollBehaviorY = "contain";
     document.body.style.overscrollBehaviorY = "contain";
@@ -491,14 +491,15 @@ export default function PowerWorksApp() {
     function onPop(e) {
       if (searchOpen) {
         setSearchOpen(false);
-        window.history.pushState({ pmScreen: screen }, "");
+        window.history.pushState({ pmScreen: screen, pmContext: screenContext }, "");
         return;
       }
+      setScreenContext(e.state?.pmContext || {});
       setScreen(e.state?.pmScreen || "Home");
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [searchOpen, screen]);
+  }, [searchOpen, screen, screenContext]);
 
   const pendingCount     = (data.syncQueue || []).filter(i => i.status === "pending").length;
   const flaggedQuotes    = (data.quotes    || []).filter(q => q.status === "Pending").length;
@@ -574,6 +575,7 @@ export default function PowerWorksApp() {
       <CalendarScreen
         data={data} setData={setData}
         userId={session.user.id}
+        teamId={teamId}
         onNavigate={navigate}
       />
     ),
