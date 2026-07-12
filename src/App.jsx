@@ -13,10 +13,10 @@ import {
 
 import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
-import { offlineSave, offlineGetAll } from "./offline/offlineDb";
+import { offlineSave, offlineGetAll, setOfflineUser, clearAllStores } from "./offline/offlineDb";
 
 import { todayISO, logEvent, genId } from "./lib/helpers";
-import { LOCAL_STORAGE_KEY, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY, BRAND } from "./lib/constants";
+import { localStorageKey, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY, BRAND } from "./lib/constants";
 import { pushSyncQueue, pullFromSupabase, setupRealtimeSync, registerSyncHandlers, triggerImmediateSync } from "./lib/sync";
 import { requestNotificationPermission, scheduleNotificationsViaSW, buildNotificationItems } from "./lib/notifications";
 import { runQuoteAutomations } from "./lib/quoteAutomation"; // NEW — quote auto-expire
@@ -142,6 +142,11 @@ export default function PowerWorksApp() {
   // FIX #3: Single service worker registration — removed from index.html and here.
   // Registration is in main.jsx only, pointing to /service-worker.js.
 
+  // FIX: Scope IndexedDB to current user on login
+  useEffect(() => {
+    if (session?.user?.id) setOfflineUser(session.user.id);
+  }, [session?.user?.id]);
+
   // FIX #11: Register sync handlers ONCE using the ref (not a closure rebuilt every render).
   useEffect(() => {
     registerSyncHandlers(setData, syncQueueRef);
@@ -231,7 +236,7 @@ export default function PowerWorksApp() {
   useEffect(() => {
     async function loadLocalData() {
       try {
-        const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+        const saved = localStorage.getItem(localStorageKey(session?.user?.id));
         if (saved) setData(d => ({ ...d, ...JSON.parse(saved) }));
       } catch (e) { console.warn("localStorage load failed:", e); }
 
@@ -275,7 +280,7 @@ export default function PowerWorksApp() {
         const serialized = JSON.stringify(safeData);
         const sizeMB = (serialized.length / 1024 / 1024).toFixed(1);
         if (parseFloat(sizeMB) > 4) logEvent("localStorage_size_warning", { sizeMB });
-        localStorage.setItem(LOCAL_STORAGE_KEY, serialized);
+        localStorage.setItem(localStorageKey(session?.user?.id), serialized);
       } catch (e) {
         console.warn("Could not save local data:", e);
         if (e.name === "QuotaExceededError") logEvent("localStorage_quota_exceeded", { message: e.message });
@@ -414,6 +419,14 @@ export default function PowerWorksApp() {
     localStorage.removeItem(PIN_KEY);
     sessionStorage.removeItem(PIN_UNLOCKED_KEY);
     resetPINAttempts();
+    // FIX: Clear ALL user CRM data on logout (prevents cross-account bleed)
+    await clearAllStores();
+    if (session?.user?.id) localStorage.removeItem(localStorageKey(session.user.id));
+    setData({
+      clients: [], followups: [], quotes: [], notes: [], equipment: [],
+      contacts: [], expenses: [], leads: [], activities: [], syncQueue: [],
+    });
+    setDataLoading(true);
     try { await supabase.auth.signOut(); } catch (e) { console.warn("Sign out failed:", e); }
     setSession(null);
   }
@@ -491,7 +504,7 @@ export default function PowerWorksApp() {
 
   const screens = {
     Home:      <HomeScreen      data={data} setScreen={navigate} user={session.user} onQuickAdd={handleQuickCapture} />,
-    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} onNavigate={navigate} />,
+    Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} onNavigate={navigate} isOnline={isOnline} />,
     Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} />,
     Quotes:    <QuotesScreen    data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
