@@ -7,7 +7,9 @@ import {
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { deleteRecord } from "../lib/deleteHelpers";
+import { withTeamId } from "../lib/teamId";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
@@ -180,14 +182,14 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
       setToast("Contact updated");
       triggerImmediateSync();
     } else {
-      const item = {
+      const item = withTeamId({
         id: genId(),
         user_id: userId,
         ...cleanForm,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         sync_status: "pending",
-      };
+      }, teamId);
       setData(d => ({
         ...d,
         contacts: [item, ...(d.contacts || [])],
@@ -204,13 +206,8 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
     const ok = await confirm(`Delete ${name}?`, { confirmLabel: "Delete" });
     if (!ok) return;
     if (editId === id) resetForm();
-    setData(d => ({
-      ...d,
-      contacts: (d.contacts || []).filter(c => c.id !== id),
-      syncQueue: [{ id: genId(), table: "contacts", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-    }));
+    await deleteRecord("contacts", id, userId, setData);
     setToast("Contact deleted");
-    triggerImmediateSync();
   }
 
   // ── Promote Contact to Client ──
