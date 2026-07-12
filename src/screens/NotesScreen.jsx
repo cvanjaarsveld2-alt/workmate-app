@@ -15,6 +15,7 @@ import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { ContactPicker, LinkedContactsDisplay } from "../components/ContactPicker";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
+import { NoteToFollowupBtn } from "../components/NoteToFollowup";
 import { exportNotesPDF, exportNotesExcel } from "../NotesExport";
 
 export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], isOnline, quickAddTrigger, searchSeed }) {
@@ -79,7 +80,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   // ── Create a contact on the fly from inside the Link Contacts sheet ──
   async function createContactInline(c) {
     if (!c.name?.trim()) return null;
-    const item = {
+    const item = withTeamId({
       id: genId(),
       user_id: userId,
       name: c.name.trim(),
@@ -92,7 +93,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       sync_status: "pending",
-    };
+    }, teamId);
     setData(d => ({
       ...d,
       contacts: [item, ...(d.contacts || [])],
@@ -107,7 +108,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   // ── Create a client on the fly from inside the note form ──
   async function createClientInline() {
     if (!newClient.company.trim()) { setToast("Company name is required"); return; }
-    const item = {
+    const item = withTeamId({
       id: genId(),
       user_id: userId,
       company: newClient.company.trim(),
@@ -118,7 +119,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
       source: "field_note",
       created_at: new Date().toISOString(),
       sync_status: "pending",
-    };
+    }, teamId);
     setData(d => ({
       ...d,
       clients: [item, ...(d.clients || [])],
@@ -260,6 +261,7 @@ Kind regards`;
 
   async function saveNote() {
     if (!form.note.trim()) { setToast("Please enter a note"); return; }
+    if (!isOnline && pendingMedia.length > 0) { setToast("Connect to the internet before saving attachments"); return; }
 
     // Resolve the selected client into a display label (kept in the `client`
     // text column so grouping, search, and exports keep working as before).
@@ -276,8 +278,8 @@ Kind regards`;
       if (isOnline && pendingMedia.length > 0) {
         newUploadedMedia = await Promise.all(pendingMedia.map(async m => {
           const path = "notes/" + editId + "/" + m.id;
-          const url = await uploadPhotoToSupabase(m.base64, path);
-          return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
+          const url = await uploadPhotoToSupabase(m.file || m.base64, path);
+          return url ? { ...m, url, base64: undefined, file: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
         }));
       } else {
         newUploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
@@ -319,8 +321,8 @@ Kind regards`;
     if (isOnline && pendingMedia.length > 0) {
       uploadedMedia = await Promise.all(pendingMedia.map(async m => {
         const path = "notes/" + noteId + "/" + m.id;
-        const url = await uploadPhotoToSupabase(m.base64, path);
-        return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
+        const url = await uploadPhotoToSupabase(m.file || m.base64, path);
+        return url ? { ...m, url, base64: undefined, file: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
       }));
     } else {
       uploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
@@ -654,6 +656,7 @@ Kind regards`;
                 {detailNote.note || <span className="text-slate-400 italic">(empty)</span>}
               </p>
             </div>
+            <NoteToFollowupBtn note={detailNote} userId={userId} teamId={teamId} data={data} setData={setData} onDone={() => setToast("Follow-up created")} />
 
             {(detailNote.linked_contact_ids || []).length > 0 && (
               <div>
