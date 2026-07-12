@@ -73,9 +73,9 @@ export async function generateQuotePDF(quote, companyInfo = {}) {
   doc.text(clientLines, M + 10, metaY + 5);
 
   // ── Line items table ──
-  const items = quote.lineItems || [];
+  const items = quote.line_items || quote.lineItems || [];
   const vatRate = quote.vatRate || 15;
-  const vatInclusive = quote.vatInclusive !== false;
+  const vatInclusive = (quote.vat_inclusive ?? quote.vatInclusive) !== false;
 
   const tableBody = items.map((item, i) => {
     const qty   = parseFloat(item.qty) || 1;
