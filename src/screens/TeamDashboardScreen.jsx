@@ -342,7 +342,7 @@ export function TeamDashboardScreen({
         </Card>
       )}
 
-      {/* Share modal */}
+      {/* Share/Assign modal */}
       <ShareToTeamModal
         open={!!shareTarget}
         onClose={() => setShareTarget(null)}
