@@ -68,6 +68,7 @@ function timeAgo(isoDate) {
 function MemberDashboard({ member, data, setData, members, currentUserId, userEmail, teamId, onBack }) {
   const today = todayISO();
   const { start, end } = getMonthRange();
+  const [reassignToast, setReassignToast] = useState("");
 
   const allClients  = data.clients   || [];
   const allContacts = data.contacts  || [];
@@ -95,27 +96,50 @@ function MemberDashboard({ member, data, setData, members, currentUserId, userEm
     const assignedName = newEmail?.split("@")[0] || newEmail;
     const updateFields = { assigned_to_user_id: newUserId, assigned_to: assignedName };
 
-    // 1. Update Supabase
-    const { error } = await supabase
-      .from(table)
-      .update(updateFields)
-      .eq("id", recordId);
-    if (error) { console.warn("Reassign failed:", error); return; }
+    try {
+      // Try direct update first
+      const { error, count } = await supabase
+        .from(table)
+        .update(updateFields)
+        .eq("id", recordId)
+        .select();
 
-    // 2. Update local state so UI reflects immediately
-    if (setData) {
-      setData(d => ({
-        ...d,
-        [table]: (d[table] || []).map(r => r.id === recordId ? { ...r, ...updateFields } : r),
-      }));
-    }
+      if (error) {
+        // If RLS blocks the update, try via RPC
+        console.warn("Direct reassign failed (likely RLS):", error.message);
+        const { error: rpcErr } = await supabase.rpc("reassign_record", {
+          p_table: table,
+          p_record_id: recordId,
+          p_assigned_to_user_id: newUserId,
+          p_assigned_to: assignedName,
+        });
+        if (rpcErr) {
+          setReassignToast("Reassign failed — check database permissions");
+          console.error("RPC reassign also failed:", rpcErr);
+          return;
+        }
+      }
 
-    // 3. Notify the teammate
-    if (newUserId !== currentUserId) {
-      await sendAssignmentNotification({
-        fromUserId: currentUserId, toUserId: newUserId, teamId,
-        recordType, recordId, recordTitle, fromEmail: userEmail,
-      });
+      // Update local state
+      if (setData) {
+        setData(d => ({
+          ...d,
+          [table]: (d[table] || []).map(r => r.id === recordId ? { ...r, ...updateFields } : r),
+        }));
+      }
+
+      // Notify the teammate
+      if (newUserId !== currentUserId) {
+        await sendAssignmentNotification({
+          fromUserId: currentUserId, toUserId: newUserId, teamId,
+          recordType, recordId, recordTitle, fromEmail: userEmail,
+        }).catch(() => {});
+      }
+
+      setReassignToast(`Assigned to ${assignedName}`);
+    } catch (e) {
+      console.error("Reassign error:", e);
+      setReassignToast("Reassign failed — " + (e.message || "unknown error"));
     }
   }
 
@@ -132,6 +156,7 @@ function MemberDashboard({ member, data, setData, members, currentUserId, userEm
 
     return (
       <div className="space-y-4">
+        <AnimatePresence>{reassignToast && <Toast message={reassignToast} onDone={() => setReassignToast("")} />}</AnimatePresence>
         <div className="flex items-center gap-3">
           <button onClick={() => setDrillSection(null)}
             className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 min-w-[44px] min-h-[44px] flex items-center justify-center">
@@ -245,6 +270,7 @@ function MemberDashboard({ member, data, setData, members, currentUserId, userEm
 
   return (
     <div className="space-y-4">
+      <AnimatePresence>{reassignToast && <Toast message={reassignToast} onDone={() => setReassignToast("")} />}</AnimatePresence>
       <div className="flex items-center gap-3">
         <button onClick={onBack}
           className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 min-w-[44px] min-h-[44px] flex items-center justify-center">
