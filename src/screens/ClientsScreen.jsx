@@ -641,13 +641,14 @@ function CategoryBadge({ catId, size = "sm" }) {
 
                   return (
                     <div key={c.id} className="px-4 py-3">
+                      {/* Branch header + action buttons */}
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onNavigate?.("Client360", { clientId: c.id, returnTo: "Clients" })}>
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="text-sm font-bold text-slate-800">{c.branch || "Main Branch"}</p>
                             <StagePill stage={c.stage || "New Lead"} />
                           </div>
-                          {/* Category badges */}
+                          {c.contact && <p className="text-sm text-slate-500 mt-0.5">{c.contact}</p>}
                           {c.division && parseCats(c.division).length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {parseCats(c.division).map(catId => (
@@ -655,133 +656,44 @@ function CategoryBadge({ catId, size = "sm" }) {
                               ))}
                             </div>
                           )}
-                          {c.contact && <p className="text-sm text-slate-500 mt-0.5">{c.contact}</p>}
-                          <div className="flex items-center gap-3 mt-1 flex-wrap">
-                            {c.phone && (
-                              <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1 text-sm text-blue-600 font-medium" onClick={e => e.stopPropagation()}>
-                                <Phone size={12} />{c.phone}
-                              </a>
-                            )}
-                            {c.phone && (
-                              <span onClick={e => e.stopPropagation()}>
-                                <WhatsAppButton
-                                  phone={c.phone}
-                                  contactName={c.contact}
-                                  clientName={c.company}
-                                  size="sm"
-                                />
-                              </span>
-                            )}
-                            {c.email && (
-                              <span onClick={e => e.stopPropagation()}>
-                                <EmailButton
-                                  email={c.email}
-                                  contactName={c.contact}
-                                  clientName={c.company}
-                                  size="sm"
-                                />
-                              </span>
-                            )}
-                            {c.email && (
-                              <a href={`mailto:${c.email}`} className="text-sm text-blue-600 truncate max-w-[160px]" onClick={e => e.stopPropagation()}>
-                                {c.email}
-                              </a>
-                            )}
-                          </div>
-                          {/* Full info — no more clipped text */}
-                          <ExpandableText text={c.notes} className="mt-1" />
-                          {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
-                          {(c.email || c.phone) && (
-                            <button
-                              onClick={() => setSendInfo({ name: c.contact || c.company, email: c.email, phone: c.phone })}
-                              className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-xl py-2 text-sm font-bold border-2 border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors min-h-[40px]">
-                              <Send size={13} /> Send Company Info
-                            </button>
-                          )}
                         </div>
-                        <div className="flex gap-2 shrink-0">
+                        <div className="flex gap-1.5 shrink-0">
                           {teamMembers.length > 0 && (
-                            <button
-                              onClick={() => setShareSheet({ id: c.id, title: `${c.company}${c.branch ? ` — ${c.branch}` : ""}`, type: "client" })}
-                              className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-purple-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-                              title="Share with teammate">
-                              <Share2 size={15} />
+                            <button onClick={() => setShareSheet({ id: c.id, title: `${c.company}${c.branch ? ` — ${c.branch}` : ""}`, type: "client" })}
+                              className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-purple-600 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center">
+                              <Share2 size={14} />
                             </button>
                           )}
-                          <button onClick={() => startEdit(c)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={15} /></button>
-                          <button onClick={() => deleteClient(c.id, c.company)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={15} /></button>
+                          <button onClick={() => startEdit(c)} className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"><Edit2 size={14} /></button>
+                          <button onClick={() => deleteClient(c.id, c.company)} className="p-2 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[40px] min-h-[40px] flex items-center justify-center"><Trash2 size={14} /></button>
                         </div>
                       </div>
 
-                      <AnimatePresence>
-                        {isExpanded && (
-                          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-                            className="mt-3 pt-3 border-t border-slate-100 space-y-4">
-
-                            {/* ── Follow-ups section ── */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                  Follow-ups {clientPending > 0 ? `· ${clientPending} pending` : ""}
-                                </p>
-                                <button
-                                  onClick={() => { setShowFollowupForm(showFollowupForm === c.id ? null : c.id); setShowNoteForm(null); }}
-                                  className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold min-h-[36px]"
-                                  style={{ background: BRAND.light, color: BRAND.primary }}>
-                                  <Plus size={12} /> Add
-                                </button>
-                              </div>
-
-                              <AnimatePresence>
-                                {showFollowupForm === c.id && (
-                                  <InlineFollowupForm client={c} userId={userId} teamId={teamId} setData={setData} onDone={() => setShowFollowupForm(null)} />
-                                )}
-                              </AnimatePresence>
-
-                              {clientFU.length === 0 && showFollowupForm !== c.id && (
-                                <p className="text-sm text-slate-400 py-1">No follow-ups yet.</p>
-                              )}
-                              <div className="space-y-2">
-                                {clientFU.map(f => (
-                                  <ClientFollowupRow key={f.id} followup={f} setData={setData} />
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* ── Notes section — NEW ── */}
-                            <div>
-                              <div className="flex items-center justify-between mb-2">
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                  <Clipboard size={11} className="inline mr-1 -mt-0.5" />
-                                  Notes {clientOpenNotes > 0 ? `· ${clientOpenNotes} open` : ""}
-                                </p>
-                                <button
-                                  onClick={() => { setShowNoteForm(showNoteForm === c.id ? null : c.id); setShowFollowupForm(null); }}
-                                  className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold min-h-[36px]"
-                                  style={{ background: "#FEF3C7", color: "#92400E" }}>
-                                  <Plus size={12} /> Add
-                                </button>
-                              </div>
-
-                              <AnimatePresence>
-                                {showNoteForm === c.id && (
-                                  <InlineNoteForm client={c} userId={userId} teamId={teamId} setData={setData} onDone={() => setShowNoteForm(null)} />
-                                )}
-                              </AnimatePresence>
-
-                              {clientNotes.length === 0 && showNoteForm !== c.id && (
-                                <p className="text-sm text-slate-400 py-1">No notes for this client yet.</p>
-                              )}
-                              <div className="space-y-2">
-                                {clientNotes.map(n => (
-                                  <ClientNoteRow key={n.id} note={n} setData={setData} />
-                                ))}
-                              </div>
-                            </div>
-
-                          </motion.div>
+                      {/* Quick actions — call, WhatsApp, email, company info */}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        {c.phone && (
+                          <a href={`tel:${c.phone}`} className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 min-h-[32px]">
+                            <Phone size={11} /> {c.phone}
+                          </a>
                         )}
-                      </AnimatePresence>
+                        {c.phone && (
+                          <WhatsAppButton phone={c.phone} contactName={c.contact} clientName={c.company} size="sm" />
+                        )}
+                        {c.email && (
+                          <EmailButton email={c.email} contactName={c.contact} clientName={c.company} size="sm" />
+                        )}
+                      </div>
+
+                      {c.notes && <ExpandableText text={c.notes} className="mt-2" />}
+                      {c.sync_status === "pending" && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">Not synced</span>}
+
+                      {/* View full details — opens Client360 */}
+                      <button
+                        onClick={() => onNavigate?.("Client360", { clientId: c.id, returnTo: "Clients" })}
+                        className="mt-2.5 w-full flex items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-colors min-h-[40px]"
+                        style={{ background: BRAND.light, color: BRAND.primary }}>
+                        View full details →
+                      </button>
                     </div>
                   );
                 })}
