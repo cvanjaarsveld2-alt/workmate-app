@@ -157,8 +157,7 @@ function NumKey({ digit, sub, onPress, disabled }) {
       whileTap={{ scale: 0.93 }}
       onClick={() => !disabled && onPress(String(digit))}
       disabled={disabled}
-      className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm select-none"
-      style={{ width: 80, height: 72 }}>
+      className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm select-none w-[72px] h-[66px] sm:w-[80px] sm:h-[72px]">
       <span className="text-2xl font-bold text-slate-900 leading-none">{digit}</span>
       {sub
         ? <span className="text-[9px] font-bold text-slate-400 tracking-[0.18em] mt-1">{sub}</span>
@@ -173,8 +172,8 @@ function BackspaceKey({ onPress, disabled }) {
       whileTap={{ scale: 0.93 }}
       onClick={() => !disabled && onPress()}
       disabled={disabled}
-      className="flex items-center justify-center rounded-2xl select-none"
-      style={{ width: 80, height: 72, background: "transparent" }}>
+      className="flex items-center justify-center rounded-2xl select-none w-[72px] h-[66px] sm:w-[80px] sm:h-[72px]"
+      style={{ background: "transparent" }}>
       <Delete size={22} className="text-slate-400" />
     </motion.button>
   );
@@ -380,17 +379,17 @@ export function PINLockScreen({ onUnlock, onForgot }) {
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-3 pb-8 pt-6 px-6">
+      <div className="flex flex-col items-center gap-3 pb-8 pt-6 px-4 w-full max-w-xs mx-auto">
         {NUMPAD.map((row, ri) => (
-          <div key={ri} className="flex gap-4">
+          <div key={ri} className="flex gap-3 sm:gap-4 justify-center">
             {row.map(key => <NumKey key={key.d} digit={key.d} sub={key.s} onPress={press} disabled={lockedOut} />)}
           </div>
         ))}
-        <div className="flex gap-4">
+        <div className="flex gap-3 sm:gap-4 justify-center">
           {biometricAvailable && biometricRegistered && !lockedOut ? (
             <BiometricButton onSuccess={handleBiometricSuccess} onError={msg => setError(msg || "Biometric failed — use your PIN")} isRegistering={false} />
           ) : (
-            <div style={{ width: 80, height: 72 }} />
+            <div className="w-[72px] h-[66px] sm:w-[80px] sm:h-[72px]" />
           )}
           <NumKey digit={0} sub="" onPress={press} disabled={lockedOut} />
           <BackspaceKey onPress={del} disabled={lockedOut} />
@@ -496,14 +495,14 @@ export function PINSetupScreen({ onComplete }) {
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-3 pb-12 pt-6 px-6">
+      <div className="flex flex-col items-center gap-3 pb-12 pt-6 px-4 w-full max-w-xs mx-auto">
         {NUMPAD.map((row, ri) => (
-          <div key={ri} className="flex gap-4">
+          <div key={ri} className="flex gap-3 sm:gap-4 justify-center">
             {row.map(key => <NumKey key={key.d} digit={key.d} sub={key.s} onPress={press} />)}
           </div>
         ))}
-        <div className="flex gap-4">
-          <div style={{ width: 80, height: 72 }} />
+        <div className="flex gap-3 sm:gap-4 justify-center">
+          <div className="w-[72px] h-[66px] sm:w-[80px] sm:h-[72px]" />
           <NumKey digit={0} sub="" onPress={press} />
           <BackspaceKey onPress={del} />
         </div>
