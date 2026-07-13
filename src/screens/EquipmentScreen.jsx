@@ -74,7 +74,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
       if (isOnline && pendingMedia.length > 0) {
         newUploaded = await Promise.all(pendingMedia.map(async m => {
           const path = `equipment/${editId}/${m.id}`;
-          const url = await uploadPhotoToSupabase(m.base64, path);
+          const url = await uploadPhotoToSupabase(m.file || m.base64, path);
           return url ? { ...m, url, base64: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
         }));
       } else {
@@ -100,7 +100,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
       if (isOnline && pendingMedia.length > 0) {
         uploadedMedia = await Promise.all(pendingMedia.map(async m => {
           const path = `equipment/${itemId}/${m.id}`;
-          const url = await uploadPhotoToSupabase(m.base64, path);
+          const url = await uploadPhotoToSupabase(m.file || m.base64, path);
           if (url) {
             setToast("Photo uploaded ✓");
             return { ...m, url, base64: undefined, uploadStatus: "done" };
@@ -113,14 +113,14 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
         uploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
       }
 
-      const item = {
+      const item = withTeamId({
         id: itemId,
         user_id: userId,
         ...cleanForm,
         media: uploadedMedia,
         created_at: new Date().toISOString(),
         sync_status: "pending",
-      };
+      }, teamId);
 
       setData(d => ({
         ...d,
