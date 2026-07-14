@@ -152,6 +152,31 @@ export function TeamDashboardScreen({
   const today   = todayISO();
   const isAdmin = userRole === "admin";
 
+  // Members see a simplified view without individual teammate data
+  if (!isAdmin) {
+    const myClients = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+    const myOpenFU = (data.followups || []).filter(f => (f.user_id === userId || f.assigned_to_user_id === userId) && !f.completed);
+    const myOverdue = myOpenFU.filter(f => f.date < today);
+    return (
+      <div className="space-y-4">
+        <Card className="p-5 text-center">
+          <p className="text-base font-black text-slate-900">Team Overview</p>
+          <p className="text-sm text-slate-400 mt-1">Contact your admin to see full team analytics</p>
+          <div className="flex gap-3 mt-4">
+            <div className="flex-1 bg-slate-50 rounded-xl p-3">
+              <p className="text-xl font-black" style={{color: BRAND.primary}}>{myClients.length}</p>
+              <p className="text-xs font-bold text-slate-400">My clients</p>
+            </div>
+            <div className="flex-1 bg-slate-50 rounded-xl p-3">
+              <p className="text-xl font-black" style={{color: myOverdue.length > 0 ? "#DC2626" : "#1D4ED8"}}>{myOpenFU.length}</p>
+              <p className="text-xs font-bold text-slate-400">{myOverdue.length > 0 ? `${myOverdue.length} overdue` : "Follow-ups"}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   const [selectedMember, setSelectedMember] = useState(null);
   const [activeSection, setActiveSection]   = useState("clients");
   const [shareTarget, setShareTarget]       = useState(null);
@@ -179,7 +204,7 @@ export function TeamDashboardScreen({
 
   function filterByMember(rows) {
     if (!selectedMember) return rows;
-    return rows.filter(r => r.user_id === selectedMember);
+    return rows.filter(r => r.user_id === selectedMember || r.assigned_to_user_id === selectedMember);
   }
 
   const clients   = filterByMember(allClients);
