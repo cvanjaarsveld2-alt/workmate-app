@@ -32,7 +32,7 @@ import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import {
   Card, Btn, Field, SelectField, SearchBar, FilterPills,
-  Toast, Empty, PageHeader, useConfirm,
+  Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 
 const CATEGORIES = [
