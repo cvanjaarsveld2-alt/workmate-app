@@ -247,9 +247,9 @@ export default function PowerWorksApp() {
       } catch (e) { console.warn("localStorage load failed:", e); }
 
       try {
-        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities", "syncQueue"];
+        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities"];
         const results = await Promise.all(tables.map(t => offlineGetAll(t)));
-        const [clients, followups, quotes, notes, equipment, contacts, expenses, leads, activities, idbQueue] = results;
+        const [clients, followups, quotes, notes, equipment, contacts, expenses, leads, activities] = results;
         setData(d => ({
           ...d,
           ...(clients?.length    ? { clients }    : {}),
@@ -261,8 +261,6 @@ export default function PowerWorksApp() {
           ...(expenses?.length   ? { expenses }   : {}),
           ...(leads?.length      ? { leads }      : {}),
           ...(activities?.length ? { activities }  : {}),
-          // Merge any queue items from IndexedDB that localStorage might have lost
-          ...(idbQueue?.length ? { syncQueue: [...new Map([...(idbQueue || []), ...(JSON.parse(localStorage.getItem("pm_sync_backup") || "[]"))].map(q => [q.id, q])).values()] } : {}),
         }));
       } catch (e) { console.warn("IndexedDB load failed:", e); }
     }
@@ -306,7 +304,7 @@ export default function PowerWorksApp() {
       !n.resolved &&
       n.resolve_by &&
       n.resolve_by < today &&
-      n.last_escalated !== n.resolve_by &&
+      n.last_escalated !== `${n.urgency}_${today}` &&
       URGENCY_ESCALATION[n.urgency || "Normal"] !== (n.urgency || "Normal")
     );
     if (toEscalate.length === 0) return;
@@ -315,7 +313,7 @@ export default function PowerWorksApp() {
     const updates = toEscalate.map(n => ({
       ...n,
       urgency: URGENCY_ESCALATION[n.urgency || "Normal"],
-      last_escalated: n.resolve_by,
+      last_escalated: `${URGENCY_ESCALATION[n.urgency || "Normal"]}_${today}`,
       sync_status: "pending",
     }));
     const queueItems = updates.map(u => ({
