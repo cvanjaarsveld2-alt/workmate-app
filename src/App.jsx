@@ -337,7 +337,7 @@ export default function PowerWorksApp() {
   useEffect(() => {
     if (dataLoading) return;
     if ((data.quotes || []).length > 0) {
-      runQuoteAutomations(data, setData);
+      runQuoteAutomations(data, setData, session?.user?.id);
     }
   }, [dataLoading]); // eslint-disable-line
 
@@ -347,16 +347,8 @@ export default function PowerWorksApp() {
     const uid = session.user.id;
 
     pullFromSupabase(uid, setData).then(() => {
-      setData(d => ({
-        ...d,
-        syncQueue: (d.syncQueue || []).filter(q => {
-          if (!q.data?.media) return true;
-          const hasUrls = q.data.media.some(m => m.url);
-          const hasMedia = q.data.media.length > 0;
-          if (hasMedia && !hasUrls) return false;
-          return true;
-        }),
-      }));
+      // Note: we no longer discard queue items just because media lacks URLs.
+      // The upload may still be in progress or waiting for connectivity.
     }).finally(() => setDataLoading(false));
 
     const cleanup = setupRealtimeSync(uid, setData);
@@ -421,11 +413,16 @@ export default function PowerWorksApp() {
 
   // FIX #13: DRY — single logout function
   async function clearAuthAndSignOut() {
-    // FIX: Warn if there's unsynced data that would be lost
-    const pendingItems = (data.syncQueue || []).filter(i => i.status === "pending");
-    if (pendingItems.length > 0) {
+    // Warn about BOTH pending AND failed unsynced items
+    const unsyncedItems = (data.syncQueue || []).filter(i => i.status === "pending" || i.status === "failed");
+    if (unsyncedItems.length > 0) {
+      const pending = unsyncedItems.filter(i => i.status === "pending").length;
+      const failed = unsyncedItems.filter(i => i.status === "failed").length;
+      const parts = [];
+      if (pending > 0) parts.push(`${pending} pending`);
+      if (failed > 0) parts.push(`${failed} failed`);
       const sure = window.confirm(
-        `You have ${pendingItems.length} unsaved change${pendingItems.length !== 1 ? "s" : ""} that haven't synced yet. Signing out will delete them.\n\nSign out anyway?`
+        `You have ${parts.join(" and ")} unsynced change${unsyncedItems.length !== 1 ? "s" : ""}. Signing out will delete them.\n\nSign out anyway?`
       );
       if (!sure) return;
     }
@@ -434,10 +431,16 @@ export default function PowerWorksApp() {
     resetPINAttempts();
     await clearAllStores();
     if (session?.user?.id) localStorage.removeItem(localStorageKey(session.user.id));
+    // Reset ALL state including team info to prevent cross-account leaks
     setData({
       clients: [], followups: [], quotes: [], notes: [], equipment: [],
       contacts: [], expenses: [], leads: [], activities: [], syncQueue: [],
     });
+    setTeamId(null);
+    setTeamMembers([]);
+    setUserRole("member");
+    setUnreadCount(0);
+    setScreenContext({});
     setDataLoading(true);
     try { await supabase.auth.signOut(); } catch (e) { console.warn("Sign out failed:", e); }
     setSession(null);
