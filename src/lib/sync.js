@@ -78,6 +78,8 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
     ...d,
     syncQueue: [queueItem, ...(d.syncQueue || []).filter(q => q.data?.id !== item.id)],
   }));
+  // Persist queue item to IndexedDB so it survives localStorage quota issues
+  offlineSave("syncQueue", queueItem).catch(() => {});
   return { ...item, sync_status: "pending" };
 }
 
@@ -239,7 +241,7 @@ export async function pullFromSupabase(uid, setData) {
         if (!serverRows) return localRows || [];
         const pendingIds = new Set(
           (pendingQueue || [])
-            .filter(q => q.table === table && q.status === "pending")
+            .filter(q => q.table === table && (q.status === "pending" || q.status === "failed"))
             .map(q => q.data?.id)
             .filter(Boolean)
         );
