@@ -152,6 +152,19 @@ export function TeamDashboardScreen({
   const today   = todayISO();
   const isAdmin = userRole === "admin";
 
+  // ALL hooks must be declared before any conditional return
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [activeSection, setActiveSection]   = useState("clients");
+  const [shareTarget, setShareTarget]       = useState(null);
+
+  const memberMap = useMemo(() => {
+    const map = {};
+    teamMembers.forEach((m, i) => {
+      map[m.user_id] = { email: m.email, role: m.role, color: memberColor(i) };
+    });
+    return map;
+  }, [teamMembers]);
+
   // Members see a simplified view without individual teammate data
   if (!isAdmin) {
     const myClients = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
@@ -177,18 +190,6 @@ export function TeamDashboardScreen({
     );
   }
 
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [activeSection, setActiveSection]   = useState("clients");
-  const [shareTarget, setShareTarget]       = useState(null);
-
-  const memberMap = useMemo(() => {
-    const map = {};
-    teamMembers.forEach((m, i) => {
-      map[m.user_id] = { email: m.email, role: m.role, color: memberColor(i) };
-    });
-    return map;
-  }, [teamMembers]);
-
   function annotate(rows) {
     return (rows || []).map(r => ({
       ...r,
@@ -204,7 +205,11 @@ export function TeamDashboardScreen({
 
   function filterByMember(rows) {
     if (!selectedMember) return rows;
-    return rows.filter(r => r.user_id === selectedMember || r.assigned_to_user_id === selectedMember);
+    // Show under assignee if assigned, otherwise under creator. Prevents double-counting.
+    return rows.filter(r => {
+      const responsible = r.assigned_to_user_id || r.user_id;
+      return responsible === selectedMember;
+    });
   }
 
   const clients   = filterByMember(allClients);
