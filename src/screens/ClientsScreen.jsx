@@ -342,7 +342,7 @@ function CategoryBadge({ catId, size = "sm" }) {
   const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
-  const clients   = (data.clients || []).filter(c => c.user_id === userId);
+  const clients   = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
   const followups = data.followups || [];
   const notes     = data.notes     || [];
   const today     = todayISO();
@@ -400,17 +400,23 @@ function CategoryBadge({ catId, size = "sm" }) {
     const linkedFUs = followups.filter(f => f.client_id === id);
     const linkedContacts = (data.contacts || []).filter(c => c.client_id === id);
     const linkedLeads = (data.leads || []).filter(l => l.client_id === id);
-    const totalLinked = linkedFUs.length + linkedContacts.length + linkedLeads.length;
-    const message = totalLinked > 0
-      ? `Delete ${companyName} and ${totalLinked} linked record${totalLinked !== 1 ? "s" : ""} (follow-ups, contacts, leads)? This cannot be undone.`
+    const linkedNotes = (data.notes || []).filter(n => n.client_id === id);
+    const linkedEquip = (data.equipment || []).filter(e => e.client && companyName && e.client.toLowerCase() === companyName.toLowerCase());
+    const linkedActs = (data.activities || []).filter(a => a.client_id === id);
+    const total = linkedFUs.length + linkedContacts.length + linkedLeads.length + linkedNotes.length + linkedEquip.length + linkedActs.length;
+    const message = total > 0
+      ? `Delete ${companyName} and all ${total} linked record${total !== 1 ? "s" : ""}? This cannot be undone.`
       : `Delete ${companyName}? This cannot be undone.`;
     const ok = await confirm(message, { confirmLabel: "Delete" });
     if (!ok) return;
     await deleteRecord("clients", id, userId, setData);
-    for (const f of linkedFUs) { await deleteRecord("followups", f.id, userId, setData); }
-    for (const c of linkedContacts) { await deleteRecord("contacts", c.id, userId, setData); }
-    for (const l of linkedLeads) { await deleteRecord("leads", l.id, userId, setData); }
-    setToast("Client and linked records deleted");
+    for (const r of linkedFUs) { await deleteRecord("followups", r.id, userId, setData); }
+    for (const r of linkedContacts) { await deleteRecord("contacts", r.id, userId, setData); }
+    for (const r of linkedLeads) { await deleteRecord("leads", r.id, userId, setData); }
+    for (const r of linkedNotes) { await deleteRecord("notes", r.id, userId, setData); }
+    for (const r of linkedEquip) { await deleteRecord("equipment", r.id, userId, setData); }
+    for (const r of linkedActs) { await deleteRecord("activities", r.id, userId, setData); }
+    setToast(`${companyName} and ${total} linked records deleted`);
   }
 
   // ── Edit-in-place: the edit form renders where the branch row is. ──
