@@ -4,6 +4,7 @@
 // Shows avatar + email/name, "Unassigned" as first option.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useRef, useEffect } from "react";
+import ReactDOM from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, UserCheck, X } from "lucide-react";
 import { BRAND } from "../lib/constants";
@@ -76,8 +77,8 @@ export function MemberSelector({
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="absolute z-30 mt-1 w-full bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden"
-            style={{ maxHeight: 280 }}>
+            className="fixed z-[100] bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden overflow-y-auto"
+            style={{ maxHeight: 280, width: ref.current?.offsetWidth || 280, left: ref.current?.getBoundingClientRect().left || 0, top: (ref.current?.getBoundingClientRect().bottom || 0) + 4 }}>
             {/* Unassigned option */}
             <button type="button"
               onClick={() => { onChange(null, null); setOpen(false); }}
