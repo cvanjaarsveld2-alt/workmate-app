@@ -180,13 +180,12 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
           </div>
         </div>
         <Field label="Location / Site" value={form.location} onChange={v => setForm(f => ({ ...f, location: v }))} placeholder="e.g. Pump Room B" />
-        <Field label="Client / Site" value={form.client} onChange={v => {
-                  const match = (data.clients || []).find(c => c.company && c.company.toLowerCase() === v.toLowerCase());
-                  setForm(f => ({ ...f, client: v, client_id: match?.id || f.client_id }));
-                }} placeholder="Linked client" list="equip-clients" />
-                <datalist id="equip-clients">
-                  {(data.clients || []).map(c => <option key={c.id} value={c.company + (c.branch ? ` — ${c.branch}` : "")} />)}
-                </datalist>
+        <ClientSelector label="Client / Site" value={form.client_id}
+                  onChange={v => {
+                    const cl = (data.clients || []).find(c => c.id === v);
+                    setForm(f => ({ ...f, client_id: v || null, client: cl ? cl.company : "" }));
+                  }}
+                  clients={data.clients || []} placeholder="Select client…" />
         <Field label="Next Service Due" type="date" value={form.service_due} onChange={v => setForm(f => ({ ...f, service_due: v }))} />
         <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Additional notes…" multiline />
         <div>
