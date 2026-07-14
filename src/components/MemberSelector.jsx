@@ -40,10 +40,12 @@ export function MemberSelector({
       {label && (
         <label className="mb-2 block text-sm font-bold text-slate-500">{label}</label>
       )}
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setOpen(!open)}
-        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base text-left flex items-center gap-3 outline-none focus:border-red-300 min-h-[56px] transition-colors">
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") setOpen(!open); }}
+        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base text-left flex items-center gap-3 outline-none focus:border-red-300 min-h-[56px] transition-colors cursor-pointer">
         {selected ? (
           <>
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0"
@@ -51,10 +53,11 @@ export function MemberSelector({
               {avatarLetters(selected)}
             </div>
             <span className="flex-1 font-medium text-slate-900">{displayName(selected)}</span>
-            <button type="button" onClick={e => { e.stopPropagation(); onChange(null, null); }}
-              className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+            <span role="button" tabIndex={0} onClick={e => { e.stopPropagation(); onChange(null, null); }}
+              onKeyDown={e => { if (e.key === "Enter") { e.stopPropagation(); onChange(null, null); }}}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer">
               <X size={14} />
-            </button>
+            </span>
           </>
         ) : (
           <>
@@ -65,7 +68,7 @@ export function MemberSelector({
             <ChevronDown size={16} className="text-slate-400 shrink-0" />
           </>
         )}
-      </button>
+      </div>
 
       <AnimatePresence>
         {open && (
