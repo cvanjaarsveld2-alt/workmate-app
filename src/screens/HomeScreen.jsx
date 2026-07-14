@@ -43,19 +43,12 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
   const overdueNotes  = notes.filter(n => !n.resolved && n.resolve_by && n.resolve_by < today);
   const leadContacts  = contacts.filter(c => (c.status || "lead") === "lead");
 
-  // Expenses this finance period (26th → 25th cycle, matches Vicky's books).
+  // Expenses this calendar month (1st → last day)
   const now = new Date();
-  const periodStart = (() => {
-    const d = now.getDate() <= 25
-      ? new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 26))
-      : new Date(Date.UTC(now.getFullYear(), now.getMonth(), 26));
-    return d.toISOString().slice(0, 10);
-  })();
+  const periodStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
   const periodEnd = (() => {
-    const d = now.getDate() <= 25
-      ? new Date(Date.UTC(now.getFullYear(), now.getMonth(), 25))
-      : new Date(Date.UTC(now.getFullYear(), now.getMonth() + 1, 25));
-    return d.toISOString().slice(0, 10);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`;
   })();
   const expThisMonth = expenses.filter(e =>
     e.expense_date && e.expense_date >= periodStart && e.expense_date <= periodEnd
@@ -190,7 +183,7 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
           <StatCard label="Won Revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} />
         </button>
         <button onClick={() => setScreen("Expenses")} className="text-left">
-          <StatCard label="Expenses (period)" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} />
+          <StatCard label="Expenses (this month)" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} />
         </button>
       </div>
 
