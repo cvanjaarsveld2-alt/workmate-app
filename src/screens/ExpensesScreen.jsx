@@ -381,7 +381,7 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
   const [form, setForm] = useState({
     vendor: "", amount: "", vat_amount: "", currency: "ZAR",
     expense_date: todayISO(), expense_time: "", category: "Other",
-    payment_method: "Card", notes: "",
+    payment_method: "Card", notes: "", client_id: null, client_name: "",
   });
   const { confirm, dialog } = useConfirm();
   const { showBanner: showReminderBanner, dismiss: dismissReminder } = useEndOfMonthReminder();
@@ -413,7 +413,7 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     setForm({
       vendor: "", amount: "", vat_amount: "", currency: "ZAR",
       expense_date: todayISO(), expense_time: "", category: "Other",
-      payment_method: "Card", notes: "",
+      payment_method: "Card", notes: "", client_id: null, client_name: "",
     });
     setReceiptUrl(null);
     setPaymentSlipUrl(null);
@@ -470,6 +470,8 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       category:       ex.category || "Other",
       payment_method: ex.payment_method || "Card",
       notes:          ex.notes || "",
+      client_id:      ex.client_id || null,
+      client_name:    ex.client_name || "",
     });
     setReceiptUrl(ex.receipt_url || null);
     setPaymentSlipUrl(ex.payment_slip_url || null);
@@ -847,6 +849,13 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
             ))}
           </div>
         </div>
+        <ClientSelector label="Client (optional)" value={form.client_id}
+          onChange={v => {
+            const cl = (data.clients || []).find(c => c.id === v);
+            setForm(f => ({ ...f, client_id: v || null, client_name: cl ? `${cl.company}${cl.branch ? " — " + cl.branch : ""}` : "" }));
+          }}
+          clients={data.clients || []} placeholder="Link to a client…" />
+
         <Field label="Notes (optional)" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What was this for?" multiline />
         <div className="flex gap-2">
           <Btn className="flex-1" onClick={saveExpense}><Save size={15} />{editId ? "Update" : "Save Expense"}</Btn>
