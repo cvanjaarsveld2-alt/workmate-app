@@ -92,9 +92,9 @@ function MemberDashboard({ member, data, setData, members, currentUserId, userEm
   const [drillSection, setDrillSection] = useState(member._openSection || null);
 
   async function reassignRecord(table, recordId, recordTitle, recordType, newUserId, newEmail) {
-    if (!newUserId) return;
-    const assignedName = newEmail?.split("@")[0] || newEmail;
-    const updateFields = { assigned_to_user_id: newUserId, assigned_to: assignedName };
+    // Handle unassign (newUserId is null)
+    const assignedName = newUserId ? (newEmail?.split("@")[0] || newEmail) : null;
+    const updateFields = { assigned_to_user_id: newUserId || null, assigned_to: assignedName };
 
     try {
       // Try direct update first
