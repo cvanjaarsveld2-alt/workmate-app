@@ -30,11 +30,11 @@ export async function pushItem(item) {
       payload = { ...payload, media: payload.media.map(m => ({ ...m, base64: undefined })) };
     }
 
-    if (item.action === "insert" || item.action === "upsert") {
+    if (item.action === "insert" || item.action === "upsert" || item.action === "update") {
+      // Always use upsert so it works whether or not the record exists on the server.
+      // This fixes the case where an insert failed but a later update succeeded —
+      // the update would modify zero rows because the record didn't exist yet.
       const { error } = await supabase.from(table).upsert({ ...payload, sync_status: "synced" }, { onConflict: "id" });
-      if (error) throw error;
-    } else if (item.action === "update") {
-      const { error } = await supabase.from(table).update({ ...payload, sync_status: "synced" }).eq("id", payload.id);
       if (error) throw error;
     } else if (item.action === "delete") {
       const { error } = await supabase.from(table).delete().eq("id", payload.id);
