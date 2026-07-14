@@ -43,7 +43,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
   const [filter, setFilter]     = useState("All");
   const [editId, setEditId]     = useState(null);
   const [toast, setToast]       = useState("");
-  const [form, setForm] = useState({ name: "", type: "", make: "", model: "", serial: "", location: "", client: "", service_due: "", notes: "" });
+  const [form, setForm] = useState({ name: "", type: "", make: "", model: "", serial: "", location: "", client: "", client_id: null, service_due: "", notes: "" });
   const [pendingMedia, setPendingMedia] = useState([]);
   const { confirm, dialog } = useConfirm();
   const equipment = (data.equipment || []).filter(e => e.user_id === userId || e.assigned_to_user_id === userId);
@@ -61,7 +61,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
     setSearch(searchSeed.term || "");
   }, [searchSeed?.ts]);
 
-  function resetForm() { setForm({ name: "", type: "", make: "", model: "", serial: "", location: "", client: "", service_due: "", notes: "" }); setEditId(null); setShowForm(false); setPendingMedia([]); }
+  function resetForm() { setForm({ name: "", type: "", make: "", model: "", serial: "", location: "", client: "", client_id: null, service_due: "", notes: "" }); setEditId(null); setShowForm(false); setPendingMedia([]); }
   function addMedia(m)     { setPendingMedia(pm => [...pm, m]); }
   function removeMedia(id) { setPendingMedia(pm => pm.filter(m => m.id !== id)); }
 
@@ -156,7 +156,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
   }
 
   function startEdit(e) {
-    setForm({ name: e.name || "", type: e.type || "", make: e.make || "", model: e.model || "", serial: e.serial || "", location: e.location || "", client: e.client || "", service_due: e.service_due || "", notes: e.notes || "" });
+    setForm({ name: e.name || "", type: e.type || "", make: e.make || "", model: e.model || "", serial: e.serial || "", location: e.location || "", client: e.client || "", client_id: e.client_id || null, service_due: e.service_due || "", notes: e.notes || "" });
     setPendingMedia([]); setEditId(e.id); setShowForm(true);
   }
 
@@ -180,7 +180,13 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
           </div>
         </div>
         <Field label="Location / Site" value={form.location} onChange={v => setForm(f => ({ ...f, location: v }))} placeholder="e.g. Pump Room B" />
-        <Field label="Client / Site" value={form.client} onChange={v => setForm(f => ({ ...f, client: v }))} placeholder="Linked client" />
+        <Field label="Client / Site" value={form.client} onChange={v => {
+                  const match = (data.clients || []).find(c => c.company && c.company.toLowerCase() === v.toLowerCase());
+                  setForm(f => ({ ...f, client: v, client_id: match?.id || f.client_id }));
+                }} placeholder="Linked client" list="equip-clients" />
+                <datalist id="equip-clients">
+                  {(data.clients || []).map(c => <option key={c.id} value={c.company + (c.branch ? ` — ${c.branch}` : "")} />)}
+                </datalist>
         <Field label="Next Service Due" type="date" value={form.service_due} onChange={v => setForm(f => ({ ...f, service_due: v }))} />
         <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Additional notes…" multiline />
         <div>
