@@ -401,9 +401,10 @@ function CategoryBadge({ catId, size = "sm" }) {
     const linkedContacts = (data.contacts || []).filter(c => c.client_id === id);
     const linkedLeads = (data.leads || []).filter(l => l.client_id === id);
     const linkedNotes = (data.notes || []).filter(n => n.client_id === id);
-    const linkedEquip = (data.equipment || []).filter(e => e.client && companyName && e.client.toLowerCase() === companyName.toLowerCase());
+    const linkedEquip = (data.equipment || []).filter(e => e.client_id === id);
     const linkedActs = (data.activities || []).filter(a => a.client_id === id);
-    const total = linkedFUs.length + linkedContacts.length + linkedLeads.length + linkedNotes.length + linkedEquip.length + linkedActs.length;
+    const linkedQuotes = (data.quotes || []).filter(q => q.client_id === id);
+    const total = linkedFUs.length + linkedContacts.length + linkedLeads.length + linkedNotes.length + linkedEquip.length + linkedActs.length + linkedQuotes.length;
     const message = total > 0
       ? `Delete ${companyName} and all ${total} linked record${total !== 1 ? "s" : ""}? This cannot be undone.`
       : `Delete ${companyName}? This cannot be undone.`;
@@ -416,6 +417,7 @@ function CategoryBadge({ catId, size = "sm" }) {
     for (const r of linkedNotes) { await deleteRecord("notes", r.id, userId, setData); }
     for (const r of linkedEquip) { await deleteRecord("equipment", r.id, userId, setData); }
     for (const r of linkedActs) { await deleteRecord("activities", r.id, userId, setData); }
+    for (const r of linkedQuotes) { await deleteRecord("quotes", r.id, userId, setData); }
     setToast(`${companyName} and ${total} linked records deleted`);
   }
 
