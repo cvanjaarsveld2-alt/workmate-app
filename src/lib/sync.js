@@ -78,8 +78,6 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
     ...d,
     syncQueue: [queueItem, ...(d.syncQueue || []).filter(q => q.data?.id !== item.id)],
   }));
-  // Persist queue item to IndexedDB so it survives localStorage quota issues
-  offlineSave("syncQueue", queueItem).catch(() => {});
   return { ...item, sync_status: "pending" };
 }
 
@@ -204,6 +202,17 @@ export async function pushSyncQueue(syncQueue, setData) {
             return attempts >= MAX_SYNC_ATTEMPTS
               ? { ...i, attempts, status: "failed" }
               : { ...i, attempts, status: "pending" };
+          })
+          // Remove any remaining pending operations for entities whose latest op just failed permanently.
+          // This prevents stale older operations from being synced after the newest one gives up.
+          .filter(i => {
+            if (i.status !== "pending") return true;
+            const key = `${i.table}:${i.data?.id}`;
+            const hasFailed = deduped.some(d => {
+              const dKey = `${d.table}:${d.data?.id}`;
+              return dKey === key && failedQueueIds.has(d.id) && (d.attempts || 0) + 1 >= MAX_SYNC_ATTEMPTS;
+            });
+            return !hasFailed;
           }),
       };
       SYNC_TABLES.forEach(table => {
@@ -228,8 +237,8 @@ export async function pullFromSupabase(uid, setData) {
       supabase.from("quotes").select("id,user_id,team_id,client_name,description,value,line_items,vat_inclusive,status,sent_date,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("contacts").select("id,user_id,team_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,client_id,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("leads").select("id,user_id,team_id,title,description,categories,client_id,client_name,contact_id,contact_name,captured_by,assigned_to,assigned_to_user_id,stage,estimated_value,lead_date,follow_up_date,closed_date,notes,outcome_notes,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(500),
-      supabase.from("notes").select("id,user_id,team_id,client,client_id,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
-      supabase.from("equipment").select("id,user_id,team_id,name,type,make,model,serial,location,client,service_due,notes,media,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
+      supabase.from("notes").select("id,user_id,team_id,client,client_id,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,assigned_to_user_id,assigned_to,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
+      supabase.from("equipment").select("id,user_id,team_id,name,type,make,model,serial,location,client,service_due,notes,media,assigned_to_user_id,assigned_to,sync_status,created_at").order("created_at", { ascending: false }).limit(500),
       supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,amount_zar,exchange_rate,rate_date,rate_source,expense_date,expense_time,category,payment_method,notes,receipt_url,payment_slip_url,status,ai_extracted,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(500),
       supabase.from("vehicle_checks").select("id,user_id,check_date,vehicle,registration,driver,data,sync_status,created_at,updated_at").eq("user_id", uid).order("check_date", { ascending: false }).limit(365),
       // FIX: Pull activities
