@@ -169,7 +169,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
   const equipment  = (data.equipment||[]).filter(e => e.client && client.company && e.client.toLowerCase()===client.company.toLowerCase());
   const activities = (data.activities||[]).filter(a => a.client_id===clientId);
   // NEW: expenses linked to this client
-  const expenses   = (data.expenses||[]).filter(e => e.client_name && client.company && e.client_name.toLowerCase()===client.company.toLowerCase());
+  const expenses   = (data.expenses||[]).filter(e => e.client_id === clientId || (e.client_name && client.company && e.client_name.toLowerCase()===client.company.toLowerCase()));
 
   // ── Timeline ───────────────────────────────────────────────────────────────
   const timeline = useMemo(() => {
