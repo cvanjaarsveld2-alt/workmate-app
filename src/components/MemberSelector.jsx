@@ -71,14 +71,14 @@ export function MemberSelector({
         )}
       </div>
 
-      <AnimatePresence>
-        {open && (
+      {open && ReactDOM.createPortal(
+        <AnimatePresence>
           <motion.div
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="fixed z-[100] bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden overflow-y-auto"
-            style={{ maxHeight: 280, width: ref.current?.offsetWidth || 280, left: ref.current?.getBoundingClientRect().left || 0, top: (ref.current?.getBoundingClientRect().bottom || 0) + 4 }}>
+            className="bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden overflow-y-auto"
+            style={{ position: "fixed", zIndex: 9999, maxHeight: 280, width: ref.current?.offsetWidth || 280, left: ref.current?.getBoundingClientRect().left || 0, top: Math.min((ref.current?.getBoundingClientRect().bottom || 0) + 4, window.innerHeight - 290) }}>
             {/* Unassigned option */}
             <button type="button"
               onClick={() => { onChange(null, null); setOpen(false); }}
@@ -110,8 +110,9 @@ export function MemberSelector({
               </button>
             ))}
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
