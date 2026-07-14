@@ -120,17 +120,21 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
               <p className="text-xs text-amber-600 mt-0.5">{isOnline ? "Tap Sync Now or wait — syncs automatically" : "Will sync automatically when you reconnect"}</p>
               <button
                 onClick={() => {
-                  const cleared = (data.syncQueue || []).filter(q => {
-                    if (q.table === 'equipment' && q.data?.service_due === '') return false;
-                    if (q.table === 'notes' && q.data?.resolve_by === '') return false;
-                    if (q.data?.media && q.data.media.length > 0 && !q.data.media.some(m => m.url)) return false;
-                    return true;
+                  // Only remove items that are genuinely stuck (failed 5+ times or have invalid data)
+                  const stuck = (data.syncQueue || []).filter(q => {
+                    if (q.status === 'failed') return true;
+                    if (q.table === 'equipment' && q.data?.service_due === '') return true;
+                    if (q.table === 'notes' && q.data?.resolve_by === '') return true;
+                    if (q.data?.media && q.data.media.length > 0 && !q.data.media.some(m => m.url)) return true;
+                    return false;
                   });
-                  if (cleared.length < (data.syncQueue || []).length) {
-                    onClearQueue(cleared);
-                  } else {
-                    onClearQueue([]);
+                  if (stuck.length === 0) {
+                    window.alert("No stuck items found. Your queue looks healthy — just wait for sync.");
+                    return;
                   }
+                  const stuckIds = new Set(stuck.map(s => s.id));
+                  const remaining = (data.syncQueue || []).filter(q => !stuckIds.has(q.id));
+                  onClearQueue(remaining);
                 }}
                 className="mt-2 w-full rounded-xl border border-amber-300 py-2 text-xs font-bold text-amber-700 bg-white">
                 Clear Stuck Items
