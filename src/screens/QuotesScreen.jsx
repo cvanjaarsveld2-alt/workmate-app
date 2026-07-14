@@ -9,7 +9,7 @@ import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
-import { Card, Btn, Field, SelectField, SearchBar, FilterPills, Toast, Empty, PageHeader, useConfirm } from "../components/ui";
+import { Card, Btn, Field, SelectField, SearchBar, FilterPills, Toast, Empty, PageHeader, useConfirm, ClientSelector } from "../components/ui";
 
 // ─── Show-more text (full info on tap, no silent clipping) ──────────────────
 function ExpandableText({ text, limit = 110, className = "" }) {
