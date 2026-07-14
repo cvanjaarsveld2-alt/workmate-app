@@ -369,7 +369,8 @@ function CategoryBadge({ catId, size = "sm" }) {
 
   async function saveClient() {
     if (!form.company.trim()) { setToast("Company name is required"); return; }
-    const formWithDivision = { ...form, division: encodeCats(form.categories), assigned_to_user_id: form.assigned_to_user_id || null, assigned_to: form.assigned_to || "" };
+    const { categories: _cats, ...formWithoutCats } = form;
+      const formWithDivision = { ...formWithoutCats, division: encodeCats(form.categories), assigned_to_user_id: form.assigned_to_user_id || null, assigned_to: form.assigned_to || "" };
     if (editId) {
       const existing = clients.find(c => c.id === editId);
       const updated  = { ...existing, ...formWithDivision, sync_status: "pending" };
@@ -397,15 +398,19 @@ function CategoryBadge({ catId, size = "sm" }) {
 
   async function deleteClient(id, companyName) {
     const linkedFUs = followups.filter(f => f.client_id === id);
-    const message = linkedFUs.length > 0
-      ? `Delete ${companyName} and its ${linkedFUs.length} follow-up${linkedFUs.length !== 1 ? "s" : ""}? This cannot be undone. (Notes are kept.)`
+    const linkedContacts = (data.contacts || []).filter(c => c.client_id === id);
+    const linkedLeads = (data.leads || []).filter(l => l.client_id === id);
+    const totalLinked = linkedFUs.length + linkedContacts.length + linkedLeads.length;
+    const message = totalLinked > 0
+      ? `Delete ${companyName} and ${totalLinked} linked record${totalLinked !== 1 ? "s" : ""} (follow-ups, contacts, leads)? This cannot be undone.`
       : `Delete ${companyName}? This cannot be undone.`;
     const ok = await confirm(message, { confirmLabel: "Delete" });
     if (!ok) return;
-    // FIX: deleteRecord clears React state + IndexedDB + queues server delete
     await deleteRecord("clients", id, userId, setData);
     for (const f of linkedFUs) { await deleteRecord("followups", f.id, userId, setData); }
-    setToast(linkedFUs.length > 0 ? `Client + ${linkedFUs.length} follow-up${linkedFUs.length !== 1 ? "s" : ""} deleted` : "Client deleted");
+    for (const c of linkedContacts) { await deleteRecord("contacts", c.id, userId, setData); }
+    for (const l of linkedLeads) { await deleteRecord("leads", l.id, userId, setData); }
+    setToast("Client and linked records deleted");
   }
 
   // ── Edit-in-place: the edit form renders where the branch row is. ──
