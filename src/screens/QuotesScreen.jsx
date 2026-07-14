@@ -38,10 +38,10 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
   const [filterStatus, setFilterStatus] = useState("All");
   const [editId, setEditId]           = useState(null);
   const [toast, setToast]             = useState("");
-  const [form, setForm] = useState({ client_name: "", description: "", value: "", status: "Pending" });
+  const [form, setForm] = useState({ client_name: "", client_id: null, description: "", value: "", status: "Pending" });
   const { confirm, dialog } = useConfirm();
   const [shareSheet, setShareSheet] = useState(null);
-  const quotes = (data.quotes || []).filter(q => q.user_id === userId);
+  const quotes = (data.quotes || []).filter(q => q.user_id === userId || q.assigned_to_user_id === userId);
 
   // ── Quick capture: open add form when FAB triggers this screen ──
   useEffect(() => {
@@ -57,7 +57,7 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
     setSearch(searchSeed.term || "");
   }, [searchSeed?.ts]);
 
-  function resetForm() { setForm({ client_name: "", description: "", value: "", status: "Pending" }); setEditId(null); setShowForm(false); }
+  function resetForm() { setForm({ client_name: "", client_id: null, description: "", value: "", status: "Pending" }); setEditId(null); setShowForm(false); }
 
   async function saveQuote() {
     if (!form.description.trim()) { setToast("Please enter a description"); return; }
@@ -86,14 +86,20 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
     setToast("Quote deleted");
   }
 
-  function startEdit(q) { setForm({ client_name: q.client_name || "", description: q.description || "", value: String(q.value || ""), status: q.status || "Pending" }); setEditId(q.id); setShowForm(true); }
+  function startEdit(q) { setForm({ client_name: q.client_name || "", client_id: q.client_id || null, description: q.description || "", value: String(q.value || ""), status: q.status || "Pending" }); setEditId(q.id); setShowForm(true); }
 
   // ── Shared form: rendered at top for NEW, in-place for EDIT ──
   function renderQuoteForm(isEdit) {
     return (
       <Card className="p-4 space-y-3">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Quote" : "New Quote"}</p>
-        <Field label="Client" value={form.client_name} onChange={v => setForm(f => ({ ...f, client_name: v }))} placeholder="Client / branch" />
+        <Field label="Client" value={form.client_name} onChange={v => {
+                const match = (data.clients || []).find(c => c.company && c.company.toLowerCase() === v.toLowerCase());
+                setForm(f => ({ ...f, client_name: v, client_id: match?.id || f.client_id }));
+              }} placeholder="Client / branch" list="quote-clients" />
+              <datalist id="quote-clients">
+                {(data.clients || []).map(c => <option key={c.id} value={c.company + (c.branch ? ` — ${c.branch}` : "")} />)}
+              </datalist>
         <Field label="Description" value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="What the quote covers" multiline required />
         <Field label="Value (R)" type="number" value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} placeholder="0.00" />
         <SelectField label="Status" value={form.status} onChange={v => setForm(f => ({ ...f, status: v }))} options={["Pending", "Accepted", "Rejected", "Expired"]} />
