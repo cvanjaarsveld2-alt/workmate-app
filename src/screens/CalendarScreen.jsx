@@ -119,7 +119,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
   const [message, setMessage] = useState("");
 
   const cells = useMemo(() => monthCells(view.year, view.month), [view]);
-  const followups = (data.followups || []).filter(item => item.user_id === userId);
+  const followups = (data.followups || []).filter(item => item.user_id === userId || item.assigned_to_user_id === userId);
   const clients = (data.clients || []).filter(client => !client.user_id || client.user_id === userId);
   const calendarItems = useMemo(() => {
     const items = followups.map(item => ({ ...item, _source: "followup", _kind: itemType(item) }));
