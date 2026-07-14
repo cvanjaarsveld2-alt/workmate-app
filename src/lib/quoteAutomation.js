@@ -80,7 +80,7 @@ export function autoAdvanceOnAccept(quote, clients, setData) {
 }
 
 // ── 3. Auto-expire stale pending quotes (14 days) ─────────────────────────────
-export function autoExpireStaleQuotes(quotes, setData) {
+export function autoExpireStaleQuotes(quotes, setData, userId) {
   const today = todayISO();
   const cutoff = (() => {
     const d = new Date(today + "T12:00:00");
@@ -90,6 +90,7 @@ export function autoExpireStaleQuotes(quotes, setData) {
 
   const stale = quotes.filter(q =>
     q.status === "Pending" &&
+    q.user_id === userId && // only expire own quotes, not teammates'
     (q.sent_date || q.created_at?.slice(0,10) || "") < cutoff
   );
 
@@ -118,6 +119,6 @@ export function autoExpireStaleQuotes(quotes, setData) {
 
 // ── Convenience: run all automations ──────────────────────────────────────────
 // Call from App.jsx useEffect after data.quotes changes (debounced).
-export function runQuoteAutomations(data, setData) {
-  autoExpireStaleQuotes(data.quotes || [], setData);
+export function runQuoteAutomations(data, setData, userId) {
+  if (userId) autoExpireStaleQuotes(data.quotes || [], setData, userId);
 }
