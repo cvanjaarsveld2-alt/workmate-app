@@ -82,7 +82,16 @@ export function ShareToTeamModal({
 
           if (updateErr) {
             console.warn("Assignment update failed:", updateErr);
-            // Don't block — still send the notification
+            // Try RPC fallback for RLS-blocked updates
+            const { error: rpcErr } = await supabase.rpc("reassign_record", {
+              p_table: table,
+              p_record_id: record.id,
+              p_assigned_to_user_id: selectedId,
+              p_assigned_to: recipName,
+            });
+            if (rpcErr) {
+              throw new Error("Could not assign — the record was not updated");
+            }
           } else if (setData) {
             // Update local state so UI reflects immediately
             setData(d => ({
