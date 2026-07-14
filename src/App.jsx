@@ -247,9 +247,9 @@ export default function PowerWorksApp() {
       } catch (e) { console.warn("localStorage load failed:", e); }
 
       try {
-        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities"];
+        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities", "syncQueue"];
         const results = await Promise.all(tables.map(t => offlineGetAll(t)));
-        const [clients, followups, quotes, notes, equipment, contacts, expenses, leads, activities] = results;
+        const [clients, followups, quotes, notes, equipment, contacts, expenses, leads, activities, idbQueue] = results;
         setData(d => ({
           ...d,
           ...(clients?.length    ? { clients }    : {}),
@@ -261,6 +261,8 @@ export default function PowerWorksApp() {
           ...(expenses?.length   ? { expenses }   : {}),
           ...(leads?.length      ? { leads }      : {}),
           ...(activities?.length ? { activities }  : {}),
+          // Merge any queue items from IndexedDB that localStorage might have lost
+          ...(idbQueue?.length ? { syncQueue: [...new Map([...(idbQueue || []), ...(JSON.parse(localStorage.getItem("pm_sync_backup") || "[]"))].map(q => [q.id, q])).values()] } : {}),
         }));
       } catch (e) { console.warn("IndexedDB load failed:", e); }
     }
@@ -298,7 +300,8 @@ export default function PowerWorksApp() {
   useEffect(() => {
     if (dataLoading) return;
     const today = todayISO();
-    const notes = data.notes || [];
+    const uid = session?.user?.id;
+    const notes = (data.notes || []).filter(n => n.user_id === uid); // only escalate own notes
     const toEscalate = notes.filter(n =>
       !n.resolved &&
       n.resolve_by &&
