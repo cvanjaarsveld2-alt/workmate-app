@@ -8,7 +8,7 @@ import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
-import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, ServiceBadge, useConfirm } from "../components/ui";
+import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, ServiceBadge, useConfirm, ClientSelector } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
