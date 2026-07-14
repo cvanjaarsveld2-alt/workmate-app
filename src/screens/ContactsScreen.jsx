@@ -79,7 +79,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
     met_at: "", met_date: todayISO(), notes: "", status: "lead",
   });
   const { confirm, dialog } = useConfirm();
-  const contacts = (data.contacts || []).filter(c => c.user_id === userId);
+  const contacts = (data.contacts || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
   const clients  = (data.clients  || []).filter(c => c.user_id === userId);
   const [sendInfo, setSendInfo] = useState(null); // { name, email, phone }
 
