@@ -526,6 +526,8 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
                           ? (expenses.find(e => e.id === editId)?.status || "unsubmitted")
                           : "unsubmitted",
       ai_extracted:     scannedNotice,
+      client_id:        form.client_id || null,
+      client_name:      form.client_name || null,
       sync_status:      "pending",
       created_at:       editId
                           ? (expenses.find(e => e.id === editId)?.created_at || now)
@@ -854,7 +856,7 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
             const cl = (data.clients || []).find(c => c.id === v);
             setForm(f => ({ ...f, client_id: v || null, client_name: cl ? `${cl.company}${cl.branch ? " — " + cl.branch : ""}` : "" }));
           }}
-          clients={data.clients || []} placeholder="Link to a client…" />
+          clients={(data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId)} placeholder="Link to a client…" />
 
         <Field label="Notes (optional)" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What was this for?" multiline />
         <div className="flex gap-2">
