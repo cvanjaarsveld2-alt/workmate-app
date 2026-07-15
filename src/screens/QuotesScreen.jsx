@@ -1,9 +1,12 @@
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2 } from "lucide-react";
+import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download } from "lucide-react";
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, genId } from "../lib/helpers";
+import { QuoteLineItems } from "../components/QuoteLineItems";
+import { shareQuotePDF } from "../lib/quotePDF";
+import { autoCreateChaseFollowup, autoAdvanceOnAccept } from "../lib/quoteAutomation";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
@@ -39,6 +42,8 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
   const [editId, setEditId]           = useState(null);
   const [toast, setToast]             = useState("");
   const [form, setForm] = useState({ client_name: "", client_id: null, description: "", value: "", status: "Pending" });
+  const [lineItems, setLineItems] = useState([]);
+  const [vatInclusive, setVatInclusive] = useState(true);
   const { confirm, dialog } = useConfirm();
   const [shareSheet, setShareSheet] = useState(null);
   const quotes = (data.quotes || []).filter(q => q.user_id === userId || q.assigned_to_user_id === userId);
@@ -57,7 +62,7 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
     setSearch(searchSeed.term || "");
   }, [searchSeed?.ts]);
 
-  function resetForm() { setForm({ client_name: "", client_id: null, description: "", value: "", status: "Pending" }); setEditId(null); setShowForm(false); }
+  function resetForm() { setForm({ client_name: "", client_id: null, description: "", value: "", status: "Pending" }); setLineItems([]); setVatInclusive(true); setEditId(null); setShowForm(false); }
 
   async function saveQuote() {
     if (!form.description.trim()) { setToast("Please enter a description"); return; }
@@ -65,14 +70,20 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
       const existing = quotes.find(q => q.id === editId);
       const updated  = { ...existing, ...form, value: parseFloat(form.value || 0), sync_status: "pending" };
       setData(d => ({ ...d, quotes: (d.quotes || []).map(q => q.id === editId ? updated : q), syncQueue: [{ id: genId(), table: "quotes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
+      if (form.status === "Accepted" && existing.status !== "Accepted") {
+        autoAdvanceOnAccept(updated, data.clients, setData);
+      }
       await offlineSave("quotes", updated);
       setToast("Quote updated");
       triggerImmediateSync();
     } else {
-      const item = withTeamId({ id: genId(), user_id: userId, ...form, value: parseFloat(form.value || 0), sent_date: todayISO(), created_at: new Date().toISOString(), sync_status: "pending" }, teamId);
+      const totalFromLines = lineItems.reduce((s, i) => s + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0), 0);
+      const quoteValue = lineItems.length > 0 ? totalFromLines : parseFloat(form.value || 0);
+      const item = withTeamId({ id: genId(), user_id: userId, ...form, value: quoteValue, line_items: lineItems.length > 0 ? JSON.stringify(lineItems) : null, vat_inclusive: vatInclusive, sent_date: todayISO(), created_at: new Date().toISOString(), sync_status: "pending" }, teamId);
       setData(d => ({ ...d, quotes: [item, ...(d.quotes || [])], syncQueue: [{ id: genId(), table: "quotes", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
       await offlineSave("quotes", item);
-      setToast("Quote added");
+      autoCreateChaseFollowup(item, userId, setData);
+      setToast("Quote added — chase follow-up created");
       triggerImmediateSync();
     }
     resetForm();
@@ -86,7 +97,12 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
     setToast("Quote deleted");
   }
 
-  function startEdit(q) { setForm({ client_name: q.client_name || "", client_id: q.client_id || null, description: q.description || "", value: String(q.value || ""), status: q.status || "Pending" }); setEditId(q.id); setShowForm(true); }
+  function startEdit(q) {
+    setForm({ client_name: q.client_name || "", client_id: q.client_id || null, description: q.description || "", value: String(q.value || ""), status: q.status || "Pending" });
+    try { setLineItems(q.line_items ? JSON.parse(q.line_items) : []); } catch { setLineItems([]); }
+    setVatInclusive(q.vat_inclusive !== false);
+    setEditId(q.id); setShowForm(true);
+  }
 
   // ── Shared form: rendered at top for NEW, in-place for EDIT ──
   function renderQuoteForm(isEdit) {
@@ -98,9 +114,10 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
                   const cl = (data.clients || []).find(c => c.id === v);
                   setForm(f => ({ ...f, client_id: v || null, client_name: cl ? `${cl.company}${cl.branch ? " — " + cl.branch : ""}` : "" }));
                 }}
-                clients={data.clients || []} placeholder="Select client…" />
+                clients={(data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId)} placeholder="Select client…" />
         <Field label="Description" value={form.description} onChange={v => setForm(f => ({ ...f, description: v }))} placeholder="What the quote covers" multiline required />
-        <Field label="Value (R)" type="number" value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} placeholder="0.00" />
+        <QuoteLineItems items={lineItems} onChange={setLineItems} vatInclusive={vatInclusive} onVatToggle={setVatInclusive} />
+        {lineItems.length === 0 && <Field label="Value (R)" type="number" value={form.value} onChange={v => setForm(f => ({ ...f, value: v }))} placeholder="0.00" />}
         <SelectField label="Status" value={form.status} onChange={v => setForm(f => ({ ...f, status: v }))} options={["Pending", "Accepted", "Rejected", "Expired"]} />
         <div className="flex gap-2">
           <Btn className="flex-1" onClick={saveQuote}><Save size={15} />{isEdit ? "Update" : "Add Quote"}</Btn>
@@ -180,6 +197,14 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
                   {teamMembers.length > 0 && (
                     <button onClick={() => setShareSheet({ id: q.id, title: q.client_name || "Quote", type: "quote" })} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-purple-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" title="Share with teammate"><Share2 size={15} /></button>
                   )}
+                  <button onClick={async () => {
+                    const r = await shareQuotePDF({
+                      clientName: q.client_name, date: q.sent_date || q.created_at?.slice(0,10),
+                      lineItems: q.line_items ? JSON.parse(q.line_items) : [{ description: q.description, qty: 1, unitPrice: q.value }],
+                      vatInclusive: q.vat_inclusive !== false, notes: q.description,
+                    });
+                    setToast(r === "shared" ? "Quote shared" : "Quote PDF downloaded");
+                  }} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-green-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" title="Generate PDF"><Download size={15} /></button>
                   <button onClick={() => startEdit(q)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={15} /></button>
                   <button onClick={() => deleteQuote(q.id, q.client_name)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={15} /></button>
                 </div>
