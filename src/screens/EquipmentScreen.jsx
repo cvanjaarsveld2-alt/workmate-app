@@ -185,7 +185,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
                     const cl = (data.clients || []).find(c => c.id === v);
                     setForm(f => ({ ...f, client_id: v || null, client: cl ? cl.company : "" }));
                   }}
-                  clients={data.clients || []} placeholder="Select client…" />
+                  clients={(data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId)} placeholder="Select client…" />
         <Field label="Next Service Due" type="date" value={form.service_due} onChange={v => setForm(f => ({ ...f, service_due: v }))} />
         <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Additional notes…" multiline />
         <div>
