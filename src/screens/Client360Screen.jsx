@@ -164,9 +164,9 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
   const contacts   = (data.contacts||[]).filter(c => c.client_id===clientId);
   const followups  = (data.followups||[]).filter(f => f.client_id===clientId);
   const notes      = (data.notes||[]).filter(n => n.client_id===clientId);
-  const quotes     = (data.quotes||[]).filter(q => q.client_name && client.company && q.client_name.toLowerCase()===client.company.toLowerCase());
+  const quotes     = (data.quotes||[]).filter(q => q.client_id === clientId || (q.client_name && client.company && q.client_name.toLowerCase()===client.company.toLowerCase()));
   const leads      = (data.leads||[]).filter(l => l.client_id===clientId || (l.client_name && client.company && l.client_name.toLowerCase()===client.company.toLowerCase()));
-  const equipment  = (data.equipment||[]).filter(e => e.client && client.company && e.client.toLowerCase()===client.company.toLowerCase());
+  const equipment  = (data.equipment||[]).filter(e => e.client_id === clientId || (e.client && client.company && e.client.toLowerCase()===client.company.toLowerCase()));
   const activities = (data.activities||[]).filter(a => a.client_id===clientId);
   // NEW: expenses linked to this client
   const expenses   = (data.expenses||[]).filter(e => e.client_id === clientId || (e.client_name && client.company && e.client_name.toLowerCase()===client.company.toLowerCase()));
