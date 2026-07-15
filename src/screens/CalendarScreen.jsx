@@ -120,11 +120,11 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
 
   const cells = useMemo(() => monthCells(view.year, view.month), [view]);
   const followups = (data.followups || []).filter(item => item.user_id === userId || item.assigned_to_user_id === userId);
-  const clients = (data.clients || []).filter(client => !client.user_id || client.user_id === userId);
+  const clients = (data.clients || []).filter(client => !client.user_id || client.user_id === userId || client.assigned_to_user_id === userId);
   const calendarItems = useMemo(() => {
     const items = followups.map(item => ({ ...item, _source: "followup", _kind: itemType(item) }));
 
-    (data.notes || []).filter(note => note.user_id === userId && note.resolve_by && !note.resolved).forEach(note => {
+    (data.notes || []).filter(note => (note.user_id === userId || note.assigned_to_user_id === userId) && note.resolve_by && !note.resolved).forEach(note => {
       items.push({
         id: note.id, date: note.resolve_by, time: "", title: (note.note || "Note").slice(0, 100),
         client: note.client || "", completed: !!note.resolved,
@@ -132,7 +132,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
       });
     });
 
-    (data.equipment || []).filter(item => item.user_id === userId && item.service_due).forEach(item => {
+    (data.equipment || []).filter(item => (item.user_id === userId || item.assigned_to_user_id === userId) && item.service_due).forEach(item => {
       const client = clients.find(clientItem => clientItem.id === item.client_id);
       items.push({
         id: item.id, date: item.service_due, time: "", title: `Service: ${item.name || "Equipment"}`,
@@ -141,7 +141,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
       });
     });
 
-    (data.quotes || []).filter(quote => quote.user_id === userId && quote.sent_date).forEach(quote => {
+    (data.quotes || []).filter(quote => (quote.user_id === userId || quote.assigned_to_user_id === userId) && quote.sent_date).forEach(quote => {
       items.push({
         id: quote.id, date: quote.sent_date, time: "", title: `Quote: ${quote.description || quote.client_name || "Quote"}`,
         client: quote.client_name || "", completed: quote.status === "Accepted",
