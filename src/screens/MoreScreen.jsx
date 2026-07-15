@@ -11,6 +11,7 @@ import { subscribeToPush, pushSupported, iosNeedsInstall } from "../lib/pushMana
 export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen, userId }) {
   const { confirm, dialog } = useConfirm();
   const pendingCount = (data.syncQueue || []).filter(i => i.status === "pending").length;
+  const failedCount = (data.syncQueue || []).filter(i => i.status === "failed").length;
 
   // Push notification state: idle | working | active | denied | ios-install | unsupported | error
   const [pushState, setPushState] = useState("idle");
