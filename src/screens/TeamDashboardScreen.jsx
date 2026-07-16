@@ -7,7 +7,7 @@ import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, UserPlus, TrendingUp, Calendar,
-  CheckCircle2, Clock, Send,
+  CheckCircle2, Clock, Send, X,
 } from "lucide-react";
 import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
 import { todayISO, smartDate } from "../lib/helpers";
@@ -114,26 +114,32 @@ function LeadRow({ lead, color, onShare }) {
   );
 }
 
-function FollowupRow({ fu, today, color, onShare }) {
+function FollowupRow({ fu, today, color, onShare, onTap }) {
   const overdue = fu.date < today && !fu.completed;
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
-      <MemberChip email={fu._ownerEmail} userId={fu.user_id} color={color} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-slate-900 truncate">{fu.title}</p>
-        <p className="text-xs text-slate-400 truncate">{fu.client}</p>
-      </div>
-      {fu.completed ? (
-        <CheckCircle2 size={14} className="text-green-500 shrink-0" />
-      ) : (
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${overdue ? "text-red-700 bg-red-50" : "text-slate-600 bg-slate-100"}`}>
-          {overdue ? "Overdue" : smartDate(fu.date)}
-        </span>
-      )}
+    <div className="border-b border-slate-50 last:border-0">
+      <button onClick={onTap} className="w-full text-left flex items-center gap-3 py-3 hover:bg-slate-50/60 transition-colors -mx-1 px-1 rounded-lg">
+        <MemberChip email={fu._ownerEmail} userId={fu.user_id} color={color} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-slate-900 truncate">{fu.title}</p>
+          <p className="text-xs text-slate-400 truncate">{fu.client}{fu.branch ? ` — ${fu.branch}` : ""}</p>
+          {fu.notes && <p className="text-xs text-slate-400 truncate mt-0.5 italic">{fu.notes}</p>}
+          <p className="text-[10px] text-slate-300 mt-0.5">{fu.time ? `${fu.time} · ` : ""}{fu.date}</p>
+        </div>
+        {fu.completed ? (
+          <CheckCircle2 size={14} className="text-green-500 shrink-0" />
+        ) : (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${overdue ? "text-red-700 bg-red-50" : "text-slate-600 bg-slate-100"}`}>
+            {overdue ? "Overdue" : smartDate(fu.date)}
+          </span>
+        )}
+      </button>
       {onShare && (
-        <button onClick={onShare} className="p-2 rounded-xl text-slate-300 hover:text-red-700 hover:bg-red-50 transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center">
-          <Send size={14} />
-        </button>
+        <div className="pb-2 pl-8">
+          <button onClick={onShare} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-red-700 transition-colors px-2 py-1 rounded-lg hover:bg-red-50">
+            <Send size={11} /> Assign to teammate
+          </button>
+        </div>
       )}
     </div>
   );
@@ -156,6 +162,7 @@ export function TeamDashboardScreen({
   const [selectedMember, setSelectedMember] = useState(null);
   const [activeSection, setActiveSection]   = useState("clients");
   const [shareTarget, setShareTarget]       = useState(null);
+  const [detailFU, setDetailFU]             = useState(null); // follow-up detail sheet
 
   const memberMap = useMemo(() => {
     const map = {};
@@ -336,6 +343,7 @@ export function TeamDashboardScreen({
             ))}
             {activeSection === "followups" && displayed.map(r => (
               <FollowupRow key={r.id} fu={r} today={today} color={r._ownerColor}
+                onTap={() => setDetailFU(r)}
                 onShare={isAdmin ? () => handleShare({ id: r.id, title: r.title, type: "followup" }) : undefined} />
             ))}
 
@@ -382,6 +390,90 @@ export function TeamDashboardScreen({
         teamId={teamId}
         teamMembers={teamMembers}
       />
+
+      {/* Follow-up detail sheet */}
+      <AnimatePresence>
+        {detailFU && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setDetailFU(null)}
+              className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm" />
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white overflow-hidden"
+              style={{ maxHeight: "80vh" }}>
+              <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
+              <div className="px-5 pb-6 space-y-4 overflow-y-auto" style={{ maxHeight: "calc(80vh - 24px)" }}>
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                        detailFU.completed ? "bg-green-100 text-green-700"
+                        : detailFU.date < today ? "bg-red-100 text-red-700"
+                        : "bg-blue-50 text-blue-700"
+                      }`}>
+                        {detailFU.completed ? "✓ Done" : detailFU.date < today ? "Overdue" : smartDate(detailFU.date)}
+                      </span>
+                      {detailFU.time && <span className="text-xs text-slate-400">{detailFU.time}</span>}
+                    </div>
+                    <p className="text-xl font-black text-slate-900 mt-2">{detailFU.title}</p>
+                    {detailFU.client && <p className="text-sm text-slate-500 mt-0.5">{detailFU.client}{detailFU.branch ? ` — ${detailFU.branch}` : ""}</p>}
+                  </div>
+                  <button onClick={() => setDetailFU(null)}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 text-slate-500 shrink-0 mt-1">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Assigned to */}
+                <div className="rounded-xl bg-slate-50 p-3.5">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Assigned to</p>
+                  <div className="flex items-center gap-2.5">
+                    <MemberChip email={detailFU._ownerEmail} userId={detailFU.user_id} color={detailFU._ownerColor} />
+                    <p className="text-sm font-bold text-slate-700">
+                      {detailFU.assigned_to || detailFU._ownerEmail?.split("@")[0] || "Unassigned"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Date + time */}
+                <div className="rounded-xl bg-slate-50 p-3.5 space-y-2">
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Schedule</p>
+                  <div className="flex items-center gap-2">
+                    <Calendar size={14} className="text-slate-400 shrink-0" />
+                    <p className="text-sm text-slate-700">{detailFU.date}{detailFU.time ? ` at ${detailFU.time}` : ""}</p>
+                  </div>
+                  {detailFU.reminder && detailFU.reminder !== "none" && (
+                    <p className="text-xs text-slate-400">Reminder: {detailFU.reminder.replace(/_/g, " ")}</p>
+                  )}
+                </div>
+
+                {/* Notes */}
+                {detailFU.notes && (
+                  <div className="rounded-xl bg-slate-50 p-3.5">
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Notes</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{detailFU.notes}</p>
+                  </div>
+                )}
+
+                {/* Admin actions */}
+                {isAdmin && !detailFU.completed && (
+                  <button
+                    onClick={() => {
+                      setShareTarget({ id: detailFU.id, title: detailFU.title, type: "followup" });
+                      setDetailFU(null);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black text-white min-h-[52px]"
+                    style={{ background: BRAND.primary }}>
+                    <Send size={16} /> Reassign to teammate
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
