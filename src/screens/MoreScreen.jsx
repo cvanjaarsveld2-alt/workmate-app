@@ -141,6 +141,19 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
                 Clear Stuck Items
               </button>
             </div>
+          : failedCount > 0
+          ? <div className="rounded-xl bg-red-50 border border-red-200 p-3.5">
+              <p className="text-sm font-bold text-red-700">⚠️ {failedCount} item{failedCount !== 1 ? "s" : ""} failed to sync</p>
+              <p className="text-xs text-red-600 mt-0.5">Tap Clear Stuck Items to remove them, or check Diagnostics</p>
+              <button
+                onClick={() => {
+                  const remaining = (data.syncQueue || []).filter(q => q.status !== "failed");
+                  onClearQueue(remaining);
+                }}
+                className="mt-2 w-full rounded-xl border border-red-300 py-2 text-xs font-bold text-red-700 bg-white">
+                Clear Failed Items
+              </button>
+            </div>
           : <div className="rounded-xl bg-green-50 border border-green-200 p-3.5">
               <p className="text-sm font-bold text-green-700">✓ All data synced to cloud</p>
               <p className="text-xs text-green-600 mt-0.5">Your data is safe and visible on all devices</p>
