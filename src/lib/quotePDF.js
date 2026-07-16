@@ -10,7 +10,7 @@
 
 export async function generateQuotePDF(quote, companyInfo = {}) {
   const { default: jsPDF } = await import("jspdf");
-  await import("jspdf-autotable");
+  const { default: autoTable } = await import("jspdf-autotable");
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
@@ -102,7 +102,7 @@ export async function generateQuotePDF(quote, companyInfo = {}) {
 
   const startY = metaY + 5 + clientLines.length * 5 + 8;
 
-  doc.autoTable({
+  autoTable(doc, {
     startY,
     head: [["#", "Description", "Qty", "Unit Price", "Total"]],
     body: tableBody,
