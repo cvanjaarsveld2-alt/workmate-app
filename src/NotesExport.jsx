@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 
 const BRAND = {
@@ -131,7 +131,7 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
     if (!n.resolved) byClient[k].unresolved++;
   });
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: y + 2,
     head: [["Client", "Notes", "Critical", "Unresolved"]],
     body: Object.entries(byClient).map(([client, stats]) => [
