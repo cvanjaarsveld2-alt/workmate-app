@@ -56,59 +56,75 @@ function SectionHead({ icon: Icon, label, count, color, bg }) {
 }
 
 // ── Record rows with share button ────────────────────────────────────────────
-function ClientRow({ client, color, onOpen, onShare }) {
+function ClientRow({ client, color, onOpen, onShare, onTap }) {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
-      <button onClick={onOpen} className="flex items-center gap-3 flex-1 min-w-0 text-left" disabled={!onOpen}>
+    <div className="border-b border-slate-50 last:border-0">
+      <button onClick={onTap} className="w-full text-left flex items-center gap-3 py-3 hover:bg-slate-50/60 transition-colors -mx-1 px-1 rounded-lg">
         <MemberChip email={client._ownerEmail} userId={client.user_id} color={color} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-slate-900 truncate">{client.company}</p>
           <p className="text-xs text-slate-400 truncate">{[client.branch, client.contact].filter(Boolean).join(" · ")}</p>
+          {client.location && <p className="text-xs text-slate-300 truncate">{client.location}</p>}
         </div>
         <StagePill stage={client.stage || "New Lead"} />
       </button>
+      <div className="flex gap-2 pb-2 pl-8">
+        {onOpen && (
+          <button onClick={onOpen} className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">
+            Full profile →
+          </button>
+        )}
+        {onShare && (
+          <button onClick={onShare} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
+            <Send size={11} /> Assign
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ContactRow({ contact, color, onShare, onTap }) {
+  return (
+    <div className="border-b border-slate-50 last:border-0">
+      <button onClick={onTap} className="w-full text-left flex items-center gap-3 py-3 hover:bg-slate-50/60 transition-colors -mx-1 px-1 rounded-lg">
+        <MemberChip email={contact._ownerEmail} userId={contact.user_id} color={color} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
+          <p className="text-xs text-slate-400 truncate">{[contact.company, contact.title].filter(Boolean).join(" · ")}</p>
+        </div>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: "#EDE9FE", color: "#5B21B6" }}>
+          {contact.status || "Lead"}
+        </span>
+      </button>
       {onShare && (
-        <button onClick={onShare} className="p-2 rounded-xl text-slate-300 hover:text-red-700 hover:bg-red-50 transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center">
-          <Send size={14} />
-        </button>
+        <div className="pb-2 pl-8">
+          <button onClick={onShare} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
+            <Send size={11} /> Assign
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
-function ContactRow({ contact, color, onShare }) {
+function LeadRow({ lead, color, onShare, onTap }) {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
-      <MemberChip email={contact._ownerEmail} userId={contact.user_id} color={color} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
-        <p className="text-xs text-slate-400 truncate">{[contact.company, contact.title].filter(Boolean).join(" · ")}</p>
-      </div>
-      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: "#EDE9FE", color: "#5B21B6" }}>
-        {contact.status || "Lead"}
-      </span>
+    <div className="border-b border-slate-50 last:border-0">
+      <button onClick={onTap} className="w-full text-left flex items-center gap-3 py-3 hover:bg-slate-50/60 transition-colors -mx-1 px-1 rounded-lg">
+        <MemberChip email={lead._ownerEmail} userId={lead.user_id} color={color} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-slate-900 truncate">{lead.title || lead.client_name}</p>
+          <p className="text-xs text-slate-400 truncate">{lead.client_name}</p>
+        </div>
+        <StagePill stage={lead.stage || "New Lead"} />
+      </button>
       {onShare && (
-        <button onClick={onShare} className="p-2 rounded-xl text-slate-300 hover:text-red-700 hover:bg-red-50 transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center">
-          <Send size={14} />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function LeadRow({ lead, color, onShare }) {
-  return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-50 last:border-0">
-      <MemberChip email={lead._ownerEmail} userId={lead.user_id} color={color} />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-slate-900 truncate">{lead.title || lead.client_name}</p>
-        <p className="text-xs text-slate-400 truncate">{lead.client_name}</p>
-      </div>
-      <StagePill stage={lead.stage || "New Lead"} />
-      {onShare && (
-        <button onClick={onShare} className="p-2 rounded-xl text-slate-300 hover:text-red-700 hover:bg-red-50 transition-colors shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center">
-          <Send size={14} />
-        </button>
+        <div className="pb-2 pl-8">
+          <button onClick={onShare} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
+            <Send size={11} /> Assign
+          </button>
+        </div>
       )}
     </div>
   );
@@ -162,7 +178,8 @@ export function TeamDashboardScreen({
   const [selectedMember, setSelectedMember] = useState(null);
   const [activeSection, setActiveSection]   = useState("clients");
   const [shareTarget, setShareTarget]       = useState(null);
-  const [detailFU, setDetailFU]             = useState(null); // follow-up detail sheet
+  const [detailFU, setDetailFU]             = useState(null);
+  const [detailItem, setDetailItem]         = useState(null); // {type, data} for clients/contacts/leads
 
   const memberMap = useMemo(() => {
     const map = {};
@@ -330,15 +347,18 @@ export function TeamDashboardScreen({
           <div className="px-4">
             {activeSection === "clients" && displayed.map(r => (
               <ClientRow key={r.id} client={r} color={r._ownerColor}
+                onTap={() => setDetailItem({ type: "client", data: r })}
                 onOpen={isAdmin ? () => onNavigate?.("Client360", { clientId: r.id, returnTo: "TeamDashboard" }) : undefined}
                 onShare={isAdmin ? () => handleShare({ id: r.id, title: r.company, type: "client" }) : undefined} />
             ))}
             {activeSection === "contacts" && displayed.map(r => (
               <ContactRow key={r.id} contact={r} color={r._ownerColor}
+                onTap={() => setDetailItem({ type: "contact", data: r })}
                 onShare={isAdmin ? () => handleShare({ id: r.id, title: r.name, type: "contact" }) : undefined} />
             ))}
             {activeSection === "leads" && displayed.map(r => (
               <LeadRow key={r.id} lead={r} color={r._ownerColor}
+                onTap={() => setDetailItem({ type: "lead", data: r })}
                 onShare={isAdmin ? () => handleShare({ id: r.id, title: r.title || r.client_name, type: "lead" }) : undefined} />
             ))}
             {activeSection === "followups" && displayed.map(r => (
@@ -380,7 +400,109 @@ export function TeamDashboardScreen({
         </Card>
       )}
 
-      {/* Share/Assign modal */}
+      {/* ── Client / Contact / Lead detail sheet ── */}
+      <AnimatePresence>
+        {detailItem && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={() => setDetailItem(null)} className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"/>
+            <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}}
+              transition={{type:"spring",damping:28,stiffness:300}}
+              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white"
+              style={{maxHeight:"82vh"}}>
+              <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
+              <div className="overflow-y-auto px-5 pb-8 space-y-4" style={{maxHeight:"calc(82vh - 24px)"}}>
+
+                {/* Header */}
+                <div className="flex items-start justify-between pt-1">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xl font-black text-slate-900">
+                      {detailItem.type === "client"  && detailItem.data.company}
+                      {detailItem.type === "contact" && detailItem.data.name}
+                      {detailItem.type === "lead"    && (detailItem.data.title || detailItem.data.client_name)}
+                    </p>
+                    {detailItem.type === "client"  && detailItem.data.branch  && <p className="text-sm text-slate-400">{detailItem.data.branch}</p>}
+                    {detailItem.type === "contact" && detailItem.data.title   && <p className="text-sm text-slate-400">{detailItem.data.title}</p>}
+                    {detailItem.type === "lead"    && detailItem.data.client_name && <p className="text-sm text-slate-400">{detailItem.data.client_name}</p>}
+                  </div>
+                  <button onClick={() => setDetailItem(null)} className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 text-slate-500 shrink-0">
+                    <X size={18}/>
+                  </button>
+                </div>
+
+                {/* CLIENT detail */}
+                {detailItem.type === "client" && (() => { const d = detailItem.data; return (<>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <StagePill stage={d.stage || "New Lead"} />
+                    {d.sync_status === "pending" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Not synced</span>}
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-4 space-y-2">
+                    {d.contact  && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Contact</p><p className="text-sm text-slate-800">{d.contact}</p></div>}
+                    {d.phone    && <div className="flex gap-2 items-center"><p className="text-xs font-bold text-slate-400 w-16">Phone</p>
+                      <a href={`tel:${d.phone}`} className="text-sm text-blue-600 font-medium">{d.phone}</a>
+                      <a href={`https://wa.me/${d.phone.replace(/^0/,"27").replace(/[^0-9]/,"")}`} target="_blank" rel="noopener noreferrer"
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">WhatsApp</a>
+                    </div>}
+                    {d.email    && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Email</p><a href={`mailto:${d.email}`} className="text-sm text-blue-600">{d.email}</a></div>}
+                    {d.location && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Location</p><p className="text-sm text-slate-800">{d.location}</p></div>}
+                  </div>
+                  {d.notes && <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-800">{d.notes}</p></div>}
+                  {isAdmin && (
+                    <button onClick={() => { onNavigate?.("Client360", { clientId: d.id, returnTo: "TeamDashboard" }); setDetailItem(null); }}
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black text-white min-h-[52px]"
+                      style={{background: BRAND.primary}}>
+                      Open full client profile →
+                    </button>
+                  )}
+                </>); })()}
+
+                {/* CONTACT detail */}
+                {detailItem.type === "contact" && (() => { const d = detailItem.data; return (<>
+                  <div className="rounded-xl bg-slate-50 p-4 space-y-2">
+                    {d.company  && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Company</p><p className="text-sm text-slate-800">{d.company}</p></div>}
+                    {d.phone    && <div className="flex gap-2 items-center"><p className="text-xs font-bold text-slate-400 w-16">Phone</p>
+                      <a href={`tel:${d.phone}`} className="text-sm text-blue-600 font-medium">{d.phone}</a>
+                      <a href={`https://wa.me/${d.phone.replace(/^0/,"27").replace(/[^0-9]/,"")}`} target="_blank" rel="noopener noreferrer"
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">WhatsApp</a>
+                    </div>}
+                    {d.email    && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Email</p><a href={`mailto:${d.email}`} className="text-sm text-blue-600">{d.email}</a></div>}
+                    {d.met_at   && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Met at</p><p className="text-sm text-slate-800">{d.met_at}</p></div>}
+                    {d.met_date && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Met on</p><p className="text-sm text-slate-800">{smartDate(d.met_date)}</p></div>}
+                    {d.status   && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Status</p>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{background:"#EDE9FE",color:"#5B21B6"}}>{d.status}</span>
+                    </div>}
+                  </div>
+                  {d.notes && <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-800 whitespace-pre-wrap">{d.notes}</p></div>}
+                </>); })()}
+
+                {/* LEAD detail */}
+                {detailItem.type === "lead" && (() => { const d = detailItem.data; return (<>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <StagePill stage={d.stage || "New Lead"} />
+                    {d.estimated_value && <p className="text-sm font-black" style={{color:BRAND.primary}}>R {parseFloat(d.estimated_value||0).toLocaleString("en-ZA")}</p>}
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-4 space-y-2">
+                    {d.lead_date      && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-20">Lead date</p><p className="text-sm text-slate-800">{smartDate(d.lead_date)}</p></div>}
+                    {d.follow_up_date && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-20">Follow up</p><p className="text-sm text-slate-800">{smartDate(d.follow_up_date)}</p></div>}
+                    {d.assigned_to    && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-20">Assigned</p><p className="text-sm text-slate-800">{d.assigned_to}</p></div>}
+                    {d.captured_by    && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-20">Captured</p><p className="text-sm text-slate-800">{d.captured_by}</p></div>}
+                  </div>
+                  {d.notes && <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-800 whitespace-pre-wrap">{d.notes}</p></div>}
+                  {d.outcome_notes && <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-bold text-slate-400 mb-1">Outcome</p><p className="text-sm text-slate-800">{d.outcome_notes}</p></div>}
+                  {isAdmin && (
+                    <button onClick={() => { setShareTarget({ id: d.id, title: d.title || d.client_name, type: "lead" }); setDetailItem(null); }}
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black text-white min-h-[52px]"
+                      style={{background: BRAND.primary}}>
+                      <Send size={16}/> Assign to teammate
+                    </button>
+                  )}
+                </>); })()}
+
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
       <ShareToTeamModal
         open={!!shareTarget}
         onClose={() => setShareTarget(null)}
