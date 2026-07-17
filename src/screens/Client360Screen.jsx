@@ -15,7 +15,7 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Phone, Mail, MapPin, Plus, Edit2,
+  ArrowLeft, Phone, Mail, MapPin, Plus, Edit2, X,
   Users, Calendar, TrendingUp, FileText, Wrench,
   MessageSquare, CheckCircle2, Clock, DollarSign,
   Send, ExternalLink, Receipt, AlertTriangle,
@@ -146,6 +146,7 @@ function EmptyTab({ icon: Icon, label, actionLabel, onAction }) {
 // ─── Main ────────────────────────────────────────────────────────────────────
 export function Client360Screen({ data, setData, userId, userEmail, teamId, teamMembers, clientId, onBack, onNavigate }) {
   const [activeTab, setActiveTab] = useState("timeline");
+  const [detailItem, setDetailItem] = useState(null); // {type, data} for inline detail sheet
   const [toast, setToast] = useState("");
   const [shareTarget, setShareTarget] = useState(null);
   const [activityOpen, setActivityOpen] = useState(false);
@@ -242,7 +243,10 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
         return timeline.length===0
           ? <EmptyTab icon={Clock} label="activity yet" />
           : <div className="px-1">{timeline.slice(0,50).map((e,i) =>
-              <TimelineItem key={i} event={e} onTap={() => e.screen && onNavigate?.(e.screen)} />
+              <TimelineItem key={i} event={e} onTap={() => {
+                if (e.type === 'note') { const n = notes.find(x => x.created_at === e.date || x.note?.startsWith(e.title?.slice(0,30))); if(n) setDetailItem({type:'note',data:n}); return; }
+                if (e.screen) onNavigate?.(e.screen);
+              }} />
             )}</div>;
 
       case "contacts":
@@ -254,7 +258,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
         return followups.length===0
           ? <EmptyTab icon={Calendar} label="follow-ups" actionLabel="Add follow-up" onAction={() => onNavigate?.("Followups")} />
           : <div className="space-y-2">{followups.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(f=>(
-            <button key={f.id} onClick={() => onNavigate?.("Followups")} className="w-full text-left">
+            <button key={f.id} onClick={() => setDetailItem({type:'followup',data:f})} className="w-full text-left">
               <Card className={`p-3 ${!f.completed&&f.date<today?"border-l-4 border-l-red-400":""}`}>
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${f.completed?"bg-green-100":"bg-slate-100"}`}>
@@ -275,7 +279,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
           : <div className="space-y-2">{notes.sort((a,b)=>(b.created_at||"").localeCompare(a.created_at||"")).map(n=>{
             const u=NOTE_URGENCY[n.urgency]||NOTE_URGENCY.Normal;
             return (
-              <button key={n.id} onClick={() => onNavigate?.("Notes")} className="w-full text-left">
+              <button key={n.id} onClick={() => setDetailItem({type:'note',data:n})} className="w-full text-left">
                 <Card className="p-3" style={{borderLeft:`3px solid ${u.border}`}}>
                   <div className="flex items-start gap-2">
                     <div className="flex-1 min-w-0">
@@ -304,7 +308,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
           : <div className="space-y-2">{quotes.sort((a,b)=>(b.created_at||"").localeCompare(a.created_at||"")).map(q=>{
             const c=QUOTE_STATUS_COLORS[q.status]||{};
             return (
-              <button key={q.id} onClick={() => onNavigate?.("Quotes")} className="w-full text-left">
+              <button key={q.id} onClick={() => setDetailItem({type:'quote',data:q})} className="w-full text-left">
                 <Card className="p-3.5"><div className="flex items-start justify-between gap-3"><div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-900 truncate">{q.description||"Quote"}</p>
                   <p className="text-lg font-black mt-0.5" style={{color:BRAND.primary}}>{formatCurrency(q.value)}</p>
@@ -316,7 +320,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
         return leads.length===0
           ? <EmptyTab icon={TrendingUp} label="leads" actionLabel="Add lead" onAction={() => onNavigate?.("Leads")} />
           : <div className="space-y-2">{leads.map(l=>(
-            <button key={l.id} onClick={() => onNavigate?.("Leads")} className="w-full text-left">
+            <button key={l.id} onClick={() => setDetailItem({type:'lead',data:l})} className="w-full text-left">
               <Card className="p-3.5">
                 <p className="text-sm font-bold text-slate-900">{l.title||"Lead"}</p>
                 {l.estimated_value&&<p className="text-sm font-black mt-0.5" style={{color:BRAND.primary}}>{formatCurrency(l.estimated_value)}</p>}
@@ -329,7 +333,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
         return equipment.length===0
           ? <EmptyTab icon={Wrench} label="equipment" actionLabel="Add equipment" onAction={() => onNavigate?.("Equipment")} />
           : <div className="space-y-2">{equipment.map(e=>(
-            <button key={e.id} onClick={() => onNavigate?.("Equipment")} className="w-full text-left">
+            <button key={e.id} onClick={() => setDetailItem({type:'equipment',data:e})} className="w-full text-left">
               <Card className="p-3.5"><div className="flex items-start justify-between">
                 <div><p className="text-sm font-bold text-slate-900">{e.name}</p><p className="text-xs text-slate-500">{[e.make,e.model].filter(Boolean).join(" · ")}</p>
                   {e.serial&&<p className="text-xs text-slate-400 mt-0.5">S/N: {e.serial}</p>}</div>
@@ -345,7 +349,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
                 <p className="text-xs font-bold text-slate-400">Total: {formatCurrency(totalExpenses)}</p>
               </div>
               {expenses.sort((a,b)=>(b.expense_date||b.created_at||"").localeCompare(a.expense_date||a.created_at||"")).slice(0,20).map(e=>(
-                <button key={e.id} onClick={() => onNavigate?.("Expenses")} className="w-full text-left">
+                <button key={e.id} onClick={() => setDetailItem({type:'expense',data:e})} className="w-full text-left">
                   <Card className="p-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -496,6 +500,129 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
       <ShareToTeamModal open={!!shareTarget} onClose={()=>setShareTarget(null)} record={shareTarget}
         fromUserId={userId} fromEmail={userEmail} teamId={teamId} teamMembers={teamMembers}/>
       <ActivityLogger open={activityOpen} onClose={()=>setActivityOpen(false)} client={client} userId={userId} teamId={teamId} data={data} setData={setData}/>
+
+      {/* ── Inline detail sheet — tapping any tab item opens this instead of navigating away ── */}
+      <AnimatePresence>
+        {detailItem && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={()=>setDetailItem(null)} className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"/>
+            <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}}
+              transition={{type:"spring",damping:28,stiffness:300}}
+              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white"
+              style={{maxHeight:"82vh"}}>
+              <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
+              <div className="overflow-y-auto px-5 pb-8 space-y-4" style={{maxHeight:"calc(82vh - 24px)"}}>
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 pt-1">
+                  <p className="text-lg font-black text-slate-900 flex-1 leading-snug">
+                    {detailItem.type==="note"      && (detailItem.data.note||"").slice(0,80)}
+                    {detailItem.type==="followup"  && detailItem.data.title}
+                    {detailItem.type==="quote"     && (detailItem.data.description||"Quote")}
+                    {detailItem.type==="equipment" && detailItem.data.name}
+                    {detailItem.type==="lead"      && (detailItem.data.title||"Lead")}
+                    {detailItem.type==="expense"   && (detailItem.data.vendor||"Expense")}
+                  </p>
+                  <button onClick={()=>setDetailItem(null)} className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 text-slate-500 shrink-0">
+                    <X size={18}/>
+                  </button>
+                </div>
+
+                {/* NOTE */}
+                {detailItem.type==="note" && (()=>{const n=detailItem.data;const u=NOTE_URGENCY[n.urgency]||NOTE_URGENCY.Normal;return(<>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{background:u.bg,color:u.text}}>{n.urgency||"Normal"}</span>
+                    {n.resolved && <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700">✓ Resolved</span>}
+                    {n.resolve_by && <span className="text-xs text-slate-500">Due: {smartDate(n.resolve_by)}</span>}
+                  </div>
+                  <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">{n.note||""}</p></div>
+                  {n.media && n.media.filter(m=>m.url).length>0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {n.media.filter(m=>m.url).map((m,i)=>(
+                        <a key={i} href={m.url} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-xl overflow-hidden bg-slate-100">
+                          <img src={m.url} alt="" className="w-full h-full object-cover"/>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </>);})()}
+
+                {/* FOLLOW-UP */}
+                {detailItem.type==="followup" && (()=>{const f=detailItem.data;return(<>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${f.completed?"bg-green-100 text-green-700":f.date<today?"bg-red-100 text-red-700":"bg-blue-50 text-blue-700"}`}>
+                      {f.completed?"✓ Completed":f.date<today?"Overdue":smartDate(f.date)}
+                    </span>
+                    {f.time && <span className="text-xs text-slate-400">{f.time}</span>}
+                  </div>
+                  {f.notes && <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">{f.notes}</p></div>}
+                  {f.reminder && f.reminder!=="none" && <p className="text-sm text-slate-500">Reminder: {f.reminder.replace(/_/g," ")}</p>}
+                </>);})()}
+
+                {/* QUOTE */}
+                {detailItem.type==="quote" && (()=>{const q=detailItem.data;return(<>
+                  <div className="flex items-center justify-between">
+                    <p className="text-2xl font-black" style={{color:BRAND.primary}}>{formatCurrency(q.value)}</p>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">{q.status}</span>
+                  </div>
+                  {q.sent_date && <p className="text-sm text-slate-500">Sent: {smartDate(q.sent_date)}</p>}
+                  {q.description && <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-800">{q.description}</p></div>}
+                </>);})()}
+
+                {/* EQUIPMENT */}
+                {detailItem.type==="equipment" && (()=>{const e=detailItem.data;return(<>
+                  <div className="rounded-xl bg-slate-50 p-4 space-y-1.5">
+                    {e.type     && <p className="text-sm text-slate-700"><span className="font-bold">Type:</span> {e.type}</p>}
+                    {e.make     && <p className="text-sm text-slate-700"><span className="font-bold">Make:</span> {e.make}</p>}
+                    {e.model    && <p className="text-sm text-slate-700"><span className="font-bold">Model:</span> {e.model}</p>}
+                    {e.serial   && <p className="text-sm text-slate-700"><span className="font-bold">Serial:</span> {e.serial}</p>}
+                    {e.location && <p className="text-sm text-slate-700"><span className="font-bold">Location:</span> {e.location}</p>}
+                    {e.service_due && <p className="text-sm font-bold" style={{color:daysDiff(e.service_due)<0?"#DC2626":"#166534"}}>Service due: {smartDate(e.service_due)}</p>}
+                  </div>
+                  {e.notes && <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-800">{e.notes}</p></div>}
+                  {e.media && e.media.filter(m=>m.url).length>0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {e.media.filter(m=>m.url).map((m,i)=>(
+                        <a key={i} href={m.url} target="_blank" rel="noopener noreferrer" className="aspect-square rounded-xl overflow-hidden bg-slate-100">
+                          <img src={m.url} alt="" className="w-full h-full object-cover"/>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </>);})()}
+
+                {/* LEAD */}
+                {detailItem.type==="lead" && (()=>{const l=detailItem.data;return(<>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{background:"#EDE9FE",color:"#5B21B6"}}>{l.stage||"New"}</span>
+                    {l.estimated_value && <p className="text-sm font-black" style={{color:BRAND.primary}}>{formatCurrency(l.estimated_value)}</p>}
+                  </div>
+                  {l.notes && <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-800 whitespace-pre-wrap">{l.notes}</p></div>}
+                  {l.follow_up_date && <p className="text-sm text-slate-500">Follow up: {smartDate(l.follow_up_date)}</p>}
+                </>);})()}
+
+                {/* EXPENSE */}
+                {detailItem.type==="expense" && (()=>{const e=detailItem.data;return(<>
+                  <div className="rounded-xl bg-slate-50 p-4 space-y-1.5">
+                    <p className="text-2xl font-black" style={{color:BRAND.primary}}>{formatCurrency(e.amount_zar||e.amount)}</p>
+                    {e.currency!=="ZAR" && <p className="text-xs text-slate-400">{e.currency} {e.amount} @ {e.exchange_rate}</p>}
+                    {e.category && <p className="text-sm text-slate-700"><span className="font-bold">Category:</span> {e.category}</p>}
+                    {e.payment_method && <p className="text-sm text-slate-700"><span className="font-bold">Payment:</span> {e.payment_method}</p>}
+                    {e.expense_date && <p className="text-sm text-slate-700"><span className="font-bold">Date:</span> {smartDate(e.expense_date)}</p>}
+                  </div>
+                  {e.notes && <div className="rounded-xl bg-slate-50 p-4"><p className="text-sm text-slate-800">{e.notes}</p></div>}
+                  {e.receipt_url && (
+                    <a href={e.receipt_url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold bg-blue-50 text-blue-700">
+                      View Receipt →
+                    </a>
+                  )}
+                </>);})()}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
