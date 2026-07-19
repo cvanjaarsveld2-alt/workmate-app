@@ -16,6 +16,9 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
   // Push notification state: idle | working | active | denied | ios-install | unsupported | error
   const [pushState, setPushState] = useState("idle");
   const [pushError, setPushError] = useState("");
+  const [pinEnabled, setPinEnabled] = useState(
+    !localStorage.getItem("pm_pin_disabled") && !!localStorage.getItem(PIN_KEY)
+  );
 
   useEffect(() => {
     if (!pushSupported()) { setPushState("unsupported"); return; }
@@ -212,13 +215,76 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
 
       <Card className="p-4 space-y-3">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Security</p>
+
+        {/* PIN toggle */}
         <div className="flex items-center justify-between">
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="text-base font-bold text-slate-800">PIN Lock</p>
-            <p className="text-sm text-slate-400">Change your 6-digit PIN</p>
+            <p className="text-sm text-slate-400">
+              {pinEnabled ? "App is locked on open" : "No lock — anyone can open the app"}
+            </p>
           </div>
-          <Btn size="sm" variant="secondary" onClick={changePIN}><Shield size={14} />Change PIN</Btn>
+          <button
+            onClick={() => {
+              if (pinEnabled) {
+                const sure = window.confirm(
+                  "Disable PIN lock?\n\nAnyone with access to your phone will be able to open PowerMate and see all your client data.\n\nWe recommend keeping PIN lock on."
+                );
+                if (!sure) return;
+                localStorage.removeItem(PIN_KEY);
+                sessionStorage.removeItem(PIN_UNLOCKED_KEY);
+                localStorage.setItem("pm_pin_disabled", "1");
+                setPinEnabled(false);
+              } else {
+                localStorage.removeItem("pm_pin_disabled");
+                localStorage.removeItem(PIN_KEY);
+                sessionStorage.removeItem(PIN_UNLOCKED_KEY);
+                window.location.reload(); // trigger PIN setup flow
+              }
+            }}
+            className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${pinEnabled ? "" : "bg-slate-200"}`}
+            style={pinEnabled ? { background: BRAND.primary } : {}}>
+            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${pinEnabled ? "translate-x-6" : "translate-x-0.5"}`} />
+          </button>
         </div>
+
+        {/* Change PIN — only if enabled */}
+        {pinEnabled && (
+          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+            <p className="text-sm text-slate-500">Change your 6-digit PIN</p>
+            <Btn size="sm" variant="secondary" onClick={changePIN}><Shield size={14} />Change PIN</Btn>
+          </div>
+        )}
+
+        {/* Warning when disabled */}
+        {!pinEnabled && (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
+            <p className="text-sm font-bold text-amber-700">⚠️ PIN lock is off</p>
+            <p className="text-xs text-amber-600 leading-relaxed">
+              Anyone who picks up your phone can open PowerMate and see all client data, field notes, quotes, and expenses — including your team's records.
+            </p>
+            <div className="pt-1 space-y-1.5">
+              <p className="text-xs font-black text-amber-700">If you choose not to use PIN lock:</p>
+              <ul className="text-xs text-amber-600 space-y-1">
+                <li>• Enable your phone's own screen lock (Face ID, fingerprint, or phone PIN) — this is your minimum protection</li>
+                <li>• Never leave your phone unattended at client sites</li>
+                <li>• Enable auto-lock (screen timeout) set to 30 seconds or less</li>
+                <li>• If your phone is lost or stolen, sign out of PowerMate from another device immediately</li>
+              </ul>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.removeItem("pm_pin_disabled");
+                localStorage.removeItem(PIN_KEY);
+                sessionStorage.removeItem(PIN_UNLOCKED_KEY);
+                window.location.reload();
+              }}
+              className="w-full mt-1 rounded-xl py-2.5 text-sm font-black text-white"
+              style={{ background: "#B45309" }}>
+              Enable PIN lock
+            </button>
+          </div>
+        )}
       </Card>
 
       <Card className="p-4">
