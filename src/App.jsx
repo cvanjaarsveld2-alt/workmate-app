@@ -34,6 +34,7 @@ import SyncStatusBadge from "./components/SyncStatusBadge";
 import { QuickCaptureFAB } from "./components/QuickCaptureFAB";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
+import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 
 import { HomeScreen }      from "./screens/HomeScreen";
 import { ClientsScreen }   from "./screens/ClientsScreen";
@@ -225,6 +226,8 @@ export default function PowerWorksApp() {
   useEffect(() => {
     if (!session) return;
     function checkPIN() {
+      // User has explicitly opted out of PIN lock
+      if (localStorage.getItem("pm_pin_disabled") === "1") { setPinState("unlocked"); return; }
       if (isSessionUnlocked()) { setPinState("unlocked"); return; }
       const hash = getPINHash();
       if (!hash) { setPinState("setup"); return; }
@@ -429,6 +432,7 @@ export default function PowerWorksApp() {
     }
     localStorage.removeItem(PIN_KEY);
     sessionStorage.removeItem(PIN_UNLOCKED_KEY);
+    localStorage.removeItem("pm_pin_disabled"); // reset so next login asks about PIN
     resetPINAttempts();
     await clearAllStores();
     if (session?.user?.id) localStorage.removeItem(localStorageKey(session.user.id));
@@ -692,8 +696,8 @@ export default function PowerWorksApp() {
         </main>
 
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
-        <QuickCaptureFAB currentScreen={screen} onTrigger={handleQuickCapture} />
         <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} data={data} onNavigate={handleSearchNavigate} />
+        <DailyVehiclePrompt userId={session.user.id} data={data} setData={setData} onNavigate={navigate} />
         <AnimatePresence>
           {syncError && <Toast message={syncError} type="error" onDone={() => setSyncError("")} />}
         </AnimatePresence>
