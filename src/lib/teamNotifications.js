@@ -30,21 +30,15 @@ export async function sendAssignmentNotification({
       p_message:      message,
     });
 
-    const { data: subs } = await supabase
-      .from("push_subscriptions")
-      .select("endpoint, p256dh, auth")
-      .eq("user_id", toUserId);
-
-    for (const sub of subs || []) {
-      await supabase.functions.invoke("send-notifications", {
-        body: {
-          subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          title: `PowerMate — ${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} shared with you`,
-          body:  message,
-          url:   "/?screen=SharedInbox",
-        },
-      }).catch(() => {});
-    }
+    // Edge Function handles subscription lookup server-side (safer)
+    await supabase.functions.invoke("send-notifications", {
+      body: {
+        to_user_id: toUserId,
+        title: `PowerMate — ${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} shared with you`,
+        body:  message,
+        url:   "/?screen=SharedInbox",
+      },
+    }).catch(() => {});
   } catch (e) {
     console.warn("Assignment notification failed:", e);
   }
@@ -82,21 +76,14 @@ export async function sendResponseNotification({
     });
 
     // Push to original sender (best-effort)
-    const { data: subs } = await supabase
-      .from("push_subscriptions")
-      .select("endpoint, p256dh, auth")
-      .eq("user_id", fromUserId);
-
-    for (const sub of subs || []) {
-      await supabase.functions.invoke("send-notifications", {
-        body: {
-          subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          title: "PowerMate — Share response",
-          body:  message,
-          url:   "/?screen=Notifications",
-        },
-      }).catch(() => {});
-    }
+    await supabase.functions.invoke("send-notifications", {
+      body: {
+        to_user_id: originalSenderId,
+        title: "PowerMate — Share response",
+        body:  message,
+        url:   "/?screen=Notifications",
+      },
+    }).catch(() => {});
   } catch (e) {
     console.warn("Response notification failed:", e);
   }
