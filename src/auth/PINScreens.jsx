@@ -381,11 +381,11 @@ export function PINLockScreen({ onUnlock, onForgot }) {
 
       <div className="flex flex-col items-center gap-3 pb-8 pt-6 px-4 w-full max-w-xs mx-auto">
         {NUMPAD.map((row, ri) => (
-          <div key={ri} className="flex gap-3 sm:gap-4 justify-center">
+          <div key={ri} className="grid grid-cols-3 gap-3 sm:gap-4 w-full justify-items-center">
             {row.map(key => <NumKey key={key.d} digit={key.d} sub={key.s} onPress={press} disabled={lockedOut} />)}
           </div>
         ))}
-        <div className="flex gap-3 sm:gap-4 justify-center">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4 w-full justify-items-center">
           {biometricAvailable && biometricRegistered && !lockedOut ? (
             <BiometricButton onSuccess={handleBiometricSuccess} onError={msg => setError(msg || "Biometric failed — use your PIN")} isRegistering={false} />
           ) : (
@@ -497,11 +497,11 @@ export function PINSetupScreen({ onComplete }) {
 
       <div className="flex flex-col items-center gap-3 pb-12 pt-6 px-4 w-full max-w-xs mx-auto">
         {NUMPAD.map((row, ri) => (
-          <div key={ri} className="flex gap-3 sm:gap-4 justify-center">
+          <div key={ri} className="grid grid-cols-3 gap-3 sm:gap-4 w-full justify-items-center">
             {row.map(key => <NumKey key={key.d} digit={key.d} sub={key.s} onPress={press} />)}
           </div>
         ))}
-        <div className="flex gap-3 sm:gap-4 justify-center">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4 w-full justify-items-center">
           <div className="w-[72px] h-[66px] sm:w-[80px] sm:h-[72px]" />
           <NumKey digit={0} sub="" onPress={press} />
           <BackspaceKey onPress={del} />
