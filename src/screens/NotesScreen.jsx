@@ -16,7 +16,7 @@ import { ContactPicker, LinkedContactsDisplay } from "../components/ContactPicke
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { NoteToFollowupBtn } from "../components/NoteToFollowup";
-import { exportNotesPDF, exportNotesExcel } from "../NotesExport";
+// NotesExport loaded lazily to keep initial bundle small
 
 export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], isOnline, quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]         = useState(false);
