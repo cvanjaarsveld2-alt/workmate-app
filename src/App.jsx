@@ -14,6 +14,7 @@ import {
 import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import { offlineSave, offlineGetAll, setOfflineUser, clearAllStores } from "./offline/offlineDb";
+import { setMediaQueueUser, processMediaQueue } from "./lib/mediaQueue";
 
 import { todayISO, logEvent, genId } from "./lib/helpers";
 import { localStorageKey, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY, BRAND } from "./lib/constants";
@@ -145,7 +146,10 @@ export default function PowerWorksApp() {
 
   // FIX: Scope IndexedDB to current user on login
   useEffect(() => {
-    if (session?.user?.id) setOfflineUser(session.user.id);
+    if (session?.user?.id) {
+      setOfflineUser(session.user.id);
+      setMediaQueueUser(session.user.id);
+    }
   }, [session?.user?.id]);
 
   // FIX #11: Register sync handlers ONCE using the ref (not a closure rebuilt every render).
@@ -392,6 +396,8 @@ export default function PowerWorksApp() {
       if ((data.syncQueue || []).some(i => i.status === "pending")) {
         pushSyncQueue(syncQueueRef.current, setData);
       }
+      // Process any photos that were queued while offline
+      processMediaQueue(setData).catch(() => {});
     }
   }, [isOnline]);
 
