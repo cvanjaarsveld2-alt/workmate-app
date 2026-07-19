@@ -27,7 +27,7 @@ import { triggerImmediateSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { ReceiptScanner } from "../components/ReceiptScanner";
 import { convertToZAR } from "../lib/exchangeRate";
-import { buildExpensePDF } from "../lib/expenseFinancePDF";
+// expenseFinancePDF loaded lazily
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import {
