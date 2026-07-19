@@ -15,7 +15,7 @@ import {
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
-import { buildVehicleCheckPDF } from "../lib/vehicleCheckPDF";
+// vehicleCheckPDF loaded lazily
 import {
   Card, Btn, Field, Toast, PageHeader, useConfirm,
 } from "../components/ui";
