@@ -8,6 +8,8 @@
 //   // Share via native share sheet or download
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { PW_LOGO_B64 } from "./pwLogo";
+
 export async function generateQuotePDF(quote, companyInfo = {}) {
   const { default: jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
