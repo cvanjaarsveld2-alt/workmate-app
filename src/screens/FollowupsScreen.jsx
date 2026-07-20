@@ -84,7 +84,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShar
   );
 }
 
-export function FollowupsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger }) {
+export function FollowupsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter]     = useState("By Client");
   const [editId, setEditId]     = useState(null);
