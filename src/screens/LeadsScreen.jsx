@@ -284,7 +284,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
-export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger }) {
+export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]       = useState(false);
   const [editLead, setEditLead]       = useState(null);
   const [detailLead, setDetailLead]   = useState(null);
