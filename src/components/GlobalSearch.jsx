@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, X, Users, UserPlus, Calendar, File as FileIcon,
-  Clipboard, Wrench, ArrowRight,
+  Clipboard, Wrench, ArrowRight, TrendingUp,
 } from "lucide-react";
 import { smartDate } from "../lib/helpers";
 
@@ -60,6 +60,24 @@ const ENTITY_CONFIG = {
     fields: ["client", "note", "urgency"],
     title: (n) => n.client || "General Note",
     subtitle: (n) => (n.note || "").slice(0, 80) + ((n.note || "").length > 80 ? "…" : ""),
+  },
+  leads: {
+    icon: TrendingUp,
+    color: "#5B21B6",
+    label: "Leads",
+    screen: "Leads",
+    fields: ["title", "client_name", "notes", "stage", "outcome_notes"],
+    preview: r => r.title || r.client_name || "Lead",
+    sub: r => [r.client_name, r.stage].filter(Boolean).join(" · "),
+  },
+  followups: {
+    icon: Calendar,
+    color: "#1E40AF",
+    label: "Follow-ups",
+    screen: "Followups",
+    fields: ["title", "client", "branch", "notes"],
+    preview: r => r.title,
+    sub: r => [r.client, r.date].filter(Boolean).join(" · "),
   },
   equipment: {
     label: "Equipment",
