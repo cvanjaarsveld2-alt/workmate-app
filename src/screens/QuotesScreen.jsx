@@ -6,6 +6,7 @@ import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, genId } from "../lib/helpers";
 import { QuoteLineItems } from "../components/QuoteLineItems";
 import { shareQuotePDF } from "../lib/quotePDF";
+import { PDFNamePrompt } from "../components/PDFNamePrompt";
 import { autoCreateChaseFollowup, autoAdvanceOnAccept } from "../lib/quoteAutomation";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
@@ -44,6 +45,7 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
   const [form, setForm] = useState({ client_name: "", client_id: null, description: "", value: "", status: "Pending" });
   const [lineItems, setLineItems] = useState([]);
   const [vatInclusive, setVatInclusive] = useState(true);
+  const [pdfPrompt, setPdfPrompt] = useState(null); // {quote} when prompt is open
   const { confirm, dialog } = useConfirm();
   const [shareSheet, setShareSheet] = useState(null);
   const quotes = (data.quotes || []).filter(q => q.user_id === userId || q.assigned_to_user_id === userId);
