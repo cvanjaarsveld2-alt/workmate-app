@@ -70,15 +70,6 @@ const ENTITY_CONFIG = {
     preview: r => r.title || r.client_name || "Lead",
     sub: r => [r.client_name, r.stage].filter(Boolean).join(" · "),
   },
-  followups: {
-    icon: Calendar,
-    color: "#1E40AF",
-    label: "Follow-ups",
-    screen: "Followups",
-    fields: ["title", "client", "branch", "notes"],
-    preview: r => r.title,
-    sub: r => [r.client, r.date].filter(Boolean).join(" · "),
-  },
   equipment: {
     label: "Equipment",
     icon: Wrench,
