@@ -694,9 +694,9 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     .sort((a, b) => {
       const da = a.expense_date || "";
       const db = b.expense_date || "";
-      const dt = da.localeCompare(db);
+      const dt = db.localeCompare(da); // newest first
       if (dt !== 0) return dt;
-      return (a.expense_time || "").localeCompare(b.expense_time || "");
+      return (b.expense_time || "").localeCompare(a.expense_time || "");
     });
 
   // Group by calendar month
