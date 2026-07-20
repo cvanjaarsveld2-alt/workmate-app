@@ -330,6 +330,11 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
                               <Receipt size={10} /> Slip
                             </span>
                           )}
+                          {ex.no_receipt && !ex.receipt_url && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700">
+                              ⚠️ No receipt
+                            </span>
+                          )}
                           {ex.payment_slip_url && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">
                               💳 Card slip
@@ -520,7 +525,8 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       category:         form.category || "Other",
       payment_method:   form.payment_method || "Card",
       notes:            form.notes || null,
-      receipt_url:      receiptUrl || null,
+      receipt_url:      (receiptUrl && receiptUrl !== "no-receipt") ? receiptUrl : null,
+      no_receipt:       receiptUrl === "no-receipt" ? true : undefined,
       payment_slip_url: paymentSlipUrl || null,
       status:           editId
                           ? (expenses.find(e => e.id === editId)?.status || "unsubmitted")
@@ -748,14 +754,26 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
                 </button>
               </div>
             ) : (
-              <button type="button"
-                onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
-                className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
-                  <Camera size={18} style={{ color: "#8B1A1A" }} />
-                </div>
-                <span className="text-xs font-bold text-slate-500">Scan till slip</span>
-              </button>
+              <div className="space-y-1.5">
+                <button type="button"
+                  onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
+                  className="w-full h-24 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+                    <Camera size={18} style={{ color: "#8B1A1A" }} />
+                  </div>
+                  <span className="text-xs font-bold text-slate-500">Scan till slip</span>
+                </button>
+                {/* No receipt option */}
+                <button type="button"
+                  onClick={() => setReceiptUrl("no-receipt")}
+                  className={`w-full py-2 rounded-xl border-2 text-xs font-bold transition-all ${
+                    receiptUrl === "no-receipt"
+                      ? "border-amber-400 bg-amber-50 text-amber-700"
+                      : "border-slate-100 bg-slate-50 text-slate-400 hover:border-amber-300 hover:text-amber-600"
+                  }`}>
+                  {receiptUrl === "no-receipt" ? "⚠️ No receipt" : "No receipt"}
+                </button>
+              </div>
             )}
           </div>
           <div>
