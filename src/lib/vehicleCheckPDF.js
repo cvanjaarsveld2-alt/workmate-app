@@ -92,7 +92,14 @@ export async function buildVehicleCheckPDF({ checkDate, dayData, settings, check
   doc.text("VEHICLE INSPECTION REPORT", margin, 50);
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text("Power Works (Pty) Ltd", margin, 68);
+  // Power Works logo — right side of the header bar
+  try {
+    doc.addImage(PW_LOGO_B64, "JPEG", pageWidth - margin - 110, 10, 110, 23);
+  } catch {
+    doc.setFontSize(11); doc.setFont("helvetica", "normal");
+    doc.setTextColor(255, 255, 255);
+    doc.text("Power Works (Pty) Ltd", margin, 68);
+  }
 
   doc.setTextColor(30, 30, 30);
 
