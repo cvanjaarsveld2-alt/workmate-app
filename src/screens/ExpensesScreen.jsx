@@ -13,6 +13,7 @@ import {
   CheckSquare,
   Square,
   FileDown,
+  FileText,
   Send,
   ChevronRight,
   ChevronDown,
@@ -1108,6 +1109,13 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
                 <Mail size={14} /> Send
               </Btn>
             )}
+            <Btn size="sm" variant="secondary" onClick={() => {
+              if (showForm || showScanner || editId) { resetForm(); }
+              else { setReceiptUrl("no-receipt"); setShowScanner(false); setShowForm(true); }
+            }}>
+              {(showForm || editId) ? null : <FileText size={15} />}
+              {(showForm || showScanner || editId) ? null : "No receipt"}
+            </Btn>
             <Btn size="sm" onClick={() => {
               if (showForm || showScanner || editId) { resetForm(); }
               else { setShowScanner(true); setScannerMode("receipt"); }
