@@ -397,22 +397,11 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
   useEffect(() => {
     if (!quickAddTrigger) return;
     if (quickAddTrigger.screen !== "Expenses") return;
-    if (quickAddTrigger.mode === "SelectMode") {
-      // Navigate from home "X expenses not submitted" — jump straight to select mode
-      // with all unsubmitted expenses pre-selected
-      const unsubmitted = (data.expenses || []).filter(e => e.status === "unsubmitted");
-      setSelectMode(true);
-      setSelectedIds(new Set(unsubmitted.map(e => e.id)));
-      setShowForm(false);
-      setShowScanner(false);
-      setEditId(null);
-    } else {
-      // Normal FAB tap — open camera scanner
+    // Normal FAB tap — open camera scanner
       setEditId(null);
       setShowForm(false);
       setShowScanner(true);
       setScannerMode("receipt");
-    }
   }, [quickAddTrigger?.ts]);
 
   function resetForm() {
@@ -1097,32 +1086,33 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       </AnimatePresence>
 
       {/* ── Header ── */}
-      {!selectMode ? (
-        <div className="flex items-center justify-between gap-2">
-          <PageHeader
-            title="Expenses"
-            subtitle={`${fmtMoney(totalThisMonth)} this month · ${unsubmittedCount} to submit`}
-          />
-          <div className="flex gap-2">
-            {expenses.length > 0 && (
-              <Btn size="sm" variant="secondary" onClick={() => { setSelectMode(true); setSelectedIds(new Set()); }}>
-                <Mail size={14} /> Send
-              </Btn>
-            )}
-            <Btn size="sm" variant="secondary" onClick={() => {
-              if (showForm || showScanner || editId) { resetForm(); }
-              else { setReceiptUrl("no-receipt"); setShowScanner(false); setShowForm(true); }
-            }}>
-              {(showForm || editId) ? null : <FileText size={15} />}
-              {(showForm || showScanner || editId) ? null : "No receipt"}
-            </Btn>
-            <Btn size="sm" onClick={() => {
-              if (showForm || showScanner || editId) { resetForm(); }
-              else { setShowScanner(true); setScannerMode("receipt"); }
-            }}>
-              {(showForm || showScanner || editId) ? <X size={15} /> : <Camera size={15} />}
-              {(showForm || showScanner || editId) ? "Cancel" : "Scan"}
-            </Btn>
+      {true ? (
+        <div className="space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xl font-black text-slate-900">Expenses</p>
+              <p className="text-xs text-slate-400 mt-0.5">{fmtMoney(totalThisMonth)} this month</p>
+            </div>
+            <div className="flex gap-1.5 shrink-0">
+
+              <button onClick={() => {
+                if (showForm || showScanner || editId) { resetForm(); }
+                else { setReceiptUrl("no-receipt"); setShowScanner(false); setShowForm(true); }
+              }}
+                className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 min-h-[36px]">
+                {!(showForm || showScanner || editId) && <FileText size={13} />}
+                {(showForm || showScanner || editId) ? null : "No slip"}
+              </button>
+              <button onClick={() => {
+                if (showForm || showScanner || editId) { resetForm(); }
+                else { setShowScanner(true); setScannerMode("receipt"); }
+              }}
+                className="flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-white min-h-[36px]"
+                style={{ background: "#8B1A1A" }}>
+                {(showForm || showScanner || editId) ? <X size={13} /> : <Camera size={13} />}
+                {(showForm || showScanner || editId) ? "Cancel" : "Scan"}
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -1191,9 +1181,9 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
               duplicateIds={duplicateIds}
               editId={editId}
               renderExpenseForm={renderExpenseForm}
-              selectMode={selectMode}
-              selectedIds={selectedIds}
-              toggleSelect={toggleSelect}
+              selectMode={false}
+              selectedIds={new Set()}
+              toggleSelect={() => {}}
               setDetailExpense={setDetailExpense}
               fmtMoney={fmtMoney}
               CATEGORY_COLORS={CATEGORY_COLORS}
