@@ -157,6 +157,9 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
     } else {
       const item = withTeamId({
         id: genId(), user_id: userId, ...form,
+        client_id: form.client_id || null,
+        linked_note_id: form.linked_note_id || null,
+        assigned_to_user_id: form.assigned_to_user_id || null,
         client: clientName, branch: clientBranch,
         completed: false, created_at: new Date().toISOString(), sync_status: "pending",
       }, teamId);
