@@ -1166,7 +1166,7 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       </AnimatePresence>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search vendor, category…" />
-      <FilterPills options={["All", ...CATEGORIES]} value={filterCat} onChange={setFilterCat} dangerValue={null} />
+
 
       {filtered.length === 0 && (
         <Empty
