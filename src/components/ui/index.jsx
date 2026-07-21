@@ -341,7 +341,7 @@ export function StatCard({ label, value, sub, color, icon: Icon }) {
     <Card className="p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider truncate">{label}</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider leading-tight">{label}</p>
           <p className="mt-1.5 text-2xl font-black leading-none" style={{ color: color || BRAND.primary }}>{value}</p>
           {sub && <p className="mt-1 text-xs text-slate-400 leading-snug">{sub}</p>}
         </div>
