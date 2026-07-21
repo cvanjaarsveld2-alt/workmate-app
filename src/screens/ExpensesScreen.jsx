@@ -1097,30 +1097,32 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
       {/* ── Header ── */}
       {!selectMode ? (
         <div className="flex items-center justify-between gap-2">
-          <PageHeader
-            title="Expenses"
-            subtitle={`${fmtMoney(totalThisMonth)} this month · ${unsubmittedCount} to submit`}
-          />
-          <div className="flex gap-2">
-            {expenses.length > 0 && (
-              <Btn size="sm" variant="secondary" onClick={() => { setSelectMode(true); setSelectedIds(new Set()); }}>
-                <Mail size={14} /> Send
-              </Btn>
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-black text-slate-900 leading-tight">Expenses</p>
+            <p className="text-xs text-slate-400">{fmtMoney(totalThisMonth)} this month</p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {expenses.length > 0 && !showForm && !showScanner && !editId && (
+              <button onClick={() => { setSelectMode(true); setSelectedIds(new Set()); }}
+                className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600">
+                <FileDown size={13} /> PDF
+              </button>
             )}
-            <Btn size="sm" variant="secondary" onClick={() => {
+            <button onClick={() => {
               if (showForm || showScanner || editId) { resetForm(); }
               else { setReceiptUrl("no-receipt"); setShowScanner(false); setShowForm(true); }
-            }}>
-              {(showForm || editId) ? null : <FileText size={15} />}
-              {(showForm || showScanner || editId) ? null : "No receipt"}
-            </Btn>
-            <Btn size="sm" onClick={() => {
+            }} className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600">
+              {!(showForm || showScanner || editId) && <FileText size={13} />}
+              {(showForm || showScanner || editId) ? "Cancel" : "No slip"}
+            </button>
+            <button onClick={() => {
               if (showForm || showScanner || editId) { resetForm(); }
               else { setShowScanner(true); setScannerMode("receipt"); }
-            }}>
-              {(showForm || showScanner || editId) ? <X size={15} /> : <Camera size={15} />}
-              {(showForm || showScanner || editId) ? "Cancel" : "Scan"}
-            </Btn>
+            }} className="flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-white"
+              style={{ background: "#8B1A1A" }}>
+              {(showForm || showScanner || editId) ? <X size={13} /> : <Camera size={13} />}
+              {!(showForm || showScanner || editId) && "Scan"}
+            </button>
           </div>
         </div>
       ) : (
