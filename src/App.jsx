@@ -620,7 +620,7 @@ export default function PowerWorksApp() {
             </button>
 
             {screen === "Home"
-              ? <img src={BRAND.logo} alt="PowerMate" className="h-7 object-contain opacity-90" onError={e => e.target.style.display = "none"} />
+              ? <img src="/logo.png" alt="Power Works" className="h-7 object-contain" onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="block"; }} />
               : (() => {
                   const SCREEN_LABELS = {
                     Clients:       { label: "Clients & Leads",  addHint: "lead / client" },
