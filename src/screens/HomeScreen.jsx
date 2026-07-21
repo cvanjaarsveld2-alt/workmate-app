@@ -86,13 +86,10 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
   return (
     <div className="space-y-5">
 
-      {/* ── Header: date + logo ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-slate-400">{niceDate()}</p>
-          <p className="text-xl font-black text-slate-900">Dashboard</p>
-        </div>
-        <img src={BRAND.logo} alt="PW" className="h-8 object-contain opacity-80" onError={e => e.target.style.display = "none"} />
+      {/* ── Header ── */}
+      <div>
+        <p className="text-sm text-slate-400">{niceDate()}</p>
+        <p className="text-xl font-black text-slate-900">Dashboard</p>
       </div>
 
       {/* ── Today's Schedule ── */}
@@ -174,20 +171,19 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
       {/* ── Stats Grid (tappable) ── */}
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => setScreen("Followups")} className="text-left">
-          <StatCard label="Today's Tasks" value={todayFU.length} sub={todayFU.length === 0 ? "all clear" : "follow-ups due"} color={BRAND.primary} icon={Calendar} />
+          <StatCard label="Tasks Today" value={todayFU.length} sub={todayFU.length === 0 ? "all clear" : "follow-ups due"} color={BRAND.primary} icon={Calendar} />
         </button>
         <button onClick={() => setScreen("Quotes")} className="text-left">
-          <StatCard label="Pending Quotes" value={pendingQ.length} sub={pendingQ.length === 0 ? "none awaiting" : "awaiting response"} color="#B45309" icon={FileIcon} />
+          <StatCard label="Quotes Pending" value={pendingQ.length} sub={pendingQ.length === 0 ? "none awaiting" : "awaiting response"} color="#B45309" icon={FileIcon} />
         </button>
         <button onClick={() => setScreen("Quotes")} className="text-left">
           <StatCard label="Won Revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} />
         </button>
         <button onClick={() => setScreen("Expenses")} className="text-left">
-          <StatCard label="Expenses (this month)" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} />
+          <StatCard label="This Month" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} />
         </button>
       </div>
 
-      {/* ── Pipeline + Analytics ── */}
       {/* ── Pipeline + Analytics ── */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
