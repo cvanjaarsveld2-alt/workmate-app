@@ -44,6 +44,7 @@ import { FollowupsScreen } from "./screens/FollowupsScreen";
 import { QuotesScreen }    from "./screens/QuotesScreen";
 import { NotesScreen }     from "./screens/NotesScreen";
 import { EquipmentScreen } from "./screens/EquipmentScreen";
+import { MeetingScreen }       from "./screens/MeetingScreen";
 import { VehicleCheckScreen }    from "./screens/VehicleCheckScreen";
 import { AnalyticsScreen }       from "./screens/AnalyticsScreen";
 import { LeadsScreen }           from "./screens/LeadsScreen";
@@ -633,6 +634,7 @@ export default function PowerWorksApp() {
                     More:          { label: "Settings",          addHint: null },
                     Diagnostics:   { label: "Diagnostics",      addHint: null },
                     Analytics:     { label: "Analytics",        addHint: null },
+                    Meeting:       { label: "Meeting Recorder", addHint: null },
                     VehicleCheck:  { label: "Vehicle Checks",   addHint: "check" },
                     Calendar:      { label: "Calendar",         addHint: null },
                     BackfillZAR:   { label: "Backfill ZAR",     addHint: null },
