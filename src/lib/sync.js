@@ -83,6 +83,20 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
 
 let _syncInProgress = false;
 
+
+// Sanitise empty string UUIDs — Postgres rejects "" for uuid columns, must be null
+function cleanUUIDs(data) {
+  const UUID_FIELDS = [
+    "id","user_id","team_id","client_id","contact_id","linked_note_id",
+    "assigned_to_user_id","from_user_id","to_user_id",
+  ];
+  const cleaned = { ...data };
+  UUID_FIELDS.forEach(f => {
+    if (cleaned[f] === "" || cleaned[f] === undefined) cleaned[f] = null;
+  });
+  return cleaned;
+}
+
 export async function pushSyncQueue(syncQueue, setData) {
   if (_syncInProgress) return;
   _syncInProgress = true;
