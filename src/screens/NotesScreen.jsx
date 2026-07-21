@@ -10,6 +10,7 @@ import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { scheduleNotificationsViaSW } from "../lib/notifications";
+import { VoiceInput } from "../components/VoiceInput";
 import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, UrgencyBadge, useConfirm, ClientSelector } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { ContactPicker, LinkedContactsDisplay } from "../components/ContactPicker";
