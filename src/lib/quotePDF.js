@@ -173,7 +173,7 @@ export async function generateQuotePDF(quote, companyInfo = {}) {
 // ── Share/download helper ──────────────────────────────────────────────────────
 export async function shareQuotePDF(quoteData, companyInfo) {
   const blob = await generateQuotePDF(quoteData, companyInfo);
-  const filename = customFilename || `Quote_${quoteData.clientName || "Client"}_${quoteData.date || "undated"}.pdf`;
+  const filename = quoteData.filename || `Quote_${(quoteData.clientName || "Client").replace(/[^a-zA-Z0-9]/g,"_")}_${quoteData.date || new Date().toISOString().slice(0,10)}.pdf`;
 
   // Try native share first (mobile)
   if (navigator.share && navigator.canShare) {
