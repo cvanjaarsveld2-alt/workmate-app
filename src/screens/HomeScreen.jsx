@@ -74,7 +74,21 @@ function money(n) {
 
 export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
   const today     = todayISO();
-  const [neglectSheet, setNeglectSheet] = React.useState(null); // {client}
+  const [neglectSheet, setNeglectSheet] = React.useState(null);
+  const DISMISS_KEY = `pm_neglect_dismissed_${user?.id}`;
+  const [dismissed, setDismissed] = React.useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(`pm_neglect_dismissed_${user?.id}`) || "[]")); }
+    catch { return new Set(); }
+  });
+
+  function dismissClient(id) {
+    setDismissed(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      localStorage.setItem(`pm_neglect_dismissed_${user?.id}`, JSON.stringify([...next]));
+      return next;
+    });
+  }
   const uid = user?.id;
   const mine = r => r.user_id === uid || r.assigned_to_user_id === uid;
 
@@ -109,6 +123,7 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
     })
     .filter(cl => cl.daysSince >= NEGLECT_DAYS)
     .sort((a, b) => b.daysSince - a.daysSince)
+    .filter(cl => !dismissed.has(cl.id))
     .slice(0, 5);
 
   const todayFU       = followups.filter(f => f.date === today && !f.completed)
@@ -284,26 +299,33 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
           </div>
           <div className="space-y-2">
             {neglected.map(cl => (
-              <button key={cl.id}
-                onClick={() => setNeglectSheet(cl)}
-                className="w-full flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-red-50 active:bg-red-100 transition-colors text-left">
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-900 truncate">{cl.company}</p>
-                  {cl.branch && <p className="text-xs text-slate-400 truncate">{cl.branch}</p>}
-                  {/* Show contact type indicator */}
-                  {cl.contactType === "stage" && (
-                    <p className="text-[10px] text-amber-600 mt-0.5">Stage updated only — no logged activity</p>
-                  )}
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className="text-xs font-black text-red-600">
-                    {cl.daysSince >= 9999 ? "Never" : `${cl.daysSince}d`}
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    {cl.daysSince >= 9999 ? "no contact" : "days ago"}
-                  </p>
-                </div>
-              </button>
+              <div key={cl.id} className="flex items-center gap-1">
+                <button
+                  onClick={() => setNeglectSheet(cl)}
+                  className="flex-1 flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-red-50 active:bg-red-100 transition-colors text-left">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 truncate">{cl.company}</p>
+                    {cl.branch && <p className="text-xs text-slate-400 truncate">{cl.branch}</p>}
+                    {cl.contactType === "stage" && (
+                      <p className="text-[10px] text-amber-600 mt-0.5">Stage updated only — no logged activity</p>
+                    )}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs font-black text-red-600">
+                      {cl.daysSince >= 9999 ? "Never" : `${cl.daysSince}d`}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      {cl.daysSince >= 9999 ? "no contact" : "days ago"}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => dismissClient(cl.id)}
+                  className="w-8 h-8 rounded-xl bg-slate-100 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center shrink-0 transition-colors"
+                  title="Hide from list">
+                  ✕
+                </button>
+              </div>
             ))}
           </div>
         </Card>
@@ -390,6 +412,14 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
                     className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl text-white font-bold text-sm"
                     style={{background:"#8B1A1A"}}>
                     👤 Open full client profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      dismissClient(neglectSheet.id);
+                      setNeglectSheet(null);
+                    }}
+                    className="w-full flex items-center gap-3 py-3 px-4 rounded-2xl bg-slate-100 text-slate-500 font-bold text-sm">
+                    ✕ Hide from attention list
                   </button>
                 </div>
               </div>
