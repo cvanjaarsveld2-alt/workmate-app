@@ -44,9 +44,17 @@ function money(n) {
 
 export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
   const today     = todayISO();
-  // Show records the user owns OR is assigned to
   const uid = user?.id;
   const mine = r => r.user_id === uid || r.assigned_to_user_id === uid;
+
+  // ── Data filtered by user ──
+  const clients   = (data.clients   || []).filter(mine);
+  const quotes    = (data.quotes    || []).filter(mine);
+  const followups = (data.followups || []).filter(mine);
+  const equipment = (data.equipment || []).filter(mine);
+  const notes     = (data.notes     || []).filter(mine);
+  const expenses  = (data.expenses  || []).filter(e => e.user_id === uid);
+  const contacts  = (data.contacts  || []).filter(mine);
 
   // ── Neglected clients (no contact in 14+ days) ──
   const activeClients = clients.filter(c =>
@@ -61,13 +69,6 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
     .filter(cl => cl.daysSince >= NEGLECT_DAYS)
     .sort((a, b) => b.daysSince - a.daysSince)
     .slice(0, 5);
-  const clients   = (data.clients   || []).filter(mine);
-  const quotes    = (data.quotes    || []).filter(mine);
-  const followups = (data.followups || []).filter(mine);
-  const equipment = (data.equipment || []).filter(mine);
-  const notes     = (data.notes     || []).filter(mine);
-  const expenses  = (data.expenses  || []).filter(e => e.user_id === uid); // expenses stay personal
-  const contacts  = (data.contacts  || []).filter(mine);
 
   const todayFU       = followups.filter(f => f.date === today && !f.completed)
                                   .sort((a, b) => (a.time || "").localeCompare(b.time || ""));
