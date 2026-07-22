@@ -287,9 +287,56 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         )}
       </Card>
 
-      {/* ── Monthly Target ── */}
-      <Card className="p-4 space-y-3">
-        <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Monthly Revenue Target</p>
+      {/* ── Dashboard Settings ── */}
+      <Card className="p-4 space-y-4">
+        <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Dashboard Settings</p>
+
+        {/* Neglect threshold */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold text-slate-700">Client neglect warning</p>
+              <p className="text-xs text-slate-400">Show warning after this many days without contact</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => {
+                const v = Math.max(7, parseInt(localStorage.getItem("pm_neglect_days")||"21",10) - 7);
+                localStorage.setItem("pm_neglect_days", String(v));
+                setToast(`Warning after ${v} days`);
+              }} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-bold text-lg flex items-center justify-center">−</button>
+              <span className="text-base font-black text-slate-900 w-10 text-center">
+                {localStorage.getItem("pm_neglect_days") || "21"}d
+              </span>
+              <button onClick={() => {
+                const v = Math.min(90, parseInt(localStorage.getItem("pm_neglect_days")||"21",10) + 7);
+                localStorage.setItem("pm_neglect_days", String(v));
+                setToast(`Warning after ${v} days`);
+              }} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 font-bold text-lg flex items-center justify-center">+</button>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {[14, 21, 30, 45].map(d => (
+              <button key={d} onClick={() => {
+                localStorage.setItem("pm_neglect_days", String(d));
+                setToast(`Warning after ${d} days`);
+              }}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  (parseInt(localStorage.getItem("pm_neglect_days")||"21",10)) === d
+                    ? "text-white" : "bg-slate-100 text-slate-500"
+                }`}
+                style={(parseInt(localStorage.getItem("pm_neglect_days")||"21",10)) === d ? {background:"#8B1A1A"} : {}}>
+                {d}d
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="h-px bg-slate-100"/>
+
+        {/* Monthly Revenue Target */}
+        <div className="space-y-2">
+          <p className="text-sm font-bold text-slate-700">Monthly Revenue Target</p>
+          <p className="text-xs text-slate-400">Shows a progress bar on your dashboard</p>
         <p className="text-xs text-slate-400">Set your monthly won-revenue target. Shows a progress bar on your dashboard.</p>
         <div className="flex gap-2 items-center">
           <span className="text-sm font-bold text-slate-500">R</span>
@@ -321,6 +368,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             ✓ Target: R {parseFloat(localStorage.getItem(`pm_revenue_target_${userId}`)).toLocaleString("en-ZA")} / month
           </p>
         )}
+        </div>
       </Card>
 
       <Card className="p-4">
