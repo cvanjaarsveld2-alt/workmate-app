@@ -11,29 +11,59 @@ import {
 } from "lucide-react";
 import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
 
-const NEGLECT_DAYS = 14; // days without contact before showing warning
+// Neglect threshold — user configurable in Settings (default 21 days)
+const NEGLECT_KEY = "pm_neglect_days";
+const NEGLECT_DAYS = parseInt(localStorage.getItem(NEGLECT_KEY) || "21", 10);
 
 function daysSince(dateStr) {
   if (!dateStr) return 9999;
   return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
 }
 
-function lastContactDate(clientId, clientName, activities, followups, notes) {
+function normName(s) { return (s || "").toLowerCase().trim().replace(/[^a-z0-9]/g, ""); }
+
+function lastContactDate(clientId, clientName, activities, followups, notes, quotes) {
   const dates = [];
+  const norm = normName(clientName);
+
+  // Activities — match by ID first (reliable), then by name (fallback for old records)
   activities.forEach(a => {
-    if (a.client_id === clientId || a.client_name === clientName)
-      dates.push(a.created_at);
+    const match = (clientId && a.client_id === clientId) ||
+                  (norm && normName(a.client_name) === norm);
+    if (match) dates.push(a.created_at);
   });
+
+  // Completed follow-ups
   followups.forEach(f => {
-    if ((f.client_id === clientId || f.client === clientName) && f.completed)
-      dates.push(f.date);
+    const match = (clientId && f.client_id === clientId) ||
+                  (norm && normName(f.client) === norm);
+    if (match && f.completed && f.date) dates.push(f.date + "T12:00:00");
   });
+
+  // Field notes
   notes.forEach(n => {
-    if (n.client_id === clientId || n.client === clientName)
-      dates.push(n.created_at);
+    const match = (clientId && n.client_id === clientId) ||
+                  (norm && normName(n.client) === norm);
+    if (match) dates.push(n.created_at);
   });
+
+  // Quotes sent
+  quotes.forEach(q => {
+    const match = (clientId && q.client_id === clientId) ||
+                  (norm && normName(q.client_name) === norm);
+    if (match && q.sent_date) dates.push(q.sent_date + "T12:00:00");
+  });
+
   if (!dates.length) return null;
-  return dates.sort().reverse()[0];
+  return dates.filter(Boolean).sort().reverse()[0];
+}
+
+// Stage-based contact: client manually marked as Contacted/Quoted/Active/Won
+function lastStageContact(cl) {
+  if (["Contacted","Quoted","Active","Won"].includes(cl.stage)) {
+    return cl.updated_at || cl.created_at;
+  }
+  return null;
 }
 import { todayISO, niceDate, daysDiff, smartDate } from "../lib/helpers";
 import { Card, StatCard } from "../components/ui";
@@ -44,6 +74,7 @@ function money(n) {
 
 export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
   const today     = todayISO();
+  const [neglectSheet, setNeglectSheet] = React.useState(null); // {client}
   const uid = user?.id;
   const mine = r => r.user_id === uid || r.assigned_to_user_id === uid;
 
@@ -62,9 +93,19 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
   );
   const neglected = activeClients
     .map(cl => {
-      const last = lastContactDate(cl.id, cl.company, data.activities || [], data.followups || [], data.notes || []);
-      const days = daysSince(last);
-      return { ...cl, daysSince: days, lastContact: last };
+      // Primary: actual logged contact (activity/note/followup/quote)
+      const lastLogged  = lastContactDate(cl.id, cl.company,
+        data.activities || [], data.followups || [],
+        data.notes || [], data.quotes || []);
+      // Secondary: stage-based (manually marked Contacted etc.)
+      const lastStage   = lastStageContact(cl);
+      // Use whichever is more recent
+      const candidates  = [lastLogged, lastStage].filter(Boolean);
+      const last        = candidates.length ? candidates.sort().reverse()[0] : null;
+      const days        = daysSince(last);
+      const contactType = lastLogged && (!lastStage || lastLogged >= lastStage)
+        ? "logged" : lastStage ? "stage" : "never";
+      return { ...cl, daysSince: days, lastContact: last, contactType };
     })
     .filter(cl => cl.daysSince >= NEGLECT_DAYS)
     .sort((a, b) => b.daysSince - a.daysSince)
@@ -232,32 +273,130 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
       {/* ── Neglected Clients Warning ── */}
       {neglected.length > 0 && (
         <Card className="p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-base">⚠️</span>
-            <p className="text-xs font-black text-red-700 uppercase tracking-wider">
-              {neglected.length} client{neglected.length !== 1 ? "s" : ""} need attention
-            </p>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⚠️</span>
+              <p className="text-xs font-black text-red-700 uppercase tracking-wider">
+                {neglected.length} client{neglected.length !== 1 ? "s" : ""} need attention
+              </p>
+            </div>
+            <span className="text-[10px] text-slate-400">{NEGLECT_DAYS}+ days</span>
           </div>
           <div className="space-y-2">
             {neglected.map(cl => (
               <button key={cl.id}
-                onClick={() => onNavigate ? onNavigate("Client360", { clientId: cl.id, returnTo: "Home" }) : setScreen?.("Clients")}
-                className="w-full flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100 transition-colors text-left">
+                onClick={() => setNeglectSheet(cl)}
+                className="w-full flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-red-50 active:bg-red-100 transition-colors text-left">
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-slate-900 truncate">{cl.company}</p>
                   {cl.branch && <p className="text-xs text-slate-400 truncate">{cl.branch}</p>}
+                  {/* Show contact type indicator */}
+                  {cl.contactType === "stage" && (
+                    <p className="text-[10px] text-amber-600 mt-0.5">Stage updated only — no logged activity</p>
+                  )}
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-xs font-black text-red-600">
-                    {cl.daysSince >= 9999 ? "Never contacted" : `${cl.daysSince}d ago`}
+                    {cl.daysSince >= 9999 ? "Never" : `${cl.daysSince}d`}
                   </p>
-                  <p className="text-[10px] text-slate-400">no contact</p>
+                  <p className="text-[10px] text-slate-400">
+                    {cl.daysSince >= 9999 ? "no contact" : "days ago"}
+                  </p>
                 </div>
               </button>
             ))}
           </div>
         </Card>
       )}
+
+      {/* ── Neglected client action sheet ── */}
+      <AnimatePresence>
+        {neglectSheet && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={() => setNeglectSheet(null)}
+              className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"/>
+            <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}}
+              transition={{type:"spring",damping:28,stiffness:300}}
+              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white"
+              style={{maxWidth:480,margin:"0 auto"}}>
+              <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
+              <div className="px-5 pb-8 pt-2 space-y-3">
+                {/* Header */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-lg font-black text-slate-900">{neglectSheet.company}</p>
+                    {neglectSheet.branch && <p className="text-sm text-slate-400">{neglectSheet.branch}</p>}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                        {neglectSheet.daysSince >= 9999 ? "Never contacted" : `${neglectSheet.daysSince} days without contact`}
+                      </span>
+                      {neglectSheet.contactType === "stage" && (
+                        <span className="text-xs text-amber-600">Stage only</span>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={() => setNeglectSheet(null)}
+                    className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500">
+                    ✕
+                  </button>
+                </div>
+
+                {/* Action options */}
+                <div className="space-y-2">
+                  {neglectSheet.phone && (
+                    <a href={`tel:${neglectSheet.phone}`}
+                      onClick={() => setNeglectSheet(null)}
+                      className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl bg-blue-50 text-blue-700 font-bold text-sm">
+                      📞 Call {neglectSheet.contact || neglectSheet.phone}
+                    </a>
+                  )}
+                  {neglectSheet.phone && (
+                    <a href={`https://wa.me/${(neglectSheet.phone||"").replace(/^0/,"27").replace(/[^0-9]/g,"")}`}
+                      target="_blank" rel="noopener noreferrer"
+                      onClick={() => setNeglectSheet(null)}
+                      className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl bg-green-50 text-green-700 font-bold text-sm">
+                      💬 WhatsApp {neglectSheet.contact || ""}
+                    </a>
+                  )}
+                  {neglectSheet.email && (
+                    <a href={`mailto:${neglectSheet.email}`}
+                      onClick={() => setNeglectSheet(null)}
+                      className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl bg-slate-50 text-slate-700 font-bold text-sm">
+                      ✉️ Email {neglectSheet.contact || neglectSheet.email}
+                    </a>
+                  )}
+                  <button
+                    onClick={() => {
+                      setNeglectSheet(null);
+                      onNavigate?.("Notes", { quickClient: neglectSheet });
+                    }}
+                    className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl bg-amber-50 text-amber-700 font-bold text-sm">
+                    📝 Add field note
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNeglectSheet(null);
+                      onNavigate?.("Followups", { quickClient: neglectSheet });
+                    }}
+                    className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl bg-purple-50 text-purple-700 font-bold text-sm">
+                    📅 Schedule follow-up
+                  </button>
+                  <button
+                    onClick={() => {
+                      setNeglectSheet(null);
+                      onNavigate?.("Client360", { clientId: neglectSheet.id, returnTo: "Home" });
+                    }}
+                    className="w-full flex items-center gap-3 py-3.5 px-4 rounded-2xl text-white font-bold text-sm"
+                    style={{background:"#8B1A1A"}}>
+                    👤 Open full client profile
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── Monthly Target ── */}
       {monthlyTarget > 0 && (
