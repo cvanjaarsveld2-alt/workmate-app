@@ -578,13 +578,14 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
 
   async function sendToFinance() {
     const selected = expenses.filter(e => selectedIds.has(e.id));
-    if (selected.length === 0) { setToast("Select expenses to send"); return; }
-    setToast("Building finance pack…");
+    if (selected.length === 0) { setToast("Select expenses to export"); return; }
+    setToast("Building PDF…");
     const sampleDate = selected[0]?.expense_date;
     const period = sampleDate ? calendarMonth(sampleDate) : currentCalendarMonth();
 
     let pdfBlob, filename, ref;
     try {
+      const { buildExpensePDF } = await import("../lib/expenseFinancePDF");
       const result = await buildExpensePDF({
         expenses: selected,
         submitter: { name: data?._submitter?.name, email: data?._submitter?.email },
