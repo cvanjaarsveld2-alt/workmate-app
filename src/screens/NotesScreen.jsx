@@ -486,6 +486,7 @@ Kind regards`;
         </div>
 
         <Field label="Note" value={form.note} onChange={v => setForm(f => ({ ...f, note: v }))} placeholder="Type your visit note…" multiline required />
+        <VoiceInput onResult={text => setForm(f => ({ ...f, note: f.note ? f.note + " " + text : text }))} />
         <div>
           <label className="mb-1.5 block text-sm font-bold text-slate-500">Urgency</label>
           <div className="flex gap-2">
