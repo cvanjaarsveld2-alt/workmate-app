@@ -13,6 +13,7 @@
 //   + Client health indicator (last contact + pipeline status)
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useMemo } from "react";
+
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Phone, Mail, MapPin, Plus, Edit2, X,
@@ -22,7 +23,9 @@ import {
   ChevronDown, ChevronUp,
 } from "lucide-react";
 import { BRAND, NOTE_URGENCY, QUOTE_STATUS_COLORS } from "../lib/constants";
-import { todayISO, smartDate, formatCurrency, daysDiff } from "../lib/helpers";
+import { genId, todayISO, smartDate, formatCurrency, daysDiff } from "../lib/helpers";
+import { withTeamId } from "../lib/teamId";
+import { offlineSave } from "../offline/offlineDb";
 import { Card, StagePill, UrgencyBadge, ServiceBadge, Toast } from "../components/ui";
 import { ShareToTeamModal } from "../components/ShareToTeamModal";
 import { ActivityLogger } from "../components/ActivityLogger";
@@ -150,6 +153,8 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
   const [toast, setToast] = useState("");
   const [shareTarget, setShareTarget] = useState(null);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [addForm, setAddForm] = useState(null); // "followup"|"note"|"contact"|"lead"|"quote"|"equipment"
+  const [addData, setAddData] = useState({});
   const [showAllStats, setShowAllStats] = useState(false);
   const today = todayISO();
 
@@ -251,12 +256,12 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
 
       case "contacts":
         return contacts.length===0
-          ? <EmptyTab icon={Users} label="contacts linked" actionLabel="Add contact" onAction={() => onNavigate?.("Contacts")} />
+          ? <EmptyTab icon={Users} label="contacts linked" actionLabel="Add contact" onAction={() => { setAddData({ name: "", phone: "", email: "", title: "" }); setAddForm("contact"); }} />
           : <div className="space-y-3">{contacts.map(c => <ContactCard key={c.id} contact={c}/>)}</div>;
 
       case "followups":
         return followups.length===0
-          ? <EmptyTab icon={Calendar} label="follow-ups" actionLabel="Add follow-up" onAction={() => onNavigate?.("Followups")} />
+          ? <EmptyTab icon={Calendar} label="follow-ups" actionLabel="Add follow-up" onAction={() => { setAddData({ date: todayISO(), time: "", notes: "", reminder: "30_min" }); setAddForm("followup"); }} />
           : <div className="space-y-2">{followups.sort((a,b)=>(b.date||"").localeCompare(a.date||"")).map(f=>(
             <button key={f.id} onClick={() => setDetailItem({type:'followup',data:f})} className="w-full text-left">
               <Card className={`p-3 ${!f.completed&&f.date<today?"border-l-4 border-l-red-400":""}`}>
@@ -275,7 +280,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
 
       case "notes":
         return notes.length===0
-          ? <EmptyTab icon={MessageSquare} label="notes" actionLabel="Add note" onAction={() => onNavigate?.("Notes")} />
+          ? <EmptyTab icon={MessageSquare} label="notes" actionLabel="Add note" onAction={() => { setAddData({ note: "", urgency: "Normal" }); setAddForm("note"); }} />
           : <div className="space-y-2">{notes.sort((a,b)=>(b.created_at||"").localeCompare(a.created_at||"")).map(n=>{
             const u=NOTE_URGENCY[n.urgency]||NOTE_URGENCY.Normal;
             return (
@@ -304,7 +309,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
 
       case "quotes":
         return quotes.length===0
-          ? <EmptyTab icon={FileText} label="quotes" actionLabel="Create quote" onAction={() => onNavigate?.("Quotes")} />
+          ? <EmptyTab icon={FileText} label="quotes" actionLabel="Create quote" onAction={() => { setAddData({ description: "", value: "", status: "Pending" }); setAddForm("quote"); }} />
           : <div className="space-y-2">{quotes.sort((a,b)=>(b.created_at||"").localeCompare(a.created_at||"")).map(q=>{
             const c=QUOTE_STATUS_COLORS[q.status]||{};
             return (
@@ -318,7 +323,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
 
       case "leads":
         return leads.length===0
-          ? <EmptyTab icon={TrendingUp} label="leads" actionLabel="Add lead" onAction={() => onNavigate?.("Leads")} />
+          ? <EmptyTab icon={TrendingUp} label="leads" actionLabel="Add lead" onAction={() => { setAddData({ title: "", stage: "New", notes: "" }); setAddForm("lead"); }} />
           : <div className="space-y-2">{leads.map(l=>(
             <button key={l.id} onClick={() => setDetailItem({type:'lead',data:l})} className="w-full text-left">
               <Card className="p-3.5">
@@ -331,7 +336,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
 
       case "equipment":
         return equipment.length===0
-          ? <EmptyTab icon={Wrench} label="equipment" actionLabel="Add equipment" onAction={() => onNavigate?.("Equipment")} />
+          ? <EmptyTab icon={Wrench} label="equipment" actionLabel="Add equipment" onAction={() => { setAddData({ name: "", type: "", serial: "" }); setAddForm("equipment"); }} />
           : <div className="space-y-2">{equipment.map(e=>(
             <button key={e.id} onClick={() => setDetailItem({type:'equipment',data:e})} className="w-full text-left">
               <Card className="p-3.5"><div className="flex items-start justify-between">
@@ -343,7 +348,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
 
       case "expenses":
         return expenses.length===0
-          ? <EmptyTab icon={Receipt} label="expenses" actionLabel="Add expense" onAction={() => onNavigate?.("Expenses")} />
+          ? <EmptyTab icon={Receipt} label="expenses" actionLabel="Add expense" onAction={() => { onNavigate?.("Expenses"); }} />
           : <div className="space-y-2">
               <div className="flex justify-between items-center px-1 pb-1">
                 <p className="text-xs font-bold text-slate-400">Total: {formatCurrency(totalExpenses)}</p>
@@ -500,6 +505,128 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
       <ShareToTeamModal open={!!shareTarget} onClose={()=>setShareTarget(null)} record={shareTarget}
         fromUserId={userId} fromEmail={userEmail} teamId={teamId} teamMembers={teamMembers}/>
       <ActivityLogger open={activityOpen} onClose={()=>setActivityOpen(false)} client={client} userId={userId} teamId={teamId} data={data} setData={setData}/>
+
+      {/* ── Inline Add Form Sheet ── */}
+      <AnimatePresence>
+        {addForm && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={() => setAddForm(null)} className="fixed inset-0 z-[82] bg-black/50 backdrop-blur-sm"/>
+            <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}}
+              transition={{type:"spring",damping:28,stiffness:300}}
+              className="fixed bottom-0 left-0 right-0 z-[83] rounded-t-3xl bg-white"
+              style={{maxHeight:"85vh"}}>
+              <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
+              <div className="overflow-y-auto px-5 pb-8 pt-2 space-y-4" style={{maxHeight:"calc(85vh - 24px)"}}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-lg font-black text-slate-900">
+                      {addForm==="followup"  && "Add Follow-up"}
+                      {addForm==="note"      && "Add Field Note"}
+                      {addForm==="contact"   && "Add Contact"}
+                      {addForm==="lead"      && "Add Lead"}
+                      {addForm==="quote"     && "Create Quote"}
+                      {addForm==="equipment" && "Add Equipment"}
+                    </p>
+                    <p className="text-xs text-slate-400">{client.company}{client.branch ? ` — ${client.branch}` : ""}</p>
+                  </div>
+                  <button onClick={()=>setAddForm(null)} className="w-9 h-9 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center"><X size={16}/></button>
+                </div>
+
+                {addForm==="followup" && (<>
+                  <Field label="Title" value={addData.title||""} onChange={v=>setAddData(d=>({...d,title:v}))} placeholder="What needs to happen?" />
+                  <Field label="Date" type="date" value={addData.date||todayISO()} onChange={v=>setAddData(d=>({...d,date:v}))} />
+                  <Field label="Time (optional)" type="time" value={addData.time||""} onChange={v=>setAddData(d=>({...d,time:v}))} />
+                  <Field label="Notes (optional)" value={addData.notes||""} onChange={v=>setAddData(d=>({...d,notes:v}))} multiline placeholder="Any context..." />
+                  <button onClick={()=>{
+                    if (!addData.title?.trim()) return;
+                    const item = withTeamId({id:genId(),user_id:userId,title:addData.title,client:client.company,branch:client.branch||"",client_id:clientId||null,date:addData.date||todayISO(),time:addData.time||"",notes:addData.notes||"",reminder:"30_min",completed:false,sync_status:"pending",created_at:new Date().toISOString()},teamId);
+                    setData(d=>({...d,followups:[item,...(d.followups||[])],syncQueue:[{id:genId(),table:"followups",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
+                    offlineSave("followups",item).catch(()=>{});
+                    setToast("Follow-up added ✓"); setAddForm(null);
+                  }} className="w-full py-4 rounded-2xl text-white font-black text-sm min-h-[52px]" style={{background:BRAND.primary}}>Save Follow-up</button>
+                </>)}
+
+                {addForm==="note" && (<>
+                  <Field label="Note" value={addData.note||""} onChange={v=>setAddData(d=>({...d,note:v}))} multiline placeholder="What happened on site..." />
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 mb-2">Urgency</p>
+                    <div className="flex gap-2">
+                      {["Normal","Urgent","Critical"].map(u=>(
+                        <button key={u} onClick={()=>setAddData(d=>({...d,urgency:u}))}
+                          className={"flex-1 py-2 rounded-xl text-xs font-bold transition-all "+(addData.urgency===u?"text-white":"bg-slate-100 text-slate-500")}
+                          style={addData.urgency===u?{background:u==="Critical"?"#DC2626":u==="Urgent"?"#D97706":BRAND.primary}:{}}>{u}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <Field label="Resolve by (optional)" type="date" value={addData.resolve_by||""} onChange={v=>setAddData(d=>({...d,resolve_by:v}))} />
+                  <button onClick={()=>{
+                    if (!addData.note?.trim()) return;
+                    const item = withTeamId({id:genId(),user_id:userId,client:client.company,client_id:clientId||null,note:addData.note,urgency:addData.urgency||"Normal",resolve_by:addData.resolve_by||null,resolved:false,media:[],sync_status:"pending",created_at:new Date().toISOString()},teamId);
+                    setData(d=>({...d,notes:[item,...(d.notes||[])],syncQueue:[{id:genId(),table:"notes",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
+                    offlineSave("notes",item).catch(()=>{});
+                    setToast("Note added ✓"); setAddForm(null);
+                  }} className="w-full py-4 rounded-2xl text-white font-black text-sm min-h-[52px]" style={{background:BRAND.primary}}>Save Note</button>
+                </>)}
+
+                {addForm==="contact" && (<>
+                  <Field label="Name" value={addData.name||""} onChange={v=>setAddData(d=>({...d,name:v}))} placeholder="Full name" />
+                  <Field label="Title / Role" value={addData.ctitle||""} onChange={v=>setAddData(d=>({...d,ctitle:v}))} placeholder="e.g. Maintenance Manager" />
+                  <Field label="Phone" type="tel" value={addData.phone||""} onChange={v=>setAddData(d=>({...d,phone:v}))} placeholder="0XX XXX XXXX" />
+                  <Field label="Email" type="email" value={addData.email||""} onChange={v=>setAddData(d=>({...d,email:v}))} placeholder="name@company.com" />
+                  <button onClick={()=>{
+                    if (!addData.name?.trim()) return;
+                    const item = withTeamId({id:genId(),user_id:userId,name:addData.name,title:addData.ctitle||"",phone:addData.phone||"",email:addData.email||"",company:client.company,client_id:clientId||null,status:"Lead",met_at:client.company,met_date:todayISO(),sync_status:"pending",created_at:new Date().toISOString()},teamId);
+                    setData(d=>({...d,contacts:[item,...(d.contacts||[])],syncQueue:[{id:genId(),table:"contacts",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
+                    offlineSave("contacts",item).catch(()=>{});
+                    setToast("Contact added ✓"); setAddForm(null);
+                  }} className="w-full py-4 rounded-2xl text-white font-black text-sm min-h-[52px]" style={{background:BRAND.primary}}>Save Contact</button>
+                </>)}
+
+                {addForm==="lead" && (<>
+                  <Field label="Title" value={addData.title||""} onChange={v=>setAddData(d=>({...d,title:v}))} placeholder="e.g. Tyre Handler opportunity" />
+                  <Field label="Estimated value (R)" type="number" value={addData.estimated_value||""} onChange={v=>setAddData(d=>({...d,estimated_value:v}))} placeholder="0" />
+                  <Field label="Notes" value={addData.notes||""} onChange={v=>setAddData(d=>({...d,notes:v}))} multiline placeholder="Details..." />
+                  <button onClick={()=>{
+                    if (!addData.title?.trim()) return;
+                    const item = withTeamId({id:genId(),user_id:userId,title:addData.title,client_name:client.company,client_id:clientId||null,estimated_value:parseFloat(addData.estimated_value)||0,notes:addData.notes||"",stage:"New",captured_by:userEmail?.split("@")[0]||"",sync_status:"pending",created_at:new Date().toISOString()},teamId);
+                    setData(d=>({...d,leads:[item,...(d.leads||[])],syncQueue:[{id:genId(),table:"leads",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
+                    offlineSave("leads",item).catch(()=>{});
+                    setToast("Lead added ✓"); setAddForm(null);
+                  }} className="w-full py-4 rounded-2xl text-white font-black text-sm min-h-[52px]" style={{background:BRAND.primary}}>Save Lead</button>
+                </>)}
+
+                {addForm==="quote" && (<>
+                  <Field label="Description" value={addData.description||""} onChange={v=>setAddData(d=>({...d,description:v}))} multiline placeholder="What are you quoting?" />
+                  <Field label="Value (R)" type="number" value={addData.value||""} onChange={v=>setAddData(d=>({...d,value:v}))} placeholder="0.00" />
+                  <button onClick={()=>{
+                    if (!addData.description?.trim()) return;
+                    const item = withTeamId({id:genId(),user_id:userId,client_name:client.company,client_id:clientId||null,description:addData.description,value:parseFloat(addData.value)||0,status:"Pending",sent_date:todayISO(),sync_status:"pending",created_at:new Date().toISOString()},teamId);
+                    setData(d=>({...d,quotes:[item,...(d.quotes||[])],syncQueue:[{id:genId(),table:"quotes",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
+                    offlineSave("quotes",item).catch(()=>{});
+                    setToast("Quote created ✓"); setAddForm(null);
+                  }} className="w-full py-4 rounded-2xl text-white font-black text-sm min-h-[52px]" style={{background:BRAND.primary}}>Save Quote</button>
+                </>)}
+
+                {addForm==="equipment" && (<>
+                  <Field label="Name / Description" value={addData.name||""} onChange={v=>setAddData(d=>({...d,name:v}))} placeholder="e.g. Tyre Handler TH-500" />
+                  <Field label="Type" value={addData.type||""} onChange={v=>setAddData(d=>({...d,type:v}))} placeholder="e.g. Tyre Handler" />
+                  <Field label="Serial number" value={addData.serial||""} onChange={v=>setAddData(d=>({...d,serial:v}))} placeholder="Serial / asset no." />
+                  <Field label="Service due (optional)" type="date" value={addData.service_due||""} onChange={v=>setAddData(d=>({...d,service_due:v}))} />
+                  <button onClick={()=>{
+                    if (!addData.name?.trim()) return;
+                    const item = withTeamId({id:genId(),user_id:userId,name:addData.name,type:addData.type||"",serial:addData.serial||"",client:client.company,client_id:clientId||null,location:client.branch||client.company,service_due:addData.service_due||null,notes:"",media:[],sync_status:"pending",created_at:new Date().toISOString()},teamId);
+                    setData(d=>({...d,equipment:[item,...(d.equipment||[])],syncQueue:[{id:genId(),table:"equipment",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
+                    offlineSave("equipment",item).catch(()=>{});
+                    setToast("Equipment added ✓"); setAddForm(null);
+                  }} className="w-full py-4 rounded-2xl text-white font-black text-sm min-h-[52px]" style={{background:BRAND.primary}}>Save Equipment</button>
+                </>)}
+
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── Inline detail sheet — tapping any tab item opens this instead of navigating away ── */}
       <AnimatePresence>
