@@ -77,12 +77,14 @@ self.addEventListener("push", (e) => {
 
   e.waitUntil(
     self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: "/logo.png",
-      badge: "/logo.png",
-      vibrate: [100, 50, 100],
-      data: { url: data.url || "/" },
-      actions: [{ action: "open", title: "Open" }],
+      body:      data.body,
+      icon:      "/icons/icon-192.png",
+      badge:     "/icons/icon-192.png",
+      vibrate:   [100, 50, 100],
+      tag:       data.tag || "powermate",   // replaces existing notification with same tag
+      renotify:  !!data.tag,               // vibrate again even if replacing
+      data:      { url: data.url || "/" },
+      actions:   [{ action: "open", title: "Open PowerMate" }],
     })
   );
 });
