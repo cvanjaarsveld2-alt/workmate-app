@@ -26,7 +26,7 @@ import { BRAND, NOTE_URGENCY, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { genId, todayISO, smartDate, formatCurrency, daysDiff } from "../lib/helpers";
 import { withTeamId } from "../lib/teamId";
 import { offlineSave } from "../offline/offlineDb";
-import { Card, StagePill, UrgencyBadge, ServiceBadge, Toast } from "../components/ui";
+import { Card, Field, StagePill, UrgencyBadge, ServiceBadge, Toast } from "../components/ui";
 import { ShareToTeamModal } from "../components/ShareToTeamModal";
 import { ActivityLogger } from "../components/ActivityLogger";
 
