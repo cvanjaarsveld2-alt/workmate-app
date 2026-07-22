@@ -3,7 +3,7 @@
 // key stats, expenses snapshot, and pipeline.
 // ─────────────────────────────────────────────────────────────────────────────
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Calendar, ChevronRight, File as FileIcon,
   TrendingUp, CheckCircle2, ArrowRight,
