@@ -10,6 +10,31 @@ import {
   Receipt, BarChart2,
 } from "lucide-react";
 import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
+
+const NEGLECT_DAYS = 14; // days without contact before showing warning
+
+function daysSince(dateStr) {
+  if (!dateStr) return 9999;
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+}
+
+function lastContactDate(clientId, clientName, activities, followups, notes) {
+  const dates = [];
+  activities.forEach(a => {
+    if (a.client_id === clientId || a.client_name === clientName)
+      dates.push(a.created_at);
+  });
+  followups.forEach(f => {
+    if ((f.client_id === clientId || f.client === clientName) && f.completed)
+      dates.push(f.date);
+  });
+  notes.forEach(n => {
+    if (n.client_id === clientId || n.client === clientName)
+      dates.push(n.created_at);
+  });
+  if (!dates.length) return null;
+  return dates.sort().reverse()[0];
+}
 import { todayISO, niceDate, daysDiff, smartDate } from "../lib/helpers";
 import { Card, StatCard } from "../components/ui";
 
@@ -17,11 +42,25 @@ function money(n) {
   return "R" + Math.round(n || 0).toLocaleString("en-ZA");
 }
 
-export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
+export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
   const today     = todayISO();
   // Show records the user owns OR is assigned to
   const uid = user?.id;
   const mine = r => r.user_id === uid || r.assigned_to_user_id === uid;
+
+  // ── Neglected clients (no contact in 14+ days) ──
+  const activeClients = clients.filter(c =>
+    !["Lost","Won"].includes(c.stage) && (c.user_id === uid || c.assigned_to_user_id === uid)
+  );
+  const neglected = activeClients
+    .map(cl => {
+      const last = lastContactDate(cl.id, cl.company, data.activities || [], data.followups || [], data.notes || []);
+      const days = daysSince(last);
+      return { ...cl, daysSince: days, lastContact: last };
+    })
+    .filter(cl => cl.daysSince >= NEGLECT_DAYS)
+    .sort((a, b) => b.daysSince - a.daysSince)
+    .slice(0, 5);
   const clients   = (data.clients   || []).filter(mine);
   const quotes    = (data.quotes    || []).filter(mine);
   const followups = (data.followups || []).filter(mine);
@@ -50,6 +89,11 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
     const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, "0")}-${String(last.getDate()).padStart(2, "0")}`;
   })();
+  // ── Monthly target ──
+  const TARGET_KEY = `pm_revenue_target_${uid}`;
+  const monthlyTarget = parseFloat(localStorage.getItem(TARGET_KEY) || "0");
+  const targetProgress = monthlyTarget > 0 ? Math.min(100, Math.round((wonRev / monthlyTarget) * 100)) : 0;
+
   const expThisMonth = expenses.filter(e =>
     e.expense_date && e.expense_date >= periodStart && e.expense_date <= periodEnd
   );
@@ -183,6 +227,69 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd }) {
           <StatCard label="This Month" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} />
         </button>
       </div>
+
+      {/* ── Neglected Clients Warning ── */}
+      {neglected.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-base">⚠️</span>
+            <p className="text-xs font-black text-red-700 uppercase tracking-wider">
+              {neglected.length} client{neglected.length !== 1 ? "s" : ""} need attention
+            </p>
+          </div>
+          <div className="space-y-2">
+            {neglected.map(cl => (
+              <button key={cl.id}
+                onClick={() => onNavigate ? onNavigate("Client360", { clientId: cl.id, returnTo: "Home" }) : setScreen?.("Clients")}
+                className="w-full flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100 transition-colors text-left">
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-900 truncate">{cl.company}</p>
+                  {cl.branch && <p className="text-xs text-slate-400 truncate">{cl.branch}</p>}
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs font-black text-red-600">
+                    {cl.daysSince >= 9999 ? "Never contacted" : `${cl.daysSince}d ago`}
+                  </p>
+                  <p className="text-[10px] text-slate-400">no contact</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Monthly Target ── */}
+      {monthlyTarget > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Monthly Target</p>
+            <p className="text-xs font-bold text-slate-400">{targetProgress}%</p>
+          </div>
+          <div className="flex items-end justify-between gap-2 mb-2">
+            <p className="text-xl font-black" style={{ color: targetProgress >= 100 ? "#16A34A" : BRAND.primary }}>
+              {money(wonRev).replace("R", "R ")}
+            </p>
+            <p className="text-sm text-slate-400 mb-0.5">of {money(monthlyTarget).replace("R", "R ")}</p>
+          </div>
+          <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${targetProgress}%` }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="h-full rounded-full"
+              style={{ background: targetProgress >= 100 ? "#16A34A" : targetProgress >= 70 ? "#D97706" : BRAND.primary }}
+            />
+          </div>
+          {targetProgress >= 100 && (
+            <p className="text-xs font-bold text-green-600 mt-1.5">🎉 Target reached!</p>
+          )}
+          {targetProgress > 0 && targetProgress < 100 && (
+            <p className="text-xs text-slate-400 mt-1.5">
+              {money(monthlyTarget - wonRev).replace("R", "R ")} to go
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* ── Pipeline + Analytics ── */}
       <Card className="p-4">
