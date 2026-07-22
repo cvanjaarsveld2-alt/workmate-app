@@ -168,6 +168,8 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
     setShowExportMenu(false);
     setExportProgress(0);
     try {
+      // Lazy load to keep bundle small
+      const { exportNotesPDF, exportNotesExcel } = await import("../NotesExport");
       const exportOptions = {
         contacts,
         onProgress: ({ percent }) => setExportProgress(percent),
