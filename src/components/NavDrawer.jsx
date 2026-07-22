@@ -13,6 +13,7 @@ import {
   Wrench,
   File as FileIcon,
   Receipt,
+  Mic,
   Settings,
   LogOut,
   Car,
@@ -42,7 +43,7 @@ const SECTIONS = [
     items: [
       { key: "Notes",        label: "Field Notes",       icon: Clipboard, badgeKey: "criticalNotes" },
       { key: "Equipment",    label: "Equipment",         icon: Wrench,    badgeKey: "overdueEquip" },
-      { key: "Meeting",      label: "Meeting Recorder", icon: "🎙️" },
+      { key: "Meeting",      label: "Meeting Recorder", icon: Mic },
     { key: "VehicleCheck", label: "Vehicle Checklist", icon: Car },
     ],
   },
