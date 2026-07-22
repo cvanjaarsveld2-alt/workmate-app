@@ -180,14 +180,9 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
   async function toggleDone(id) {
     const t = followups.find(f => f.id === id);
     if (!t) return;
-    const up = { ...t, completed: !t.completed, sync_status: "pending" };
-    // Narrow payload for the sync push — avoids accidentally pushing any
-    // fields that aren't actual columns on the followups table.
-    const syncPayload = {
-      id: t.id,
-      completed: !t.completed,
-      sync_status: "pending",
-    };
+    const completing = !t.completed;
+    const up = { ...t, completed: completing, sync_status: "pending" };
+    const syncPayload = { id: t.id, completed: completing, sync_status: "pending" };
     setData(d => ({
       ...d,
       followups: (d.followups || []).map(f => f.id === id ? up : f),
@@ -195,6 +190,10 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
     }));
     await offlineSave("followups", up);
     triggerImmediateSync();
+    // Show "schedule next action?" prompt when marking complete
+    if (completing) {
+      setTimeout(() => setNextActionPrompt(t), 400);
+    }
   }
 
   async function deleteFollowup(id) {
