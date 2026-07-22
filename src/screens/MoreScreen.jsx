@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
-import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
+import { Card, Btn, Toast, PageHeader, useConfirm } from "../components/ui";
 import ReportExport from "../ReportExport";
 import { BackupExport } from "../components/BackupExport";
 import { CompanyDocuments } from "../components/CompanyDocuments";
@@ -287,6 +287,42 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         )}
       </Card>
 
+      {/* ── Monthly Target ── */}
+      <Card className="p-4 space-y-3">
+        <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Monthly Revenue Target</p>
+        <p className="text-xs text-slate-400">Set your monthly won-revenue target. Shows a progress bar on your dashboard.</p>
+        <div className="flex gap-2 items-center">
+          <span className="text-sm font-bold text-slate-500">R</span>
+          <input
+            type="number"
+            value={targetInput}
+            onChange={e => setTargetInput(e.target.value)}
+            placeholder="e.g. 100000"
+            className="flex-1 rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-red-300"
+          />
+          <button
+            onClick={() => {
+              const val = parseFloat(targetInput) || 0;
+              if (val > 0) {
+                localStorage.setItem(`pm_revenue_target_${userId}`, String(val));
+                setToast("Target saved — check your dashboard");
+              } else {
+                localStorage.removeItem(`pm_revenue_target_${userId}`);
+                setToast("Target cleared");
+              }
+            }}
+            className="px-4 py-2.5 rounded-xl text-sm font-bold text-white min-h-[44px]"
+            style={{ background: BRAND.primary }}>
+            Save
+          </button>
+        </div>
+        {localStorage.getItem(`pm_revenue_target_${userId}`) && (
+          <p className="text-xs text-green-600 font-bold">
+            ✓ Target: R {parseFloat(localStorage.getItem(`pm_revenue_target_${userId}`)).toLocaleString("en-ZA")} / month
+          </p>
+        )}
+      </Card>
+
       <Card className="p-4">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Data Summary</p>
         {[
@@ -360,6 +396,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         <LogOut size={16} />Sign Out
       </Btn>
       <p className="text-center text-xs text-slate-300">PowerMate v2.4 · Power Works (Pty) Ltd</p>
+      {toast && <Toast message={toast} onClose={() => setToast("")} />}
     </div>
   );
 }
