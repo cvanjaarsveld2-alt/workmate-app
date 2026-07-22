@@ -545,7 +545,7 @@ export default function PowerWorksApp() {
   if (dataLoading)             return <DataLoadingScreen />;
 
   const screens = {
-    Home:      <HomeScreen      data={data} setScreen={navigate} user={session.user} onQuickAdd={handleQuickCapture} />,
+    Home:      <HomeScreen      data={data} setScreen={navigate} user={session.user} onQuickAdd={handleQuickCapture} onNavigate={navigate} />,
     Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} onNavigate={navigate} isOnline={isOnline} />,
     Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
