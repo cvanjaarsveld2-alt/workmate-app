@@ -131,14 +131,17 @@ export async function buildExpensePDF({ expenses, submitter, periodLabel }) {
   let y = 120;
   doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
-  doc.text("REFERENCE", margin, y);
-  doc.text("SUBMITTED BY", margin + 180, y);
-  doc.text("PERIOD", margin + 360, y);
+  doc.text("REFERENCE",    margin,       y);
+  doc.text("SUBMITTED BY", margin + 160, y);
+  doc.text("PERIOD",       margin + 320, y);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
-  doc.text(ref, margin, y + 16);
-  doc.text(submitter?.name || submitter?.email || "—", margin + 180, y + 16);
-  doc.text(periodLabel || "—", margin + 360, y + 16);
+  doc.setFontSize(11);
+  doc.text(ref,                                      margin,       y + 16);
+  doc.text(submitter?.name || submitter?.email || "—", margin + 160, y + 16);
+  // Period may be long — wrap if needed
+  const periodText = periodLabel || "—";
+  doc.setFontSize(10);
+  doc.text(doc.splitTextToSize(periodText, 200), margin + 320, y + 16);
 
   // Totals block
   y = 180;
