@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import jsPDF from "jspdf";
+import { PW_LOGO_B64 } from "./lib/pwLogo";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 
@@ -98,6 +99,10 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
   // Cover page
   doc.setFillColor(BRAND.primary);
   doc.rect(0, 0, pageWidth, 50, "F");
+  // Logo right side
+  try {
+    doc.addImage(PW_LOGO_B64, "JPEG", pageWidth - margin - 100, 8, 100, 21);
+  } catch {}
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
