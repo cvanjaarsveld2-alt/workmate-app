@@ -32,7 +32,7 @@ import { convertToZAR } from "../lib/exchangeRate";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import {
-  Card, Btn, Field, SelectField, SearchBar, FilterPills,
+  Card, Btn, Field, SelectField, SearchBar,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 
