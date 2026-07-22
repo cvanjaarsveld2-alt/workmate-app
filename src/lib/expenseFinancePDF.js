@@ -113,17 +113,20 @@ export async function buildExpensePDF({ expenses, submitter, periodLabel }) {
   doc.setFillColor(BRAND_RED);
   doc.rect(0, 0, pageWidth, 80, "F");
   doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.text("EXPENSE CLAIM", margin, 50);
-  doc.setFontSize(11);
-  doc.setFont("helvetica", "normal");
-  // Power Works logo
+  // Logo — RIGHT side of header
   try {
-    doc.addImage(PW_LOGO_B64, "JPEG", margin, 35, 110, 23);
+    doc.addImage(PW_LOGO_B64, "JPEG", pageWidth - margin - 110, 10, 110, 23);
   } catch {
-    doc.text("Power Works (Pty) Ltd", margin, 68);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    doc.text("Power Works (Pty) Ltd", pageWidth - margin, 20, { align: "right" });
   }
+  // "EXPENSE CLAIM" — LEFT side, vertically centred
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(26);
+  doc.text("EXPENSE", margin, 38);
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "normal");
+  doc.text("CLAIM", margin, 55);
 
   doc.setTextColor(30, 30, 30);
 
