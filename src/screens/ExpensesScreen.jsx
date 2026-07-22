@@ -78,7 +78,10 @@ function calendarMonth(isoDate) {
   const start = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
   const end   = new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
   const label = d.toLocaleDateString("en-ZA", { month: "long", year: "numeric" });
-  return { key, label, start, end };
+  const startFmt = new Date(start + "T12:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
+  const endFmt   = new Date(end   + "T12:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
+  const rangeLabel = `${startFmt} – ${endFmt}`;
+  return { key, label: rangeLabel, start, end };
 }
 
 // Current calendar month
@@ -367,7 +370,7 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
+export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigger }) {
   const [showForm, setShowForm]       = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [editId, setEditId]           = useState(null);
@@ -586,10 +589,24 @@ export function ExpensesScreen({ data, setData, userId, quickAddTrigger }) {
     let pdfBlob, filename, ref;
     try {
       const { buildExpensePDF } = await import("../lib/expenseFinancePDF");
+      // Build proper date range from actual selected expenses
+      const dates = selected.map(e => e.expense_date).filter(Boolean).sort();
+      const firstDate = dates[0];
+      const lastDate  = dates[dates.length - 1];
+      const fmt = d => new Date(d + "T12:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
+      const rangeLabel = firstDate && lastDate && firstDate !== lastDate
+        ? `${fmt(firstDate)} – ${fmt(lastDate)}`
+        : firstDate ? fmt(firstDate) : (period?.label || "—");
+
+      // Submitter name from email (Christo@pwrstart.com → Christo)
+      const submitterName = userEmail
+        ? userEmail.split("@")[0].replace(/[._]/g, " ").replace(/\w/g, l => l.toUpperCase())
+        : "—";
+
       const result = await buildExpensePDF({
         expenses: selected,
-        submitter: { name: data?._submitter?.name, email: data?._submitter?.email },
-        periodLabel: period?.label || "—",
+        submitter: { name: submitterName, email: userEmail },
+        periodLabel: rangeLabel,
       });
       pdfBlob = result.blob;
       filename = result.filename;
