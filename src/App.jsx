@@ -567,7 +567,7 @@ export default function PowerWorksApp() {
         } catch (e) { console.warn("Could not load team members:", e); }
       }
     }} />,
-    Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} quickAddTrigger={quickAddTrigger} />,
+    Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} quickAddTrigger={quickAddTrigger} />,
     More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
     Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => goBack("More")} onBackfill={() => navigate("BackfillZAR")} />,
     // FIX #4: BackfillZAR was missing from this map
