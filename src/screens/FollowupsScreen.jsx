@@ -1,4 +1,5 @@
 // ─── Follow-ups Screen ────────────────────────────────────────────────────────
+import { VoiceInput } from "../components/VoiceInput";
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, Check, Calendar, Send, Share2 } from "lucide-react";
@@ -261,6 +262,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
           </select>
         </div>
         <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Any context…" multiline />
+              <VoiceInput onResult={text => setForm(f => ({ ...f, notes: f.notes ? f.notes + " " + text : text }))} />
 
         {/* Assign to team member */}
         {teamMembers.length > 0 && (
