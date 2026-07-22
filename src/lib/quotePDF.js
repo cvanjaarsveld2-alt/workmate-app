@@ -29,15 +29,23 @@ export async function generateQuotePDF(quote, companyInfo = {}) {
   };
 
   // ── Header bar ──
-  doc.setFillColor(139, 26, 26); // BRAND.primary
-  doc.rect(0, 0, W, 32, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
-  doc.setFont("helvetica", "bold");
-  doc.text(company.name, M, 15);
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text([company.address, company.phone, company.email].filter(Boolean).join("  |  "), M, 24);
+  doc.setFillColor(139, 26, 26);
+  doc.rect(0, 0, W, 36, "F");
+  // Logo left side
+  try {
+    doc.addImage(PW_LOGO_B64, "JPEG", M, 4, 60, 13);
+  } catch {
+    doc.setFontSize(14); doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text(company.name, M, 14);
+  }
+  // Contact details right side
+  doc.setFontSize(7); doc.setFont("helvetica", "normal");
+  doc.setTextColor(255, 220, 220);
+  const contactLine = [company.phone, company.email].filter(Boolean).join("  |  ");
+  if (contactLine) doc.text(contactLine, W - M, 12, { align: "right" });
+  if (company.address) doc.text(company.address, W - M, 19, { align: "right" });
+  if (company.vat) doc.text(`VAT: ${company.vat}`, W - M, 26, { align: "right" });
 
   // ── Quote title ──
   doc.setTextColor(30, 30, 30);
