@@ -159,23 +159,20 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
   const today = todayISO();
 
   const client = (data.clients||[]).find(c => c.id === clientId);
-  if (!client) return (
-    <div className="space-y-4">
-      <button onClick={onBack} className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 min-w-[44px] min-h-[44px] flex items-center justify-center"><ArrowLeft size={18}/></button>
-      <div className="text-center py-12"><p className="text-sm text-slate-400">Client not found</p></div>
-    </div>
-  );
+  // NOTE: no early return here — ALL hooks must run on every render or React
+  // throws "Rendered fewer hooks than expected". The not-found guard lives
+  // after the last hook below.
+  const clientCo = client?.company || "";
 
-  // ── Related records ────────────────────────────────────────────────────────
+  // ── Related records (null-safe so they work even when client is missing) ──
   const contacts   = (data.contacts||[]).filter(c => c.client_id===clientId);
   const followups  = (data.followups||[]).filter(f => f.client_id===clientId);
   const notes      = (data.notes||[]).filter(n => n.client_id===clientId);
-  const quotes     = (data.quotes||[]).filter(q => q.client_id === clientId || (q.client_name && client.company && q.client_name.toLowerCase()===client.company.toLowerCase()));
-  const leads      = (data.leads||[]).filter(l => l.client_id===clientId || (l.client_name && client.company && l.client_name.toLowerCase()===client.company.toLowerCase()));
-  const equipment  = (data.equipment||[]).filter(e => e.client_id === clientId || (e.client && client.company && e.client.toLowerCase()===client.company.toLowerCase()));
+  const quotes     = (data.quotes||[]).filter(q => q.client_id === clientId || (q.client_name && clientCo && q.client_name.toLowerCase()===clientCo.toLowerCase()));
+  const leads      = (data.leads||[]).filter(l => l.client_id===clientId || (l.client_name && clientCo && l.client_name.toLowerCase()===clientCo.toLowerCase()));
+  const equipment  = (data.equipment||[]).filter(e => e.client_id === clientId || (e.client && clientCo && e.client.toLowerCase()===clientCo.toLowerCase()));
   const activities = (data.activities||[]).filter(a => a.client_id===clientId);
-  // NEW: expenses linked to this client
-  const expenses   = (data.expenses||[]).filter(e => e.client_id === clientId || (e.client_name && client.company && e.client_name.toLowerCase()===client.company.toLowerCase()));
+  const expenses   = (data.expenses||[]).filter(e => e.client_id === clientId || (e.client_name && clientCo && e.client_name.toLowerCase()===clientCo.toLowerCase()));
 
   // ── Timeline ───────────────────────────────────────────────────────────────
   const timeline = useMemo(() => {
@@ -211,6 +208,14 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
     events.sort((a,b) => new Date(b.date||0)-new Date(a.date||0));
     return events;
   }, [followups, notes, quotes, leads, equipment, activities, expenses, today]);
+
+  // ── Not-found guard — safe here because every hook above has already run ──
+  if (!client) return (
+    <div className="space-y-4">
+      <button onClick={onBack} className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 min-w-[44px] min-h-[44px] flex items-center justify-center"><ArrowLeft size={18}/></button>
+      <div className="text-center py-12"><p className="text-sm text-slate-400">Client not found</p></div>
+    </div>
+  );
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   const openFU      = followups.filter(f=>!f.completed);
