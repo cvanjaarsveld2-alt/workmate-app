@@ -293,6 +293,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [filterCat, setFilterCat]     = useState("All");
   const [toast, setToast]             = useState("");
   const [shareSheet, setShareSheet]   = useState(null); // { id, title, type }
+  const [reassigning, setReassigning] = useState(false);
   const { confirm, dialog }           = useConfirm();
 
   const leads    = data.leads    || [];
