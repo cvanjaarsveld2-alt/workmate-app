@@ -14,6 +14,10 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
   const failedCount = (data.syncQueue || []).filter(i => i.status === "failed").length;
 
   // Push notification state: idle | working | active | denied | ios-install | unsupported | error
+  const [toast, setToast]           = useState("");
+  const [targetInput, setTargetInput] = useState(
+    () => localStorage.getItem(`pm_revenue_target_${userId}`) || ""
+  );
   const [pushState, setPushState] = useState("idle");
   const [pushError, setPushError] = useState("");
   const [pinEnabled, setPinEnabled] = useState(
