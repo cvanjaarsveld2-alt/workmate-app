@@ -92,6 +92,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
   const [toast, setToast]       = useState("");
   const [sendInfo, setSendInfo] = useState(null);
   const [shareSheet, setShareSheet] = useState(null);
+  const [nextActionPrompt, setNextActionPrompt] = useState(null);
   const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "", assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
