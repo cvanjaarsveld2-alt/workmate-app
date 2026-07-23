@@ -44,7 +44,7 @@ const SECTIONS = [
       { key: "Notes",        label: "Field Notes",       icon: Clipboard, badgeKey: "criticalNotes" },
       { key: "Equipment",    label: "Equipment",         icon: Wrench,    badgeKey: "overdueEquip" },
       { key: "Meeting",      label: "Meeting Recorder", icon: Mic },
-    { key: "VehicleCheck", label: "Vehicle Checklist", icon: Car },
+      { key: "VehicleCheck", label: "Vehicle Checklist",  icon: Car },
     ],
   },
   {
