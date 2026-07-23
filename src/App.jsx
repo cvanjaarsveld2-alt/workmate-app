@@ -461,6 +461,7 @@ export default function PowerWorksApp() {
   const forgotPIN = clearAuthAndSignOut;
 
   function handleQuickCapture(targetScreen) {
+    if (!targetScreen || typeof targetScreen !== "string") return;
     const [screenName, mode] = targetScreen.split(":");
     navigate(screenName);
     setQuickAddTrigger({ screen: screenName, mode: mode || null, ts: Date.now() });
