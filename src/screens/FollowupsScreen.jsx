@@ -381,6 +381,60 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
       </AnimatePresence>
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
+      {/* ── Next Action Prompt ── */}
+      <AnimatePresence>
+        {nextActionPrompt && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={() => setNextActionPrompt(null)}
+              className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"/>
+            <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}}
+              transition={{type:"spring",damping:28,stiffness:300}}
+              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white"
+              style={{maxWidth:480,margin:"0 auto"}}>
+              <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
+              <div className="px-6 pb-8 pt-2 space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                    <span className="text-lg">&#10003;</span>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-base font-black text-slate-900">Done! Schedule next action?</p>
+                    <p className="text-xs text-slate-400 truncate">{nextActionPrompt.title}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {[{label:"Tomorrow",days:1},{label:"3 days",days:3},{label:"1 week",days:7},{label:"2 weeks",days:14},{label:"1 month",days:30},{label:"Custom",days:null}].map(opt => (
+                    <button key={opt.label}
+                      onClick={() => {
+                        if (!opt.days) {
+                          setForm({title:nextActionPrompt.title,client_id:nextActionPrompt.client_id||null,client:nextActionPrompt.client||"",branch:nextActionPrompt.branch||"",date:todayISO(),time:"",reminder:"30_min",notes:"",linked_note_id:null,assigned_to_user_id:null,assigned_to:""});
+                          setShowForm(true); setNextActionPrompt(null); return;
+                        }
+                        const nd=new Date(); nd.setDate(nd.getDate()+opt.days);
+                        const ds=nd.toISOString().slice(0,10);
+                        const fu=withTeamId({id:genId(),user_id:userId,title:nextActionPrompt.title,client_id:nextActionPrompt.client_id||null,client:nextActionPrompt.client||"",branch:nextActionPrompt.branch||"",date:ds,time:"",reminder:"30_min",notes:"",completed:false,sync_status:"pending",created_at:new Date().toISOString()},teamId);
+                        setData(d=>({...d,followups:[fu,...(d.followups||[])],syncQueue:[{id:genId(),table:"followups",action:"insert",data:fu,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
+                        offlineSave("followups",fu).catch(()=>{});
+                        triggerImmediateSync();
+                        setToast("Next follow-up scheduled");
+                        setNextActionPrompt(null);
+                      }}
+                      className="py-3 rounded-xl text-xs font-bold border-2 border-slate-100 bg-slate-50 text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-800 transition-all min-h-[48px]">
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => setNextActionPrompt(null)}
+                  className="w-full py-3 text-sm text-slate-400 font-bold">
+                  Skip
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center justify-between">
         <PageHeader title="Follow-ups" subtitle={`${pendingTotal} pending${overdueCount > 0 ? ` · ${overdueCount} overdue` : ""}`} />
         <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
