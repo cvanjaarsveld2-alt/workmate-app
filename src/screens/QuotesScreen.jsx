@@ -200,12 +200,25 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
                     <button onClick={() => setShareSheet({ id: q.id, title: q.client_name || "Quote", type: "quote" })} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-purple-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" title="Share with teammate"><Share2 size={15} /></button>
                   )}
                   <button onClick={async () => {
-                    const r = await shareQuotePDF({
-                      clientName: q.client_name, date: q.sent_date || q.created_at?.slice(0,10),
-                      lineItems: q.line_items ? JSON.parse(q.line_items) : [{ description: q.description, qty: 1, unitPrice: q.value }],
-                      vatInclusive: q.vat_inclusive !== false, notes: q.description,
-                    });
-                    setToast(r === "shared" ? "Quote shared" : "Quote PDF downloaded");
+                    try {
+                      // Parse line items defensively — malformed JSON must not crash the screen
+                      let li;
+                      try {
+                        li = q.line_items ? JSON.parse(q.line_items) : null;
+                      } catch { li = null; }
+                      if (!Array.isArray(li) || li.length === 0) {
+                        li = [{ description: q.description || "Quote", qty: 1, unitPrice: parseFloat(q.value) || 0 }];
+                      }
+                      const r = await shareQuotePDF({
+                        clientName: q.client_name, date: q.sent_date || q.created_at?.slice(0,10),
+                        lineItems: li,
+                        vatInclusive: q.vat_inclusive !== false, notes: q.description,
+                      });
+                      setToast(r === "shared" ? "Quote shared" : "Quote PDF downloaded");
+                    } catch (err) {
+                      console.error("Quote PDF failed:", err);
+                      setToast("Couldn't generate PDF — try again");
+                    }
                   }} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-green-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center" title="Generate PDF"><Download size={15} /></button>
                   <button onClick={() => startEdit(q)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-blue-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Edit2 size={15} /></button>
                   <button onClick={() => deleteQuote(q.id, q.client_name)} className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-red-600 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"><Trash2 size={15} /></button>
