@@ -6,7 +6,7 @@ export const BRAND = {
   primary: "#8B1A1A",
   primaryDark: "#6B1414",
   light: "#F7F3F3",
-  logo: "https://powerstart.eu/wp-content/uploads/2021/10/Power-Works-Logo.png",
+  logo: "/pw-logo-wide.png",   // local asset — no dependency on external site being up
 };
 
 // ─── Pipeline ─────────────────────────────────────────────────────────────────
