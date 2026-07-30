@@ -23,7 +23,7 @@ export function Card({ children, className = "", onClick }) {
           ? "cursor-pointer transition-all duration-100 active:scale-[0.975] active:bg-slate-50 active:shadow-none"
           : ""
       } ${className}`}
-      onClick={onClick}>
+      onClick={onClick ? (e) => { haptic.light(); onClick(e); } : undefined}>
       {children}
     </div>
   );
@@ -325,7 +325,7 @@ export function Toast({ message, onDone, type = "success" }) {
 }
 
 // ─── Empty ────────────────────────────────────────────────────────────────────
-export function Empty({ title, text, icon: Icon }) {
+export function Empty({ title, text, icon: Icon, actionLabel, onAction }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
       {Icon && (
@@ -335,6 +335,13 @@ export function Empty({ title, text, icon: Icon }) {
       )}
       <p className="text-lg font-black text-slate-700 mb-1.5">{title}</p>
       {text && <p className="text-sm text-slate-400 leading-relaxed max-w-[260px]">{text}</p>}
+      {actionLabel && onAction && (
+        <button onClick={() => { haptic.light(); onAction(); }}
+          className="mt-5 px-5 py-3 rounded-2xl text-white text-sm font-black min-h-[48px] active:scale-[0.97] transition-transform"
+          style={{ background: BRAND.primary }}>
+          {actionLabel}
+        </button>
+      )}
     </div>
   );
 }
@@ -363,7 +370,7 @@ export function StatCard({ label, value, sub, color, icon: Icon }) {
 export function NavTab({ icon: Icon, label, active, onClick, badge }) {
   return (
     <button
-      onClick={onClick}
+      onClick={onClick ? (e) => { haptic.light(); onClick(e); } : undefined}
       className="relative flex flex-col items-center justify-center gap-1 flex-1 transition-all"
       style={{ minHeight: 72, color: active ? BRAND.primary : "#94A3B8" }}>
       <div className={`rounded-2xl px-3 py-1.5 transition-all ${active ? "bg-red-50" : ""}`}>
