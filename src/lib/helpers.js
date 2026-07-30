@@ -96,7 +96,7 @@ import { supabase } from "../supabase";
 
 export async function uploadPhotoToSupabase(base64OrFile, path) {
   try {
-    console.log("[Photo] Starting upload to path:", path);
+    if (import.meta.env.DEV) console.log("[Photo] Starting upload to path:", path);
 
     let blob;
     let mimeType = "image/jpeg";
@@ -123,7 +123,7 @@ export async function uploadPhotoToSupabase(base64OrFile, path) {
       blob = new Blob([byteArray], { type: mimeType });
     }
 
-    console.log("[Photo] Blob created:", blob.size, "bytes,", mimeType);
+    if (import.meta.env.DEV) console.log("[Photo] Blob created:", blob.size, "bytes,", mimeType);
 
     const { error } = await supabase.storage
       .from("powermate-media")
@@ -135,7 +135,7 @@ export async function uploadPhotoToSupabase(base64OrFile, path) {
     }
 
     const { data } = supabase.storage.from("powermate-media").getPublicUrl(path);
-    console.log("[Photo] Upload success! URL:", data.publicUrl);
+    if (import.meta.env.DEV) console.log("[Photo] Upload success! URL:", data.publicUrl);
     return data.publicUrl;
   } catch (e) {
     console.error("[Photo] Upload exception:", e?.message || e);
@@ -145,7 +145,7 @@ export async function uploadPhotoToSupabase(base64OrFile, path) {
 
 // ─── Telemetry ────────────────────────────────────────────────────────────────
 export async function logEvent(name, data = {}) {
-  console.log("[PowerMate]", name, data);
+  if (import.meta.env.DEV) console.log("[PowerMate]", name, data);
   if (!navigator.onLine) return;
   try {
     await supabase.from("events").insert({
