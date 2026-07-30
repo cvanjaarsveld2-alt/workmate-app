@@ -111,7 +111,7 @@ export async function processMediaQueue(setData) {
   const pending = await getPendingUploads();
   if (pending.length === 0) return;
 
-  console.log(`[MediaQueue] Processing ${pending.length} pending uploads`);
+  if (import.meta.env.DEV) console.log(`[MediaQueue] Processing ${pending.length} pending uploads`);
 
   for (const item of pending) {
     try {
@@ -150,7 +150,7 @@ export async function processMediaQueue(setData) {
       }
 
       await markDone(item.id);
-      console.log(`[MediaQueue] ✓ Uploaded ${item.fileName}`);
+      if (import.meta.env.DEV) console.log(`[MediaQueue] ✓ Uploaded ${item.fileName}`);
     } catch (e) {
       console.warn(`[MediaQueue] Failed ${item.fileName}:`, e);
       await markFailed(item.id, (item.retries || 0) + 1);
