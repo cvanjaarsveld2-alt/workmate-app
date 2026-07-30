@@ -157,6 +157,19 @@ export default function PowerWorksApp() {
     }
   }, [session?.user?.id]);
 
+  // Keyboard-aware inputs: scroll a focused field into view above the keyboard
+  useEffect(() => {
+    function onFocusIn(e) {
+      const el = e.target;
+      if (!el || !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      setTimeout(() => {
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 300); // wait for keyboard to open
+    }
+    window.addEventListener("focusin", onFocusIn);
+    return () => window.removeEventListener("focusin", onFocusIn);
+  }, []);
+
   // FIX #11: Register sync handlers ONCE using the ref (not a closure rebuilt every render).
   useEffect(() => {
     registerSyncHandlers(setData, syncQueueRef);
