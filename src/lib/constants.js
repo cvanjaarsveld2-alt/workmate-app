@@ -1,3 +1,6 @@
+// ─── Design tokens (single source of truth) ─────────────────────────────────
+export { COLORS, TYPE, RADIUS, TAP, TAP_LG, SHEET_SPRING, SHEET_ANIM, statusColor } from "./tokens";
+
 // ─── Brand ────────────────────────────────────────────────────────────────────
 export const BRAND = {
   primary: "#8B1A1A",
