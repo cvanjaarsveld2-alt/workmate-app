@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, Check, Calendar, Send, Share2 } from "lucide-react";
 import { BRAND, REMINDER_OPTIONS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
+import { haptic } from "../lib/haptics";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
@@ -182,6 +183,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
     const t = followups.find(f => f.id === id);
     if (!t) return;
     const completing = !t.completed;
+    if (completing) haptic.success();
     const up = { ...t, completed: completing, sync_status: "pending" };
     const syncPayload = { id: t.id, completed: completing, sync_status: "pending" };
     setData(d => ({
