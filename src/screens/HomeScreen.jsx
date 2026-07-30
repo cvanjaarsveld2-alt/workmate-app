@@ -272,16 +272,16 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
       {/* ── Stats Grid (tappable) ── */}
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => setScreen("Followups")} className="text-left">
-          <StatCard label="Tasks Today" value={todayFU.length} sub={todayFU.length === 0 ? "all clear" : "follow-ups due"} color={BRAND.primary} icon={Calendar} />
+          <StatCard label="Tasks today" value={todayFU.length} sub={todayFU.length === 0 ? "all clear" : "follow-ups due"} color={BRAND.primary} icon={Calendar} />
         </button>
         <button onClick={() => setScreen("Quotes")} className="text-left">
-          <StatCard label="Quotes Pending" value={pendingQ.length} sub={pendingQ.length === 0 ? "none awaiting" : "awaiting response"} color="#B45309" icon={FileIcon} />
+          <StatCard label="Quotes pending" value={pendingQ.length} sub={pendingQ.length === 0 ? "none awaiting" : "awaiting response"} color="#B45309" icon={FileIcon} />
         </button>
         <button onClick={() => setScreen("Quotes")} className="text-left">
-          <StatCard label="Won Revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} />
+          <StatCard label="Won revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} />
         </button>
         <button onClick={() => setScreen("Expenses")} className="text-left">
-          <StatCard label="This Month" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} />
+          <StatCard label="This month" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} />
         </button>
       </div>
 
@@ -303,21 +303,21 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
                 <button
                   onClick={() => setNeglectSheet(cl)}
                   className="flex-1 flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-red-50 active:bg-red-100 transition-colors text-left">
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{cl.company}</p>
-                    {cl.branch && <p className="text-xs text-slate-400 truncate">{cl.branch}</p>}
-                    {cl.contactType === "stage" && (
-                      <p className="text-[10px] text-amber-600 mt-0.5">Stage updated only — no logged activity</p>
-                    )}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-[10px] bg-white/70 flex items-center justify-center shrink-0 text-[11px] font-black text-slate-500">
+                      {(cl.company || "?").replace(/[^a-zA-Z ]/g, "").split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "?"}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900 truncate">{cl.company}</p>
+                      {cl.branch && <p className="text-xs text-slate-400 truncate">{cl.branch}</p>}
+                      {cl.contactType === "stage" && (
+                        <p className="text-[10px] text-amber-600 mt-0.5">Stage updated only</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-xs font-black text-red-600">
-                      {cl.daysSince >= 9999 ? "Never" : `${cl.daysSince}d`}
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      {cl.daysSince >= 9999 ? "no contact" : "days ago"}
-                    </p>
-                  </div>
+                  <span className="shrink-0 text-[11px] font-black text-red-600 bg-red-100 px-2.5 py-1 rounded-full">
+                    {cl.daysSince >= 9999 ? "Never" : `${cl.daysSince}d`}
+                  </span>
                 </button>
                 <button
                   onClick={() => dismissClient(cl.id)}
