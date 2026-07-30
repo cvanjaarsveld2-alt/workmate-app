@@ -1,5 +1,5 @@
 // ─── PowerMate App ────────────────────────────────────────────────────────────
-import React, { useEffect, useState, useCallback, useRef} from "react";
+import React, { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home,
@@ -43,22 +43,22 @@ import { ContactsScreen }  from "./screens/ContactsScreen";
 import { FollowupsScreen } from "./screens/FollowupsScreen";
 import { QuotesScreen }    from "./screens/QuotesScreen";
 import { NotesScreen }     from "./screens/NotesScreen";
-import { EquipmentScreen } from "./screens/EquipmentScreen";
-import { MeetingScreen }       from "./screens/MeetingScreen";
-import { VehicleCheckScreen }    from "./screens/VehicleCheckScreen";
-import { AnalyticsScreen }       from "./screens/AnalyticsScreen";
-import { LeadsScreen }           from "./screens/LeadsScreen";
-import { TeamScreen }            from "./screens/TeamScreen";
-import { NotificationsScreen }   from "./screens/NotificationsScreen";
-import { SharedInboxScreen }     from "./screens/SharedInboxScreen";
-import { ExpensesScreen }  from "./screens/ExpensesScreen";
-import { MoreScreen }      from "./screens/MoreScreen";
-import { DiagnosticsScreen } from "./screens/DiagnosticsScreen";
-import { BackfillZARScreen } from "./screens/BackfillZARScreen";
+const EquipmentScreen = lazy(() => import("./screens/EquipmentScreen").then(m => ({ default: m.EquipmentScreen })));
+const MeetingScreen = lazy(() => import("./screens/MeetingScreen").then(m => ({ default: m.MeetingScreen })));
+const VehicleCheckScreen = lazy(() => import("./screens/VehicleCheckScreen").then(m => ({ default: m.VehicleCheckScreen })));
+const AnalyticsScreen = lazy(() => import("./screens/AnalyticsScreen").then(m => ({ default: m.AnalyticsScreen })));
+const LeadsScreen = lazy(() => import("./screens/LeadsScreen").then(m => ({ default: m.LeadsScreen })));
+const TeamScreen = lazy(() => import("./screens/TeamScreen").then(m => ({ default: m.TeamScreen })));
+const NotificationsScreen = lazy(() => import("./screens/NotificationsScreen").then(m => ({ default: m.NotificationsScreen })));
+const SharedInboxScreen = lazy(() => import("./screens/SharedInboxScreen").then(m => ({ default: m.SharedInboxScreen })));
+const ExpensesScreen = lazy(() => import("./screens/ExpensesScreen").then(m => ({ default: m.ExpensesScreen })));
+const MoreScreen = lazy(() => import("./screens/MoreScreen").then(m => ({ default: m.MoreScreen })));
+const DiagnosticsScreen = lazy(() => import("./screens/DiagnosticsScreen").then(m => ({ default: m.DiagnosticsScreen })));
+const BackfillZARScreen = lazy(() => import("./screens/BackfillZARScreen").then(m => ({ default: m.BackfillZARScreen })));
 // ── NEW SCREENS ──
 import { Client360Screen }   from "./screens/Client360Screen";
 import { CalendarScreen }     from "./screens/CalendarScreen";
-import { TeamDashboardScreen } from "./screens/TeamDashboardScreen";
+const TeamDashboardScreen = lazy(() => import("./screens/TeamDashboardScreen").then(m => ({ default: m.TeamDashboardScreen })));
 
 import { ErrorBoundary as ScreenErrorBoundary } from "./components/ErrorBoundary";
 import { Onboarding, shouldShowOnboarding } from "./components/Onboarding";
@@ -721,7 +721,13 @@ export default function PowerWorksApp() {
             <AnimatePresence mode="wait">
               <motion.div key={screen} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
                 <ScreenErrorBoundary label={screen} onGoHome={() => navigate("Home")}>
-                  {screens[screen]}
+                  <Suspense fallback={
+                    <div className="flex justify-center items-center py-20">
+                      <Spinner />
+                    </div>
+                  }>
+                    {screens[screen]}
+                  </Suspense>
                 </ScreenErrorBoundary>
               </motion.div>
             </AnimatePresence>
