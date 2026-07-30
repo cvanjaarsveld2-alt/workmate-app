@@ -61,6 +61,8 @@ import { CalendarScreen }     from "./screens/CalendarScreen";
 import { TeamDashboardScreen } from "./screens/TeamDashboardScreen";
 
 import { ErrorBoundary as ScreenErrorBoundary } from "./components/ErrorBoundary";
+import { Onboarding, shouldShowOnboarding } from "./components/Onboarding";
+import { PullToRefresh } from "./components/PullToRefresh";
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false }; }
@@ -127,6 +129,7 @@ export default function PowerWorksApp() {
   const [teamMembers, setTeamMembers] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [userRole, setUserRole]       = useState("member"); // NEW: for team dashboard
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [screenContext, setScreenContext] = useState({}); // NEW: for passing data between screens (e.g. clientId)
 
   // ── FIX #10 + #11: Use a ref for syncQueue so callbacks always read current data ──
@@ -150,6 +153,7 @@ export default function PowerWorksApp() {
     if (session?.user?.id) {
       setOfflineUser(session.user.id);
       setMediaQueueUser(session.user.id);
+      if (shouldShowOnboarding(session.user.id)) setShowOnboarding(true);
     }
   }, [session?.user?.id]);
 
@@ -696,13 +700,19 @@ export default function PowerWorksApp() {
         />
 
         <main className="mx-auto max-w-2xl px-4 pt-4">
-          <AnimatePresence mode="wait">
-            <motion.div key={screen} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
-              <ScreenErrorBoundary label={screen} onGoHome={() => navigate("Home")}>
-                {screens[screen]}
-              </ScreenErrorBoundary>
-            </motion.div>
-          </AnimatePresence>
+          <PullToRefresh onRefresh={async () => {
+            if (!isOnline || !session?.user?.id) return;
+            await pushSyncQueue(data, setData);
+            await pullFromSupabase(session.user.id, setData);
+          }}>
+            <AnimatePresence mode="wait">
+              <motion.div key={screen} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.15 }}>
+                <ScreenErrorBoundary label={screen} onGoHome={() => navigate("Home")}>
+                  {screens[screen]}
+                </ScreenErrorBoundary>
+              </motion.div>
+            </AnimatePresence>
+          </PullToRefresh>
         </main>
 
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
@@ -710,6 +720,9 @@ export default function PowerWorksApp() {
         <DailyVehiclePrompt userId={session.user.id} data={data} setData={setData} onNavigate={navigate} />
         <AnimatePresence>
           {syncError && <Toast message={syncError} type="error" onDone={() => setSyncError("")} />}
+          {showOnboarding && session?.user?.id && (
+            <Onboarding userId={session.user.id} onDone={() => setShowOnboarding(false)} />
+          )}
         </AnimatePresence>
       </div>
     </ErrorBoundary>
