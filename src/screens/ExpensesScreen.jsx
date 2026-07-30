@@ -1105,7 +1105,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 End of month is coming — {unsubmittedCount} unsubmitted expense{unsubmittedCount !== 1 ? "s" : ""}. Send your pack to Vicky before month-end.
               </p>
             </div>
-            <button onClick={dismissReminder} className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-100 shrink-0">
+            <button onClick={dismissReminder} className="w-11 h-11 flex items-center justify-center rounded-lg text-amber-500 hover:bg-amber-100 shrink-0">
               <X size={14} />
             </button>
           </motion.div>
