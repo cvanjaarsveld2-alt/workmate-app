@@ -51,7 +51,7 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
   function log(msg) {
     const t = new Date().toLocaleTimeString();
     setDebug(d => [...d, `${t} · ${msg}`].slice(-8));
-    console.log("[ReceiptScanner]", msg);
+    if (import.meta.env.DEV) console.log("[ReceiptScanner]", msg);
   }
 
   async function handleFile(file) {
