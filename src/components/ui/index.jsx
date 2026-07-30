@@ -348,18 +348,23 @@ export function Empty({ title, text, icon: Icon, actionLabel, onAction }) {
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 export function StatCard({ label, value, sub, color, icon: Icon }) {
+  const accent = color || BRAND.primary;
+  // Soft tint of the accent for the icon chip background
+  const chipBg = `${accent}14`;
   return (
     <Card className="p-3.5">
-      <div className="flex items-start justify-between gap-1 mb-1.5">
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider leading-tight flex-1">{label}</p>
+      <div className="flex items-center justify-between mb-2.5">
         {Icon && (
-          <div className="rounded-lg p-1.5 shrink-0" style={{ background: BRAND.light }}>
-            <Icon size={14} style={{ color: color || BRAND.primary }} />
+          <div className="rounded-[9px] shrink-0 flex items-center justify-center" style={{ background: chipBg, width: 30, height: 30 }}>
+            <Icon size={15} style={{ color: accent }} />
           </div>
         )}
       </div>
-      <p className="text-2xl font-black leading-none" style={{ color: color || BRAND.primary }}>{value}</p>
-      {sub && <p className="mt-1 text-[11px] text-slate-400 leading-snug">{sub}</p>}
+      {/* Number is neutral dark so the row reads as one clean data set — colour lives in the icon */}
+      <p className="text-[26px] font-black leading-none tracking-tight text-slate-900">{value}</p>
+      {/* Sentence-case label below the number */}
+      <p className="mt-1.5 text-[11px] font-bold text-slate-400 leading-tight">{label}</p>
+      {sub && <p className="mt-0.5 text-[11px] text-slate-400 leading-snug">{sub}</p>}
     </Card>
   );
 }
