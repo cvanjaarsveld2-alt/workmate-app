@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, ChevronDown, Camera } from "lucide-react";
 import { BRAND, STAGE_COLORS, NOTE_URGENCY } from "../../lib/constants";
 import { daysDiff, smartDate } from "../../lib/helpers";
+import { haptic } from "../../lib/haptics";
 
 // ─── Card ─────────────────────────────────────────────────────────────────────
 // Tappable cards get a strong iOS-style press state — background dims and
@@ -49,7 +50,7 @@ export function Btn({ children, onClick, disabled, variant = "solid", className 
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={onClick ? (e) => { haptic.light(); onClick(e); } : undefined}
       disabled={disabled}
       className={`inline-flex items-center justify-center gap-2 font-bold transition-all active:scale-95 active:opacity-80 disabled:opacity-40 ${sizes[size]} ${className}`}
       style={vs[variant] || vs.solid}>
@@ -297,9 +298,12 @@ export function FilterPills({ options, value, onChange, dangerValue }) {
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
-export function Toast({ message, onDone }) {
+export function Toast({ message, onDone, type = "success" }) {
   const duration = Math.max(2200, Math.min(message.length * 55, 6000));
   useEffect(() => {
+    // Tactile feedback whenever a toast appears — every save/action feels physical
+    if (type === "error") haptic.error();
+    else haptic.success();
     const t = setTimeout(onDone, duration);
     return () => clearTimeout(t);
   }, [message]);
