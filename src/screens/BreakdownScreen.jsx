@@ -67,6 +67,30 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
       base.client_name = linkedBreakdown.client_name || "";
       base.reference   = linkedBreakdown.reference || "";
       base.title       = linkedBreakdown.title ? `Repair — ${linkedBreakdown.title}` : "";
+
+      // Pre-fill a repair item for each distinct fault found in the breakdown,
+      // so every fault gets a repair action logged against it. The fault seeds
+      // the item heading; the technician adds the photo and "what was done".
+      const seenFaults = new Set();
+      const prefilled = [];
+      for (const it of (Array.isArray(linkedBreakdown.items) ? linkedBreakdown.items : [])) {
+        for (const fault of (it.faults || [])) {
+          const key = fault.toLowerCase().trim();
+          if (!key || seenFaults.has(key)) continue;
+          seenFaults.add(key);
+          prefilled.push({
+            id: genId(),
+            heading: fault,
+            photos: [],
+            faults: [],
+            action: "",
+            note: it.heading ? `From breakdown: ${it.heading}` : "",
+            phase: "general",
+            _fromFault: true,
+          });
+        }
+      }
+      if (prefilled.length > 0) base.items = prefilled;
     }
     setEditing(base);
     setView("edit");
@@ -410,8 +434,12 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
       </div>
 
       {r.linked_breakdown_id && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold">
-          <Link2 size={14} /> Linked to breakdown — it'll be marked resolved on save
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-blue-50 text-blue-700 text-xs font-bold">
+          <Link2 size={14} className="shrink-0 mt-0.5" />
+          <span>
+            Linked to breakdown — it'll be marked resolved on save.
+            {r.items.some(it => it._fromFault) && " Repair items were pre-filled from the breakdown's faults; add a photo and what you did to each."}
+          </span>
         </div>
       )}
 
@@ -524,9 +552,16 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
               )}
 
               {isRepair && (
-                <textarea value={it.action || ""} onChange={e => patchItem(it.id, { action: e.target.value })}
-                  placeholder="What was done to fix it…" rows={2}
-                  className="w-full text-sm text-slate-700 bg-slate-50 rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-none resize-none" />
+                <>
+                  {it._fromFault && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">
+                      <AlertTriangle size={11} /> Fault from breakdown — log the repair below
+                    </div>
+                  )}
+                  <textarea value={it.action || ""} onChange={e => patchItem(it.id, { action: e.target.value })}
+                    placeholder="What was done to fix it…" rows={2}
+                    className="w-full text-sm text-slate-700 bg-slate-50 rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-none resize-none" />
+                </>
               )}
 
               <input value={it.note} onChange={e => patchItem(it.id, { note: e.target.value })}
