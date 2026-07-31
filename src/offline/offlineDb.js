@@ -12,11 +12,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const DB_PREFIX  = "powermate_offline_";
-const DB_VERSION = 6;
+const DB_VERSION = 8;  // bumped for breakdowns store
 const STORES = [
   "clients", "followups", "quotes", "notes", "equipment",
   "contacts", "expenses", "leads", "vehicle_checks",
   "activities",  // NEW: interaction logging
+  "breakdowns", "repairs",  // NEW: breakdown + repair reports
   "syncQueue",
 ];
 
