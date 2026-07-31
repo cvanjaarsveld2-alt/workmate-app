@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, ChevronRight, ChevronDown, AlertTriangle, Camera,
   Trash2, Wrench, ArrowLeft, Check, Search, CheckCircle2, Link2,
+  Share2, FileText, FileType,
 } from "lucide-react";
 import { BRAND, MAX_FILE_SIZE_MB } from "../lib/constants";
 import { genId, todayISO, smartDate, uploadPhotoToSupabase, compressImage } from "../lib/helpers";
@@ -260,6 +261,7 @@ function ReportEditor({ isRepair, report, clients, onBack, onSave, onDelete }) {
   const [r, setR] = useState(report);
   const [faultSheet, setFaultSheet] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   function patch(fields) { setR(prev => ({ ...prev, ...fields })); }
 
@@ -319,6 +321,27 @@ function ReportEditor({ isRepair, report, clients, onBack, onSave, onDelete }) {
   const activeFaultItem = r.items.find(it => it.id === faultSheet);
   const isEditingExisting = report.created_at;
 
+  async function handleExport(format) {
+    setExporting(false);
+    try {
+      const { buildReportPDF, buildReportWord } = await import("../lib/reportExport");
+      const builder = format === "word" ? buildReportWord : buildReportPDF;
+      const { blob, filename } = await builder({ report: r, mode: isRepair ? "repair" : "breakdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      haptic.success();
+    } catch (e) {
+      console.error("Export failed:", e);
+      alert("Could not generate the document. Please try again.");
+    }
+  }
+
   return (
     <div className="space-y-4 pb-28">
       <div className="flex items-center gap-3">
@@ -328,6 +351,12 @@ function ReportEditor({ isRepair, report, clients, onBack, onSave, onDelete }) {
         <h1 className="text-xl font-black text-slate-900 flex-1">
           {isEditingExisting ? "Edit Report" : (isRepair ? "New Repair" : "New Report")}
         </h1>
+        {isEditingExisting && (
+          <button onClick={() => { haptic.light(); setExporting(true); }}
+            className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-600 min-w-[44px] min-h-[44px] flex items-center justify-center">
+            <Share2 size={18} />
+          </button>
+        )}
         {onDelete && (
           <button onClick={onDelete} className="p-2.5 rounded-xl border-2 border-red-100 bg-white text-red-500 min-w-[44px] min-h-[44px] flex items-center justify-center">
             <Trash2 size={18} />
@@ -464,6 +493,50 @@ function ReportEditor({ isRepair, report, clients, onBack, onSave, onDelete }) {
       <AnimatePresence>
         {faultSheet && activeFaultItem && (
           <FaultPickerSheet item={activeFaultItem} onToggle={(f) => toggleFault(faultSheet, f)} onClose={() => setFaultSheet(null)} />
+        )}
+      </AnimatePresence>
+
+      {/* Export sheet: PDF or Word */}
+      <AnimatePresence>
+        {exporting && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setExporting(false)} className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm" />
+            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="fixed bottom-0 left-0 right-0 z-[91] rounded-t-3xl bg-white p-5"
+              style={{ maxWidth: 672, margin: "0 auto" }}>
+              <div className="flex justify-center pb-3"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
+              <p className="text-base font-black text-slate-900 mb-1">Export report</p>
+              <p className="text-xs text-slate-400 mb-4">Download a branded document to share or print.</p>
+              <div className="space-y-2.5">
+                <button onClick={() => handleExport("pdf")}
+                  className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-100 active:bg-slate-50 transition-colors text-left">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FEF2F2" }}>
+                    <FileText size={20} style={{ color: BRAND_PRIMARY }} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-black text-slate-900">PDF document</p>
+                    <p className="text-xs text-slate-400">Best for sending to clients &amp; printing</p>
+                  </div>
+                </button>
+                <button onClick={() => handleExport("word")}
+                  className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-100 active:bg-slate-50 transition-colors text-left">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#EFF6FF" }}>
+                    <FileType size={20} style={{ color: "#2563EB" }} />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-black text-slate-900">Word document</p>
+                    <p className="text-xs text-slate-400">Editable .doc — opens in Microsoft Word</p>
+                  </div>
+                </button>
+              </div>
+              <button onClick={() => setExporting(false)}
+                className="w-full mt-4 py-3 rounded-2xl bg-slate-100 text-slate-500 font-bold text-sm min-h-[48px]">
+                Cancel
+              </button>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>
