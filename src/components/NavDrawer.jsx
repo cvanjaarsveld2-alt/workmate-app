@@ -21,7 +21,9 @@ import {
   TrendingUp,
   Inbox,
   Bell,
-  LayoutDashboard, // NEW: for Team Dashboard
+  LayoutDashboard,
+  AlertTriangle,
+  CheckCircle2, // NEW: for Team Dashboard
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
@@ -45,6 +47,8 @@ const SECTIONS = [
       { key: "Equipment",    label: "Equipment",         icon: Wrench,    badgeKey: "overdueEquip" },
       { key: "Meeting",      label: "Meeting Recorder", icon: Mic },
       { key: "VehicleCheck", label: "Vehicle Checklist",  icon: Car },
+      { key: "Breakdown",    label: "Breakdown Reports", icon: AlertTriangle, badgeKey: "openBreakdowns" },
+      { key: "Repair",       label: "Repair Reports",    icon: CheckCircle2 },
     ],
   },
   {
