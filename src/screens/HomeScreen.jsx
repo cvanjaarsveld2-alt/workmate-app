@@ -492,7 +492,7 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
                 <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${(count / total) * 100}%` }}
+                    animate={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }}
                     transition={{ duration: 0.6, ease: "easeOut" }}
                     className="h-full rounded-full"
                     style={{ background: c.dot }} />
@@ -505,7 +505,7 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
             <div className="flex items-center gap-3 pt-2 border-t border-slate-50 mt-2">
               <span className="w-20 text-xs font-bold shrink-0 text-slate-400">Lost</span>
               <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                <div className="h-full rounded-full bg-slate-300" style={{ width: `${(lostC / clients.length) * 100}%` }} />
+                <div className="h-full rounded-full bg-slate-300" style={{ width: `${clients.length > 0 ? (lostC / clients.length) * 100 : 0}%` }} />
               </div>
               <span className="text-xs font-bold text-slate-400 w-6 text-right">{lostC}</span>
             </div>
