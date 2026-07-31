@@ -224,7 +224,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
     const total = wonC.reduce((s, c) => {
       return s + followups.filter(f => f.client === c.company).length;
     }, 0);
-    return (total / wonC.length).toFixed(1);
+    return wonC.length ? (total / wonC.length).toFixed(1) : "0";
   }, [clients, followups]);
 
   // ── Pipeline velocity (how long in each stage on average) ─────────────────
