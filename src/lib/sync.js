@@ -257,7 +257,7 @@ export async function pullFromSupabase(uid, setData) {
       return pullSince ? query.gte("updated_at", pullSince) : query;
     }
 
-    const [a, b, c, d, leads_res, e, f, g, h, act, bd, rep] = await Promise.all([
+    const [a, b, c, d, leads_res, e, f, g, h, act, bd, rep, cf] = await Promise.all([
       supabase.from("clients").select("id,user_id,team_id,company,division,contact,phone,email,location,branch,stage,sync_status,auto_created,source,notes,assigned_to_user_id,assigned_to,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
       supabase.from("followups").select("id,user_id,team_id,client_id,client,branch,title,date,time,reminder,notes,completed,linked_note_id,sync_status,auto_generated,assigned_to_user_id,assigned_to,created_at").order("date", { ascending: false }).limit(1000),
       supabase.from("quotes").select("id,user_id,team_id,client_name,client_id,description,value,line_items,vat_inclusive,status,sent_date,sync_status,created_at").order("created_at", { ascending: false }).limit(1000),
@@ -273,6 +273,8 @@ export async function pullFromSupabase(uid, setData) {
       supabase.from("breakdown_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,severity,summary,items,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
       // NEW: Pull repair reports
       supabase.from("repair_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,summary,items,linked_breakdown_id,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
+      // NEW: Pull custom faults library
+      supabase.from("custom_faults").select("id,user_id,team_id,label,fault_group,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
     ]);
 
     setData(prev => {
@@ -312,6 +314,7 @@ export async function pullFromSupabase(uid, setData) {
         activities:    act.error ? (prev.activities || []) : merge(act.data, prev.activities, prev.syncQueue, "activities"),
         breakdowns:    bd.error ? (prev.breakdowns || []) : merge(bd.data, prev.breakdowns, prev.syncQueue, "breakdown_reports"),
         repairs:       rep.error ? (prev.repairs || []) : merge(rep.data, prev.repairs, prev.syncQueue, "repair_reports"),
+        customFaults:  cf.error ? (prev.customFaults || []) : merge(cf.data, prev.customFaults, prev.syncQueue, "custom_faults"),
         vehicleChecks: vcMap,
       };
     });
