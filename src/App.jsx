@@ -124,6 +124,7 @@ export default function PowerWorksApp() {
     clients: [], followups: [], quotes: [], notes: [], equipment: [],
     contacts: [], expenses: [], leads: [], activities: [], // NEW: activities
     breakdowns: [], repairs: [], // NEW: breakdown + repair reports
+    customFaults: [], // NEW: saved common faults library
     syncQueue: [],
   });
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
@@ -465,7 +466,7 @@ export default function PowerWorksApp() {
     // Reset ALL state including team info to prevent cross-account leaks
     setData({
       clients: [], followups: [], quotes: [], notes: [], equipment: [],
-      contacts: [], expenses: [], leads: [], activities: [], breakdowns: [], repairs: [], syncQueue: [],
+      contacts: [], expenses: [], leads: [], activities: [], breakdowns: [], repairs: [], customFaults: [], syncQueue: [],
     });
     setTeamId(null);
     setTeamMembers([]);
