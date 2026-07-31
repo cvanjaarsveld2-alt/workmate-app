@@ -46,6 +46,7 @@ import { NotesScreen }     from "./screens/NotesScreen";
 const EquipmentScreen = lazy(() => import("./screens/EquipmentScreen").then(m => ({ default: m.EquipmentScreen })));
 const MeetingScreen = lazy(() => import("./screens/MeetingScreen").then(m => ({ default: m.MeetingScreen })));
 const VehicleCheckScreen = lazy(() => import("./screens/VehicleCheckScreen").then(m => ({ default: m.VehicleCheckScreen })));
+const BreakdownScreen = lazy(() => import("./screens/BreakdownScreen").then(m => ({ default: m.BreakdownScreen })));
 const AnalyticsScreen = lazy(() => import("./screens/AnalyticsScreen").then(m => ({ default: m.AnalyticsScreen })));
 const LeadsScreen = lazy(() => import("./screens/LeadsScreen").then(m => ({ default: m.LeadsScreen })));
 const TeamScreen = lazy(() => import("./screens/TeamScreen").then(m => ({ default: m.TeamScreen })));
@@ -122,6 +123,7 @@ export default function PowerWorksApp() {
   const [data, setData] = useState({
     clients: [], followups: [], quotes: [], notes: [], equipment: [],
     contacts: [], expenses: [], leads: [], activities: [], // NEW: activities
+    breakdowns: [], repairs: [], // NEW: breakdown + repair reports
     syncQueue: [],
   });
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
@@ -463,7 +465,7 @@ export default function PowerWorksApp() {
     // Reset ALL state including team info to prevent cross-account leaks
     setData({
       clients: [], followups: [], quotes: [], notes: [], equipment: [],
-      contacts: [], expenses: [], leads: [], activities: [], syncQueue: [],
+      contacts: [], expenses: [], leads: [], activities: [], breakdowns: [], repairs: [], syncQueue: [],
     });
     setTeamId(null);
     setTeamMembers([]);
@@ -541,6 +543,7 @@ export default function PowerWorksApp() {
   const leadContacts     = (data.contacts  || []).filter(c => (c.status || "lead") === "lead").length;
   const criticalNotes    = (data.notes     || []).filter(n => !n.resolved && n.urgency === "Critical").length;
   const unsubmittedExp   = (data.expenses  || []).filter(e => e.status === "unsubmitted").length;
+  const openBreakdowns   = (data.breakdowns || []).filter(b => b.status !== "resolved").length;
 
   const drawerBadges = {
     clients:        (data.clients || []).length,
@@ -548,6 +551,7 @@ export default function PowerWorksApp() {
     overdueFU:      overdueFollowups,
     criticalNotes,
     overdueEquip,
+    openBreakdowns,
     pendingQ:       flaggedQuotes,
     unsubmittedExp,
     pending:        pendingCount,
@@ -572,6 +576,8 @@ export default function PowerWorksApp() {
     Equipment: <EquipmentScreen data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} isOnline={isOnline} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Meeting:      <MeetingScreen      data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} onNavigate={navigate} />,
     VehicleCheck: <VehicleCheckScreen data={data} setData={setData} userId={session.user.id} />,
+    Breakdown:    <BreakdownScreen    data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} onNavigate={navigate} mode="breakdown" />,
+    Repair:       <BreakdownScreen    data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} onNavigate={navigate} mode="repair" />,
     Analytics:    <AnalyticsScreen    data={data} onNavigate={navigate} />,
     Leads:        <LeadsScreen        data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     // FIX #16: use supabase directly instead of dynamic import
