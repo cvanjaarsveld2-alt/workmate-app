@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, ChevronRight, ChevronDown, AlertTriangle, Camera,
   Trash2, Wrench, ArrowLeft, Check, Search, CheckCircle2, Link2,
-  Share2, FileText, FileType,
+  Share2, FileText, FileType, LayoutGrid, ClipboardList,
 } from "lucide-react";
 import { BRAND, MAX_FILE_SIZE_MB } from "../lib/constants";
 import { genId, todayISO, smartDate, uploadPhotoToSupabase, compressImage } from "../lib/helpers";
@@ -39,6 +39,7 @@ function itemPhotos(it) {
 export function BreakdownScreen({ data, setData, userId, userEmail, teamId, teamMembers, onNavigate, mode = "breakdown" }) {
   const isRepair = mode === "repair";
   const [view, setView]       = useState("list");
+  const [listMode, setListMode] = useState("list"); // "list" | "board" (breakdown only)
   const [editing, setEditing] = useState(null);
   const [toast, setToast]     = useState("");
   const { confirm, dialog } = useConfirm();
@@ -229,6 +230,24 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
     haptic.light();
   }
 
+  // ── Change a report's status (used by the board view to move between columns) ──
+  function changeStatus(reportId, newStatus) {
+    haptic.tick();
+    const now = new Date().toISOString();
+    setData(d => ({
+      ...d,
+      [dataKey]: (d[dataKey] || []).map(b =>
+        b.id === reportId ? { ...b, status: newStatus, sync_status: "pending", updated_at: now } : b
+      ),
+      syncQueue: [
+        { id: genId(), table: tableName, action: "upsert", data: { id: reportId, status: newStatus, updated_at: now }, status: "pending", created_at: now },
+        ...(d.syncQueue || []),
+      ],
+    }));
+    const updated = (data[dataKey] || []).find(b => b.id === reportId);
+    if (updated) offlineSave(dataKey, { ...updated, status: newStatus, updated_at: now }).catch(() => {});
+  }
+
   if (view === "list") {
     const openBreakdowns = (data.breakdowns || []).filter(b => b.status !== "resolved");
     return (
@@ -242,6 +261,24 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
           style={{ background: BRAND_PRIMARY }}>
           <Plus size={18} /> {isRepair ? "New repair report" : "New breakdown report"}
         </button>
+
+        {/* List / Board toggle — breakdown only (repairs are all "Repaired") */}
+        {!isRepair && reports.length > 0 && (
+          <div className="flex gap-1 p-1 rounded-xl bg-slate-100">
+            {[
+              { key: "list", label: "List", icon: ClipboardList },
+              { key: "board", label: "Board", icon: LayoutGrid },
+            ].map(m => (
+              <button key={m.key} onClick={() => { haptic.light(); setListMode(m.key); }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-bold transition-all min-h-[40px]"
+                style={listMode === m.key
+                  ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
+                  : { background: "transparent", color: "#94A3B8" }}>
+                <m.icon size={15} /> {m.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {isRepair && openBreakdowns.length > 0 && (
           <Card className="p-4">
@@ -268,6 +305,8 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
               ? "Log a completed repair — take photos of the fix and record what was done."
               : "Tap the button above to log your first breakdown — take photos and tag the faults as you inspect."}
             actionLabel={isRepair ? "New repair" : "New report"} onAction={() => newReport()} />
+        ) : (!isRepair && listMode === "board") ? (
+          <BreakdownBoard reports={reports} onOpen={openReport} onChangeStatus={changeStatus} />
         ) : (
           <div className="space-y-3">
             {reports.map(r => {
@@ -652,6 +691,101 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
           </>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ─── Board view: 3 status columns (Open / In progress / Resolved) ────────────
+// Reuses the existing report.status field. Tap a card to open it; use the
+// move buttons on each card to shift it between columns (persists + syncs).
+// Tap-to-move is used instead of drag because it's far more reliable on a
+// phone touchscreen inside a scrolling container.
+function BreakdownBoard({ reports, onOpen, onChangeStatus }) {
+  const columns = STATUS_OPTIONS; // open / in_progress / resolved, with colors
+  const byStatus = (val) => reports.filter(r => (r.status || "open") === val);
+
+  // The next status when moving right, and previous when moving left
+  const order = columns.map(c => c.value);
+  const moveTo = (current, dir) => {
+    const i = order.indexOf(current || "open");
+    const ni = i + dir;
+    if (ni < 0 || ni >= order.length) return null;
+    return order[ni];
+  };
+
+  return (
+    <div className="-mx-4 px-4 overflow-x-auto pb-2">
+      <div className="flex gap-3" style={{ minWidth: "min-content" }}>
+        {columns.map(col => {
+          const items = byStatus(col.value);
+          return (
+            <div key={col.value} className="shrink-0" style={{ width: 260 }}>
+              {/* Column header */}
+              <div className="flex items-center justify-between mb-2 px-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: col.color }} />
+                  <p className="text-sm font-black text-slate-700">{col.label}</p>
+                </div>
+                <span className="text-xs font-black text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">{items.length}</span>
+              </div>
+
+              {/* Column cards */}
+              <div className="space-y-2">
+                {items.length === 0 && (
+                  <div className="rounded-xl border-2 border-dashed border-slate-100 py-8 text-center">
+                    <p className="text-xs text-slate-300 font-bold">Empty</p>
+                  </div>
+                )}
+                {items.map(r => {
+                  const sev = severityMeta(r.severity);
+                  const allPhotos = (r.items || []).reduce((s, i) => s + itemPhotos(i).length, 0);
+                  const faultCount = (r.items || []).reduce((s, i) => s + (i.faults?.length || 0), 0);
+                  const left = moveTo(r.status, -1);
+                  const right = moveTo(r.status, +1);
+                  return (
+                    <div key={r.id} className="rounded-xl border-2 border-slate-100 bg-white overflow-hidden">
+                      <button onClick={() => onOpen(r)} className="w-full text-left p-3 active:bg-slate-50 transition-colors">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: `${sev.color}18`, color: sev.color }}>{sev.label}</span>
+                          {r.linked_breakdown_id && <span className="flex items-center gap-0.5 text-[9px] font-black text-slate-400"><Link2 size={9} /> linked</span>}
+                        </div>
+                        <p className="text-sm font-black text-slate-900 leading-snug line-clamp-2">{r.title || "Untitled report"}</p>
+                        {r.equipment && <p className="text-xs text-slate-500 truncate mt-0.5">{r.equipment}</p>}
+                        {r.client_name && <p className="text-[11px] text-slate-400 truncate">{r.client_name}</p>}
+                        <div className="flex items-center gap-2.5 mt-2 text-[10px] text-slate-400 font-bold">
+                          <span className="flex items-center gap-1"><Camera size={11} /> {allPhotos}</span>
+                          <span className="flex items-center gap-1"><AlertTriangle size={11} /> {faultCount}</span>
+                          <span>{smartDate(r.report_date)}</span>
+                        </div>
+                      </button>
+                      {/* Move controls */}
+                      <div className="flex border-t border-slate-100">
+                        <button
+                          onClick={() => left && onChangeStatus(r.id, left)}
+                          disabled={!left}
+                          className="flex-1 flex items-center justify-center gap-1 py-2 text-[11px] font-bold transition-colors"
+                          style={left ? { color: "#64748B" } : { color: "#E2E8F0", cursor: "default" }}>
+                          <ChevronRight size={12} className="rotate-180" />
+                          {left ? statusMeta(left).label : ""}
+                        </button>
+                        <div className="w-px bg-slate-100" />
+                        <button
+                          onClick={() => right && onChangeStatus(r.id, right)}
+                          disabled={!right}
+                          className="flex-1 flex items-center justify-center gap-1 py-2 text-[11px] font-bold transition-colors"
+                          style={right ? { color: "#64748B" } : { color: "#E2E8F0", cursor: "default" }}>
+                          {right ? statusMeta(right).label : ""}
+                          <ChevronRight size={12} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
