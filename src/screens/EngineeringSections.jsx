@@ -11,7 +11,7 @@ import {
   ChevronDown, FileText, Info, Clock, Search, AlertOctagon,
   ClipboardList, Wrench, ShieldCheck, Paperclip, Plus, X, Trash2,
 } from "lucide-react";
-import { Field, SelectField } from "../components/ui";
+import { Field } from "../components/ui";
 import { BRAND } from "../lib/constants";
 import { genId } from "../lib/helpers";
 import { haptic } from "../lib/haptics";
@@ -195,9 +195,15 @@ export function EngineeringSections({ engineering = {}, onChange }) {
       <Section icon={Search} title="5. Root Cause Analysis"
         subtitle="Method, primary cause, contributing factors"
         filled={hasObj(eng.rca)}>
-        <SelectField label="Method used" value={eng.rca?.method || ""}
-          onChange={v => setIn("rca", "method", v)}
-          options={RCA_METHODS} />
+        <div>
+          <p className="text-xs font-bold text-slate-500 mb-1.5">Method used</p>
+          <select
+            value={eng.rca?.method || ""}
+            onChange={e => setIn("rca", "method", e.target.value)}
+            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-red-300 focus:bg-white transition-colors">
+            {RCA_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+        </div>
         <TextBlock label="Primary cause" value={eng.rca?.primary}
           onChange={v => setIn("rca", "primary", v)}
           placeholder="Detailed explanation of the root cause." />
