@@ -19,6 +19,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { Card, Field, ClientSelector, Toast, Empty, PageHeader, useConfirm } from "../components/ui";
 import { MediaPicker } from "../components/MediaComponents";
 import { FAULT_GROUPS, SEVERITY_OPTIONS, STATUS_OPTIONS } from "../lib/breakdownFaults";
+import { EngineeringSections } from "./EngineeringSections";
 import { haptic } from "../lib/haptics";
 
 const BRAND_PRIMARY = BRAND.primary;
@@ -57,7 +58,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
       id: genId(), title: "", reference: "", equipment: "", location: "",
       client_id: null, client_name: "",
       status: isRepair ? "resolved" : "open", severity: "medium",
-      summary: "", items: [], report_date: todayISO(),
+      summary: "", items: [], report_date: todayISO(), engineering: {},
     };
     if (isRepair && linkedBreakdown) {
       base.linked_breakdown_id = linkedBreakdown.id;
@@ -73,7 +74,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
 
   function openReport(r) {
     haptic.light();
-    setEditing({ ...r, items: (Array.isArray(r.items) ? r.items : []).map(it => ({ ...it, photos: itemPhotos(it) })) });
+    setEditing({ ...r, engineering: r.engineering || {}, items: (Array.isArray(r.items) ? r.items : []).map(it => ({ ...it, photos: itemPhotos(it) })) });
     setView("edit");
   }
 
@@ -101,6 +102,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
         faults: isRepair ? [] : (it.faults || []),
         action: isRepair ? (it.action || "") : "",
         note: it.note || "",
+        phase: it.phase || "general",
       });
     }
 
@@ -113,6 +115,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
       status: report.status || (isRepair ? "resolved" : "open"),
       severity: report.severity || "medium", summary: report.summary || "",
       items, report_date: report.report_date || todayISO(),
+      engineering: report.engineering || {},
       ...(isRepair ? { linked_breakdown_id: report.linked_breakdown_id || null } : {}),
       sync_status: "pending", created_at: report.created_at || new Date().toISOString(),
     }, teamId);
@@ -309,7 +312,7 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
 
   function addItemWithPhoto(media) {
     const photo = { id: genId(), url: null, _base64: media.base64 || null, _file: media.file || null };
-    const item = { id: genId(), heading: "", photos: [photo], faults: [], action: "", note: "" };
+    const item = { id: genId(), heading: "", photos: [photo], faults: [], action: "", note: "", phase: "general" };
     setR(prev => ({ ...prev, items: [...prev.items, item] }));
     haptic.success();
     if (!isRepair) setTimeout(() => setFaultSheet(item.id), 300);
@@ -468,6 +471,26 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
                 </button>
               </div>
 
+              {/* Phase selector (breakdown only): Intake / Strip & Assess / General */}
+              {!isRepair && (
+                <div className="flex gap-1.5">
+                  {[
+                    { value: "intake", label: "Intake" },
+                    { value: "strip", label: "Strip & assess" },
+                    { value: "general", label: "General" },
+                  ].map(ph => (
+                    <button key={ph.value}
+                      onClick={() => { haptic.tick(); patchItem(it.id, { phase: ph.value }); }}
+                      className="flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+                      style={(it.phase || "general") === ph.value
+                        ? { background: BRAND_PRIMARY, color: "#fff" }
+                        : { background: "#F1F5F9", color: "#64748B" }}>
+                      {ph.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {photos.map(p => (
                   <div key={p.id} className="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
@@ -523,6 +546,13 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
         <Field label={isRepair ? "Overall summary" : "Overall summary / recommendation"} value={r.summary} onChange={v => patch({ summary: v })}
           placeholder={isRepair ? "Summary of the repair and current condition…" : "What's the overall finding and what needs to happen next?"} multiline />
       </Card>
+
+      {/* Full engineering report sections — breakdown reports only */}
+      {!isRepair && (
+        <EngineeringSections
+          engineering={r.engineering || {}}
+          onChange={(eng) => patch({ engineering: eng })} />
+      )}
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 p-3 z-40" style={{ maxWidth: 672, margin: "0 auto" }}>
         <button onClick={handleSave} disabled={saving}
