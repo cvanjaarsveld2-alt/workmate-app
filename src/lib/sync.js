@@ -270,9 +270,9 @@ export async function pullFromSupabase(uid, setData) {
       // FIX: Pull activities
       supabase.from("activities").select("id,user_id,team_id,client_id,client_name,activity_type,summary,outcome,duration_mins,sync_status,created_at").order("created_at", { ascending: false }).limit(1000),
       // NEW: Pull breakdown reports
-      supabase.from("breakdown_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,severity,summary,items,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("breakdown_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,severity,summary,items,engineering,breakdown_datetime,reported_by,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
       // NEW: Pull repair reports
-      supabase.from("repair_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,summary,items,linked_breakdown_id,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("repair_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,summary,items,engineering,linked_breakdown_id,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
       // NEW: Pull custom faults library
       supabase.from("custom_faults").select("id,user_id,team_id,label,fault_group,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
     ]);
