@@ -284,6 +284,11 @@ export async function buildReportPDF({ report, mode = "breakdown", company = {} 
     y += 4;
   }
 
+  // ── Engineering sections (breakdown only) ──
+  if (!isRepair && report.engineering && Object.keys(report.engineering).length > 0) {
+    y = drawEngineeringPDF(doc, report.engineering, { margin, pageWidth, pageHeight, y, drawHeader, headerTitle, RED_RGB, DARK_RGB, GREY_RGB });
+  }
+
   // ── Overall summary ──
   if (report.summary) {
     if (y + 80 > pageHeight - 60) {
@@ -424,6 +429,10 @@ export async function buildReportWord({ report, mode = "breakdown", company = {}
     <h2 style="color:#8B1A1A;font-size:13pt;margin:18px 0 8px;">${isRepair ? "Summary" : "Summary / Recommendation"}</h2>
     <p style="color:#1e1e1e;font-size:10pt;line-height:1.5;">${esc(report.summary)}</p>` : "";
 
+  // ── Engineering sections (breakdown only) ──
+  const eng = report.engineering || {};
+  const engHTML = buildEngineeringHTML(eng, esc, isRepair);
+
   const html = `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head>
@@ -456,6 +465,8 @@ export async function buildReportWord({ report, mode = "breakdown", company = {}
   <h2 style="color:#8B1A1A;font-size:13pt;margin:0 0 10px;">${isRepair ? "Repair Items" : "Inspection Items"}</h2>
   ${itemsHTML}
 
+  ${engHTML}
+
   ${summaryHTML}
 
   <table style="width:100%;margin:36px 0 0;">
@@ -476,4 +487,280 @@ export async function buildReportWord({ report, mode = "breakdown", company = {}
   const safeTitle = (report.title || headerTitle).replace(/[^a-z0-9]+/gi, "-").slice(0, 40);
   const filename = `${isRepair ? "Repair" : "Breakdown"}-${safeTitle}-${reportRef}.doc`;
   return { blob, filename, ref: reportRef };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENGINEERING SECTIONS HTML (Word export)
+// ═══════════════════════════════════════════════════════════════════════════
+const RCA_METHOD_LABELS = {
+  "5whys": "5 Whys", fishbone: "Fishbone (Ishikawa)", fmea: "FMEA",
+  fault_tree: "Fault Tree Analysis", pareto: "Pareto Analysis", other: "Other",
+};
+const SEV_LABELS = { low: "Low", medium: "Medium", high: "High" };
+const ACTION_STATUS = { pending: "Pending", in_progress: "In progress", done: "Done" };
+
+function buildEngineeringHTML(eng, esc, isRepair) {
+  if (isRepair || !eng || Object.keys(eng).length === 0) return "";
+
+  const h2 = (t) => `<h2 style="color:#8B1A1A;font-size:13pt;margin:20px 0 6px;border-bottom:1px solid #eee;padding-bottom:3px;">${t}</h2>`;
+  const field = (label, val) => {
+    if (!val || !String(val).trim()) return "";
+    const text = esc(val).replace(/\n/g, "<br/>");
+    return `<p style="margin:4px 0;font-size:10pt;"><span style="color:#787878;font-weight:bold;">${label}: </span>${text}</p>`;
+  };
+  const hasAny = (obj, keys) => keys.some(k => obj?.[k] && String(obj[k]).trim());
+
+  let out = "";
+
+  // 1. Executive Summary
+  if (hasAny(eng.executive, ["overview", "impact_summary", "key_findings"])) {
+    out += h2("1. Executive Summary");
+    out += field("Incident overview", eng.executive?.overview);
+    out += field("Impact summary", eng.executive?.impact_summary);
+    out += field("Key findings", eng.executive?.key_findings);
+  }
+
+  // 2. Incident Details
+  if (hasAny(eng.incident, ["datetime", "reported_by", "conditions"])) {
+    out += h2("2. Incident Details");
+    out += field("Date & time of breakdown", eng.incident?.datetime);
+    out += field("Reported by", eng.incident?.reported_by);
+    out += field("Weather / environmental conditions", eng.incident?.conditions);
+  }
+
+  // 3. Background Information
+  if (hasAny(eng.background, ["history", "operating", "personnel"])) {
+    out += h2("3. Background Information");
+    out += field("Equipment history", eng.background?.history);
+    out += field("Operating conditions", eng.background?.operating);
+    out += field("Personnel involved", eng.background?.personnel);
+  }
+
+  // 4. Breakdown Description
+  if (hasAny(eng.description, ["sequence", "symptoms", "immediate"])) {
+    out += h2("4. Breakdown Description");
+    out += field("Sequence of events", eng.description?.sequence);
+    out += field("Observed symptoms", eng.description?.symptoms);
+    out += field("Immediate actions taken", eng.description?.immediate);
+  }
+
+  // 5. Root Cause Analysis
+  if (hasAny(eng.rca, ["method", "primary", "contributing", "evidence"])) {
+    out += h2("5. Root Cause Analysis");
+    if (eng.rca?.method) out += field("Method used", RCA_METHOD_LABELS[eng.rca.method] || eng.rca.method);
+    out += field("Primary cause", eng.rca?.primary);
+    out += field("Contributing factors", eng.rca?.contributing);
+    out += field("Evidence collected", eng.rca?.evidence);
+  }
+
+  // 6. Impact Assessment
+  const impact = eng.impact || {};
+  const impactAreas = [["safety", "Safety"], ["production", "Production"], ["financial", "Financial"], ["environmental", "Environmental"]];
+  const hasImpact = impactAreas.some(([k]) => impact[k]?.description || impact[k]?.severity);
+  if (hasImpact) {
+    out += h2("6. Impact Assessment");
+    out += `<table style="width:100%;border-collapse:collapse;font-size:10pt;margin:6px 0;">
+      <tr style="background:#f5f3f3;">
+        <td style="padding:5px 8px;font-weight:bold;border:1px solid #e0e0e0;width:25%;">Impact Area</td>
+        <td style="padding:5px 8px;font-weight:bold;border:1px solid #e0e0e0;">Description</td>
+        <td style="padding:5px 8px;font-weight:bold;border:1px solid #e0e0e0;width:15%;">Severity</td>
+      </tr>`;
+    for (const [k, label] of impactAreas) {
+      const row = impact[k] || {};
+      out += `<tr>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;">${label}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;">${esc(row.description || "—")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;">${SEV_LABELS[row.severity] || "—"}</td>
+      </tr>`;
+    }
+    out += `</table>`;
+  }
+
+  // 7. Corrective Actions
+  const actions = Array.isArray(eng.corrective_actions) ? eng.corrective_actions.filter(a => a.action?.trim()) : [];
+  if (actions.length > 0) {
+    out += h2("7. Corrective Actions");
+    out += `<table style="width:100%;border-collapse:collapse;font-size:10pt;margin:6px 0;">
+      <tr style="background:#f5f3f3;">
+        <td style="padding:5px 8px;font-weight:bold;border:1px solid #e0e0e0;">Action Item</td>
+        <td style="padding:5px 8px;font-weight:bold;border:1px solid #e0e0e0;width:22%;">Responsible</td>
+        <td style="padding:5px 8px;font-weight:bold;border:1px solid #e0e0e0;width:18%;">Target Date</td>
+        <td style="padding:5px 8px;font-weight:bold;border:1px solid #e0e0e0;width:15%;">Status</td>
+      </tr>`;
+    for (const a of actions) {
+      out += `<tr>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;">${esc(a.action)}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;">${esc(a.responsible || "—")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;">${esc(a.target_date || "—")}</td>
+        <td style="padding:5px 8px;border:1px solid #e0e0e0;">${ACTION_STATUS[a.status] || "Pending"}</td>
+      </tr>`;
+    }
+    out += `</table>`;
+  }
+
+  // 8. Preventive Measures
+  if (hasAny(eng.preventive, ["design", "maintenance", "training"])) {
+    out += h2("8. Preventive Measures");
+    out += field("Design improvements", eng.preventive?.design);
+    out += field("Maintenance changes", eng.preventive?.maintenance);
+    out += field("Training needs", eng.preventive?.training);
+  }
+
+  // 9. Supporting Documentation
+  if (eng.supporting && String(eng.supporting).trim()) {
+    out += h2("9. Supporting Documentation");
+    out += field("Reference", eng.supporting);
+  }
+
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENGINEERING SECTIONS (PDF)
+// ═══════════════════════════════════════════════════════════════════════════
+function drawEngineeringPDF(doc, eng, ctx) {
+  const { margin, pageWidth, pageHeight, drawHeader, headerTitle, RED_RGB, DARK_RGB, GREY_RGB } = ctx;
+  let y = ctx.y;
+  const contentW = pageWidth - 2 * margin;
+
+  function ensureSpace(needed) {
+    if (y + needed > pageHeight - 60) {
+      doc.addPage();
+      drawHeader(headerTitle);
+      y = 100;
+    }
+  }
+  function sectionHeading(t) {
+    ensureSpace(40);
+    y += 20;
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...RED_RGB);
+    doc.text(t, margin, y);
+    y += 4;
+    doc.setDrawColor(...RED_RGB);
+    doc.setLineWidth(1);
+    doc.line(margin, y, margin + 40, y);
+    y += 12;
+  }
+  function labelledField(label, val) {
+    if (!val || !String(val).trim()) return;
+    ensureSpace(30);
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...GREY_RGB);
+    doc.text(label.toUpperCase(), margin, y);
+    y += 11;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...DARK_RGB);
+    const lines = doc.splitTextToSize(String(val), contentW);
+    for (const ln of lines) {
+      ensureSpace(14);
+      doc.text(ln, margin, y);
+      y += 12;
+    }
+    y += 4;
+  }
+  const hasAny = (obj, keys) => keys.some(k => obj?.[k] && String(obj[k]).trim());
+
+  // 1. Executive Summary
+  if (hasAny(eng.executive, ["overview", "impact_summary", "key_findings"])) {
+    sectionHeading("1. Executive Summary");
+    labelledField("Incident overview", eng.executive?.overview);
+    labelledField("Impact summary", eng.executive?.impact_summary);
+    labelledField("Key findings", eng.executive?.key_findings);
+  }
+  // 2. Incident Details
+  if (hasAny(eng.incident, ["datetime", "reported_by", "conditions"])) {
+    sectionHeading("2. Incident Details");
+    labelledField("Date & time of breakdown", eng.incident?.datetime);
+    labelledField("Reported by", eng.incident?.reported_by);
+    labelledField("Weather / environmental conditions", eng.incident?.conditions);
+  }
+  // 3. Background
+  if (hasAny(eng.background, ["history", "operating", "personnel"])) {
+    sectionHeading("3. Background Information");
+    labelledField("Equipment history", eng.background?.history);
+    labelledField("Operating conditions", eng.background?.operating);
+    labelledField("Personnel involved", eng.background?.personnel);
+  }
+  // 4. Description
+  if (hasAny(eng.description, ["sequence", "symptoms", "immediate"])) {
+    sectionHeading("4. Breakdown Description");
+    labelledField("Sequence of events", eng.description?.sequence);
+    labelledField("Observed symptoms", eng.description?.symptoms);
+    labelledField("Immediate actions taken", eng.description?.immediate);
+  }
+  // 5. RCA
+  if (hasAny(eng.rca, ["method", "primary", "contributing", "evidence"])) {
+    sectionHeading("5. Root Cause Analysis");
+    if (eng.rca?.method) labelledField("Method used", RCA_METHOD_LABELS[eng.rca.method] || eng.rca.method);
+    labelledField("Primary cause", eng.rca?.primary);
+    labelledField("Contributing factors", eng.rca?.contributing);
+    labelledField("Evidence collected", eng.rca?.evidence);
+  }
+  // 6. Impact Assessment
+  const impact = eng.impact || {};
+  const impactAreas = [["safety", "Safety"], ["production", "Production"], ["financial", "Financial"], ["environmental", "Environmental"]];
+  if (impactAreas.some(([k]) => impact[k]?.description || impact[k]?.severity)) {
+    sectionHeading("6. Impact Assessment");
+    for (const [k, label] of impactAreas) {
+      const row = impact[k] || {};
+      if (!row.description && !row.severity) continue;
+      ensureSpace(18);
+      doc.setFontSize(9.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...DARK_RGB);
+      const sev = SEV_LABELS[row.severity] || "—";
+      doc.text(`${label}  [${sev}]`, margin, y);
+      y += 11;
+      if (row.description) {
+        doc.setFontSize(9.5);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(80, 80, 80);
+        const lines = doc.splitTextToSize(row.description, contentW - 10);
+        for (const ln of lines) { ensureSpace(12); doc.text(ln, margin + 10, y); y += 11; }
+      }
+      y += 4;
+    }
+  }
+  // 7. Corrective Actions
+  const actions = Array.isArray(eng.corrective_actions) ? eng.corrective_actions.filter(a => a.action?.trim()) : [];
+  if (actions.length > 0) {
+    sectionHeading("7. Corrective Actions");
+    actions.forEach((a, i) => {
+      ensureSpace(22);
+      doc.setFontSize(9.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...DARK_RGB);
+      const actLines = doc.splitTextToSize(`${i + 1}. ${a.action}`, contentW);
+      for (const ln of actLines) { ensureSpace(12); doc.text(ln, margin, y); y += 11; }
+      doc.setFontSize(8.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...GREY_RGB);
+      const meta = [
+        a.responsible ? `Owner: ${a.responsible}` : null,
+        a.target_date ? `Target: ${a.target_date}` : null,
+        `Status: ${ACTION_STATUS[a.status] || "Pending"}`,
+      ].filter(Boolean).join("   ·   ");
+      ensureSpace(12);
+      doc.text(meta, margin + 10, y);
+      y += 14;
+    });
+  }
+  // 8. Preventive
+  if (hasAny(eng.preventive, ["design", "maintenance", "training"])) {
+    sectionHeading("8. Preventive Measures");
+    labelledField("Design improvements", eng.preventive?.design);
+    labelledField("Maintenance changes", eng.preventive?.maintenance);
+    labelledField("Training needs", eng.preventive?.training);
+  }
+  // 9. Supporting
+  if (eng.supporting && String(eng.supporting).trim()) {
+    sectionHeading("9. Supporting Documentation");
+    labelledField("Reference", eng.supporting);
+  }
+
+  return y;
 }
