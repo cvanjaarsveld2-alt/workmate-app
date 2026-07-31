@@ -163,6 +163,45 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
     setToast("Report deleted");
   }
 
+  // ── Custom faults library (saved, reusable across all reports) ──
+  function addCustomFault(label) {
+    const clean = (label || "").trim();
+    if (!clean) return;
+    // Avoid duplicates (case-insensitive) against existing custom faults
+    const existing = (data.customFaults || []).some(cf => (cf.label || "").toLowerCase() === clean.toLowerCase());
+    if (existing) return;
+    const rec = withTeamId({
+      id: genId(),
+      user_id: userId,
+      label: clean,
+      fault_group: "Custom",
+      sync_status: "pending",
+      created_at: new Date().toISOString(),
+    }, teamId);
+    setData(d => ({
+      ...d,
+      customFaults: [rec, ...(d.customFaults || [])],
+      syncQueue: [
+        { id: genId(), table: "custom_faults", action: "upsert", data: rec, status: "pending", created_at: new Date().toISOString() },
+        ...(d.syncQueue || []),
+      ],
+    }));
+    offlineSave("customFaults", rec).catch(() => {});
+    haptic.success();
+  }
+
+  function removeCustomFault(id) {
+    setData(d => ({
+      ...d,
+      customFaults: (d.customFaults || []).filter(cf => cf.id !== id),
+      syncQueue: [
+        { id: genId(), table: "custom_faults", action: "delete", data: { id }, status: "pending", created_at: new Date().toISOString() },
+        ...(d.syncQueue || []),
+      ],
+    }));
+    haptic.light();
+  }
+
   if (view === "list") {
     const openBreakdowns = (data.breakdowns || []).filter(b => b.status !== "resolved");
     return (
@@ -250,6 +289,9 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
       isRepair={isRepair}
       report={editing}
       clients={data.clients || []}
+      customFaults={data.customFaults || []}
+      onAddCustomFault={addCustomFault}
+      onRemoveCustomFault={removeCustomFault}
       onBack={() => { setView("list"); setEditing(null); }}
       onSave={saveReport}
       onDelete={editing && (data[dataKey] || []).some(b => b.id === editing.id) ? () => deleteReport(editing) : null}
@@ -257,7 +299,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
   );
 }
 
-function ReportEditor({ isRepair, report, clients, onBack, onSave, onDelete }) {
+function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFault, onRemoveCustomFault, onBack, onSave, onDelete }) {
   const [r, setR] = useState(report);
   const [faultSheet, setFaultSheet] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -492,7 +534,13 @@ function ReportEditor({ isRepair, report, clients, onBack, onSave, onDelete }) {
 
       <AnimatePresence>
         {faultSheet && activeFaultItem && (
-          <FaultPickerSheet item={activeFaultItem} onToggle={(f) => toggleFault(faultSheet, f)} onClose={() => setFaultSheet(null)} />
+          <FaultPickerSheet
+            item={activeFaultItem}
+            customFaults={customFaults}
+            onAddCustomFault={onAddCustomFault}
+            onRemoveCustomFault={onRemoveCustomFault}
+            onToggle={(f) => toggleFault(faultSheet, f)}
+            onClose={() => setFaultSheet(null)} />
         )}
       </AnimatePresence>
 
@@ -569,14 +617,48 @@ function AddPhotoTile({ onAdd }) {
   );
 }
 
-function FaultPickerSheet({ item, onToggle, onClose }) {
+function FaultPickerSheet({ item, customFaults = [], onAddCustomFault, onRemoveCustomFault, onToggle, onClose }) {
   const [q, setQ] = useState("");
   const selected = item.faults || [];
+
+  // Build the "Your saved faults" group from the persisted custom faults library
+  const customGroup = useMemo(() => {
+    const labels = customFaults.map(cf => ({ label: cf.label, id: cf.id }));
+    return labels;
+  }, [customFaults]);
+
+  // Filter built-in groups by search
   const groups = useMemo(() => {
     if (!q.trim()) return FAULT_GROUPS;
     const needle = q.toLowerCase();
     return FAULT_GROUPS.map(g => ({ ...g, faults: g.faults.filter(f => f.toLowerCase().includes(needle)) })).filter(g => g.faults.length > 0);
   }, [q]);
+
+  // Filter custom faults by search
+  const filteredCustom = useMemo(() => {
+    if (!q.trim()) return customGroup;
+    const needle = q.toLowerCase();
+    return customGroup.filter(cf => cf.label.toLowerCase().includes(needle));
+  }, [q, customGroup]);
+
+  // Does the search term already exist anywhere? (built-in or custom)
+  const trimmed = q.trim();
+  const existsSomewhere = useMemo(() => {
+    if (!trimmed) return true;
+    const needle = trimmed.toLowerCase();
+    const inBuiltIn = FAULT_GROUPS.some(g => g.faults.some(f => f.toLowerCase() === needle));
+    const inCustom = customGroup.some(cf => cf.label.toLowerCase() === needle);
+    return inBuiltIn || inCustom;
+  }, [trimmed, customGroup]);
+
+  const noResults = groups.length === 0 && filteredCustom.length === 0;
+
+  function handleAddNew() {
+    if (!trimmed) return;
+    onAddCustomFault?.(trimmed);
+    onToggle?.(trimmed);   // immediately tag it on the current item
+    setQ("");              // clear search so it shows in the list
+  }
 
   return (
     <>
@@ -597,11 +679,49 @@ function FaultPickerSheet({ item, onToggle, onClose }) {
           </div>
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search faults…"
+            <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search or add a fault…"
               className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-red-200" />
           </div>
         </div>
         <div className="overflow-y-auto px-5 pb-6 flex-1">
+          {/* Add-new button appears when the typed fault doesn't already exist */}
+          {trimmed && !existsSomewhere && (
+            <button onClick={handleAddNew}
+              className="w-full flex items-center gap-2 px-3 py-3 mb-4 rounded-xl border-2 border-dashed transition-all min-h-[48px] text-left"
+              style={{ borderColor: BRAND_PRIMARY, background: "#FEF2F2" }}>
+              <Plus size={16} style={{ color: BRAND_PRIMARY }} />
+              <span className="text-sm font-bold" style={{ color: "#B91C1C" }}>Add &amp; save “{trimmed}”</span>
+            </button>
+          )}
+
+          {/* Your saved faults (custom library) */}
+          {filteredCustom.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2">Your saved faults</p>
+              <div className="space-y-1.5">
+                {filteredCustom.map(cf => {
+                  const on = selected.includes(cf.label);
+                  return (
+                    <div key={cf.id} className="flex items-center gap-2">
+                      <button onClick={() => onToggle(cf.label)}
+                        className="flex-1 flex items-center justify-between gap-2 px-3 py-3 rounded-xl border-2 transition-all min-h-[48px] text-left"
+                        style={on ? { borderColor: BRAND_PRIMARY, background: "#FEF2F2" } : { borderColor: "#F1F5F9", background: "#fff" }}>
+                        <span className="text-sm font-bold" style={{ color: on ? "#B91C1C" : "#334155" }}>{cf.label}</span>
+                        {on && <Check size={16} style={{ color: BRAND_PRIMARY }} />}
+                      </button>
+                      <button onClick={() => onRemoveCustomFault?.(cf.id)}
+                        className="w-9 h-9 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0"
+                        title="Remove from saved faults">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Built-in fault groups */}
           {groups.map(g => (
             <div key={g.group} className="mb-4">
               <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2">{g.group}</p>
@@ -620,7 +740,9 @@ function FaultPickerSheet({ item, onToggle, onClose }) {
               </div>
             </div>
           ))}
-          {groups.length === 0 && <p className="text-center text-sm text-slate-400 py-8">No faults match "{q}"</p>}
+
+          {noResults && !trimmed && <p className="text-center text-sm text-slate-400 py-8">No faults yet</p>}
+          {noResults && trimmed && existsSomewhere && <p className="text-center text-sm text-slate-400 py-8">No faults match “{q}”</p>}
         </div>
         <div className="p-4 border-t border-slate-100 shrink-0">
           <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-white font-black text-sm min-h-[52px]" style={{ background: BRAND_PRIMARY }}>
