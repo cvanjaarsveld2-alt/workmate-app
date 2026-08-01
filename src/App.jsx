@@ -33,6 +33,7 @@ import { PINSetupScreen, PINLockScreen } from "./auth/PINScreens";
 import { NavTab, Spinner, DataLoadingScreen, Toast } from "./components/ui";
 import SyncStatusBadge from "./components/SyncStatusBadge";
 import { QuickCaptureFAB } from "./components/QuickCaptureFAB";
+import { Wordmark } from "./components/Wordmark";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
@@ -593,7 +594,7 @@ export default function PowerWorksApp() {
       }
     }} />,
     Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} quickAddTrigger={quickAddTrigger} />,
-    More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
+    More:      <MoreScreen      data={data} onLogout={logout} userId={session.user.id} teamId={teamId} onSyncNow={handleSyncNow} onClearQueue={(q) => setData(d => ({...d, syncQueue: q}))} syncing={syncing} isOnline={isOnline} notifPermission={notifPermission} onRequestNotif={handleRequestNotif} setScreen={navigate} />,
     Diagnostics: <DiagnosticsScreen data={data} userId={session.user.id} isOnline={isOnline} onBack={() => goBack("More")} onBackfill={() => navigate("BackfillZAR")} />,
     // FIX #4: BackfillZAR was missing from this map
     BackfillZAR: <BackfillZARScreen data={data} setData={setData} userId={session.user.id} onBack={() => goBack("Diagnostics")} />,
@@ -647,7 +648,7 @@ export default function PowerWorksApp() {
             </button>
 
             {screen === "Home"
-              ? <img src="/pw-logo-wide.png" alt="Power Works" className="h-8 object-contain" />
+              ? <Wordmark variant="dark" size="sm" />
               : (() => {
                   const SCREEN_LABELS = {
                     Clients:       { label: "Clients & Leads",  addHint: "lead / client" },
