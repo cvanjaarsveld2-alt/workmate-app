@@ -37,7 +37,7 @@ function formatBytes(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
 }
 
-export function CompanyDocuments({ userId }) {
+export function CompanyDocuments({ userId, teamId }) {
   const [docs, setDocs]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -52,15 +52,16 @@ export function CompanyDocuments({ userId }) {
 
   useEffect(() => {
     loadDocs();
-  }, [userId]);
+  }, [userId, teamId]);
 
   async function loadDocs() {
     setLoading(true);
     try {
+      // Team-shared: RLS returns docs owned by the user OR belonging to their
+      // team. We don't filter by user_id here so teammates' shared docs appear.
       const { data, error } = await supabase
         .from("company_documents")
         .select("*")
-        .eq("user_id", userId)
         .order("created_at", { ascending: false });
       if (!error) setDocs(data || []);
     } catch (e) {
@@ -112,6 +113,7 @@ export function CompanyDocuments({ userId }) {
         .from("company_documents")
         .insert({
           user_id:   userId,
+          team_id:   teamId || null,
           name:      docName.trim(),
           category,
           file_url:  urlData.publicUrl,
@@ -288,16 +290,21 @@ export function CompanyDocuments({ userId }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-slate-800 truncate">{doc.name}</p>
-                        <p className="text-xs text-slate-400">{doc.file_name}{doc.file_size ? ` · ${formatBytes(doc.file_size)}` : ""}</p>
+                        <p className="text-xs text-slate-400">
+                          {doc.file_name}{doc.file_size ? ` · ${formatBytes(doc.file_size)}` : ""}
+                          {doc.team_id && doc.user_id !== userId ? " · Shared by team" : ""}
+                        </p>
                       </div>
                       <a href={doc.file_url} target="_blank" rel="noreferrer"
                         className="p-2 rounded-lg text-slate-400 hover:text-blue-600 min-w-[36px] min-h-[36px] flex items-center justify-center">
                         <FileText size={14} />
                       </a>
-                      <button onClick={() => handleDelete(doc)}
-                        className="p-2 rounded-lg text-slate-400 hover:text-red-600 min-w-[36px] min-h-[36px] flex items-center justify-center">
-                        <Trash2 size={14} />
-                      </button>
+                      {doc.user_id === userId && (
+                        <button onClick={() => handleDelete(doc)}
+                          className="p-2 rounded-lg text-slate-400 hover:text-red-600 min-w-[36px] min-h-[36px] flex items-center justify-center">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
