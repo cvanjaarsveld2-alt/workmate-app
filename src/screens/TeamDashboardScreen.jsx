@@ -7,10 +7,11 @@ import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, UserPlus, TrendingUp, Calendar,
-  CheckCircle2, Clock, Send, X,
+  CheckCircle2, Clock, Send, X, FolderOpen,
 } from "lucide-react";
 import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
 import { todayISO, smartDate } from "../lib/helpers";
+import { CompanyDocuments } from "../components/CompanyDocuments";
 import { Card, StagePill } from "../components/ui";
 import { ShareToTeamModal } from "../components/ShareToTeamModal";
 
@@ -252,6 +253,7 @@ export function TeamDashboardScreen({
     { key: "leads",     label: "Leads",      icon: TrendingUp, count: leads.length,     color: "#5B21B6", bg: "#EDE9FE" },
     { key: "followups", label: "Follow-ups", icon: Calendar,   count: followups.length, color: "#1E40AF", bg: "#DBEAFE" },
     { key: "contacts",  label: "Contacts",   icon: UserPlus,   count: contacts.length,  color: "#92400E", bg: "#FEF3C7" },
+    { key: "docs",      label: "Docs",       icon: FolderOpen, count: 0,                color: "#8B1A1A", bg: "#FEE2E2" },
   ];
 
   const activeS    = SECTIONS.find(s => s.key === activeSection) || SECTIONS[0];
@@ -279,7 +281,8 @@ export function TeamDashboardScreen({
         </div>
       </div>
 
-      {/* Teammate filter */}
+      {/* Teammate filter — not shown for the shared Docs library */}
+      {activeSection !== "docs" && (
       <div>
         <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2 px-0.5">Filter by teammate</p>
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -310,6 +313,7 @@ export function TeamDashboardScreen({
           })}
         </div>
       </div>
+      )}
 
       {/* Section tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -328,7 +332,11 @@ export function TeamDashboardScreen({
         })}
       </div>
 
-      {/* Records list */}
+      {/* Docs tab: shared company document library (view / upload / share) */}
+      {activeSection === "docs" ? (
+        <CompanyDocuments userId={userId} teamId={teamId} />
+      ) : (
+      /* Records list */
       <Card className="overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-50">
           <SectionHead icon={activeS.icon}
@@ -375,9 +383,10 @@ export function TeamDashboardScreen({
           </div>
         )}
       </Card>
+      )}
 
       {/* Admin pipeline */}
-      {isAdmin && (
+      {isAdmin && activeSection !== "docs" && (
         <Card className="overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-50">
             <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Pipeline — admin view</p>
