@@ -8,7 +8,7 @@ import { BackupExport } from "../components/BackupExport";
 import { CompanyDocuments } from "../components/CompanyDocuments";
 import { subscribeToPush, pushSupported, iosNeedsInstall } from "../lib/pushManager";
 
-export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen, userId }) {
+export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen, userId, teamId }) {
   const { confirm, dialog } = useConfirm();
   const pendingCount = (data.syncQueue || []).filter(i => i.status === "pending").length;
   const failedCount = (data.syncQueue || []).filter(i => i.status === "failed").length;
@@ -422,7 +422,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
       })()}
 
       {/* Company Documents */}
-      <CompanyDocuments userId={userId} />
+      <CompanyDocuments userId={userId} teamId={teamId} />
 
       {/* Team Settings */}
       <Card className="p-0 overflow-hidden">
