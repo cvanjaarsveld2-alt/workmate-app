@@ -25,6 +25,7 @@ import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
+import { useExportProgress } from "../components/ExportProgress";
 import { supabase } from "../supabase";
 import { ReceiptScanner } from "../components/ReceiptScanner";
 import { convertToZAR } from "../lib/exchangeRate";
@@ -371,6 +372,7 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigger }) {
+  const exportProgress = useExportProgress();
   const [showForm, setShowForm]       = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [editId, setEditId]           = useState(null);
@@ -582,12 +584,13 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   async function sendToFinance() {
     const selected = expenses.filter(e => selectedIds.has(e.id));
     if (selected.length === 0) { setToast("Select expenses to export"); return; }
-    setToast("Building PDF…");
+    exportProgress.start("Building expense PDF");
     const sampleDate = selected[0]?.expense_date;
     const period = sampleDate ? calendarMonth(sampleDate) : currentCalendarMonth();
 
     let pdfBlob, filename, ref;
     try {
+      exportProgress.setStage("Loading generator…", 0.15);
       const { buildExpensePDF } = await import("../lib/expenseFinancePDF");
       // Build proper date range from actual selected expenses
       const dates = selected.map(e => e.expense_date).filter(Boolean).sort();
@@ -603,23 +606,25 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
         ? userEmail.split("@")[0].replace(/[._]/g, " ").replace(/\w/g, l => l.toUpperCase())
         : "—";
 
+      exportProgress.setStage(`Rendering ${selected.length} expense${selected.length !== 1 ? "s" : ""} & receipts`, 0.4);
       const result = await buildExpensePDF({
         expenses: selected,
         submitter: { name: submitterName, email: userEmail },
         periodLabel: rangeLabel,
       });
+      exportProgress.setStage("Finalising document", 0.9);
       pdfBlob = result.blob;
       filename = result.filename;
       ref = result.ref;
     } catch (e) {
       console.error("PDF build failed:", e);
-      setToast("Couldn't build PDF — try again");
+      exportProgress.fail("Couldn't build PDF — try again");
       return;
     }
     const totalZAR = selected.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
     const url = URL.createObjectURL(pdfBlob);
     setFinancePack({ blob: pdfBlob, url, filename, ref, periodLabel: period?.label || "—", totalZAR, count: selected.length, ids: Array.from(selectedIds) });
-    setToast("");
+    exportProgress.done("Expense PDF ready");
   }
 
   function markPackSubmitted() {
