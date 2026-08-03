@@ -26,6 +26,7 @@ import {
   CheckCircle2, // NEW: for Team Dashboard
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
+import { Wordmark } from "./Wordmark";
 
 const SECTIONS = [
   {
@@ -96,17 +97,7 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
             {/* Brand header */}
             <div className="px-5 pt-12 pb-4 flex items-end justify-between"
               style={{ background: "linear-gradient(135deg, #8B1A1A 0%, #6B1414 100%)" }}>
-              <img
-                src={BRAND.logo}
-                alt="Power Works"
-                className="h-9 w-auto object-contain object-left"
-                style={{ maxWidth: 180 }}
-                onError={e => {
-                  e.target.style.display = "none";
-                  e.target.nextSibling.style.display = "block";
-                }}
-              />
-              <p className="text-lg font-black text-white tracking-wide hidden">PowerMate</p>
+              <Wordmark variant="light" size="md" />
               <button onClick={onClose}
                 className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mb-0.5"
                 style={{ background: "rgba(255,255,255,0.15)" }}>
