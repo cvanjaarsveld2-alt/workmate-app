@@ -34,6 +34,7 @@ import { NavTab, Spinner, DataLoadingScreen, Toast } from "./components/ui";
 import SyncStatusBadge from "./components/SyncStatusBadge";
 import { QuickCaptureFAB } from "./components/QuickCaptureFAB";
 import { Wordmark } from "./components/Wordmark";
+import { ExportProgressProvider } from "./components/ExportProgress";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
@@ -636,6 +637,7 @@ export default function PowerWorksApp() {
 
   return (
     <ErrorBoundary>
+      <ExportProgressProvider>
       <div className="min-h-screen pb-32" style={{ background: "#F7F3F3" }}>
 
         {/* ── Top bar ── */}
@@ -752,6 +754,7 @@ export default function PowerWorksApp() {
           )}
         </AnimatePresence>
       </div>
+      </ExportProgressProvider>
     </ErrorBoundary>
   );
 }
