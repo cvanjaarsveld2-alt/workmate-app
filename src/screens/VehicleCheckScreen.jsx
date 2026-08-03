@@ -5,6 +5,7 @@
 // - Multi-select days/weeks, build combined PDF, share to department
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useExportProgress } from "../components/ExportProgress";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2, XCircle, Minus, ChevronDown, ChevronUp,
@@ -239,6 +240,7 @@ function WeekRow({ week, checksMap, selected, onSelect, onDayClick, selectMode }
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export function VehicleCheckScreen({ data, setData, userId }) {
   const today = todayISO();
+  const exportProgress = useExportProgress();
   const [tab, setTab]                   = useState("daily");   // "daily" | "history"
   const [selectedDate, setSelectedDate] = useState(today);
   const [currentMonday, setCurrentMonday] = useState(getMondayOfWeek(today));
@@ -365,18 +367,20 @@ export function VehicleCheckScreen({ data, setData, userId }) {
 
   // ── PDF single day ──────────────────────────────────────────────────────────
   async function exportPDF(date) {
-    setToast("Building inspection report…");
+    exportProgress.start("Building inspection report");
     try {
+      exportProgress.setStage("Rendering checklist & photos", 0.4);
       const { blob, filename, ref } = await buildVehicleCheckPDF({
         checkDate: date || selectedDate,
         dayData: getDayData(date || selectedDate),
         settings, checklist: CHECKLIST,
       });
+      exportProgress.setStage("Finalising document", 0.9);
       const url = URL.createObjectURL(blob);
       setPdfPack({ blob, url, filename, ref });
-      setToast("");
+      exportProgress.done("Inspection report ready");
     } catch (e) {
-      setToast("Could not build PDF — try again");
+      exportProgress.fail("Could not build PDF — try again");
     }
   }
 
@@ -384,8 +388,9 @@ export function VehicleCheckScreen({ data, setData, userId }) {
   async function exportSelectedPDF() {
     if (selectedWeeks.size === 0) { setToast("Select at least one week"); return; }
     setBuildingPDF(true);
-    setToast("Building multi-week report…");
+    exportProgress.start("Building multi-week report");
     try {
+      exportProgress.setStage("Collecting inspection days", 0.25);
       // Collect all days from selected weeks that have data
       const allDays = [];
       for (const monday of [...selectedWeeks].sort()) {
@@ -394,8 +399,9 @@ export function VehicleCheckScreen({ data, setData, userId }) {
           if (Object.keys(d.items).length > 0) allDays.push(date);
         });
       }
-      if (allDays.length === 0) { setToast("No completed checks in selected weeks"); setBuildingPDF(false); return; }
+      if (allDays.length === 0) { exportProgress.fail("No completed checks in selected weeks"); setBuildingPDF(false); return; }
 
+      exportProgress.setStage(`Rendering ${allDays.length} day${allDays.length !== 1 ? "s" : ""}`, 0.5);
       // Build one PDF per day, combine into a multi-page blob using jsPDF
       // For now build individual PDFs and share the first; in future merge
       const { blob, filename, ref } = await buildVehicleCheckPDF({
@@ -405,9 +411,10 @@ export function VehicleCheckScreen({ data, setData, userId }) {
         // Pass all days for a summary report
         allDays: allDays.map(d => ({ date: d, dayData: getDayData(d) })),
       });
+      exportProgress.setStage("Finalising document", 0.9);
       const url = URL.createObjectURL(blob);
       setPdfPack({ blob, url, filename, ref, weekCount: selectedWeeks.size, dayCount: allDays.length });
-      setToast("");
+      exportProgress.done("Multi-week report ready");
     } catch (e) {
       console.error(e);
       setToast("Could not build PDF — try again");
