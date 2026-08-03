@@ -21,6 +21,7 @@ import { MediaPicker } from "../components/MediaComponents";
 import { FAULT_GROUPS, SEVERITY_OPTIONS, STATUS_OPTIONS } from "../lib/breakdownFaults";
 import { EngineeringSections } from "./EngineeringSections";
 import { haptic } from "../lib/haptics";
+import { useExportProgress } from "../components/ExportProgress";
 
 const BRAND_PRIMARY = BRAND.primary;
 
@@ -370,6 +371,7 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
   const [faultSheet, setFaultSheet] = useState(null);
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const exportProgress = useExportProgress();
 
   function patch(fields) { setR(prev => ({ ...prev, ...fields })); }
 
@@ -431,10 +433,15 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
 
   async function handleExport(format) {
     setExporting(false);
+    exportProgress.start(`Building ${format === "word" ? "Word" : "PDF"} report`);
     try {
+      exportProgress.setStage("Loading generator…", 0.15);
       const { buildReportPDF, buildReportWord } = await import("../lib/reportExport");
       const builder = format === "word" ? buildReportWord : buildReportPDF;
+      const photoCount = (r.items || []).reduce((s, i) => s + (Array.isArray(i.photos) ? i.photos.length : 0), 0);
+      exportProgress.setStage(photoCount > 0 ? `Fetching ${photoCount} photo${photoCount !== 1 ? "s" : ""} & rendering` : "Rendering document", 0.4);
       const { blob, filename } = await builder({ report: r, mode: isRepair ? "repair" : "breakdown" });
+      exportProgress.setStage("Finalising & downloading", 0.9);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -444,9 +451,10 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
       document.body.removeChild(a);
       setTimeout(() => URL.revokeObjectURL(url), 4000);
       haptic.success();
+      exportProgress.done(`${format === "word" ? "Word" : "PDF"} downloaded`);
     } catch (e) {
       console.error("Export failed:", e);
-      alert("Could not generate the document. Please try again.");
+      exportProgress.fail("Could not generate the document");
     }
   }
 
