@@ -147,3 +147,27 @@ export function BulkGroupSheet({ open, existingGroups = [], onClose, onConfirm }
     </AnimatePresence>
   );
 }
+
+// ─── Collapsible group state ─────────────────────────────────────────────────
+// Tracks which group headers are collapsed. Shared across Contacts, Notes,
+// and Clients so grouped lists can be folded up.
+//
+//   const groups = useCollapsibleGroups();
+//   groups.isCollapsed(name)   -> bool
+//   groups.toggle(name)        -> fold/unfold one group
+//   groups.collapseAll(names)  -> fold every group
+//   groups.expandAll()         -> unfold all
+export function useCollapsibleGroups() {
+  const [collapsed, setCollapsed] = React.useState(() => new Set());
+  const isCollapsed = React.useCallback((name) => collapsed.has(name), [collapsed]);
+  const toggle = React.useCallback((name) => {
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  }, []);
+  const collapseAll = React.useCallback((names) => setCollapsed(new Set(names)), []);
+  const expandAll = React.useCallback(() => setCollapsed(new Set()), []);
+  return { isCollapsed, toggle, collapseAll, expandAll };
+}
