@@ -10,7 +10,7 @@ import {
   Sparkles,
   Receipt,
   Mail,
-  CheckSquare,
+  CheckSquare, Check,
   Square,
   FileDown,
   FileText,
@@ -385,6 +385,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   const [scannedNotice, setScannedNotice] = useState(false);
   const [selectMode, setSelectMode]   = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [sortBy, setSortBy]           = useState("date"); // "date" | "amount" | "category"
   const [manualZAR, setManualZAR]     = useState("");
   const [detailExpense, setDetailExpense] = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
@@ -713,26 +714,42 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   const filtered = expenses
     .filter(e => !search || [e.vendor, e.category, e.notes].some(x => x?.toLowerCase().includes(search.toLowerCase())))
     .sort((a, b) => {
+      if (sortBy === "amount") {
+        const aa = parseFloat(a.amount_zar || a.amount || 0);
+        const ba = parseFloat(b.amount_zar || b.amount || 0);
+        if (ba !== aa) return ba - aa; // largest first
+      } else if (sortBy === "category") {
+        const ca = (a.category || "").localeCompare(b.category || "");
+        if (ca !== 0) return ca;
+      }
+      // default + tiebreaker: newest date first
       const da = a.expense_date || "";
       const db = b.expense_date || "";
-      const dt = db.localeCompare(da); // newest first
+      const dt = db.localeCompare(da);
       if (dt !== 0) return dt;
       return (b.expense_time || "").localeCompare(a.expense_time || "");
     });
 
-  // Group by calendar month
+  // Group by calendar month (date sort) or show a single sorted list otherwise
   const monthsInOrder = [];
   const byMonthMap = {};
-  filtered.forEach(e => {
-    const m = e.expense_date ? calendarMonth(e.expense_date) : null;
-    const key   = m ? m.key   : "no-date";
-    const label = m ? m.label : "No date";
-    if (!byMonthMap[key]) {
-      byMonthMap[key] = { label, items: [] };
-      monthsInOrder.push(key);
-    }
-    byMonthMap[key].items.push(e);
-  });
+  if (sortBy === "date") {
+    filtered.forEach(e => {
+      const m = e.expense_date ? calendarMonth(e.expense_date) : null;
+      const key   = m ? m.key   : "no-date";
+      const label = m ? m.label : "No date";
+      if (!byMonthMap[key]) {
+        byMonthMap[key] = { label, items: [] };
+        monthsInOrder.push(key);
+      }
+      byMonthMap[key].items.push(e);
+    });
+  } else {
+    // Single flat group that preserves the active sort
+    const label = sortBy === "amount" ? "All expenses — by amount" : "All expenses — by category";
+    byMonthMap["all"] = { label, items: filtered };
+    monthsInOrder.push("all");
+  }
   const orderedMonthKeys = monthsInOrder
     .filter(k => k !== "no-date")
     .sort((a, b) => b.localeCompare(a))
@@ -1159,6 +1176,19 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               <X size={18} />
             </button>
           </div>
+          <div className="flex gap-2 mb-2">
+            <button
+              onClick={() => {
+                const allVisible = filtered.map(e => e.id);
+                const allSelected = allVisible.every(id => selectedIds.has(id)) && allVisible.length > 0;
+                setSelectedIds(allSelected ? new Set() : new Set(allVisible));
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold border border-slate-200 bg-white text-slate-600 min-h-[40px]">
+              {filtered.length > 0 && filtered.every(e => selectedIds.has(e.id))
+                ? <><X size={13} /> Clear all</>
+                : <><Check size={13} /> Select all ({filtered.length})</>}
+            </button>
+          </div>
           <button onClick={sendToFinance} disabled={selectedIds.size === 0}
             className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40 min-h-[48px]" style={{ background: "#8B1A1A" }}>
             <FileDown size={15} /> Export {selectedIds.size > 0 ? `${selectedIds.size} expense${selectedIds.size !== 1 ? "s" : ""} ` : ""}as PDF
@@ -1191,6 +1221,26 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       </AnimatePresence>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search vendor, category…" />
+
+      {/* Sort selector */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold text-slate-400 shrink-0">Sort:</span>
+        <div className="flex gap-1 p-1 rounded-lg bg-slate-100 flex-1">
+          {[
+            { k: "date", label: "Date" },
+            { k: "amount", label: "Amount" },
+            { k: "category", label: "Category" },
+          ].map(o => (
+            <button key={o.k} onClick={() => setSortBy(o.k)}
+              className="flex-1 py-1.5 rounded-md text-xs font-bold transition-all"
+              style={sortBy === o.k
+                ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
+                : { background: "transparent", color: "#94A3B8" }}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
 
       {filtered.length === 0 && (
