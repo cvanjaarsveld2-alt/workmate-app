@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, User, Phone, Mail,
-  Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight, Send, ChevronRight, Share2,
+  Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight, Send, ChevronRight, ChevronDown, Share2,
   FolderPlus, Check,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
@@ -16,7 +16,7 @@ import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { CardScanner } from "../components/CardScanner";
-import { useBulkGroup, BulkGroupBar, BulkGroupSheet } from "../components/BulkGroup";
+import { useBulkGroup, BulkGroupBar, BulkGroupSheet, useCollapsibleGroups } from "../components/BulkGroup";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
@@ -71,7 +71,14 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [groupBy, setGroupBy]         = useState("company"); // "company" | "category"
+  const [collapsedGroups, setCollapsedGroups] = useState(new Set());
+  const toggleGroupCollapse = (key) => setCollapsedGroups(prev => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
+  });
   const bulk = useBulkGroup();
+  const groups = useCollapsibleGroups();
 
   // Assign the chosen group name to all selected contacts
   function assignGroupToSelected(groupName) {
@@ -623,14 +630,23 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
       )}
 
       <div className="space-y-3">
-        {Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([company, list]) => (
+        {Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([company, list]) => {
+          const isCol = groups.isCollapsed(company);
+          return (
           <Card key={company} className="overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-slate-100" style={{ background: "#F7F3F3" }}>
+            <button onClick={() => groups.toggle(company)}
+              className="w-full px-4 py-2.5 border-b border-slate-100 active:bg-slate-100 transition-colors" style={{ background: "#F7F3F3" }}>
               <div className="flex items-center justify-between">
-                <p className="text-sm font-black text-slate-900">{company}</p>
+                <div className="flex items-center gap-2">
+                  <motion.div animate={{ rotate: isCol ? -90 : 0 }} transition={{ duration: 0.2 }}>
+                    <ChevronDown size={16} className="text-slate-400" />
+                  </motion.div>
+                  <p className="text-sm font-black text-slate-900">{company}</p>
+                </div>
                 <span className="text-xs font-bold text-slate-500">{list.length} contact{list.length !== 1 ? "s" : ""}</span>
               </div>
-            </div>
+            </button>
+            {!isCol && (
             <div className="divide-y divide-slate-50">
               {list.map(c => {
                 // ── Edit-in-place: form replaces this contact at its position ──
@@ -686,8 +702,10 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
                 );
               })}
             </div>
+            )}
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       <BulkGroupSheet
