@@ -300,15 +300,17 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
 // ─── Lead categories ──────────────────────────────────────────────────────────
 // Stored as a comma-separated string in the existing `division` column.
 const LEAD_CATEGORIES = [
+  { id: "opencast",  label: "Opencast",                 color: "#B45309", bg: "#FEF3C7" },
+  { id: "underground", label: "Underground",            color: "#1E293B", bg: "#E2E8F0" },
   { id: "jacks",     label: "Jacks",                    color: "#1E40AF", bg: "#DBEAFE" },
-  { id: "tyres",     label: "Tyre Handlers",             color: "#166534", bg: "#DCFCE7" },
-  { id: "starters",  label: "Starters",                  color: "#92400E", bg: "#FEF3C7" },
-  { id: "ausco",     label: "Ausco Brakes",              color: "#7C2D12", bg: "#FFE4D9" },
-  { id: "manifolds", label: "Axiom — Manifolds",         color: "#5B21B6", bg: "#EDE9FE" },
-  { id: "motors",    label: "Axiom — Motors",            color: "#0E7490", bg: "#CFFAFE" },
-  { id: "pumps",     label: "Axiom — Pumps",             color: "#065F46", bg: "#D1FAE5" },
-  { id: "coolers",   label: "Axiom — Coolers",           color: "#9F1239", bg: "#FFE4E6" },
-  { id: "other",     label: "Other",                     color: "#64748B", bg: "#F1F5F9" },
+  { id: "tyres",     label: "Tyre Handlers",            color: "#166534", bg: "#DCFCE7" },
+  { id: "starters",  label: "Starters",                 color: "#92400E", bg: "#FEF3C7" },
+  { id: "ausco",     label: "Ausco Brakes",             color: "#7C2D12", bg: "#FFE4D9" },
+  { id: "manifolds", label: "Axiom — Manifolds",        color: "#5B21B6", bg: "#EDE9FE" },
+  { id: "motors",    label: "Axiom — Motors",           color: "#0E7490", bg: "#CFFAFE" },
+  { id: "pumps",     label: "Axiom — Pumps",            color: "#065F46", bg: "#D1FAE5" },
+  { id: "coolers",   label: "Axiom — Coolers",          color: "#9F1239", bg: "#FFE4E6" },
+  { id: "other",     label: "Other",                    color: "#64748B", bg: "#F1F5F9" },
 ];
 
 function parseCats(str) {
