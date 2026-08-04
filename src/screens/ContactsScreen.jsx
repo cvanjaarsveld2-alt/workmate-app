@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, User, Phone, Mail,
   Calendar as CalendarIcon, Camera, Sparkles, ArrowUpRight, Send, ChevronRight, Share2,
+  FolderPlus, Check,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
@@ -15,6 +16,7 @@ import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { CardScanner } from "../components/CardScanner";
+import { useBulkGroup, BulkGroupBar, BulkGroupSheet } from "../components/BulkGroup";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
@@ -69,6 +71,37 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
   const [groupBy, setGroupBy]         = useState("company"); // "company" | "category"
+  const bulk = useBulkGroup();
+
+  // Assign the chosen group name to all selected contacts
+  function assignGroupToSelected(groupName) {
+    const ids = bulk.selected;
+    const now = new Date().toISOString();
+    setData(d => ({
+      ...d,
+      contacts: (d.contacts || []).map(c =>
+        ids.has(c.id) ? { ...c, category: groupName, sync_status: "pending", updated_at: now } : c
+      ),
+      syncQueue: [
+        ...[...ids].map(id => {
+          const existing = (d.contacts || []).find(c => c.id === id);
+          return { id: genId(), table: "contacts", action: "update", data: { ...existing, category: groupName, updated_at: now }, status: "pending", created_at: now };
+        }),
+        ...(d.syncQueue || []),
+      ],
+    }));
+    // Persist offline
+    [...ids].forEach(id => {
+      const existing = contacts.find(c => c.id === id);
+      if (existing) offlineSave("contacts", { ...existing, category: groupName, updated_at: now }).catch(() => {});
+    });
+    setToast(`${ids.size} contact${ids.size !== 1 ? "s" : ""} added to "${groupName}"`);
+    bulk.cancel();
+    setGroupBy("category"); // jump to the group view so they see the result
+  }
+
+  // Existing group names for the picker
+  const contactGroupNames = [...new Set((data.contacts || []).map(c => c.category?.trim()).filter(Boolean))].sort();
   const [toast, setToast]             = useState("");
   const [cardPhotoUrl, setCardPhotoUrl] = useState(null);
   const [scannedNotice, setScannedNotice] = useState(false);
@@ -513,11 +546,17 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
       <div className="flex items-center justify-between gap-2">
         <PageHeader title="Contacts" subtitle={`${contacts.length} total · ${leadCount} leads`} />
         <div className="flex gap-2">
-          {!showForm && !editId && !showScanner && (
+          {!showForm && !editId && !showScanner && !bulk.active && contacts.length > 0 && (
+            <Btn size="sm" variant="secondary" onClick={bulk.enter}>
+              <FolderPlus size={14} /> Group
+            </Btn>
+          )}
+          {!showForm && !editId && !showScanner && !bulk.active && (
             <Btn size="sm" variant="secondary" onClick={() => { setShowScanner(true); setEditId(null); }}>
               <Camera size={14} /> Scan
             </Btn>
           )}
+          {!bulk.active && (
           <Btn size="sm" onClick={() => {
             if (showForm || editId) resetForm();
             else if (showScanner) setShowScanner(false);
@@ -526,6 +565,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
             {(showForm || editId || showScanner) ? <X size={15} /> : <Plus size={15} />}
             {(showForm || editId || showScanner) ? "Cancel" : "Add"}
           </Btn>
+          )}
         </div>
       </div>
 
@@ -549,6 +589,17 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
       </AnimatePresence>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search by name, company, email…" />
+
+      <BulkGroupBar
+        active={bulk.active}
+        count={bulk.selected.size}
+        allCount={filtered.length}
+        onCancel={bulk.cancel}
+        onAssign={bulk.openAssign}
+        onSelectAll={() => bulk.selectAll(filtered.map(c => c.id))}
+        onClear={bulk.clear}
+        label="contacts"
+      />
       <FilterPills options={["All", "Lead", "Active", "Converted", "Archived"]} value={filterStatus} onChange={setFilterStatus} dangerValue={null} />
 
       {/* Group by: Company or Category/Group */}
@@ -592,8 +643,20 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
                 }
 
                 const canPromote = (c.status === "lead" || c.status === "active") && c.company?.trim();
+                const isSel = bulk.selected.has(c.id);
                 return (
-                  <div key={c.id} className="px-4 py-3 active:bg-slate-50 cursor-pointer" onClick={() => setDetailContact(c)}>
+                  <div key={c.id}
+                    className={`px-4 py-3 cursor-pointer transition-colors ${bulk.active && isSel ? "bg-red-50" : "active:bg-slate-50"}`}
+                    onClick={() => bulk.active ? bulk.toggle(c.id) : setDetailContact(c)}>
+                    {bulk.active && (
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0"
+                          style={isSel ? { background: BRAND.primary, borderColor: BRAND.primary } : { borderColor: "#CBD5E1" }}>
+                          {isSel && <Check size={13} className="text-white" />}
+                        </span>
+                        <span className="text-xs font-bold text-slate-400">{isSel ? "Selected" : "Tap to select"}</span>
+                      </div>
+                    )}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -626,6 +689,13 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
           </Card>
         ))}
       </div>
+
+      <BulkGroupSheet
+        open={bulk.assignOpen}
+        existingGroups={contactGroupNames}
+        onClose={bulk.closeAssign}
+        onConfirm={assignGroupToSelected}
+      />
     </div>
   );
 }
