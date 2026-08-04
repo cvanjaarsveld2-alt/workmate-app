@@ -11,9 +11,10 @@ import {
   CheckCircle2, XCircle, Minus, ChevronDown, ChevronUp,
   Settings, Save, AlertTriangle, Car, X, FileText,
   ChevronRight, ChevronLeft, RotateCcw, FileDown, Send,
-  Calendar, History, Check,
+  Calendar, History, Check, Camera,
 } from "lucide-react";
-import { todayISO, smartDate, genId } from "../lib/helpers";
+import { todayISO, smartDate, genId, compressImage, uploadPhotoToSupabase } from "../lib/helpers";
+import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
 // vehicleCheckPDF loaded lazily
@@ -328,6 +329,41 @@ export function VehicleCheckScreen({ data, setData, userId }) {
   function saveItemComment(date, item, comment) {
     const dayData = getDayData(date);
     persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...(dayData.items[item] || { status: "issue" }), comment } } });
+  }
+
+  // ── Vehicle photos (physical photo of the vehicle for the day) ──
+  async function addVehiclePhoto(media) {
+    const file = media?.file || media;
+    if (!file) return;
+    const dayData = getDayData(selectedDate);
+    const photos = Array.isArray(dayData.photos) ? dayData.photos : [];
+    const id = genId();
+    // Compress and store a local base64 preview immediately; upload in background
+    let base64 = null;
+    try {
+      base64 = await compressImage(file, 1600, 0.75);
+    } catch { base64 = null; }
+    const newPhoto = { id, url: null, _base64: base64 };
+    persistDay(selectedDate, { ...dayData, photos: [...photos, newPhoto] });
+
+    // Upload to storage, then patch the URL in
+    try {
+      const path = `vehicle-checks/${userId}/${selectedDate}/${id}.jpg`;
+      const url = await uploadPhotoToSupabase(base64 || file, path);
+      if (url) {
+        const latest = getDayData(selectedDate);
+        const updated = (latest.photos || []).map(p => p.id === id ? { ...p, url, _base64: null } : p);
+        persistDay(selectedDate, { ...latest, photos: updated });
+      }
+    } catch (e) {
+      console.warn("Vehicle photo upload failed (kept local copy):", e);
+    }
+  }
+
+  function removeVehiclePhoto(id) {
+    const dayData = getDayData(selectedDate);
+    const photos = (dayData.photos || []).filter(p => p.id !== id);
+    persistDay(selectedDate, { ...dayData, photos });
   }
 
   function markAllGood(date) {
@@ -678,6 +714,32 @@ export function VehicleCheckScreen({ data, setData, userId }) {
           <p className="text-xs text-slate-400 text-center -mt-2">
             Tap above for a quick all-clear, or tap individual items to flag issues.
           </p>
+
+          {/* Vehicle photos */}
+          {(() => {
+            const dayPhotos = getDayData(selectedDate).photos || [];
+            const galleryMedia = dayPhotos.map(p => ({ id: p.id, url: p.url || p._base64, type: "image" }));
+            return (
+              <div className="rounded-2xl border-2 border-slate-100 bg-white p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Camera size={16} style={{ color: "#8B1A1A" }} />
+                    <p className="text-sm font-black text-slate-700">Vehicle photos</p>
+                    {dayPhotos.length > 0 && (
+                      <span className="text-xs font-black text-slate-400 bg-slate-100 rounded-full px-2 py-0.5">{dayPhotos.length}</span>
+                    )}
+                  </div>
+                </div>
+                {dayPhotos.length > 0 && (
+                  <div className="mb-3">
+                    <MediaGallery media={galleryMedia} onDelete={(m) => removeVehiclePhoto(m.id)} />
+                  </div>
+                )}
+                <MediaPicker onAdd={addVehiclePhoto} />
+                <p className="text-[11px] text-slate-400 mt-2">Take a photo or choose one from your gallery — attach a physical photo of the vehicle for this day's record.</p>
+              </div>
+            );
+          })()}
 
           {/* Checklist sections */}
           {CHECKLIST.map(({ section, items }) => {
