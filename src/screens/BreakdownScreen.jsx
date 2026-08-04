@@ -22,6 +22,7 @@ import { FAULT_GROUPS, SEVERITY_OPTIONS, STATUS_OPTIONS } from "../lib/breakdown
 import { EngineeringSections } from "./EngineeringSections";
 import { haptic } from "../lib/haptics";
 import { useExportProgress } from "../components/ExportProgress";
+import { PDFNamePrompt } from "../components/PDFNamePrompt";
 
 const BRAND_PRIMARY = BRAND.primary;
 
@@ -431,6 +432,9 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
   const activeFaultItem = r.items.find(it => it.id === faultSheet);
   const isEditingExisting = report.created_at;
 
+  // Holds the built export awaiting a filename: { blob, defaultName, ext, url }
+  const [pendingExport, setPendingExport] = useState(null);
+
   async function handleExport(format) {
     setExporting(false);
     exportProgress.start(`Building ${format === "word" ? "Word" : "PDF"} report`);
@@ -441,21 +445,29 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
       const photoCount = (r.items || []).reduce((s, i) => s + (Array.isArray(i.photos) ? i.photos.length : 0), 0);
       exportProgress.setStage(photoCount > 0 ? `Fetching ${photoCount} photo${photoCount !== 1 ? "s" : ""} & rendering` : "Rendering document", 0.4);
       const { blob, filename } = await builder({ report: r, mode: isRepair ? "repair" : "breakdown" });
-      exportProgress.setStage("Finalising & downloading", 0.9);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      exportProgress.setStage("Ready", 1);
+      exportProgress.done(`${format === "word" ? "Word" : "PDF"} ready`);
       haptic.success();
-      exportProgress.done(`${format === "word" ? "Word" : "PDF"} downloaded`);
+      // Offer a filename before downloading
+      const ext = format === "word" ? "doc" : "pdf";
+      setPendingExport({ blob, defaultName: filename, ext });
     } catch (e) {
       console.error("Export failed:", e);
       exportProgress.fail("Could not generate the document");
     }
+  }
+
+  function downloadPending(chosenName) {
+    if (!pendingExport) return;
+    const url = URL.createObjectURL(pendingExport.blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = chosenName || pendingExport.defaultName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    setPendingExport(null);
   }
 
   return (
@@ -699,11 +711,18 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
           </>
         )}
       </AnimatePresence>
+
+      {/* Filename prompt before download */}
+      <PDFNamePrompt
+        open={!!pendingExport}
+        defaultName={pendingExport?.defaultName || "report"}
+        ext={pendingExport?.ext || "pdf"}
+        onConfirm={downloadPending}
+        onCancel={() => setPendingExport(null)}
+      />
     </div>
   );
 }
-
-// ─── Board view: 3 status columns (Open / In progress / Resolved) ────────────
 // Reuses the existing report.status field. Tap a card to open it; use the
 // move buttons on each card to shift it between columns (persists + syncs).
 // Tap-to-move is used instead of drag because it's far more reliable on a
