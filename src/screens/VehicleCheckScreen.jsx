@@ -115,15 +115,29 @@ function statusStyle(s) {
 }
 
 // ─── Issue sheet ──────────────────────────────────────────────────────────────
-function IssueSheet({ item, date, currentComment, onSave, onClose }) {
+function IssueSheet({ item, date, currentComment, currentPhoto, onSave, onClose }) {
   const [text, setText] = useState(currentComment || "");
+  const [photo, setPhoto] = useState(currentPhoto || null);
+  const [compressing, setCompressing] = useState(false);
+
+  async function handlePhoto(media) {
+    const file = media?.file || media;
+    if (!file) return;
+    setCompressing(true);
+    try {
+      const base64 = await compressImage(file, 1600, 0.75);
+      setPhoto(base64);
+    } catch { /* ignore */ }
+    finally { setCompressing(false); }
+  }
+
   return (
     <>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         onClick={onClose} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
       <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-w-2xl mx-auto">
+        className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
         <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
         <div className="px-5 pt-2 pb-2 flex items-start justify-between">
           <div>
@@ -139,9 +153,27 @@ function IssueSheet({ item, date, currentComment, onSave, onClose }) {
           <textarea autoFocus value={text} onChange={e => setText(e.target.value)}
             placeholder="e.g. Left rear tyre is flat, oil below minimum…" rows={4}
             className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 resize-none" />
+
+          {/* Photo of the fault */}
+          <div className="mt-3">
+            <label className="mb-1.5 block text-sm font-bold text-slate-500">Photo of the fault</label>
+            {photo ? (
+              <div className="relative rounded-xl overflow-hidden border-2 border-slate-100">
+                <img src={photo} alt="Fault" className="w-full h-44 object-cover" />
+                <button onClick={() => setPhoto(null)}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center">
+                  <X size={15} />
+                </button>
+              </div>
+            ) : (
+              <MediaPicker onAdd={handlePhoto} />
+            )}
+            {compressing && <p className="text-xs text-slate-400 mt-1">Processing photo…</p>}
+            <p className="text-[11px] text-slate-400 mt-1">Attach a photo of this specific fault.</p>
+          </div>
         </div>
-        <div className="px-5 pb-8 flex gap-3">
-          <Btn className="flex-1" onClick={() => onSave(text)} disabled={!text.trim()}><Save size={15} /> Save Issue</Btn>
+        <div className="px-5 pb-8 pt-2 flex gap-3">
+          <Btn className="flex-1" onClick={() => onSave(text, photo)} disabled={!text.trim()}><Save size={15} /> Save Issue</Btn>
           <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
         </div>
       </motion.div>
@@ -150,8 +182,28 @@ function IssueSheet({ item, date, currentComment, onSave, onClose }) {
 }
 
 // ─── Settings panel ───────────────────────────────────────────────────────────
-function SettingsPanel({ settings, onSave, onClose }) {
+function SettingsPanel({ settings, userId, onSave, onClose }) {
   const [form, setForm] = useState({ ...settings });
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  async function handleVehiclePhoto(media) {
+    const file = media?.file || media;
+    if (!file) return;
+    setUploadingPhoto(true);
+    try {
+      const base64 = await compressImage(file, 1200, 0.75);
+      // Show preview immediately
+      setForm(f => ({ ...f, vehicle_photo_url: base64 }));
+      // Upload in background, then swap to the hosted URL
+      const path = `vehicle-profile/${userId}/vehicle.jpg`;
+      const url = await uploadPhotoToSupabase(base64 || file, path);
+      if (url) setForm(f => ({ ...f, vehicle_photo_url: url }));
+    } catch (e) {
+      console.warn("Vehicle photo failed:", e);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
   return (
     <>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -165,6 +217,28 @@ function SettingsPanel({ settings, onSave, onClose }) {
           <button onClick={onClose} className="p-2 rounded-lg text-slate-400 min-w-[40px] min-h-[40px] flex items-center justify-center"><X size={18} /></button>
         </div>
         <div className="px-5 pb-2 space-y-3">
+          {/* Permanent vehicle photo */}
+          <div>
+            <label className="mb-1.5 block text-sm font-bold text-slate-500">Vehicle photo</label>
+            {form.vehicle_photo_url ? (
+              <div className="relative rounded-2xl overflow-hidden border-2 border-slate-100">
+                <img src={form.vehicle_photo_url} alt="Vehicle" className="w-full h-40 object-cover" />
+                <button onClick={() => setForm(f => ({ ...f, vehicle_photo_url: null }))}
+                  className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center">
+                  <X size={15} />
+                </button>
+                {uploadingPhoto && (
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">Uploading…</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <MediaPicker onAdd={handleVehiclePhoto} />
+            )}
+            <p className="text-[11px] text-slate-400 mt-1.5">Shown at the top of the checklist. A permanent profile photo of the vehicle.</p>
+          </div>
+
           <Field label="Vehicle (Make & Model)" value={form.vehicle} onChange={v => setForm(f => ({ ...f, vehicle: v }))} placeholder="e.g. Toyota Hilux" />
           <Field label="Registration Number" value={form.registration} onChange={v => setForm(f => ({ ...f, registration: v.toUpperCase() }))} placeholder="e.g. MN31MJGP" />
           <Field label="Driver / Inspected By" value={form.driver} onChange={v => setForm(f => ({ ...f, driver: v }))} placeholder="Your name" />
@@ -323,12 +397,35 @@ export function VehicleCheckScreen({ data, setData, userId }) {
 
   function saveItemStatus(date, item, status, comment = "") {
     const dayData = getDayData(date);
-    persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { status, comment: comment || dayData.items[item]?.comment || "" } } });
+    const existing = dayData.items[item] || {};
+    persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...existing, status, comment: comment || existing.comment || "" } } });
   }
 
   function saveItemComment(date, item, comment) {
     const dayData = getDayData(date);
     persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...(dayData.items[item] || { status: "issue" }), comment } } });
+  }
+
+  function getItemPhoto(date, item) { return getDayData(date).items[item]?.photo || null; }
+
+  // Save a photo against a specific flagged item (uploads then patches URL)
+  async function saveItemPhoto(date, item, base64) {
+    const dayData = getDayData(date);
+    const existing = dayData.items[item] || { status: "issue", comment: "" };
+    // Store base64 preview immediately
+    persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...existing, photo: base64 } } });
+    try {
+      const safeItem = item.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      const path = `vehicle-checks/${userId}/${date}/item-${safeItem}.jpg`;
+      const url = await uploadPhotoToSupabase(base64, path);
+      if (url) {
+        const latest = getDayData(date);
+        const latestItem = latest.items[item] || existing;
+        persistDay(date, { ...latest, items: { ...latest.items, [item]: { ...latestItem, photo: url } } });
+      }
+    } catch (e) {
+      console.warn("Item photo upload failed (kept local):", e);
+    }
   }
 
   // ── Vehicle photos (physical photo of the vehicle for the day) ──
@@ -393,10 +490,11 @@ export function VehicleCheckScreen({ data, setData, userId }) {
     else { saveItemStatus(date, item, null); }
   }
 
-  function handleIssueSave(comment) {
+  function handleIssueSave(comment, photo) {
     if (!issueSheet) return;
     saveItemComment(issueSheet.date, issueSheet.item, comment);
     saveItemStatus(issueSheet.date, issueSheet.item, "issue", comment);
+    if (photo) saveItemPhoto(issueSheet.date, issueSheet.item, photo);
     setIssueSheet(null);
     setToast("Issue saved");
   }
@@ -508,6 +606,7 @@ export function VehicleCheckScreen({ data, setData, userId }) {
         {issueSheet && (
           <IssueSheet item={issueSheet.item} date={issueSheet.date}
             currentComment={getItemComment(issueSheet.date, issueSheet.item)}
+            currentPhoto={getItemPhoto(issueSheet.date, issueSheet.item)}
             onSave={handleIssueSave} onClose={() => setIssueSheet(null)} />
         )}
       </AnimatePresence>
@@ -515,7 +614,7 @@ export function VehicleCheckScreen({ data, setData, userId }) {
       {/* Settings panel */}
       <AnimatePresence>
         {showSettings && (
-          <SettingsPanel settings={settings}
+          <SettingsPanel settings={settings} userId={userId}
             onSave={s => { setSettings(s); saveVehicleSettings(s); setToast("Settings saved"); }}
             onClose={() => setShowSettings(false)} />
         )}
@@ -586,9 +685,14 @@ export function VehicleCheckScreen({ data, setData, userId }) {
       {/* Vehicle card */}
       <Card className="p-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: "#FEE2E2" }}>
-            <Car size={20} style={{ color: "#8B1A1A" }} />
-          </div>
+          {settings.vehicle_photo_url ? (
+            <img src={settings.vehicle_photo_url} alt="Vehicle"
+              className="w-14 h-14 rounded-2xl object-cover shrink-0 border border-slate-100" />
+          ) : (
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: "#FEE2E2" }}>
+              <Car size={20} style={{ color: "#8B1A1A" }} />
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-base font-black text-slate-900 leading-tight">{settings.vehicle || "No vehicle set"}</p>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
