@@ -68,6 +68,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   const [editId, setEditId]           = useState(null);
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
+  const [groupBy, setGroupBy]         = useState("company"); // "company" | "category"
   const [toast, setToast]             = useState("");
   const [cardPhotoUrl, setCardPhotoUrl] = useState(null);
   const [scannedNotice, setScannedNotice] = useState(false);
@@ -76,7 +77,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   const [shareSheet, setShareSheet]     = useState(null);
   const [form, setForm] = useState({
     name: "", company: "", title: "", email: "", phone: "",
-    met_at: "", met_date: todayISO(), notes: "", status: "lead",
+    met_at: "", met_date: todayISO(), notes: "", status: "lead", category: "",
   });
   const { confirm, dialog } = useConfirm();
   const contacts = (data.contacts || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
@@ -100,7 +101,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   function resetForm() {
     setForm({
       name: "", company: "", title: "", email: "", phone: "",
-      met_at: "", met_date: todayISO(), notes: "", status: "lead",
+      met_at: "", met_date: todayISO(), notes: "", status: "lead", category: "",
     });
     setEditId(null);
     setShowForm(false);
@@ -119,6 +120,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
       met_date: c.met_date || todayISO(),
       notes:    c.notes || "",
       status:   c.status || "lead",
+      category: c.category || "",
     });
     setCardPhotoUrl(c.card_photo_url || null);
     setEditId(c.id);
@@ -313,6 +315,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Met At" value={form.met_at} onChange={v => setForm(f => ({ ...f, met_at: v }))} placeholder="e.g. Wampex 2026" />
+          <Field label="Group / Category" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} placeholder="e.g. Expo 2026, Suppliers, Contractors" />
           <Field label="Met On" type="date" value={form.met_date} onChange={v => setForm(f => ({ ...f, met_date: v }))} />
         </div>
         <div>
@@ -345,7 +348,9 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
     .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
 
   const grouped = filtered.reduce((acc, c) => {
-    const k = c.company || "(No company)";
+    const k = groupBy === "category"
+      ? (c.category?.trim() || "(No group)")
+      : (c.company || "(No company)");
     if (!acc[k]) acc[k] = [];
     acc[k].push(c);
     return acc;
@@ -545,6 +550,22 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search by name, company, email…" />
       <FilterPills options={["All", "Lead", "Active", "Converted", "Archived"]} value={filterStatus} onChange={setFilterStatus} dangerValue={null} />
+
+      {/* Group by: Company or Category/Group */}
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold text-slate-400">Group by:</span>
+        <div className="flex gap-1 p-1 rounded-lg bg-slate-100">
+          {[{ k: "company", label: "Company" }, { k: "category", label: "Group" }].map(o => (
+            <button key={o.k} onClick={() => setGroupBy(o.k)}
+              className="px-3 py-1.5 rounded-md text-xs font-bold transition-all"
+              style={groupBy === o.k
+                ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
+                : { background: "transparent", color: "#94A3B8" }}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {Object.keys(grouped).length === 0 && (
         <Empty title="No contacts yet" text="Add the people you meet at events and site visits — they'll be searchable here." icon={User} />
