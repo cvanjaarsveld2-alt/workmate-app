@@ -1,7 +1,8 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, Send, Mail, Share2 } from "lucide-react";
+import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, Send, Mail, Share2, FolderPlus, Tag } from "lucide-react";
+import { BulkGroupSheet } from "../components/BulkGroup";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
@@ -26,7 +27,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [filterUrgency, setFilterUrgency] = useState("All");
   const [filterStatus, setFilterStatus] = useState("Unresolved");
   const [toast, setToast]               = useState("");
-  const [form, setForm] = useState({ client_id: "", note: "", urgency: "Normal", resolve_by: "" });
+  const [form, setForm] = useState({ client_id: "", note: "", urgency: "Normal", resolve_by: "", category: "" });
   const [pendingMedia, setPendingMedia] = useState([]);
   const [existingMedia, setExistingMedia] = useState([]);
   const [linkedContactIds, setLinkedContactIds] = useState([]);
@@ -35,6 +36,8 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [newClient, setNewClient] = useState({ company: "", branch: "" });
   const [selectMode, setSelectMode]     = useState(false);
   const [selectedIds, setSelectedIds]   = useState(new Set());
+  const [groupSheetOpen, setGroupSheetOpen] = useState(false);
+  const [groupBy, setGroupBy]           = useState("none"); // "none" | "category"
   const [detailNote, setDetailNote]     = useState(null);
   const [shareSheet, setShareSheet]     = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
@@ -68,7 +71,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   function removeLinkedContact(id) { setLinkedContactIds(ids => ids.filter(x => x !== id)); }
 
   function resetForm() {
-    setForm({ client_id: "", note: "", urgency: "Normal", resolve_by: "" });
+    setForm({ client_id: "", note: "", urgency: "Normal", resolve_by: "", category: "" });
     setPendingMedia([]);
     setExistingMedia([]);
     setLinkedContactIds([]);
@@ -142,6 +145,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
       note:       n.note || "",
       urgency:    n.urgency || "Normal",
       resolve_by: n.resolve_by || "",
+      category:   n.category || "",
     });
     setExistingMedia(n.media || []);
     setPendingMedia([]);
@@ -160,6 +164,35 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   function enterSelectMode() { resetForm(); setSelectMode(true); setSelectedIds(new Set()); }
   function exitSelectMode()  { setSelectMode(false); setSelectedIds(new Set()); setShowExportMenu(false); }
   function selectAllVisible(visibleNotes) { setSelectedIds(new Set(visibleNotes.map(n => n.id))); }
+
+  // Assign a group name to all selected notes
+  function assignGroupToNotes(groupName) {
+    const ids = selectedIds;
+    const now = new Date().toISOString();
+    setData(d => ({
+      ...d,
+      notes: (d.notes || []).map(n =>
+        ids.has(n.id) ? { ...n, category: groupName, sync_status: "pending" } : n
+      ),
+      syncQueue: [
+        ...[...ids].map(id => {
+          const existing = (d.notes || []).find(n => n.id === id);
+          return { id: genId(), table: "notes", action: "update", data: { ...existing, category: groupName, media: (existing?.media || []).map(m => ({ ...m, base64: undefined })) }, status: "pending", created_at: now };
+        }),
+        ...(d.syncQueue || []),
+      ],
+    }));
+    [...ids].forEach(id => {
+      const existing = notes.find(n => n.id === id);
+      if (existing) offlineSave("notes", { ...existing, category: groupName }).catch(() => {});
+    });
+    setToast(`${ids.size} note${ids.size !== 1 ? "s" : ""} added to "${groupName}"`);
+    setGroupSheetOpen(false);
+    exitSelectMode();
+    setGroupBy("category");
+  }
+
+  const noteGroupNames = [...new Set((data.notes || []).map(n => n.category?.trim()).filter(Boolean))].sort();
 
   async function handleExport(format) {
     const selected = notes.filter(n => selectedIds.has(n.id));
@@ -295,6 +328,7 @@ Kind regards`;
         note:       form.note,
         urgency:    form.urgency,
         resolve_by: form.resolve_by || null,
+        category:   form.category?.trim() || null,
         media: [...existingMedia, ...newUploadedMedia],
         linked_contact_ids: linkedContactIds,
         sync_status: "pending",
@@ -339,6 +373,7 @@ Kind regards`;
       note:       form.note,
       urgency:    form.urgency,
       resolve_by: form.resolve_by || null,
+      category:   form.category?.trim() || null,
       media: uploadedMedia,
       linked_contact_ids: linkedContactIds,
       resolved: false,
@@ -422,6 +457,22 @@ Kind regards`;
     .filter(n => !search || [n.client, n.note].some(x => x?.toLowerCase().includes(search.toLowerCase())))
     .sort((a, b) => { const u = { Critical: 0, Urgent: 1, Normal: 2 }; if (a.resolved !== b.resolved) return a.resolved ? 1 : -1; return (u[a.urgency || "Normal"] || 2) - (u[b.urgency || "Normal"] || 2); });
 
+  // When grouping by category, build [{ group, notes[] }] sections
+  const groupedNotes = (() => {
+    if (groupBy !== "category" || selectMode) return null;
+    const map = {};
+    const order = [];
+    filtered.forEach(n => {
+      const k = n.category?.trim() || "(No group)";
+      if (!map[k]) { map[k] = []; order.push(k); }
+      map[k].push(n);
+    });
+    // Named groups first (alpha), "(No group)" last
+    const named = order.filter(k => k !== "(No group)").sort((a, b) => a.localeCompare(b));
+    if (order.includes("(No group)")) named.push("(No group)");
+    return named.map(k => ({ group: k, notes: map[k] }));
+  })();
+
   // ── Shared form JSX (rendered at top for NEW, in-place for EDIT) ──
   // Plain function returning JSX (not a component) so inputs keep focus.
   function renderNoteForm(isEdit) {
@@ -500,6 +551,7 @@ Kind regards`;
           </div>
         </div>
         <Field label="Resolve By (optional)" type="date" value={form.resolve_by} onChange={v => setForm(f => ({ ...f, resolve_by: v }))} />
+        <Field label="Group / Site (optional)" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} placeholder="e.g. Newmont Ghana, Accra site" />
 
         {isEdit && existingMedia.length > 0 && (
           <div>
@@ -740,6 +792,11 @@ Kind regards`;
             <button onClick={() => setSelectedIds(new Set())} disabled={selectedIds.size === 0} className="flex-1 rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-40 min-h-[40px]">
               Clear
             </button>
+          </div>
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => setGroupSheetOpen(true)} disabled={selectedIds.size === 0} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-40 min-h-[40px]">
+              <FolderPlus size={14} /> Assign group
+            </button>
             <button onClick={() => setShowExportMenu(true)} disabled={selectedIds.size === 0 || exporting} className="flex-1 rounded-xl px-3 py-2 text-sm font-bold text-white disabled:opacity-40 min-h-[40px]" style={{ background: "#8B1A1A" }}>
               <FileDown size={14} className="inline mr-1" /> Export ({selectedIds.size})
             </button>
@@ -822,6 +879,24 @@ Kind regards`;
       </AnimatePresence>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search notes…" />
+
+      {/* Group by: None or Group/Site */}
+      {!selectMode && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-400">Group by:</span>
+          <div className="flex gap-1 p-1 rounded-lg bg-slate-100">
+            {[{ k: "none", label: "None" }, { k: "category", label: "Group / Site" }].map(o => (
+              <button key={o.k} onClick={() => setGroupBy(o.k)}
+                className="px-3 py-1.5 rounded-md text-xs font-bold transition-all"
+                style={groupBy === o.k
+                  ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
+                  : { background: "transparent", color: "#94A3B8" }}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="space-y-2">
         <FilterPills options={["Unresolved", "Resolved", "All"]} value={filterStatus} onChange={setFilterStatus} dangerValue={null} />
         <FilterPills options={["All", "Normal", "Urgent", "Critical"]} value={filterUrgency} onChange={setFilterUrgency} dangerValue="Critical" />
@@ -829,7 +904,22 @@ Kind regards`;
       {filtered.length === 0 && <Empty title="No notes found" text="Add a note or change your filters." icon={Clipboard} />}
 
       <div className="space-y-2">
-        {filtered.map(n => {
+        {(groupedNotes
+          ? groupedNotes.flatMap(sec => [{ _header: sec.group, _count: sec.notes.length }, ...sec.notes])
+          : filtered
+        ).map(n => {
+          // Group header row (only present when grouping by category)
+          if (n._header !== undefined) {
+            return (
+              <div key={`hdr-${n._header}`} className="flex items-center justify-between px-1 pt-3 pb-1">
+                <div className="flex items-center gap-1.5">
+                  <Tag size={13} style={{ color: "#8B1A1A" }} />
+                  <p className="text-sm font-black text-slate-700">{n._header}</p>
+                </div>
+                <span className="text-xs font-bold text-slate-400">{n._count} note{n._count !== 1 ? "s" : ""}</span>
+              </div>
+            );
+          }
           // ── Edit-in-place: the form replaces the card at its position ──
           if (editId === n.id && !selectMode) {
             return (
@@ -878,6 +968,13 @@ Kind regards`;
           );
         })}
       </div>
+
+      <BulkGroupSheet
+        open={groupSheetOpen}
+        existingGroups={noteGroupNames}
+        onClose={() => setGroupSheetOpen(false)}
+        onConfirm={assignGroupToNotes}
+      />
     </div>
   );
 }
