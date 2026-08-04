@@ -1,8 +1,8 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, Send, Mail, Share2, FolderPlus, Tag } from "lucide-react";
-import { BulkGroupSheet } from "../components/BulkGroup";
+import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, ChevronDown, Send, Mail, Share2, FolderPlus, Tag } from "lucide-react";
+import { BulkGroupSheet, useCollapsibleGroups } from "../components/BulkGroup";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
@@ -38,6 +38,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [selectedIds, setSelectedIds]   = useState(new Set());
   const [groupSheetOpen, setGroupSheetOpen] = useState(false);
   const [groupBy, setGroupBy]           = useState("none"); // "none" | "category"
+  const groups = useCollapsibleGroups();
   const [detailNote, setDetailNote]     = useState(null);
   const [shareSheet, setShareSheet]     = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
@@ -905,19 +906,27 @@ Kind regards`;
 
       <div className="space-y-2">
         {(groupedNotes
-          ? groupedNotes.flatMap(sec => [{ _header: sec.group, _count: sec.notes.length }, ...sec.notes])
+          ? groupedNotes.flatMap(sec => [
+              { _header: sec.group, _count: sec.notes.length },
+              ...(groups.isCollapsed(sec.group) ? [] : sec.notes),
+            ])
           : filtered
         ).map(n => {
           // Group header row (only present when grouping by category)
           if (n._header !== undefined) {
+            const isCol = groups.isCollapsed(n._header);
             return (
-              <div key={`hdr-${n._header}`} className="flex items-center justify-between px-1 pt-3 pb-1">
+              <button key={`hdr-${n._header}`} onClick={() => groups.toggle(n._header)}
+                className="w-full flex items-center justify-between px-1 pt-3 pb-1 active:opacity-70 transition-opacity">
                 <div className="flex items-center gap-1.5">
+                  <motion.div animate={{ rotate: isCol ? -90 : 0 }} transition={{ duration: 0.2 }}>
+                    <ChevronDown size={15} className="text-slate-400" />
+                  </motion.div>
                   <Tag size={13} style={{ color: "#8B1A1A" }} />
                   <p className="text-sm font-black text-slate-700">{n._header}</p>
                 </div>
                 <span className="text-xs font-bold text-slate-400">{n._count} note{n._count !== 1 ? "s" : ""}</span>
-              </div>
+              </button>
             );
           }
           // ── Edit-in-place: the form replaces the card at its position ──
