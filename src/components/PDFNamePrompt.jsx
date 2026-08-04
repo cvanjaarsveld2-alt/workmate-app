@@ -13,20 +13,21 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Download } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
-export function PDFNamePrompt({ open, defaultName = "PowerMate-Export", onConfirm, onCancel }) {
-  const [name, setName] = useState(defaultName.replace(/\.pdf$/i, ""));
+export function PDFNamePrompt({ open, defaultName = "PowerMate-Export", ext = "pdf", onConfirm, onCancel }) {
+  const extRe = new RegExp(`\\.${ext}$`, "i");
+  const [name, setName] = useState(defaultName.replace(extRe, ""));
   const inputRef = useRef(null);
 
   useEffect(() => {
     if (open) {
-      setName(defaultName.replace(/\.pdf$/i, ""));
+      setName(defaultName.replace(extRe, ""));
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [open, defaultName]);
 
   function handleConfirm() {
-    const clean = (name.trim() || defaultName).replace(/\.pdf$/i, "");
-    onConfirm(`${clean}.pdf`);
+    const clean = (name.trim() || defaultName).replace(extRe, "");
+    onConfirm(`${clean}.${ext}`);
   }
 
   return (
@@ -44,7 +45,7 @@ export function PDFNamePrompt({ open, defaultName = "PowerMate-Export", onConfir
             </div>
             <div className="px-6 pb-8 pt-3 space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-base font-black text-slate-900">Name your PDF</p>
+                <p className="text-base font-black text-slate-900">Name your {ext === "doc" ? "Word doc" : ext.toUpperCase()}</p>
                 <button onClick={onCancel} className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 text-slate-500">
                   <X size={16} />
                 </button>
