@@ -38,7 +38,6 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [selectedIds, setSelectedIds]   = useState(new Set());
   const [groupSheetOpen, setGroupSheetOpen] = useState(false);
   const [groupBy, setGroupBy]           = useState("none"); // "none" | "category"
-  const groups = useCollapsibleGroups();
   const [detailNote, setDetailNote]     = useState(null);
   const [shareSheet, setShareSheet]     = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
@@ -473,6 +472,9 @@ Kind regards`;
     if (order.includes("(No group)")) named.push("(No group)");
     return named.map(k => ({ group: k, notes: map[k] }));
   })();
+
+  const noteGroupKeys = groupedNotes ? groupedNotes.map(s => s.group) : null;
+  const groups = useCollapsibleGroups(noteGroupKeys, true);
 
   // ── Shared form JSX (rendered at top for NEW, in-place for EDIT) ──
   // Plain function returning JSX (not a component) so inputs keep focus.
