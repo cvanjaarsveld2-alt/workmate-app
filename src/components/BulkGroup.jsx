@@ -157,10 +157,23 @@ export function BulkGroupSheet({ open, existingGroups = [], onClose, onConfirm }
 //   groups.toggle(name)        -> fold/unfold one group
 //   groups.collapseAll(names)  -> fold every group
 //   groups.expandAll()         -> unfold all
-export function useCollapsibleGroups() {
+export function useCollapsibleGroups(allNames = null, defaultCollapsed = false) {
   const [collapsed, setCollapsed] = React.useState(() => new Set());
+  const [touched, setTouched] = React.useState(false);
+
+  // When defaultCollapsed is on, fold every group the first time we see the
+  // group names (and whenever a brand-new group appears), until the user has
+  // manually toggled something.
+  React.useEffect(() => {
+    if (!defaultCollapsed || !allNames) return;
+    if (touched) return;
+    setCollapsed(new Set(allNames));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultCollapsed, allNames ? allNames.join("|") : "", touched]);
+
   const isCollapsed = React.useCallback((name) => collapsed.has(name), [collapsed]);
   const toggle = React.useCallback((name) => {
+    setTouched(true);
     setCollapsed(prev => {
       const next = new Set(prev);
       next.has(name) ? next.delete(name) : next.add(name);
