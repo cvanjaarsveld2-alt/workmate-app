@@ -70,7 +70,6 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   const [editId, setEditId]           = useState(null);
   const [search, setSearch]           = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
-  const [groupBy, setGroupBy]         = useState("company"); // "company" | "category"
   const [collapsedGroups, setCollapsedGroups] = useState(new Set());
   const toggleGroupCollapse = (key) => setCollapsedGroups(prev => {
     const next = new Set(prev);
@@ -78,7 +77,6 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
     return next;
   });
   const bulk = useBulkGroup();
-  const groups = useCollapsibleGroups();
 
   // Assign the chosen group name to all selected contacts
   function assignGroupToSelected(groupName) {
@@ -104,7 +102,6 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
     });
     setToast(`${ids.size} contact${ids.size !== 1 ? "s" : ""} added to "${groupName}"`);
     bulk.cancel();
-    setGroupBy("category"); // jump to the group view so they see the result
   }
 
   // Existing group names for the picker
@@ -388,13 +385,13 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
     .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
 
   const grouped = filtered.reduce((acc, c) => {
-    const k = groupBy === "category"
-      ? (c.category?.trim() || "(No group)")
-      : (c.company || "(No company)");
+    const k = c.category?.trim() || "(No group)";
     if (!acc[k]) acc[k] = [];
     acc[k].push(c);
     return acc;
   }, {});
+  const groupKeys = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
+  const groups = useCollapsibleGroups(groupKeys, true);
 
   const leadCount = contacts.filter(c => (c.status || "lead") === "lead").length;
 
@@ -608,22 +605,6 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
         label="contacts"
       />
       <FilterPills options={["All", "Lead", "Active", "Converted", "Archived"]} value={filterStatus} onChange={setFilterStatus} dangerValue={null} />
-
-      {/* Group by: Company or Category/Group */}
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-bold text-slate-400">Group by:</span>
-        <div className="flex gap-1 p-1 rounded-lg bg-slate-100">
-          {[{ k: "company", label: "Company" }, { k: "category", label: "Group" }].map(o => (
-            <button key={o.k} onClick={() => setGroupBy(o.k)}
-              className="px-3 py-1.5 rounded-md text-xs font-bold transition-all"
-              style={groupBy === o.k
-                ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
-                : { background: "transparent", color: "#94A3B8" }}>
-              {o.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
       {Object.keys(grouped).length === 0 && (
         <Empty title="No contacts yet" text="Add the people you meet at events and site visits — they'll be searchable here." icon={User} />
