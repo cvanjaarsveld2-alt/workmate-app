@@ -37,7 +37,6 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [selectMode, setSelectMode]     = useState(false);
   const [selectedIds, setSelectedIds]   = useState(new Set());
   const [groupSheetOpen, setGroupSheetOpen] = useState(false);
-  const [groupBy, setGroupBy]           = useState("none"); // "none" | "category"
   const [detailNote, setDetailNote]     = useState(null);
   const [shareSheet, setShareSheet]     = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
@@ -189,7 +188,6 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
     setToast(`${ids.size} note${ids.size !== 1 ? "s" : ""} added to "${groupName}"`);
     setGroupSheetOpen(false);
     exitSelectMode();
-    setGroupBy("category");
   }
 
   const noteGroupNames = [...new Set((data.notes || []).map(n => n.category?.trim()).filter(Boolean))].sort();
@@ -459,7 +457,7 @@ Kind regards`;
 
   // When grouping by category, build [{ group, notes[] }] sections
   const groupedNotes = (() => {
-    if (groupBy !== "category" || selectMode) return null;
+    if (selectMode) return null;
     const map = {};
     const order = [];
     filtered.forEach(n => {
@@ -883,23 +881,6 @@ Kind regards`;
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search notes…" />
 
-      {/* Group by: None or Group/Site */}
-      {!selectMode && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-400">Group by:</span>
-          <div className="flex gap-1 p-1 rounded-lg bg-slate-100">
-            {[{ k: "none", label: "None" }, { k: "category", label: "Group / Site" }].map(o => (
-              <button key={o.k} onClick={() => setGroupBy(o.k)}
-                className="px-3 py-1.5 rounded-md text-xs font-bold transition-all"
-                style={groupBy === o.k
-                  ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
-                  : { background: "transparent", color: "#94A3B8" }}>
-                {o.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
       <div className="space-y-2">
         <FilterPills options={["Unresolved", "Resolved", "All"]} value={filterStatus} onChange={setFilterStatus} dangerValue={null} />
         <FilterPills options={["All", "Normal", "Urgent", "Critical"]} value={filterUrgency} onChange={setFilterUrgency} dangerValue="Critical" />
