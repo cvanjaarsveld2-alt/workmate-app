@@ -394,9 +394,9 @@ export function NavTab({ icon: Icon, label, active, onClick, badge }) {
 // ─── PageHeader ───────────────────────────────────────────────────────────────
 export function PageHeader({ title, subtitle }) {
   return (
-    <div className="mb-2">
-      <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{title}</h1>
-      {subtitle && <p className="mt-1 text-sm text-slate-400 leading-snug">{subtitle}</p>}
+    <div className="mb-2 min-w-0 flex-1">
+      <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight truncate">{title}</h1>
+      {subtitle && <p className="mt-1 text-sm text-slate-400 leading-snug truncate">{subtitle}</p>}
     </div>
   );
 }
