@@ -641,7 +641,7 @@ export default function PowerWorksApp() {
       <div className="min-h-screen pb-32" style={{ background: "#F7F3F3" }}>
 
         {/* ── Top bar ── */}
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100">
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100" style={{ paddingTop: "env(safe-area-inset-top)" }}>
           <div className="mx-auto max-w-2xl px-3 h-14 flex items-center justify-between gap-2">
             <button onClick={() => setDrawerOpen(true)}
               className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
