@@ -413,7 +413,8 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
     return acc;
   }, {});
   const groupKeys = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
-  const groups = useCollapsibleGroups(groupKeys, true);
+  const collapseKeys = groupKeys.filter(k => k !== "(No group)");
+  const groups = useCollapsibleGroups(collapseKeys, true);
 
   const leadCount = contacts.filter(c => (c.status || "lead") === "lead").length;
 
@@ -571,16 +572,20 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
 
       <div className="flex items-center justify-between gap-2">
         <PageHeader title="Contacts" subtitle={`${contacts.length} total · ${leadCount} leads`} />
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 shrink-0">
           {!showForm && !editId && !showScanner && !bulk.active && contacts.length > 0 && (
-            <Btn size="sm" variant="secondary" onClick={bulk.enter}>
-              <FolderPlus size={14} /> Group
-            </Btn>
+            <button onClick={bulk.enter}
+              className="flex items-center justify-center gap-1 px-2.5 h-9 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-600 shrink-0"
+              aria-label="Group">
+              <FolderPlus size={15} />
+            </button>
           )}
           {!showForm && !editId && !showScanner && !bulk.active && (
-            <Btn size="sm" variant="secondary" onClick={() => { setShowScanner(true); setEditId(null); }}>
-              <Camera size={14} /> Scan
-            </Btn>
+            <button onClick={() => { setShowScanner(true); setEditId(null); }}
+              className="flex items-center justify-center gap-1 px-2.5 h-9 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-600 shrink-0"
+              aria-label="Scan card">
+              <Camera size={15} />
+            </button>
           )}
           {!bulk.active && (
           <Btn size="sm" onClick={() => {
