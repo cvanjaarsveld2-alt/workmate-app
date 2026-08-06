@@ -16,7 +16,7 @@ import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { CardScanner } from "../components/CardScanner";
-import { useBulkGroup, BulkGroupBar, BulkGroupSheet, useCollapsibleGroups } from "../components/BulkGroup";
+import { useBulkGroup, BulkGroupBar, BulkGroupSheet, useCollapsibleGroups, RenameGroupSheet } from "../components/BulkGroup";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
@@ -106,6 +106,28 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
 
   // Existing group names for the picker
   const contactGroupNames = [...new Set((data.contacts || []).map(c => c.category?.trim()).filter(Boolean))].sort();
+
+  const [renamingGroup, setRenamingGroup] = useState(null);
+
+  // Rename a group: update category on every contact currently in it
+  function renameContactGroup(oldName, newName) {
+    if (oldName === "(No group)") { setRenamingGroup(null); return; }
+    const now = new Date().toISOString();
+    const affected = (data.contacts || []).filter(c => (c.category?.trim() || "") === oldName);
+    setData(d => ({
+      ...d,
+      contacts: (d.contacts || []).map(c =>
+        (c.category?.trim() || "") === oldName ? { ...c, category: newName, sync_status: "pending", updated_at: now } : c
+      ),
+      syncQueue: [
+        ...affected.map(c => ({ id: genId(), table: "contacts", action: "update", data: { ...c, category: newName, updated_at: now }, status: "pending", created_at: now })),
+        ...(d.syncQueue || []),
+      ],
+    }));
+    affected.forEach(c => offlineSave("contacts", { ...c, category: newName, updated_at: now }).catch(() => {}));
+    setToast(`Renamed to "${newName}"`);
+    setRenamingGroup(null);
+  }
   const [toast, setToast]             = useState("");
   const [cardPhotoUrl, setCardPhotoUrl] = useState(null);
   const [scannedNotice, setScannedNotice] = useState(false);
@@ -615,18 +637,27 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
           const isCol = groups.isCollapsed(company);
           return (
           <Card key={company} className="overflow-hidden">
-            <button onClick={() => groups.toggle(company)}
-              className="w-full px-4 py-2.5 border-b border-slate-100 active:bg-slate-100 transition-colors" style={{ background: "#F7F3F3" }}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <motion.div animate={{ rotate: isCol ? -90 : 0 }} transition={{ duration: 0.2 }}>
-                    <ChevronDown size={16} className="text-slate-400" />
-                  </motion.div>
-                  <p className="text-sm font-black text-slate-900">{company}</p>
+            <div className="flex items-center border-b border-slate-100" style={{ background: "#F7F3F3" }}>
+              <button onClick={() => groups.toggle(company)}
+                className="flex-1 px-4 py-2.5 active:bg-slate-100 transition-colors">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <motion.div animate={{ rotate: isCol ? -90 : 0 }} transition={{ duration: 0.2 }}>
+                      <ChevronDown size={16} className="text-slate-400" />
+                    </motion.div>
+                    <p className="text-sm font-black text-slate-900">{company}</p>
+                  </div>
+                  <span className="text-xs font-bold text-slate-500">{list.length} contact{list.length !== 1 ? "s" : ""}</span>
                 </div>
-                <span className="text-xs font-bold text-slate-500">{list.length} contact{list.length !== 1 ? "s" : ""}</span>
-              </div>
-            </button>
+              </button>
+              {company !== "(No group)" && (
+                <button onClick={() => setRenamingGroup(company)}
+                  className="px-3 py-2.5 text-slate-400 active:text-slate-700 active:bg-slate-100 transition-colors"
+                  aria-label="Rename group">
+                  <Edit2 size={14} />
+                </button>
+              )}
+            </div>
             {!isCol && (
             <div className="divide-y divide-slate-50">
               {list.map(c => {
@@ -694,6 +725,14 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
         existingGroups={contactGroupNames}
         onClose={bulk.closeAssign}
         onConfirm={assignGroupToSelected}
+      />
+
+      <RenameGroupSheet
+        open={!!renamingGroup}
+        currentName={renamingGroup}
+        existingGroups={contactGroupNames}
+        onClose={() => setRenamingGroup(null)}
+        onConfirm={(newName) => renameContactGroup(renamingGroup, newName)}
       />
     </div>
   );
