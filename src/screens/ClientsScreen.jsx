@@ -580,7 +580,7 @@ function CategoryBadge({ catId, size = "sm" }) {
     if (b === "(No group)") return -1;
     return a.localeCompare(b);
   });
-  const collapse = useCollapsibleGroups(groupMode === "category" ? groupKeys : null, groupMode === "category");
+  const collapse = useCollapsibleGroups(groupMode === "category" ? groupKeys.filter(k => k !== "(No group)") : null, groupMode === "category");
 
   return (
     <div className="space-y-4">
