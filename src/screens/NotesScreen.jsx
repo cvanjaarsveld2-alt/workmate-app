@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, ChevronDown, Send, Mail, Share2, FolderPlus, Tag } from "lucide-react";
-import { BulkGroupSheet, useCollapsibleGroups } from "../components/BulkGroup";
+import { BulkGroupSheet, useCollapsibleGroups, RenameGroupSheet } from "../components/BulkGroup";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
@@ -191,6 +191,28 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   }
 
   const noteGroupNames = [...new Set((data.notes || []).map(n => n.category?.trim()).filter(Boolean))].sort();
+
+  const [renamingGroup, setRenamingGroup] = useState(null);
+
+  // Rename a note group: update category on every note currently in it
+  function renameNoteGroup(oldName, newName) {
+    if (oldName === "(No group)") { setRenamingGroup(null); return; }
+    const now = new Date().toISOString();
+    const affected = (data.notes || []).filter(n => (n.category?.trim() || "") === oldName);
+    setData(d => ({
+      ...d,
+      notes: (d.notes || []).map(n =>
+        (n.category?.trim() || "") === oldName ? { ...n, category: newName, sync_status: "pending" } : n
+      ),
+      syncQueue: [
+        ...affected.map(n => ({ id: genId(), table: "notes", action: "update", data: { ...n, category: newName, media: (n.media || []).map(m => ({ ...m, base64: undefined })) }, status: "pending", created_at: now })),
+        ...(d.syncQueue || []),
+      ],
+    }));
+    affected.forEach(n => offlineSave("notes", { ...n, category: newName }).catch(() => {}));
+    setToast(`Renamed to "${newName}"`);
+    setRenamingGroup(null);
+  }
 
   async function handleExport(format) {
     const selected = notes.filter(n => selectedIds.has(n.id));
@@ -899,17 +921,26 @@ Kind regards`;
           if (n._header !== undefined) {
             const isCol = groups.isCollapsed(n._header);
             return (
-              <button key={`hdr-${n._header}`} onClick={() => groups.toggle(n._header)}
-                className="w-full flex items-center justify-between px-1 pt-3 pb-1 active:opacity-70 transition-opacity">
-                <div className="flex items-center gap-1.5">
-                  <motion.div animate={{ rotate: isCol ? -90 : 0 }} transition={{ duration: 0.2 }}>
-                    <ChevronDown size={15} className="text-slate-400" />
-                  </motion.div>
-                  <Tag size={13} style={{ color: "#8B1A1A" }} />
-                  <p className="text-sm font-black text-slate-700">{n._header}</p>
-                </div>
-                <span className="text-xs font-bold text-slate-400">{n._count} note{n._count !== 1 ? "s" : ""}</span>
-              </button>
+              <div key={`hdr-${n._header}`} className="flex items-center px-1 pt-3 pb-1">
+                <button onClick={() => groups.toggle(n._header)}
+                  className="flex-1 flex items-center justify-between active:opacity-70 transition-opacity">
+                  <div className="flex items-center gap-1.5">
+                    <motion.div animate={{ rotate: isCol ? -90 : 0 }} transition={{ duration: 0.2 }}>
+                      <ChevronDown size={15} className="text-slate-400" />
+                    </motion.div>
+                    <Tag size={13} style={{ color: "#8B1A1A" }} />
+                    <p className="text-sm font-black text-slate-700">{n._header}</p>
+                  </div>
+                  <span className="text-xs font-bold text-slate-400">{n._count} note{n._count !== 1 ? "s" : ""}</span>
+                </button>
+                {n._header !== "(No group)" && (
+                  <button onClick={() => setRenamingGroup(n._header)}
+                    className="pl-3 pr-1 text-slate-400 active:text-slate-700 transition-colors"
+                    aria-label="Rename group">
+                    <Edit2 size={13} />
+                  </button>
+                )}
+              </div>
             );
           }
           // ── Edit-in-place: the form replaces the card at its position ──
@@ -966,6 +997,14 @@ Kind regards`;
         existingGroups={noteGroupNames}
         onClose={() => setGroupSheetOpen(false)}
         onConfirm={assignGroupToNotes}
+      />
+
+      <RenameGroupSheet
+        open={!!renamingGroup}
+        currentName={renamingGroup}
+        existingGroups={noteGroupNames}
+        onClose={() => setRenamingGroup(null)}
+        onConfirm={(newName) => renameNoteGroup(renamingGroup, newName)}
       />
     </div>
   );
