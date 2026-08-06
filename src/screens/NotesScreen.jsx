@@ -494,7 +494,10 @@ Kind regards`;
   })();
 
   const noteGroupKeys = groupedNotes ? groupedNotes.map(s => s.group) : null;
-  const groups = useCollapsibleGroups(noteGroupKeys, true);
+  // Collapse real groups by default, but keep "(No group)" open so uncategorised
+  // notes stay visible (otherwise the screen looks empty until you expand it).
+  const noteCollapseKeys = noteGroupKeys ? noteGroupKeys.filter(k => k !== "(No group)") : null;
+  const groups = useCollapsibleGroups(noteCollapseKeys, true);
 
   // ── Shared form JSX (rendered at top for NEW, in-place for EDIT) ──
   // Plain function returning JSX (not a component) so inputs keep focus.
