@@ -2,7 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
+html, body {
   margin: 0;
   background: #f1f5f9;
+  /* Prevent any stray-wide element from forcing Mobile Safari to zoom out */
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+  /* Respect iPhone safe areas (notch / home indicator) */
+  -webkit-text-size-adjust: 100%;
+}
+
+#root {
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* iOS zooms in on focus for any input with font-size < 16px. Force 16px on
+   form controls so focusing a field never triggers an unwanted zoom. */
+input, select, textarea {
+  font-size: 16px;
+}
+
+/* Long unbroken strings (emails, URLs, part numbers) must wrap, not overflow */
+* {
+  overflow-wrap: break-word;
 }
