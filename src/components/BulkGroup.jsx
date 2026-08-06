@@ -184,3 +184,76 @@ export function useCollapsibleGroups(allNames = null, defaultCollapsed = false) 
   const expandAll = React.useCallback(() => setCollapsed(new Set()), []);
   return { isCollapsed, toggle, collapseAll, expandAll };
 }
+
+// ─── Rename group sheet ──────────────────────────────────────────────────────
+// Renames an existing group. The caller applies the new name to every record
+// currently in that group.
+//
+//   const [renaming, setRenaming] = useState(null); // group name or null
+//   ...
+//   <RenameGroupSheet
+//     open={!!renaming}
+//     currentName={renaming}
+//     existingGroups={groupNames}
+//     onClose={() => setRenaming(null)}
+//     onConfirm={(newName) => { renameGroup(renaming, newName); setRenaming(null); }}
+//   />
+export function RenameGroupSheet({ open, currentName, existingGroups = [], onClose, onConfirm }) {
+  const [name, setName] = React.useState(currentName || "");
+
+  React.useEffect(() => { if (open) setName(currentName || ""); }, [open, currentName]);
+
+  const trimmed = name.trim();
+  const clash = trimmed && trimmed !== currentName &&
+    existingGroups.some(g => g.toLowerCase() === trimmed.toLowerCase());
+
+  function confirm() {
+    if (!trimmed || clash || trimmed === currentName) return;
+    onConfirm(trimmed);
+  }
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose} className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm" />
+          <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 300 }}
+            className="fixed bottom-0 left-0 right-0 z-[91] rounded-t-3xl bg-white"
+            style={{ maxWidth: 480, margin: "0 auto" }}>
+            <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
+            <div className="px-6 pb-8 pt-3 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-base font-black text-slate-900">Rename group</p>
+                <button onClick={onClose} className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 text-slate-500">
+                  <X size={16} />
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-400 -mt-2">
+                Renaming “{currentName}” updates every record in this group.
+              </p>
+
+              <input
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && confirm()}
+                autoFocus
+                className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-none focus:border-red-300 focus:bg-white transition-colors"
+                placeholder="New group name…" />
+
+              {clash && <p className="text-xs font-bold text-red-500 -mt-2">A group with that name already exists.</p>}
+
+              <button onClick={confirm} disabled={!trimmed || clash || trimmed === currentName}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white font-black text-sm disabled:opacity-40 min-h-[52px]"
+                style={{ background: BRAND_PRIMARY }}>
+                <Check size={16} /> Rename
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
