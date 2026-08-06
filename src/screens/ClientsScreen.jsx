@@ -3,8 +3,9 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, X, Save, Edit2, Trash2, Check,
-  ChevronDown, ChevronUp, Phone, Clipboard, Send, Share2,
+  ChevronDown, ChevronUp, Phone, Clipboard, Send, Share2, FolderPlus, Tag,
 } from "lucide-react";
+import { useBulkGroup, BulkGroupBar, BulkGroupSheet, useCollapsibleGroups, RenameGroupSheet } from "../components/BulkGroup";
 import { MemberSelector } from "../components/MemberSelector";
 import { ShareSheet } from "../components/ShareSheet";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
@@ -340,8 +341,50 @@ function CategoryBadge({ catId, size = "sm" }) {
   const [showNoteForm, setShowNoteForm] = useState(null);
   const [filterStage, setFilterStage]   = useState("All");
   const [filterCat, setFilterCat]       = useState("All");
+  const [groupMode, setGroupMode]       = useState("company"); // "company" | "category"
+  const bulk = useBulkGroup();
+  const [renamingGroup, setRenamingGroup] = useState(null);
+
+  const clientGroupNames = [...new Set((data.clients || []).map(c => c.category?.trim()).filter(Boolean))].sort();
+
+  // Assign a group to all selected clients
+  function assignGroupToClients(groupName) {
+    const ids = bulk.selected;
+    const now = new Date().toISOString();
+    const affected = (data.clients || []).filter(c => ids.has(c.id));
+    setData(d => ({
+      ...d,
+      clients: (d.clients || []).map(c => ids.has(c.id) ? { ...c, category: groupName, sync_status: "pending" } : c),
+      syncQueue: [
+        ...affected.map(c => ({ id: genId(), table: "clients", action: "update", data: { ...c, category: groupName }, status: "pending", created_at: now })),
+        ...(d.syncQueue || []),
+      ],
+    }));
+    affected.forEach(c => offlineSave("clients", { ...c, category: groupName }).catch(() => {}));
+    setToast(`${ids.size} client${ids.size !== 1 ? "s" : ""} added to "${groupName}"`);
+    bulk.cancel();
+    setGroupMode("category");
+  }
+
+  // Rename a client group: update every client in it
+  function renameClientGroup(oldName, newName) {
+    if (oldName === "(No group)") { setRenamingGroup(null); return; }
+    const now = new Date().toISOString();
+    const affected = (data.clients || []).filter(c => (c.category?.trim() || "") === oldName);
+    setData(d => ({
+      ...d,
+      clients: (d.clients || []).map(c => (c.category?.trim() || "") === oldName ? { ...c, category: newName, sync_status: "pending" } : c),
+      syncQueue: [
+        ...affected.map(c => ({ id: genId(), table: "clients", action: "update", data: { ...c, category: newName }, status: "pending", created_at: now })),
+        ...(d.syncQueue || []),
+      ],
+    }));
+    affected.forEach(c => offlineSave("clients", { ...c, category: newName }).catch(() => {}));
+    setToast(`Renamed to "${newName}"`);
+    setRenamingGroup(null);
+  }
   const [shareSheet, setShareSheet]     = useState(null);
-  const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], assigned_to_user_id: null, assigned_to: "" });
+  const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], category: "", assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
   const clients   = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
@@ -364,7 +407,7 @@ function CategoryBadge({ catId, size = "sm" }) {
 
 
   function resetForm() {
-    setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], assigned_to_user_id: null, assigned_to: "" });
+    setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], category: "", assigned_to_user_id: null, assigned_to: "" });
     setEditId(null);
     setShowForm(false);
   }
@@ -425,7 +468,7 @@ function CategoryBadge({ catId, size = "sm" }) {
 
   // ── Edit-in-place: the edit form renders where the branch row is. ──
   function startEdit(c) {
-    setForm({ company: c.company || "", branch: c.branch || "", contact: c.contact || "", phone: c.phone || "", email: c.email || "", stage: c.stage || "New Lead", notes: c.notes || "", categories: parseCats(c.division), assigned_to_user_id: c.assigned_to_user_id || null, assigned_to: c.assigned_to || "" });
+    setForm({ company: c.company || "", branch: c.branch || "", contact: c.contact || "", phone: c.phone || "", email: c.email || "", stage: c.stage || "New Lead", notes: c.notes || "", categories: parseCats(c.division), category: c.category || "", assigned_to_user_id: c.assigned_to_user_id || null, assigned_to: c.assigned_to || "" });
     setEditId(c.id);
     setShowForm(false);
   }
@@ -464,6 +507,8 @@ function CategoryBadge({ catId, size = "sm" }) {
           <Field label="Email" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} placeholder="Email" type="email" />
         </div>
         <SelectField label="Pipeline Stage" value={form.stage} onChange={v => setForm(f => ({ ...f, stage: v }))} options={PIPELINE_STAGES} />
+
+        <Field label="Group (optional)" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} placeholder="e.g. Kathu Expo, Priority Accounts" />
 
         {/* ── Product / service categories ── */}
         <div>
@@ -523,11 +568,19 @@ function CategoryBadge({ catId, size = "sm" }) {
     .filter(c => !search || [c.company, c.branch, c.contact].some(f => f?.toLowerCase().includes(search.toLowerCase())));
 
   const grouped = filtered.reduce((a, c) => {
-    const k = c.company || "Unknown";
+    const k = groupMode === "category"
+      ? (c.category?.trim() || "(No group)")
+      : (c.company || "Unknown");
     if (!a[k]) a[k] = [];
     a[k].push(c);
     return a;
   }, {});
+  const groupKeys = Object.keys(grouped).sort((a, b) => {
+    if (a === "(No group)") return 1;
+    if (b === "(No group)") return -1;
+    return a.localeCompare(b);
+  });
+  const collapse = useCollapsibleGroups(groupMode === "category" ? groupKeys : null, groupMode === "category");
 
   return (
     <div className="space-y-4">
@@ -595,10 +648,121 @@ function CategoryBadge({ catId, size = "sm" }) {
         onChange={v => setFilterCat(v === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.label === v)?.id || "All"))}
       />
 
+      {/* Group by + bulk group */}
+      {!bulk.active && (
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-400">Group by:</span>
+            <div className="flex gap-1 p-1 rounded-lg bg-slate-100">
+              {[{ k: "company", label: "Company" }, { k: "category", label: "Group" }].map(o => (
+                <button key={o.k} onClick={() => setGroupMode(o.k)}
+                  className="px-3 py-1.5 rounded-md text-xs font-bold transition-all"
+                  style={groupMode === o.k
+                    ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
+                    : { background: "transparent", color: "#94A3B8" }}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {clients.length > 0 && (
+            <button onClick={bulk.enter} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-600">
+              <FolderPlus size={13} /> Group
+            </button>
+          )}
+        </div>
+      )}
+
+      <BulkGroupBar
+        active={bulk.active}
+        count={bulk.selected.size}
+        allCount={filtered.length}
+        onCancel={bulk.cancel}
+        onAssign={bulk.openAssign}
+        onSelectAll={() => bulk.selectAll(filtered.map(c => c.id))}
+        onClear={bulk.clear}
+        label="clients"
+      />
+
       {Object.keys(grouped).length === 0 && <Empty title="No clients or leads found" text="Add new leads and clients here. Use the Leads screen for new opportunities at existing clients." />}
 
       <div className="space-y-3">
-        {Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([cn, branches]) => {
+        {(() => {
+          // In category mode, group the companies under category-group headers.
+          // In company mode, render the company cards directly (no wrapper).
+          if (groupMode === "category") {
+            // Build: groupName -> { companyName -> branches[] }
+            const sections = {};
+            filtered.forEach(c => {
+              const g = c.category?.trim() || "(No group)";
+              const co = c.company || "Unknown";
+              if (!sections[g]) sections[g] = {};
+              if (!sections[g][co]) sections[g][co] = [];
+              sections[g][co].push(c);
+            });
+            const sectionKeys = Object.keys(sections).sort((a, b) => {
+              if (a === "(No group)") return 1;
+              if (b === "(No group)") return -1;
+              return a.localeCompare(b);
+            });
+            return sectionKeys.map(gName => {
+              const isCol = collapse.isCollapsed(gName);
+              const companyCount = Object.keys(sections[gName]).length;
+              return (
+                <div key={`grp-${gName}`} className="space-y-2">
+                  <div className="flex items-center px-1">
+                    <button onClick={() => collapse.toggle(gName)}
+                      className="flex-1 flex items-center justify-between py-1 active:opacity-70 transition-opacity">
+                      <div className="flex items-center gap-1.5">
+                        <motion.div animate={{ rotate: isCol ? -90 : 0 }} transition={{ duration: 0.2 }}>
+                          <ChevronDown size={16} className="text-slate-400" />
+                        </motion.div>
+                        <Tag size={14} style={{ color: "#8B1A1A" }} />
+                        <p className="text-sm font-black text-slate-700">{gName}</p>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400">{companyCount} {companyCount === 1 ? "company" : "companies"}</span>
+                    </button>
+                    {gName !== "(No group)" && (
+                      <button onClick={() => setRenamingGroup(gName)}
+                        className="pl-3 pr-1 text-slate-400 active:text-slate-700 transition-colors" aria-label="Rename group">
+                        <Edit2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                  {!isCol && (
+                    <div className="space-y-3">
+                      {Object.entries(sections[gName]).sort(([a],[b]) => a.localeCompare(b)).map(([cn, branches]) =>
+                        renderCompanyCard(cn, branches))}
+                    </div>
+                  )}
+                </div>
+              );
+            });
+          }
+          // Company mode — original behaviour
+          return Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([cn, branches]) =>
+            renderCompanyCard(cn, branches));
+        })()}
+      </div>
+
+      <BulkGroupSheet
+        open={bulk.assignOpen}
+        existingGroups={clientGroupNames}
+        onClose={bulk.closeAssign}
+        onConfirm={assignGroupToClients}
+      />
+      <RenameGroupSheet
+        open={!!renamingGroup}
+        currentName={renamingGroup}
+        existingGroups={clientGroupNames}
+        onClose={() => setRenamingGroup(null)}
+        onConfirm={(newName) => renameClientGroup(renamingGroup, newName)}
+      />
+    </div>
+  );
+
+  // Renders a single company card (used by both grouping modes)
+  function renderCompanyCard(cn, branches) {
           const isExpanded    = expandedClient === cn;
           const allBranchIds  = branches.map(b => b.id);
           const companyFU     = followups.filter(f => allBranchIds.includes(f.client_id));
@@ -654,8 +818,20 @@ function CategoryBadge({ catId, size = "sm" }) {
                   const clientPending = clientFU.filter(f => !f.completed).length;
                   const clientOpenNotes = clientNotes.filter(n => !n.resolved).length;
 
+                  const isSel = bulk.selected.has(c.id);
                   return (
-                    <div key={c.id} className="px-4 py-3">
+                    <div key={c.id}
+                      className={`px-4 py-3 ${bulk.active ? (isSel ? "bg-red-50 cursor-pointer" : "cursor-pointer active:bg-slate-50") : ""}`}
+                      onClick={bulk.active ? () => bulk.toggle(c.id) : undefined}>
+                      {bulk.active && (
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0"
+                            style={isSel ? { background: BRAND.primary, borderColor: BRAND.primary } : { borderColor: "#CBD5E1" }}>
+                            {isSel && <Check size={13} className="text-white" />}
+                          </span>
+                          <span className="text-xs font-bold text-slate-400">{isSel ? "Selected" : "Tap to select"}</span>
+                        </div>
+                      )}
                       {/* Branch header + action buttons */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -715,8 +891,5 @@ function CategoryBadge({ catId, size = "sm" }) {
               </div>
             </Card>
           );
-        })}
-      </div>
-    </div>
-  );
+  }
 }
