@@ -789,11 +789,20 @@ Kind regards`;
       {!selectMode ? (
         <div className="flex items-center justify-between">
           <PageHeader title="Field Notes" subtitle={`${unresolvedCount} unresolved · ${notes.length} total`} />
-          <div className="flex gap-2">
+          <div className="flex gap-1.5 shrink-0">
             {notes.length > 0 && (
-              <Btn size="sm" variant="secondary" onClick={enterSelectMode}>
-                <FileDown size={14} /> Export
-              </Btn>
+              <button onClick={enterSelectMode}
+                className="flex items-center justify-center px-2.5 h-9 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-600 shrink-0"
+                aria-label="Group notes">
+                <FolderPlus size={15} />
+              </button>
+            )}
+            {notes.length > 0 && (
+              <button onClick={enterSelectMode}
+                className="flex items-center justify-center px-2.5 h-9 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-600 shrink-0"
+                aria-label="Export notes">
+                <FileDown size={15} />
+              </button>
             )}
             <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
               {(showForm || editId) ? <X size={15} /> : <Plus size={15} />}{(showForm || editId) ? "Cancel" : "Add"}
@@ -805,7 +814,7 @@ Kind regards`;
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-base font-black text-slate-900">{selectedIds.size} selected</p>
-              <p className="text-xs text-slate-400">Tap notes to select for export</p>
+              <p className="text-xs text-slate-400">Tap notes, then assign a group or export</p>
             </div>
             <button onClick={exitSelectMode} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center">
               <X size={18} />
@@ -820,11 +829,11 @@ Kind regards`;
             </button>
           </div>
           <div className="flex gap-2 mt-2">
-            <button onClick={() => setGroupSheetOpen(true)} disabled={selectedIds.size === 0} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-40 min-h-[40px]">
-              <FolderPlus size={14} /> Assign group
+            <button onClick={() => setGroupSheetOpen(true)} disabled={selectedIds.size === 0} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold text-white disabled:opacity-40 min-h-[44px]" style={{ background: "#8B1A1A" }}>
+              <FolderPlus size={14} /> Assign group ({selectedIds.size})
             </button>
-            <button onClick={() => setShowExportMenu(true)} disabled={selectedIds.size === 0 || exporting} className="flex-1 rounded-xl px-3 py-2 text-sm font-bold text-white disabled:opacity-40 min-h-[40px]" style={{ background: "#8B1A1A" }}>
-              <FileDown size={14} className="inline mr-1" /> Export ({selectedIds.size})
+            <button onClick={() => setShowExportMenu(true)} disabled={selectedIds.size === 0 || exporting} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 disabled:opacity-40 min-h-[44px]">
+              <FileDown size={14} /> Export
             </button>
           </div>
           {exporting && (
