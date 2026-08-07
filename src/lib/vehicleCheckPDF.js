@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { PW_LOGO_B64 } from "./pwLogo";
 
 const BRAND_RED  = "#8B1A1A";
 const RED_RGB    = [139, 26, 26];
