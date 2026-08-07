@@ -476,17 +476,19 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
       </div>}
 
       {contactPickerOpen && (
-        <ContactPicker
-          contacts={data.contacts || []}
-          selectedIds={form.contact_id ? [form.contact_id] : []}
-          onChange={(ids) => {
-            // Single-select: take the most recently added id
-            const picked = ids && ids.length ? ids[ids.length - 1] : "";
-            setForm(current => ({ ...current, contact_id: picked }));
-            setContactPickerOpen(false);
-          }}
-          onClose={() => setContactPickerOpen(false)}
-        />
+        <div className="fixed inset-0 z-[110]">
+          <ContactPicker
+            contacts={data.contacts || []}
+            selectedIds={form.contact_id ? [form.contact_id] : []}
+            onChange={(ids) => {
+              // Single-select: take the most recently added id
+              const picked = ids && ids.length ? ids[ids.length - 1] : "";
+              setForm(current => ({ ...current, contact_id: picked }));
+              setContactPickerOpen(false);
+            }}
+            onClose={() => setContactPickerOpen(false)}
+          />
+        </div>
       )}
     </div>
   );
