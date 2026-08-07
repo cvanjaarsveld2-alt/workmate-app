@@ -65,7 +65,7 @@ function ClientRow({ client, color, onOpen, onShare, onTap }) {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-slate-900 truncate">{client.company}</p>
           <p className="text-xs text-slate-400 truncate">{[client.branch, client.contact].filter(Boolean).join(" · ")}</p>
-          {client.location && <p className="text-xs text-slate-300 truncate">{client.location}</p>}
+          {client.location && <p className="text-xs text-slate-400 truncate">{client.location}</p>}
         </div>
         <StagePill stage={client.stage || "New Lead"} />
       </button>
@@ -141,7 +141,7 @@ function FollowupRow({ fu, today, color, onShare, onTap }) {
           <p className="text-sm font-bold text-slate-900 truncate">{fu.title}</p>
           <p className="text-xs text-slate-400 truncate">{fu.client}{fu.branch ? ` — ${fu.branch}` : ""}</p>
           {fu.notes && <p className="text-xs text-slate-400 truncate mt-0.5 italic">{fu.notes}</p>}
-          <p className="text-[10px] text-slate-300 mt-0.5">{fu.time ? `${fu.time} · ` : ""}{fu.date}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">{fu.time ? `${fu.time} · ` : ""}{fu.date}</p>
         </div>
         {fu.completed ? (
           <CheckCircle2 size={14} className="text-green-500 shrink-0" />
