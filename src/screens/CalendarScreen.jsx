@@ -2,11 +2,12 @@ import React, { useMemo, useRef, useState } from "react";
 import {
   Bell, Calendar as CalendarIcon, Check, CheckCircle2, ChevronLeft,
   ChevronRight, Clock, Grid3X3, List, MapPin, Navigation, Pencil,
-  Plus, Save, Trash2, Users, X,
+  Plus, Save, Trash2, Users, UserPlus, X,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { genId, smartDate, todayISO } from "../lib/helpers";
-import { Card } from "../components/ui";
+import { Card, ClientSelector } from "../components/ui";
+import { ContactPicker } from "../components/ContactPicker";
 import { offlineSave } from "../offline/offlineDb";
 import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
@@ -27,7 +28,7 @@ const REMINDERS = [
   ["1d_before", "1 day before"],
 ];
 const EMPTY_FORM = {
-  type: "Meeting", title: "", client_id: "", related_to: "", location: "",
+  type: "Meeting", title: "", client_id: "", contact_id: "", related_to: "", location: "",
   date: "", time: "09:00", allDay: false, reminder: "15_before", notes: "",
 };
 
@@ -117,6 +118,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ ...EMPTY_FORM, date: today });
   const [message, setMessage] = useState("");
+  const [contactPickerOpen, setContactPickerOpen] = useState(false);
 
   const cells = useMemo(() => monthCells(view.year, view.month), [view]);
   const followups = (data.followups || []).filter(item => item.user_id === userId || item.assigned_to_user_id === userId);
@@ -206,6 +208,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
       type: itemType(item),
       title: cleanTitle(item),
       client_id: item.client_id || "",
+      contact_id: item.contact_id || "",
       date: item.date || selectedDate,
       time: item.time || "09:00",
       allDay: !item.time,
@@ -225,6 +228,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
       values.type === "Meeting" ? "Calendar meeting" : "Calendar follow-up",
       values.related_to.trim() ? `Related to: ${values.related_to.trim()}` : "",
       values.location.trim() ? `Location: ${values.location.trim()}` : "",
+      values._contactName && values._contactName.trim() ? `Contact: ${values._contactName.trim()}` : "",
       values.notes.trim(),
     ].filter(Boolean).join("\n");
   }
@@ -233,16 +237,18 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
     if (!form.title.trim()) { setMessage("Please enter a title."); return; }
     if (!form.date) { setMessage("Please select a date."); return; }
     const selectedClient = clients.find(client => client.id === form.client_id);
+    const selectedContact = (data.contacts || []).find(c => c.id === form.contact_id);
     const existing = editId ? followups.find(item => item.id === editId) : null;
     const values = {
       client_id: form.client_id || null,
+      contact_id: form.contact_id || null,
       client: selectedClient?.company || "",
       branch: selectedClient?.branch || "",
       title: form.type === "Meeting" ? `Meeting: ${form.title.trim()}` : form.title.trim(),
       date: form.date,
       time: form.allDay ? "" : (form.time || "09:00"),
       reminder: form.reminder,
-      notes: encodedNotes(form),
+      notes: encodedNotes({ ...form, _contactName: selectedContact ? (selectedContact.name || "") : "" }),
       completed: existing?.completed || false,
       sync_status: "pending",
     };
@@ -435,7 +441,26 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
             </div>
 
             <div className="bg-white rounded-2xl overflow-hidden border border-slate-200 divide-y divide-slate-100">
-              <label className="min-h-[56px] px-4 flex items-center gap-3"><Users size={17} className="text-slate-400" /><span className="font-semibold text-slate-800 shrink-0">Client</span><select value={form.client_id} onChange={event => setForm(current => ({ ...current, client_id: event.target.value }))} className="ml-auto min-w-0 max-w-[60%] text-right text-slate-600 bg-transparent outline-none"><option value="">No client</option>{clients.map(client => <option key={client.id} value={client.id}>{client.company}{client.branch ? ` — ${client.branch}` : ""}</option>)}</select></label>
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-3 mb-2">
+                  <Users size={17} className="text-slate-400" />
+                  <span className="font-semibold text-slate-800">Client</span>
+                </div>
+                <ClientSelector value={form.client_id} clients={clients} placeholder="No client — tap to search…"
+                  onChange={(id) => setForm(current => ({ ...current, client_id: id || "" }))} />
+              </div>
+              <button type="button" onClick={() => setContactPickerOpen(true)}
+                className="w-full min-h-[56px] px-4 flex items-center gap-3 text-left">
+                <UserPlus size={17} className="text-slate-400" />
+                <span className="font-semibold text-slate-800 shrink-0">Contact</span>
+                <span className="ml-auto min-w-0 max-w-[60%] truncate text-right text-slate-600 font-medium">
+                  {(() => {
+                    const c = (data.contacts || []).find(ct => ct.id === form.contact_id);
+                    return c ? (c.name || "Unnamed") : "No contact";
+                  })()}
+                </span>
+                <ChevronRight size={16} className="text-slate-300 shrink-0" />
+              </button>
               <label className="min-h-[56px] px-4 flex items-center gap-3"><Bell size={17} className="text-slate-400" /><span className="font-semibold text-slate-800 shrink-0">Alert</span><select value={form.reminder} onChange={event => setForm(current => ({ ...current, reminder: event.target.value }))} className="ml-auto min-w-0 max-w-[60%] text-right text-slate-600 bg-transparent outline-none">{REMINDERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className="min-h-[56px] px-4 flex items-center gap-3"><Navigation size={17} className="text-slate-400" /><input value={form.related_to} onChange={event => setForm(current => ({ ...current, related_to: event.target.value }))} placeholder="Related to (optional)" className="flex-1 min-w-0 text-slate-700 outline-none" /></label>
             </div>
@@ -449,6 +474,20 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
           </div>
         </div>
       </div>}
+
+      {contactPickerOpen && (
+        <ContactPicker
+          contacts={data.contacts || []}
+          selectedIds={form.contact_id ? [form.contact_id] : []}
+          onChange={(ids) => {
+            // Single-select: take the most recently added id
+            const picked = ids && ids.length ? ids[ids.length - 1] : "";
+            setForm(current => ({ ...current, contact_id: picked }));
+            setContactPickerOpen(false);
+          }}
+          onClose={() => setContactPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }
