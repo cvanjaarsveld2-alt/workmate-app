@@ -4,13 +4,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Search, CheckSquare, Square, User, UserPlus, Check } from "lucide-react";
+import { X, Search, CheckSquare, Square, User, UserPlus, Check, ChevronDown, ChevronRight, Tag } from "lucide-react";
 
 const inputCls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-2.5 px-3 text-sm outline-none focus:border-red-300 focus:bg-white min-h-[44px]";
 
 export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCreate }) {
   const [search, setSearch] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [collapsed, setCollapsed] = useState({});
+  const toggleGroup = (name) => setCollapsed(prev => ({ ...prev, [name]: !prev[name] }));
   const [newContact, setNewContact] = useState({ name: "", company: "", phone: "" });
   const [saving, setSaving] = useState(false);
 
@@ -18,6 +20,22 @@ export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCrea
     .filter(c => !search || [c.name, c.company, c.title, c.email]
       .some(f => f?.toLowerCase().includes(search.toLowerCase())))
     .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  // Group filtered contacts by category (fallback "(No group)"), matching the
+  // Contacts screen. Groups are collapsible; "(No group)" sorts last.
+  const grouped = (() => {
+    const map = {};
+    for (const c of filtered) {
+      const key = (c.category?.trim()) || "(No group)";
+      (map[key] = map[key] || []).push(c);
+    }
+    const names = Object.keys(map).sort((a, b) => {
+      if (a === "(No group)") return 1;
+      if (b === "(No group)") return -1;
+      return a.localeCompare(b);
+    });
+    return names.map(name => ({ name, items: map[name] }));
+  })();
 
   function toggle(id) {
     const next = new Set(selectedIds);
@@ -139,31 +157,54 @@ export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCrea
                 </div>
               )}
 
-              <div className="divide-y divide-slate-50">
-                {filtered.map(c => {
-                  const isSelected = selectedIds.includes(c.id);
-                  return (
+              {grouped.map(group => {
+                const isCollapsed = collapsed[group.name];
+                return (
+                  <div key={group.name}>
+                    {/* Group header */}
                     <button
-                      key={c.id}
-                      onClick={() => toggle(c.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left min-h-[60px] transition-colors ${
-                        isSelected ? "bg-red-50" : ""
-                      }`}>
-                      <div className="shrink-0">
-                        {isSelected
-                          ? <CheckSquare size={22} className="text-red-600" />
-                          : <Square size={22} className="text-slate-300" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-slate-900 truncate">{c.name}</p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {c.company || "(no company)"}{c.title ? ` · ${c.title}` : ""}
-                        </p>
-                      </div>
+                      type="button"
+                      onClick={() => toggleGroup(group.name)}
+                      className="w-full sticky top-0 z-10 flex items-center gap-2 px-4 py-2.5 bg-slate-50 border-y border-slate-100 text-left">
+                      {isCollapsed
+                        ? <ChevronRight size={16} className="text-slate-400 shrink-0" />
+                        : <ChevronDown size={16} className="text-slate-400 shrink-0" />}
+                      <Tag size={13} className="text-red-700 shrink-0" />
+                      <span className="text-sm font-bold text-slate-800 truncate flex-1">{group.name}</span>
+                      <span className="text-xs text-slate-400 shrink-0">{group.items.length}</span>
                     </button>
-                  );
-                })}
-              </div>
+
+                    {/* Group members */}
+                    {!isCollapsed && (
+                      <div className="divide-y divide-slate-50">
+                        {group.items.map(c => {
+                          const isSelected = selectedIds.includes(c.id);
+                          return (
+                            <button
+                              key={c.id}
+                              onClick={() => toggle(c.id)}
+                              className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left min-h-[60px] transition-colors ${
+                                isSelected ? "bg-red-50" : ""
+                              }`}>
+                              <div className="shrink-0">
+                                {isSelected
+                                  ? <CheckSquare size={22} className="text-red-600" />
+                                  : <Square size={22} className="text-slate-300" />}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-slate-900 truncate">{c.name}</p>
+                                <p className="text-xs text-slate-500 truncate">
+                                  {c.company || "(no company)"}{c.title ? ` · ${c.title}` : ""}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Footer */}
