@@ -7,7 +7,7 @@
 //   - Buttons sized for thumb use
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, ChevronDown, Camera } from "lucide-react";
+import { Search, X, ChevronDown, ChevronUp, SlidersHorizontal, Camera } from "lucide-react";
 import { BRAND, STAGE_COLORS, NOTE_URGENCY } from "../../lib/constants";
 import { daysDiff, smartDate } from "../../lib/helpers";
 import { haptic } from "../../lib/haptics";
@@ -293,6 +293,79 @@ export function FilterPills({ options, value, onChange, dangerValue }) {
           {o}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ─── CollapsibleFilters ───────────────────────────────────────────────────────
+// A tidy, collapsed-by-default filter panel. Instead of two always-visible pill
+// rows eating vertical space, this shows a single "Filters" bar with a summary
+// of what's active; tapping it reveals the pill groups. Pass an array of groups,
+// each { label, options, value, onChange, dangerValue }.
+export function CollapsibleFilters({ groups = [], defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  // Count filters that aren't on "All" so we can show a badge when collapsed.
+  const activeCount = groups.filter(g => g.value && g.value !== "All").length;
+  const activeSummary = groups
+    .filter(g => g.value && g.value !== "All")
+    .map(g => g.value)
+    .join(" · ");
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2.5 px-4 min-h-[48px] text-left">
+        <SlidersHorizontal size={16} className="text-slate-500 shrink-0" />
+        <span className="text-sm font-semibold text-slate-700 shrink-0">Filters</span>
+        {activeCount > 0 && !open && (
+          <span className="min-w-0 truncate text-xs text-slate-400 font-medium">
+            {activeSummary}
+          </span>
+        )}
+        <span className="ml-auto flex items-center gap-2 shrink-0">
+          {activeCount > 0 && (
+            <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
+              style={{ background: BRAND.primary }}>
+              {activeCount}
+            </span>
+          )}
+          {open
+            ? <ChevronUp size={16} className="text-slate-400" />
+            : <ChevronDown size={16} className="text-slate-400" />}
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="overflow-hidden">
+            <div className="px-4 pb-3 pt-1 space-y-3 border-t border-slate-100">
+              {groups.map((g, i) => (
+                <div key={g.label || i}>
+                  {g.label && (
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">
+                      {g.label}
+                    </p>
+                  )}
+                  <FilterPills
+                    options={g.options}
+                    value={g.value}
+                    onChange={g.onChange}
+                    dangerValue={g.dangerValue}
+                  />
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
