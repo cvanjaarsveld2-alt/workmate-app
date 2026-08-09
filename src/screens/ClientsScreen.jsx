@@ -20,7 +20,7 @@ import { triggerImmediateSync } from "../lib/sync";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import {
   Card, Btn, Field, SelectField, SearchBar,
-  FilterPills, Toast, Empty, StagePill, PageHeader, useConfirm,
+  FilterPills, CollapsibleFilters, Toast, Empty, StagePill, PageHeader, useConfirm,
 } from "../components/ui";
 
 const STAGE_PRIORITY = { Active: 0, Quoted: 1, Contacted: 2, "New Lead": 3, Won: 4, Lost: 5 };
@@ -341,7 +341,7 @@ function CategoryBadge({ catId, size = "sm" }) {
   const [showNoteForm, setShowNoteForm] = useState(null);
   const [filterStage, setFilterStage]   = useState("All");
   const [filterCat, setFilterCat]       = useState("All");
-  const [groupMode, setGroupMode]       = useState("company"); // "company" | "category"
+  const [groupMode, setGroupMode]       = useState("category"); // always "category" — Group toggle removed
   const bulk = useBulkGroup();
   const [renamingGroup, setRenamingGroup] = useState(null);
 
@@ -641,35 +641,31 @@ function CategoryBadge({ catId, size = "sm" }) {
       </AnimatePresence>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search clients…" />
-      <FilterPills options={["All", ...PIPELINE_STAGES]} value={filterStage} onChange={setFilterStage} dangerValue="Lost" />
-      <FilterPills
-        options={["All", ...LEAD_CATEGORIES.map(c => c.label)]}
-        value={filterCat === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.id === filterCat)?.label || "All")}
-        onChange={v => setFilterCat(v === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.label === v)?.id || "All"))}
+
+      <CollapsibleFilters
+        groups={[
+          {
+            label: "Stage",
+            options: ["All", ...PIPELINE_STAGES],
+            value: filterStage,
+            onChange: setFilterStage,
+            dangerValue: "Lost",
+          },
+          {
+            label: "Division",
+            options: ["All", ...LEAD_CATEGORIES.map(c => c.label)],
+            value: filterCat === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.id === filterCat)?.label || "All"),
+            onChange: v => setFilterCat(v === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.label === v)?.id || "All")),
+          },
+        ]}
       />
 
-      {/* Group by + bulk group */}
-      {!bulk.active && (
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400">Group by:</span>
-            <div className="flex gap-1 p-1 rounded-lg bg-slate-100">
-              {[{ k: "company", label: "Company" }, { k: "category", label: "Group" }].map(o => (
-                <button key={o.k} onClick={() => setGroupMode(o.k)}
-                  className="px-3 py-1.5 rounded-md text-xs font-bold transition-all"
-                  style={groupMode === o.k
-                    ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
-                    : { background: "transparent", color: "#94A3B8" }}>
-                  {o.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          {clients.length > 0 && (
-            <button onClick={bulk.enter} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-600">
-              <FolderPlus size={13} /> Group
-            </button>
-          )}
+      {/* Bulk group (always grouped by Group/category) */}
+      {!bulk.active && clients.length > 0 && (
+        <div className="flex items-center justify-end">
+          <button onClick={bulk.enter} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-600">
+            <FolderPlus size={13} /> Group
+          </button>
         </div>
       )}
 
