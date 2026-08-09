@@ -292,13 +292,14 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
 
   async function toggleComplete(item) {
     const updated = { ...item, completed: !item.completed, sync_status: "pending" };
-    // Upsert must satisfy the INSERT RLS check → carry user_id/team_id.
+    // Send the FULL row, not a partial payload. Sync upserts, which overwrites
+    // the whole row — any column left out (e.g. title) would be set to null and
+    // violate a not-null constraint. `updated` already carries every field, and
+    // we make sure the RLS-required owner fields are present.
     const syncPayload = {
-      id: item.id,
+      ...updated,
       user_id: item.user_id || userId,
       team_id: item.team_id || teamId || null,
-      completed: updated.completed,
-      sync_status: "pending",
     };
     setData(current => ({
       ...current,
