@@ -11,8 +11,8 @@ const inputCls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-2.5
 export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCreate }) {
   const [search, setSearch] = useState("");
   const [showNew, setShowNew] = useState(false);
-  const [collapsed, setCollapsed] = useState({});
-  const toggleGroup = (name) => setCollapsed(prev => ({ ...prev, [name]: !prev[name] }));
+  const [expandedGroups, setExpandedGroups] = useState({});
+  const toggleGroup = (name) => setExpandedGroups(prev => ({ ...prev, [name]: !prev[name] }));
   const [newContact, setNewContact] = useState({ name: "", company: "", phone: "" });
   const [saving, setSaving] = useState(false);
 
@@ -158,7 +158,9 @@ export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCrea
               )}
 
               {grouped.map(group => {
-                const isCollapsed = collapsed[group.name];
+                // Collapsed by default. While searching, force-expand so
+                // matching contacts are visible without extra taps.
+                const isCollapsed = search.trim() ? false : !expandedGroups[group.name];
                 return (
                   <div key={group.name}>
                     {/* Group header */}
