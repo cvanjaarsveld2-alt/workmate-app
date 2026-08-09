@@ -7,7 +7,7 @@
 //   - Buttons sized for thumb use
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, X, ChevronDown, ChevronUp, SlidersHorizontal, Camera } from "lucide-react";
+import { Search, X, ChevronDown, ChevronUp, ChevronRight, Check, Tag, SlidersHorizontal, Camera } from "lucide-react";
 import { BRAND, STAGE_COLORS, NOTE_URGENCY } from "../../lib/constants";
 import { daysDiff, smartDate } from "../../lib/helpers";
 import { haptic } from "../../lib/haptics";
@@ -310,64 +310,31 @@ export function CollapsibleFilters({ groups = [], defaultOpen = false }) {
   const hasActive = activeCount > 0;
 
   return (
-    <div
-      className="rounded-2xl overflow-hidden transition-all duration-200"
-      style={{
-        background: "#fff",
-        border: `1.5px solid ${hasActive ? "rgba(139,26,26,0.25)" : "#E9E4E4"}`,
-        boxShadow: open
-          ? "0 4px 20px -6px rgba(15,23,42,0.12)"
-          : hasActive
-            ? "0 1px 3px rgba(139,26,26,0.06)"
-            : "0 1px 2px rgba(15,23,42,0.04)",
-      }}>
+    <div>
+      {/* Header row — iOS grouped-list style, like the group headers elsewhere */}
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 pl-3 pr-3.5 min-h-[52px] text-left">
-        {/* Icon chip — tinted brand red so it reads as the control's identity */}
-        <span
-          className="grid place-items-center rounded-xl shrink-0 transition-colors duration-200"
-          style={{
-            width: 34, height: 34,
-            background: hasActive ? BRAND.primary : "#F5EFEF",
-          }}>
-          <SlidersHorizontal size={16} className={hasActive ? "text-white" : "text-slate-500"} />
-        </span>
-
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="text-[15px] font-bold text-slate-800">Filters</span>
-            {hasActive && (
-              <span
-                className="rounded-full px-1.5 min-w-[18px] h-[18px] grid place-items-center text-[10px] font-black text-white"
-                style={{ background: BRAND.primary }}>
-                {activeCount}
-              </span>
-            )}
+        className="w-full flex items-center gap-2.5 px-4 min-h-[48px] rounded-2xl bg-white border border-slate-200 text-left"
+        style={hasActive ? { borderColor: "rgba(139,26,26,0.25)" } : {}}>
+        <SlidersHorizontal size={16} className={hasActive ? "text-red-700 shrink-0" : "text-slate-500 shrink-0"} />
+        <span className="text-[15px] font-bold text-slate-800 shrink-0">Filters</span>
+        {hasActive && (
+          <span className="rounded-full px-1.5 min-w-[18px] h-[18px] grid place-items-center text-[10px] font-black text-white shrink-0"
+            style={{ background: BRAND.primary }}>
+            {activeCount}
           </span>
-          {/* Active values shown as real mini-pills, not plain text */}
-          {hasActive && !open && (
-            <span className="flex items-center gap-1 mt-0.5 overflow-hidden">
-              {activeGroups.map((g, i) => (
-                <span key={i}
-                  className="shrink-0 truncate rounded-md px-1.5 py-0.5 text-[11px] font-bold"
-                  style={{ background: "#F5EFEF", color: BRAND.primary, maxWidth: 130 }}>
-                  {g.value}
-                </span>
-              ))}
-            </span>
-          )}
-          {!hasActive && !open && (
-            <span className="block text-xs text-slate-400 font-medium mt-0.5">Tap to filter</span>
-          )}
-        </span>
-
+        )}
+        {hasActive && !open && (
+          <span className="min-w-0 truncate text-xs font-semibold" style={{ color: BRAND.primary }}>
+            {activeGroups.map(g => g.value).join(" · ")}
+          </span>
+        )}
         <motion.span
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-          className="shrink-0 grid place-items-center">
-          <ChevronDown size={18} className="text-slate-400" />
+          animate={{ rotate: open ? 90 : 0 }}
+          transition={{ duration: 0.18 }}
+          className="ml-auto shrink-0 grid place-items-center">
+          <ChevronRight size={18} className="text-slate-400" />
         </motion.span>
       </button>
 
@@ -379,31 +346,47 @@ export function CollapsibleFilters({ groups = [], defaultOpen = false }) {
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden">
-            <div className="px-3.5 pb-3.5 pt-1 space-y-3.5">
+            <div className="pt-2.5 space-y-4">
               {groups.map((g, i) => (
                 <div key={g.label || i}>
-                  {g.label && (
-                    <div className="flex items-center gap-2 mb-2">
-                      <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">
-                        {g.label}
-                      </p>
-                      {g.value && g.value !== "All" && (
+                  {/* Section header — iOS grouped-list caption */}
+                  <div className="flex items-center gap-2 px-1 mb-1.5">
+                    <Tag size={12} className="text-red-700 shrink-0" />
+                    <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                      {g.label}
+                    </p>
+                    {g.value && g.value !== "All" && (
+                      <button onClick={() => g.onChange("All")}
+                        className="ml-auto text-[11px] font-bold" style={{ color: BRAND.primary }}>
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Inset grouped card — each option is a row with a checkmark */}
+                  <div className="rounded-2xl bg-white border border-slate-200 overflow-hidden divide-y divide-slate-100">
+                    {g.options.map(opt => {
+                      const selected = g.value === opt;
+                      const isDanger = opt === g.dangerValue;
+                      return (
                         <button
-                          onClick={() => g.onChange("All")}
-                          className="text-[11px] font-bold"
-                          style={{ color: BRAND.primary }}>
-                          Clear
+                          key={opt}
+                          type="button"
+                          onClick={() => g.onChange(opt)}
+                          className="w-full flex items-center gap-3 px-4 min-h-[46px] text-left active:bg-slate-50 transition-colors">
+                          <span className={`text-[15px] flex-1 ${selected ? "font-bold" : "font-medium text-slate-600"}`}
+                            style={selected ? { color: isDanger ? "#DC2626" : BRAND.primary } : {}}>
+                            {opt}
+                          </span>
+                          {selected && (
+                            <Check size={18} strokeWidth={3}
+                              style={{ color: isDanger ? "#DC2626" : BRAND.primary }}
+                              className="shrink-0" />
+                          )}
                         </button>
-                      )}
-                      <span className="flex-1 h-px bg-slate-100" />
-                    </div>
-                  )}
-                  <FilterPills
-                    options={g.options}
-                    value={g.value}
-                    onChange={g.onChange}
-                    dangerValue={g.dangerValue}
-                  />
+                      );
+                    })}
+                  </div>
                 </div>
               ))}
             </div>
