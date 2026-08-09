@@ -305,37 +305,70 @@ export function FilterPills({ options, value, onChange, dangerValue }) {
 export function CollapsibleFilters({ groups = [], defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
 
-  // Count filters that aren't on "All" so we can show a badge when collapsed.
-  const activeCount = groups.filter(g => g.value && g.value !== "All").length;
-  const activeSummary = groups
-    .filter(g => g.value && g.value !== "All")
-    .map(g => g.value)
-    .join(" · ");
+  const activeGroups = groups.filter(g => g.value && g.value !== "All");
+  const activeCount = activeGroups.length;
+  const hasActive = activeCount > 0;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+    <div
+      className="rounded-2xl overflow-hidden transition-all duration-200"
+      style={{
+        background: "#fff",
+        border: `1.5px solid ${hasActive ? "rgba(139,26,26,0.25)" : "#E9E4E4"}`,
+        boxShadow: open
+          ? "0 4px 20px -6px rgba(15,23,42,0.12)"
+          : hasActive
+            ? "0 1px 3px rgba(139,26,26,0.06)"
+            : "0 1px 2px rgba(15,23,42,0.04)",
+      }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2.5 px-4 min-h-[48px] text-left">
-        <SlidersHorizontal size={16} className="text-slate-500 shrink-0" />
-        <span className="text-sm font-semibold text-slate-700 shrink-0">Filters</span>
-        {activeCount > 0 && !open && (
-          <span className="min-w-0 truncate text-xs text-slate-400 font-medium">
-            {activeSummary}
+        className="w-full flex items-center gap-3 pl-3 pr-3.5 min-h-[52px] text-left">
+        {/* Icon chip — tinted brand red so it reads as the control's identity */}
+        <span
+          className="grid place-items-center rounded-xl shrink-0 transition-colors duration-200"
+          style={{
+            width: 34, height: 34,
+            background: hasActive ? BRAND.primary : "#F5EFEF",
+          }}>
+          <SlidersHorizontal size={16} className={hasActive ? "text-white" : "text-slate-500"} />
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className="text-[15px] font-bold text-slate-800">Filters</span>
+            {hasActive && (
+              <span
+                className="rounded-full px-1.5 min-w-[18px] h-[18px] grid place-items-center text-[10px] font-black text-white"
+                style={{ background: BRAND.primary }}>
+                {activeCount}
+              </span>
+            )}
           </span>
-        )}
-        <span className="ml-auto flex items-center gap-2 shrink-0">
-          {activeCount > 0 && (
-            <span className="rounded-full px-2 py-0.5 text-[11px] font-bold text-white"
-              style={{ background: BRAND.primary }}>
-              {activeCount}
+          {/* Active values shown as real mini-pills, not plain text */}
+          {hasActive && !open && (
+            <span className="flex items-center gap-1 mt-0.5 overflow-hidden">
+              {activeGroups.map((g, i) => (
+                <span key={i}
+                  className="shrink-0 truncate rounded-md px-1.5 py-0.5 text-[11px] font-bold"
+                  style={{ background: "#F5EFEF", color: BRAND.primary, maxWidth: 130 }}>
+                  {g.value}
+                </span>
+              ))}
             </span>
           )}
-          {open
-            ? <ChevronUp size={16} className="text-slate-400" />
-            : <ChevronDown size={16} className="text-slate-400" />}
+          {!hasActive && !open && (
+            <span className="block text-xs text-slate-400 font-medium mt-0.5">Tap to filter</span>
+          )}
         </span>
+
+        <motion.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="shrink-0 grid place-items-center">
+          <ChevronDown size={18} className="text-slate-400" />
+        </motion.span>
       </button>
 
       <AnimatePresence initial={false}>
@@ -344,15 +377,26 @@ export function CollapsibleFilters({ groups = [], defaultOpen = false }) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
             className="overflow-hidden">
-            <div className="px-4 pb-3 pt-1 space-y-3 border-t border-slate-100">
+            <div className="px-3.5 pb-3.5 pt-1 space-y-3.5">
               {groups.map((g, i) => (
                 <div key={g.label || i}>
                   {g.label && (
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">
-                      {g.label}
-                    </p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                        {g.label}
+                      </p>
+                      {g.value && g.value !== "All" && (
+                        <button
+                          onClick={() => g.onChange("All")}
+                          className="text-[11px] font-bold"
+                          style={{ color: BRAND.primary }}>
+                          Clear
+                        </button>
+                      )}
+                      <span className="flex-1 h-px bg-slate-100" />
+                    </div>
                   )}
                   <FilterPills
                     options={g.options}
