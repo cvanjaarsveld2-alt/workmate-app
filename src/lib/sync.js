@@ -63,7 +63,9 @@ export async function pushItem(item) {
     console.warn(`[Sync] FAILED ${item.table} ${item.action}`, detail);
     logCrash({
       screen: `Sync (${item.table} ${item.action})`,
-      message: `${detail.message || "Unknown"}${detail.code ? ` [${detail.code}]` : ""}`,
+      message: `${detail.message || "Unknown"}${detail.code ? ` [${detail.code}]` : ""}`
+        + `${detail.details ? ` — details: ${detail.details}` : ""}`
+        + `${detail.hint ? ` — hint: ${detail.hint}` : ""}`,
     });
     return { ok: false, error: detail };
   }
