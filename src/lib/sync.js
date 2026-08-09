@@ -20,6 +20,9 @@ const SYNC_TABLES = [
   "team_notifications",
 ];
 const MAX_SYNC_ATTEMPTS = 5;
+// Tables that are user-owned and/or team-shared and carry a user_id column.
+// Used by the RLS safety net in pushItem and by realtime filtering below.
+const TEAM_TABLES = new Set(["clients", "followups", "quotes", "contacts", "notes", "equipment", "leads", "activities"]);
 
 export async function pushItem(item) {
   try {
@@ -31,6 +34,20 @@ export async function pushItem(item) {
     }
 
     if (item.action === "insert" || item.action === "upsert" || item.action === "update") {
+      // Safety net for RLS: we upsert (not plain update), so every write must
+      // satisfy the INSERT row-level-security check, which requires
+      // user_id = auth.uid(). Some update payloads (e.g. a completion toggle)
+      // only carry the changed fields and omit user_id, and some legacy rows
+      // never had it stamped — both fail with 42501. If this is a user-owned
+      // table and the payload has no user_id, fill it from the current auth
+      // user so the upsert passes the policy.
+      if (TEAM_TABLES.has(table) && !payload?.user_id) {
+        try {
+          const { data: authData } = await supabase.auth.getUser();
+          const uid = authData?.user?.id;
+          if (uid) payload = { ...payload, user_id: uid };
+        } catch {} // best-effort; if it fails the upsert will surface the real error
+      }
       // Always use upsert so it works whether or not the record exists on the server.
       // This fixes the case where an insert failed but a later update succeeded —
       // the update would modify zero rows because the record didn't exist yet.
@@ -334,7 +351,7 @@ export function resetSyncCursor(uid) {
 }
 
 // Team tables get no user_id filter so all RLS-permitted rows come through realtime
-const TEAM_TABLES = new Set(["clients", "followups", "quotes", "contacts", "notes", "equipment", "leads", "activities"]);
+// (TEAM_TABLES is defined near the top of this file.)
 
 export function setupRealtimeSync(uid, setData) {
   const channels = SYNC_TABLES.map(table => {
