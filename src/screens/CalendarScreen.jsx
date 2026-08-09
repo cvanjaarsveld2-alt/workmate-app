@@ -255,7 +255,16 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
 
     if (existing) {
       const updated = { ...existing, ...values };
-      const syncPayload = { id: existing.id, ...values };
+      // Include user_id + team_id in the sync payload. Sync upserts (not plain
+      // updates), and an upsert must satisfy the INSERT row-level-security
+      // check, which requires user_id = auth.uid(). Older rows that predate
+      // user_id stamping, or a payload that omits it, otherwise fail with 42501.
+      const syncPayload = {
+        id: existing.id,
+        user_id: existing.user_id || userId,
+        team_id: existing.team_id || teamId || null,
+        ...values,
+      };
       setData(current => ({
         ...current,
         followups: (current.followups || []).map(item => item.id === existing.id ? updated : item),
@@ -283,7 +292,14 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
 
   async function toggleComplete(item) {
     const updated = { ...item, completed: !item.completed, sync_status: "pending" };
-    const syncPayload = { id: item.id, completed: updated.completed, sync_status: "pending" };
+    // Upsert must satisfy the INSERT RLS check → carry user_id/team_id.
+    const syncPayload = {
+      id: item.id,
+      user_id: item.user_id || userId,
+      team_id: item.team_id || teamId || null,
+      completed: updated.completed,
+      sync_status: "pending",
+    };
     setData(current => ({
       ...current,
       followups: (current.followups || []).map(entry => entry.id === item.id ? updated : entry),
