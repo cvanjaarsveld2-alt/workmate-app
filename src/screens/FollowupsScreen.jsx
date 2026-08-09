@@ -185,7 +185,9 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
     const completing = !t.completed;
     if (completing) haptic.success();
     const up = { ...t, completed: completing, sync_status: "pending" };
-    const syncPayload = { id: t.id, completed: completing, sync_status: "pending" };
+    // Send the FULL row — sync upserts, so a partial payload would null out
+    // required columns like title. `up` already carries every field.
+    const syncPayload = { ...up, user_id: t.user_id || userId, team_id: t.team_id || teamId || null };
     setData(d => ({
       ...d,
       followups: (d.followups || []).map(f => f.id === id ? up : f),
