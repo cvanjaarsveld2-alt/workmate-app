@@ -642,30 +642,31 @@ function CategoryBadge({ catId, size = "sm" }) {
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search clients…" />
 
-      <CollapsibleFilters
-        groups={[
-          {
-            label: "Stage",
-            options: ["All", ...PIPELINE_STAGES],
-            value: filterStage,
-            onChange: setFilterStage,
-            dangerValue: "Lost",
-          },
-          {
-            label: "Division",
-            options: ["All", ...LEAD_CATEGORIES.map(c => c.label)],
-            value: filterCat === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.id === filterCat)?.label || "All"),
-            onChange: v => setFilterCat(v === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.label === v)?.id || "All")),
-          },
-        ]}
-      />
-
-      {/* Bulk group (always grouped by Group/category) */}
-      {!bulk.active && clients.length > 0 && (
-        <div className="flex items-center justify-end">
-          <button onClick={bulk.enter} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-600">
-            <FolderPlus size={13} /> Group
-          </button>
+      {/* Compact filter + group controls on one row */}
+      {!bulk.active && (
+        <div className="flex items-center justify-end gap-2">
+          <CollapsibleFilters
+            groups={[
+              {
+                label: "Stage",
+                options: ["All", ...PIPELINE_STAGES],
+                value: filterStage,
+                onChange: setFilterStage,
+                dangerValue: "Lost",
+              },
+              {
+                label: "Division",
+                options: ["All", ...LEAD_CATEGORIES.map(c => c.label)],
+                value: filterCat === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.id === filterCat)?.label || "All"),
+                onChange: v => setFilterCat(v === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.label === v)?.id || "All")),
+              },
+            ]}
+          />
+          {clients.length > 0 && (
+            <button onClick={bulk.enter} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border border-slate-200 bg-white text-slate-600">
+              <FolderPlus size={13} /> Group
+            </button>
+          )}
         </div>
       )}
 
