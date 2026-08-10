@@ -12,7 +12,7 @@ import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { scheduleNotificationsViaSW } from "../lib/notifications";
 import { VoiceInput } from "../components/VoiceInput";
-import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, UrgencyBadge, useConfirm, ClientSelector } from "../components/ui";
+import { Card, Btn, Field, SearchBar, FilterPills, CollapsibleFilters, Toast, Empty, PageHeader, UrgencyBadge, useConfirm, ClientSelector } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { ContactPicker, LinkedContactsDisplay } from "../components/ContactPicker";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
@@ -916,8 +916,25 @@ Kind regards`;
       <SearchBar value={search} onChange={setSearch} placeholder="Search notes…" />
 
       <div className="space-y-2">
-        <FilterPills options={["Unresolved", "Resolved", "All"]} value={filterStatus} onChange={setFilterStatus} dangerValue={null} />
-        <FilterPills options={["All", "Normal", "Urgent", "Critical"]} value={filterUrgency} onChange={setFilterUrgency} dangerValue="Critical" />
+        <div className="flex items-center justify-end">
+          <CollapsibleFilters
+            groups={[
+              {
+                label: "Status",
+                options: ["Unresolved", "Resolved", "All"],
+                value: filterStatus,
+                onChange: setFilterStatus,
+              },
+              {
+                label: "Urgency",
+                options: ["All", "Normal", "Urgent", "Critical"],
+                value: filterUrgency,
+                onChange: setFilterUrgency,
+                dangerValue: "Critical",
+              },
+            ]}
+          />
+        </div>
       </div>
       {filtered.length === 0 && <Empty title="No notes found" text="Add a note or change your filters." icon={Clipboard} />}
 
