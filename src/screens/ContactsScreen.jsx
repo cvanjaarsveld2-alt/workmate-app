@@ -22,7 +22,7 @@ import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { logCrash } from "../components/ErrorBoundary";
 import {
-  Card, Btn, Field, SearchBar, FilterPills,
+  Card, Btn, Field, SearchBar, FilterPills, CollapsibleFilters,
   Toast, Empty, PageHeader, useConfirm,
 } from "../components/ui";
 
@@ -631,7 +631,18 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
         onClear={bulk.clear}
         label="contacts"
       />
-      <FilterPills options={["All", "Lead", "Active", "Converted", "Archived"]} value={filterStatus} onChange={setFilterStatus} dangerValue={null} />
+      <div className="flex items-center justify-end">
+        <CollapsibleFilters
+          groups={[
+            {
+              label: "Status",
+              options: ["All", "Lead", "Active", "Converted", "Archived"],
+              value: filterStatus,
+              onChange: setFilterStatus,
+            },
+          ]}
+        />
+      </div>
 
       {Object.keys(grouped).length === 0 && (
         <Empty title="No contacts yet" text="Add the people you meet at events and site visits — they'll be searchable here." icon={User} />
