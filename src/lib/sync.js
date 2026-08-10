@@ -34,23 +34,40 @@ export async function pushItem(item) {
     }
 
     if (item.action === "insert" || item.action === "upsert" || item.action === "update") {
-      // Safety net for RLS: we upsert (not plain update), so every write must
-      // satisfy the INSERT row-level-security check, which requires
-      // user_id = auth.uid(). Some update payloads (e.g. a completion toggle)
-      // only carry the changed fields and omit user_id, and some legacy rows
-      // never had it stamped — both fail with 42501. If this is a user-owned
-      // table and the payload has no user_id, fill it from the current auth
-      // user so the upsert passes the policy.
+      // ── Guard 1: RLS ────────────────────────────────────────────────────
+      // We upsert (not plain update), so every write must satisfy the INSERT
+      // row-level-security check, which requires user_id = auth.uid(). Some
+      // update payloads omit user_id, and some legacy rows never had it — both
+      // fail with 42501. Fill it from the current auth user when missing.
       if (TEAM_TABLES.has(table) && !payload?.user_id) {
         try {
           const { data: authData } = await supabase.auth.getUser();
           const uid = authData?.user?.id;
           if (uid) payload = { ...payload, user_id: uid };
-        } catch {} // best-effort; if it fails the upsert will surface the real error
+        } catch {} // best-effort; the upsert will surface the real error otherwise
       }
-      // Always use upsert so it works whether or not the record exists on the server.
-      // This fixes the case where an insert failed but a later update succeeded —
-      // the update would modify zero rows because the record didn't exist yet.
+
+      // ── Guard 2: never null an existing column on a partial update ───────
+      // upsert overwrites the WHOLE row — any column not in the payload is set
+      // to null. A partial update (e.g. a completion toggle that sends only
+      // {id, completed}) would therefore wipe required columns like title and
+      // fail with 23502, or silently blank optional data. To make this class
+      // of bug impossible, we fetch the current row and merge the partial
+      // payload on top of it, so the upsert always carries the complete row.
+      // Only needed for updates to existing rows; a genuine insert has no row
+      // to merge and carries its full object already.
+      if (item.action === "update" && payload?.id) {
+        try {
+          const { data: existingRow, error: fetchErr } = await supabase
+            .from(table).select("*").eq("id", payload.id).maybeSingle();
+          if (!fetchErr && existingRow) {
+            // payload wins for changed fields; existingRow fills the rest.
+            payload = { ...existingRow, ...payload };
+          }
+        } catch {} // if the fetch fails, fall through with the payload as-is
+      }
+
+      // Always upsert so it works whether or not the record exists on the server.
       const { error } = await supabase.from(table).upsert({ ...payload, sync_status: "synced" }, { onConflict: "id" });
       if (error) throw error;
     } else if (item.action === "delete") {
