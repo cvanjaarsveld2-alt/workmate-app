@@ -13,7 +13,7 @@ import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
-import { Card, Btn, Field, SelectField, SearchBar, FilterPills, Toast, Empty, PageHeader, useConfirm, ClientSelector } from "../components/ui";
+import { Card, Btn, Field, SelectField, SearchBar, FilterPills, CollapsibleFilters, Toast, Empty, PageHeader, useConfirm, ClientSelector } from "../components/ui";
 
 // ─── Show-more text (full info on tap, no silent clipping) ──────────────────
 function ExpandableText({ text, limit = 110, className = "" }) {
@@ -168,7 +168,19 @@ export function QuotesScreen({ data, setData, userId, userEmail, teamId, teamMem
       </AnimatePresence>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search quotes…" />
-      <FilterPills options={["All", "Pending", "Accepted", "Rejected", "Expired"]} value={filterStatus} onChange={setFilterStatus} dangerValue="Rejected" />
+      <div className="flex items-center justify-end">
+        <CollapsibleFilters
+          groups={[
+            {
+              label: "Status",
+              options: ["All", "Pending", "Accepted", "Rejected", "Expired"],
+              value: filterStatus,
+              onChange: setFilterStatus,
+              dangerValue: "Rejected",
+            },
+          ]}
+        />
+      </div>
       {filtered.length === 0 && <Empty title="No quotes found" text="Add a quote or change filters." icon={FileIcon} />}
       <div className="space-y-2">
         {filtered.map(q => {
