@@ -16,7 +16,7 @@ import { ShareSheet } from "../components/ShareSheet";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import { MemberSelector } from "../components/MemberSelector";
 import {
-  Card, Btn, Field, SearchBar, FilterPills,
+  Card, Btn, Field, SearchBar, FilterPills, CollapsibleFilters,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 
@@ -473,7 +473,19 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
         )}
       </AnimatePresence>
 
-      <FilterPills options={["Upcoming", "By Client", "Overdue", "Today", "This week", "Done"]} value={filter} onChange={setFilter} dangerValue="Overdue" />
+      <div className="flex items-center justify-end">
+        <CollapsibleFilters
+          groups={[
+            {
+              label: "View",
+              options: ["Upcoming", "By Client", "Overdue", "Today", "This week", "Done"],
+              value: filter,
+              onChange: setFilter,
+              dangerValue: "Overdue",
+            },
+          ]}
+        />
+      </div>
 
       {filtered.length === 0 && <Empty title={filter === "Done" ? "No completed follow-ups" : "All clear!"} text="No follow-ups in this category." icon={Calendar} />}
 
