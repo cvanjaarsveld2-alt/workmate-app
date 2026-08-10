@@ -18,7 +18,7 @@ import { triggerImmediateSync } from "../lib/sync";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { ShareSheet } from "../components/ShareSheet";
 import {
-  Card, Btn, Field, SearchBar, FilterPills,
+  Card, Btn, Field, SearchBar, FilterPills, CollapsibleFilters,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 import { MemberSelector } from "../components/MemberSelector";
@@ -640,11 +640,18 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
       <SearchBar value={search} onChange={setSearch} placeholder="Search leads, clients, assigned to…" />
 
       {/* Category filter */}
-      <FilterPills
-        options={["All", ...LEAD_CATEGORIES.map(c => c.label)]}
-        value={filterCat === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.id === filterCat)?.label || "All")}
-        onChange={v => setFilterCat(v === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.label === v)?.id || "All"))}
-      />
+      <div className="flex items-center justify-end">
+        <CollapsibleFilters
+          groups={[
+            {
+              label: "Division",
+              options: ["All", ...LEAD_CATEGORIES.map(c => c.label)],
+              value: filterCat === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.id === filterCat)?.label || "All"),
+              onChange: v => setFilterCat(v === "All" ? "All" : (LEAD_CATEGORIES.find(c => c.label === v)?.id || "All")),
+            },
+          ]}
+        />
+      </div>
 
       {/* ── Lead list ── */}
       {filtered.length === 0 ? (
