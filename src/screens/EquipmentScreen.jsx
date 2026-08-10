@@ -8,7 +8,7 @@ import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
-import { Card, Btn, Field, SearchBar, FilterPills, Toast, Empty, PageHeader, ServiceBadge, useConfirm, ClientSelector } from "../components/ui";
+import { Card, Btn, Field, SearchBar, FilterPills, CollapsibleFilters, Toast, Empty, PageHeader, ServiceBadge, useConfirm, ClientSelector } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
@@ -337,7 +337,19 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
       </AnimatePresence>
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search name, serial, location…" />
-      <FilterPills options={["All", "Overdue", "Due Soon", "OK"]} value={filter} onChange={setFilter} dangerValue="Overdue" />
+      <div className="flex items-center justify-end">
+        <CollapsibleFilters
+          groups={[
+            {
+              label: "Service status",
+              options: ["All", "Overdue", "Due Soon", "OK"],
+              value: filter,
+              onChange: setFilter,
+              dangerValue: "Overdue",
+            },
+          ]}
+        />
+      </div>
       {filtered.length === 0 && <Empty title="No equipment found" text="Register your first piece of equipment." icon={Wrench} />}
 
       <div className="space-y-2">
