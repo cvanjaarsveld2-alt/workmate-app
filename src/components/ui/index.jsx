@@ -401,6 +401,57 @@ export function CollapsibleFilters({ groups = [], defaultOpen = false }) {
   );
 }
 
+// ─── GroupField ───────────────────────────────────────────────────────────────
+// Lets you allocate a record to a group AS you create it. Shows existing groups
+// as tappable chips (tap to select, tap again to clear) plus a text input to
+// type a new one. Reusing existing chips prevents duplicate/typo groups
+// ("Suppliers" vs "suppliers"). `existing` is the list of current group names.
+export function GroupField({ label = "Group", value = "", onChange, existing = [], placeholder = "Type a new group…" }) {
+  const groups = [...new Set(existing.map(g => (g || "").trim()).filter(Boolean))].sort();
+  const isNew = value && !groups.includes(value.trim());
+
+  return (
+    <div>
+      <label className="block text-xs font-bold text-slate-500 mb-1.5">{label}</label>
+
+      {groups.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {groups.map(g => {
+            const selected = value.trim() === g;
+            return (
+              <button
+                key={g}
+                type="button"
+                onClick={() => onChange(selected ? "" : g)}
+                className="px-3 py-1.5 rounded-full text-xs font-bold border transition-colors"
+                style={selected
+                  ? { background: BRAND.primary, borderColor: BRAND.primary, color: "#fff" }
+                  : { background: "#fff", borderColor: "#E2E8F0", color: "#475569" }}>
+                {g}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="relative">
+        <input
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+          style={{ fontSize: 16 }} />
+        {isNew && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-wide"
+            style={{ color: BRAND.primary }}>
+            New
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Toast ────────────────────────────────────────────────────────────────────
 export function Toast({ message, onDone, type = "success" }) {
   const duration = Math.max(2200, Math.min(message.length * 55, 6000));
