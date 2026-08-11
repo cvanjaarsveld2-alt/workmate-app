@@ -22,7 +22,7 @@ import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { logCrash } from "../components/ErrorBoundary";
 import {
-  Card, Btn, Field, SearchBar, FilterPills, CollapsibleFilters,
+  Card, Btn, Field, GroupField, SearchBar, FilterPills, CollapsibleFilters,
   Toast, Empty, PageHeader, useConfirm,
 } from "../components/ui";
 
@@ -374,7 +374,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Met At" value={form.met_at} onChange={v => setForm(f => ({ ...f, met_at: v }))} placeholder="e.g. Wampex 2026" />
-          <Field label="Group / Category" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} placeholder="e.g. Expo 2026, Suppliers, Contractors" />
+          <GroupField label="Group / Category" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} existing={contactGroupNames} placeholder="e.g. Expo 2026, Suppliers, Contractors" />
           <Field label="Met On" type="date" value={form.met_date} onChange={v => setForm(f => ({ ...f, met_date: v }))} />
         </div>
         <div>
