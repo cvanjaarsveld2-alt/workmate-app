@@ -65,16 +65,38 @@ function lastStageContact(cl) {
   }
   return null;
 }
-import { todayISO, niceDate, daysDiff, smartDate } from "../lib/helpers";
+import { todayISO, niceDate, daysDiff, smartDate, genId } from "../lib/helpers";
+import { withTeamId } from "../lib/teamId";
+import { triggerImmediateSync } from "../lib/sync";
+import { offlineSave } from "../offline/offlineDb";
 import { Card, StatCard } from "../components/ui";
 
 function money(n) {
   return "R" + Math.round(n || 0).toLocaleString("en-ZA");
 }
 
-export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
+export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQuickAdd, onNavigate }) {
   const today     = todayISO();
   const [neglectSheet, setNeglectSheet] = React.useState(null);
+  const [expandedStage, setExpandedStage] = React.useState(null); // which pipeline stage is expanded
+  const [movingClient, setMovingClient]   = React.useState(null); // client whose stage picker is open
+
+  // Move a client to a new stage — routed through the app's normal safe sync
+  // path (full-row update, so no column gets nulled). setData may be absent in
+  // some mount contexts, so guard for it.
+  function moveClientStage(client, newStage) {
+    if (!client || !newStage || client.stage === newStage) { setMovingClient(null); return; }
+    if (!setData) { setMovingClient(null); return; }
+    const updated = withTeamId({ ...client, stage: newStage, sync_status: "pending" }, teamId);
+    setData(d => ({
+      ...d,
+      clients: (d.clients || []).map(c => c.id === client.id ? updated : c),
+      syncQueue: [{ id: genId(), table: "clients", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    offlineSave("clients", updated).catch(() => {});
+    triggerImmediateSync();
+    setMovingClient(null);
+  }
   const DISMISS_KEY = `pm_neglect_dismissed_${user?.id}`;
   const [dismissed, setDismissed] = React.useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem(`pm_neglect_dismissed_${user?.id}`) || "[]")); }
@@ -486,18 +508,64 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
             const count = pCount[stage] || 0;
             const total = inPipeline || 1;
             const c     = STAGE_COLORS[stage];
+            const isExpanded = expandedStage === stage;
+            const stageClients = (clients || []).filter(cl => (cl.stage || "New Lead") === stage);
             return (
-              <div key={stage} className="flex items-center gap-3">
-                <span className="w-20 text-sm font-bold shrink-0" style={{ color: c.text }}>{stage}</span>
-                <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }}
-                    transition={{ duration: 0.6, ease: "easeOut" }}
-                    className="h-full rounded-full"
-                    style={{ background: c.dot }} />
-                </div>
-                <span className="text-sm font-black text-slate-600 w-6 text-right">{count}</span>
+              <div key={stage}>
+                <button
+                  onClick={() => setExpandedStage(isExpanded ? null : (count > 0 ? stage : null))}
+                  className="w-full flex items-center gap-3 rounded-lg -mx-1 px-1 py-0.5 active:bg-slate-50 transition-colors">
+                  <span className="w-20 text-sm font-bold shrink-0 text-left flex items-center gap-1" style={{ color: c.text }}>
+                    {count > 0 && (
+                      <motion.span animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.15 }} className="inline-flex">
+                        <ChevronRight size={12} style={{ color: c.text }} />
+                      </motion.span>
+                    )}
+                    {stage}
+                  </span>
+                  <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${total > 0 ? (count / total) * 100 : 0}%` }}
+                      transition={{ duration: 0.6, ease: "easeOut" }}
+                      className="h-full rounded-full"
+                      style={{ background: c.dot }} />
+                  </div>
+                  <span className="text-sm font-black text-slate-600 w-6 text-right">{count}</span>
+                </button>
+
+                <AnimatePresence initial={false}>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden">
+                      <div className="pl-1 pr-1 pt-2 pb-1 space-y-1">
+                        {stageClients.slice(0, 8).map(cl => (
+                          <button
+                            key={cl.id}
+                            onClick={() => setMovingClient(cl)}
+                            className="w-full flex items-center gap-2 rounded-xl px-3 min-h-[42px] bg-slate-50 active:bg-slate-100 text-left">
+                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.dot }} />
+                            <span className="flex-1 min-w-0 truncate text-sm font-bold text-slate-700">
+                              {cl.company || "Unnamed"}{cl.branch ? ` — ${cl.branch}` : ""}
+                            </span>
+                            <span className="text-[11px] font-bold text-slate-400 shrink-0">Move</span>
+                            <ChevronRight size={13} className="text-slate-300 shrink-0" />
+                          </button>
+                        ))}
+                        {stageClients.length > 8 && (
+                          <button onClick={() => setScreen("Clients")}
+                            className="w-full text-center py-2 text-xs font-bold" style={{ color: BRAND.primary }}>
+                            View all {stageClients.length} in {stage} →
+                          </button>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}
@@ -512,6 +580,52 @@ export function HomeScreen({ data, setScreen, user, onQuickAdd, onNavigate }) {
           )}
         </div>
       </Card>
+
+      {/* Stage-move picker — appears when a client is tapped in the expanded pipeline */}
+      <AnimatePresence>
+        {movingClient && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setMovingClient(null)}
+            className="fixed inset-0 z-[120] flex items-end justify-center"
+            style={{ background: "rgba(15,23,42,0.4)", backdropFilter: "blur(2px)" }}>
+            <motion.div
+              initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}
+              transition={{ type: "spring", stiffness: 320, damping: 30 }}
+              onClick={e => e.stopPropagation()}
+              className="w-full max-w-md m-3 rounded-3xl bg-white p-5"
+              style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
+              <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1">Move to stage</p>
+              <p className="text-lg font-black text-slate-900 mb-4 truncate">
+                {movingClient.company || "Unnamed"}{movingClient.branch ? ` — ${movingClient.branch}` : ""}
+              </p>
+              <div className="space-y-1.5">
+                {PIPELINE_STAGES.map(stage => {
+                  const sc = STAGE_COLORS[stage] || {};
+                  const current = (movingClient.stage || "New Lead") === stage;
+                  return (
+                    <button
+                      key={stage}
+                      onClick={() => moveClientStage(movingClient, stage)}
+                      className="w-full flex items-center gap-3 rounded-2xl px-4 min-h-[52px] border text-left transition-colors"
+                      style={current
+                        ? { borderColor: sc.dot, background: sc.bg || "#F5EFEF" }
+                        : { borderColor: "#E2E8F0", background: "#fff" }}>
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: sc.dot }} />
+                      <span className="flex-1 text-[15px] font-bold" style={{ color: sc.text || "#334155" }}>{stage}</span>
+                      {current && <span className="text-[11px] font-black uppercase" style={{ color: sc.text }}>Current</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <button onClick={() => setMovingClient(null)}
+                className="w-full mt-3 min-h-[48px] rounded-2xl font-bold text-slate-500 bg-slate-100">
+                Cancel
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );
