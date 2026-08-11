@@ -19,7 +19,7 @@ import { EmailButton } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import {
-  Card, Btn, Field, SelectField, SearchBar,
+  Card, Btn, Field, GroupField, SelectField, SearchBar,
   FilterPills, CollapsibleFilters, Toast, Empty, StagePill, PageHeader, useConfirm,
 } from "../components/ui";
 
@@ -508,7 +508,7 @@ function CategoryBadge({ catId, size = "sm" }) {
         </div>
         <SelectField label="Pipeline Stage" value={form.stage} onChange={v => setForm(f => ({ ...f, stage: v }))} options={PIPELINE_STAGES} />
 
-        <Field label="Group (optional)" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} placeholder="e.g. Kathu Expo, Priority Accounts" />
+        <GroupField label="Group (optional)" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} existing={clientGroupNames} placeholder="e.g. Kathu Expo, Priority Accounts" />
 
         {/* ── Product / service categories ── */}
         <div>
