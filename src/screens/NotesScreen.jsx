@@ -12,7 +12,7 @@ import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { scheduleNotificationsViaSW } from "../lib/notifications";
 import { VoiceInput } from "../components/VoiceInput";
-import { Card, Btn, Field, SearchBar, FilterPills, CollapsibleFilters, Toast, Empty, PageHeader, UrgencyBadge, useConfirm, ClientSelector } from "../components/ui";
+import { Card, Btn, Field, GroupField, SearchBar, FilterPills, CollapsibleFilters, Toast, Empty, PageHeader, UrgencyBadge, useConfirm, ClientSelector } from "../components/ui";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { ContactPicker, LinkedContactsDisplay } from "../components/ContactPicker";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
@@ -577,7 +577,7 @@ Kind regards`;
           </div>
         </div>
         <Field label="Resolve By (optional)" type="date" value={form.resolve_by} onChange={v => setForm(f => ({ ...f, resolve_by: v }))} />
-        <Field label="Group / Site (optional)" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} placeholder="e.g. Newmont Ghana, Accra site" />
+        <GroupField label="Group / Site (optional)" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} existing={noteGroupNames} placeholder="e.g. Newmont Ghana, Accra site" />
 
         {isEdit && existingMedia.length > 0 && (
           <div>
