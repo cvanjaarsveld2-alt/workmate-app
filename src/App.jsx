@@ -37,7 +37,6 @@ import { Wordmark } from "./components/Wordmark";
 import { ExportProgressProvider } from "./components/ExportProgress";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
-import { PowerMateAgent } from "./components/PowerMateAgent";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 
 import { HomeScreen }      from "./screens/HomeScreen";
@@ -744,16 +743,6 @@ export default function PowerWorksApp() {
             </AnimatePresence>
           </PullToRefresh>
         </main>
-
-        {session && (
-          <PowerMateAgent
-            data={data}
-            setData={setData}
-            userId={session.user.id}
-            teamId={teamId}
-            isOnline={isOnline}
-          />
-        )}
 
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
         <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} data={data} onNavigate={handleSearchNavigate} />
