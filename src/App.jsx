@@ -37,6 +37,7 @@ import { Wordmark } from "./components/Wordmark";
 import { ExportProgressProvider } from "./components/ExportProgress";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
+import { PowerMateAgent } from "./components/PowerMateAgent";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 
 import { HomeScreen }      from "./screens/HomeScreen";
@@ -638,10 +639,10 @@ export default function PowerWorksApp() {
   return (
     <ErrorBoundary>
       <ExportProgressProvider>
-      <div className="min-h-screen pb-32" style={{ background: "#F7F3F3" }}>
+      <div className="min-h-screen pb-32" style={{ background: "#F7F3F3", paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}>
 
-        {/* ── Top bar ── */}
-        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        {/* ── Top bar (fixed so it pins regardless of ancestor overflow) ── */}
+        <header className="fixed top-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100" style={{ paddingTop: "env(safe-area-inset-top)" }}>
           <div className="mx-auto max-w-2xl px-3 h-14 flex items-center justify-between gap-2">
             <button onClick={() => setDrawerOpen(true)}
               className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center shrink-0"
@@ -743,6 +744,16 @@ export default function PowerWorksApp() {
             </AnimatePresence>
           </PullToRefresh>
         </main>
+
+        {session && (
+          <PowerMateAgent
+            data={data}
+            setData={setData}
+            userId={session.user.id}
+            teamId={teamId}
+            isOnline={isOnline}
+          />
+        )}
 
         <SyncStatusBadge isOnline={isOnline} pendingCount={pendingCount} syncing={syncing} />
         <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} data={data} onNavigate={handleSearchNavigate} />
