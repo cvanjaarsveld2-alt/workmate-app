@@ -5,18 +5,37 @@
 html, body {
   margin: 0;
   background: #f1f5f9;
-  /* Prevent any stray-wide element from forcing Mobile Safari to zoom out */
-  overflow-x: hidden;
   width: 100%;
   max-width: 100vw;
   /* Respect iPhone safe areas (notch / home indicator) */
   -webkit-text-size-adjust: 100%;
 }
 
+/* Prevent stray-wide elements from causing horizontal scroll / zoom-out.
+   Use `clip` (not `hidden`): clip stops horizontal overflow WITHOUT turning
+   the element into a scroll container, so `position: sticky` on the header
+   keeps working. `overflow: hidden` implicitly makes overflow-y compute to
+   auto, which creates a scroll container and un-sticks the top bar.
+   Only applied where `clip` is supported (iOS Safari 16+, all modern browsers). */
+@supports (overflow: clip) {
+  html, body, #root {
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+}
+
+/* Fallback for older browsers (pre-2022) that lack overflow: clip.
+   Put the horizontal guard on #root only, NOT on html/body, so the page's
+   own scroll (and the sticky header) stay on the body where sticky works. */
+@supports not (overflow: clip) {
+  #root {
+    overflow-x: hidden;
+  }
+}
+
 #root {
   width: 100%;
   max-width: 100vw;
-  overflow-x: hidden;
 }
 
 /* iOS zooms in on focus for any input with font-size < 16px. Force 16px on
