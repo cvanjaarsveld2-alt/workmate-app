@@ -18,11 +18,12 @@ import { haptic } from "../../lib/haptics";
 export function Card({ children, className = "", onClick }) {
   return (
     <div
-      className={`bg-white rounded-2xl shadow-sm border border-slate-100 ${
+      className={`bg-white rounded-2xl border border-slate-100/80 ${
         onClick
-          ? "cursor-pointer transition-all duration-100 active:scale-[0.975] active:bg-slate-50 active:shadow-none"
+          ? "cursor-pointer transition-all duration-150 active:scale-[0.98] active:bg-slate-50"
           : ""
       } ${className}`}
+      style={{ boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 4px 16px -8px rgba(15,23,42,0.10)" }}
       onClick={onClick ? (e) => { haptic.light(); onClick(e); } : undefined}>
       {children}
     </div>
@@ -501,24 +502,71 @@ export function Empty({ title, text, icon: Icon, actionLabel, onAction }) {
   );
 }
 
+// ─── Gauge ────────────────────────────────────────────────────────────────────
+// A compact semicircular arc gauge for a single percentage (e.g. conversion).
+// Premium dashboard look: soft track + accent arc + big centred number.
+export function Gauge({ value = 0, size = 88, label, color }) {
+  const pct = Math.max(0, Math.min(100, value));
+  const accent = color || BRAND.primary;
+  const r = (size - 12) / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+  // Semicircle: 180° sweep from left to right along the top.
+  const circumference = Math.PI * r;           // half circle
+  const dash = (pct / 100) * circumference;
+  return (
+    <div className="relative shrink-0 flex flex-col items-center" style={{ width: size, height: size / 2 + 18 }}>
+      <svg width={size} height={size / 2 + 6} viewBox={`0 0 ${size} ${size / 2 + 6}`}>
+        {/* Track */}
+        <path
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+          fill="none" stroke="#EEF2F6" strokeWidth="9" strokeLinecap="round" />
+        {/* Value arc */}
+        <path
+          d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+          fill="none" stroke={accent} strokeWidth="9" strokeLinecap="round"
+          strokeDasharray={`${dash} ${circumference}`} />
+      </svg>
+      <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: size / 2 - 14 }}>
+        <span className="text-lg font-black leading-none text-slate-900">{pct}%</span>
+        {label && <span className="text-[9px] font-bold text-slate-400 mt-0.5 uppercase tracking-wide">{label}</span>}
+      </div>
+    </div>
+  );
+}
+
 // ─── StatCard ─────────────────────────────────────────────────────────────────
-export function StatCard({ label, value, sub, color, icon: Icon }) {
+export function StatCard({ label, value, sub, color, icon: Icon, trend, invertTrend }) {
   const accent = color || BRAND.primary;
   // Soft tint of the accent for the icon chip background
   const chipBg = `${accent}14`;
+  // Optional trend pill: { dir: "up"|"down", text: "22% vs last month" }.
+  // invertTrend flips the good/bad colouring — use it for metrics where "up" is
+  // bad (e.g. expenses), so a rising number reads red, not green.
+  const rising = trend && trend.dir !== "down";
+  const isGood = invertTrend ? !rising : rising;
   return (
-    <Card className="p-3.5">
+    <Card className="p-4">
       <div className="flex items-center justify-between mb-2.5">
         {Icon && (
-          <div className="rounded-[9px] shrink-0 flex items-center justify-center" style={{ background: chipBg, width: 30, height: 30 }}>
-            <Icon size={15} style={{ color: accent }} />
+          <div className="rounded-[10px] shrink-0 flex items-center justify-center" style={{ background: chipBg, width: 32, height: 32 }}>
+            <Icon size={16} style={{ color: accent }} />
           </div>
         )}
+        {trend && (
+          <span
+            className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-black shrink-0"
+            style={{
+              background: isGood ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
+              color: isGood ? "#16A34A" : "#DC2626",
+            }}>
+            {rising ? "↑" : "↓"} {trend.text}
+          </span>
+        )}
       </div>
-      {/* Number is neutral dark so the row reads as one clean data set — colour lives in the icon */}
-      <p className="text-[26px] font-black leading-none tracking-tight text-slate-900">{value}</p>
-      {/* Sentence-case label below the number */}
-      <p className="mt-1.5 text-[11px] font-bold text-slate-400 leading-tight">{label}</p>
+      {/* Big confident hero number — colour lives in the icon chip so the row reads clean */}
+      <p className="text-[28px] font-black leading-none tracking-tight text-slate-900">{value}</p>
+      <p className="mt-2 text-[11px] font-bold text-slate-400 leading-tight">{label}</p>
       {sub && <p className="mt-0.5 text-[11px] text-slate-400 leading-snug">{sub}</p>}
     </Card>
   );
