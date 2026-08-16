@@ -69,7 +69,7 @@ import { todayISO, niceDate, daysDiff, smartDate, genId } from "../lib/helpers";
 import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { offlineSave } from "../offline/offlineDb";
-import { Card, StatCard } from "../components/ui";
+import { Card, StatCard, Gauge } from "../components/ui";
 
 function money(n) {
   return "R" + Math.round(n || 0).toLocaleString("en-ZA");
@@ -176,6 +176,34 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
   const expThisMonth = expenses.filter(e =>
     e.expense_date && e.expense_date >= periodStart && e.expense_date <= periodEnd
   );
+
+  // Last calendar month range, for month-over-month trend pills.
+  const _pm = new Date(now.getFullYear(), now.getMonth(), 1); // first of this month
+  const _pmStart = new Date(_pm.getFullYear(), _pm.getMonth() - 1, 1);
+  const _pmEnd = new Date(_pm.getFullYear(), _pm.getMonth(), 0);
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const lastMonthStart = iso(_pmStart);
+  const lastMonthEnd = iso(_pmEnd);
+
+  const expLastMonthTotal = expenses
+    .filter(e => e.expense_date && e.expense_date >= lastMonthStart && e.expense_date <= lastMonthEnd)
+    .reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
+
+  const wonRevLastMonth = quotes
+    .filter(q => q.status === "Accepted" && q.sent_date && q.sent_date >= lastMonthStart && q.sent_date <= lastMonthEnd)
+    .reduce((s, q) => s + parseFloat(q.value || 0), 0);
+
+  // Build a trend pill { dir, text } from current vs previous. Returns null when
+  // there's no meaningful comparison (no prior data), so the pill only appears
+  // when it actually says something.
+  function monthTrend(current, previous) {
+    if (!previous || previous === 0) return null;
+    const pct = Math.round(((current - previous) / previous) * 100);
+    if (pct === 0) return null;
+    return { dir: pct >= 0 ? "up" : "down", text: `${Math.abs(pct)}% vs last month` };
+  }
+  const expTrend = monthTrend(expMonthTotal, expLastMonthTotal);
+  const revTrend = monthTrend(wonRev, wonRevLastMonth);
   // Use ZAR equivalent so mixed-currency periods sum sensibly.
   const expMonthTotal     = expThisMonth.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
 
@@ -300,10 +328,10 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
           <StatCard label="Quotes pending" value={pendingQ.length} sub={pendingQ.length === 0 ? "none awaiting" : "awaiting response"} color="#B45309" icon={FileIcon} />
         </button>
         <button onClick={() => setScreen("Quotes")} className="text-left">
-          <StatCard label="Won revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} />
+          <StatCard label="Won revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} trend={revTrend} />
         </button>
         <button onClick={() => setScreen("Expenses")} className="text-left">
-          <StatCard label="This month" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} />
+          <StatCard label="This month" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} trend={expTrend} invertTrend />
         </button>
       </div>
 
@@ -486,15 +514,17 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
       {/* ── Pipeline + Analytics ── */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <div>
+          <div className="min-w-0">
             <button onClick={() => setScreen("Clients")} className="text-xs font-black text-slate-500 uppercase tracking-wider">
               Sales Pipeline
             </button>
             <p className="text-xs text-slate-400 mt-0.5">
-              {inPipeline} in pipeline · {quoteConversion}% conversion
-              {lostC > 0 ? ` · ${lostC} lost` : ""}
+              {inPipeline} in pipeline{lostC > 0 ? ` · ${lostC} lost` : ""}
             </p>
           </div>
+          <Gauge value={quoteConversion} label="Conversion" size={78} />
+        </div>
+        <div className="flex items-center justify-end mb-3 -mt-1">
           <button onClick={() => setScreen("Analytics")}
             className="flex items-center gap-1.5 rounded-xl px-3 py-2 min-h-[40px] shrink-0"
             style={{ background: BRAND.light }}>
