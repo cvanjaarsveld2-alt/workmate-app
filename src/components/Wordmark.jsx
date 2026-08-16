@@ -12,9 +12,13 @@ import { BRAND } from "../lib/constants";
 
 export function Wordmark({ variant = "dark", size = "md", className = "" }) {
   const onDark = variant === "light";
-  const powerColor = onDark ? "#FFFFFF" : "#111111";
+  // "light" variant is always white (used on the red drawer). The "dark" variant
+  // is dark text on light backgrounds — but must flip to light in dark mode, so
+  // it uses a CSS variable (--pm-wordmark, defined in darkMode.css) rather than
+  // a hardcoded near-black that would vanish on a dark background.
+  const powerColor = onDark ? "#FFFFFF" : "var(--pm-wordmark, #111111)";
   const worksColor = BRAND.primary; // brand red
-  const tagColor = onDark ? "rgba(255,255,255,0.75)" : "#6B7280";
+  const tagColor = onDark ? "rgba(255,255,255,0.75)" : "var(--pm-wordmark-tag, #6B7280)";
 
   const sizes = {
     sm: { power: "1rem",    works: "1rem",    tag: "0.5rem",  gap: "0.28rem" },
