@@ -1,0 +1,83 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dark mode — CSS remap
+   ---------------------------------------------------------------------------
+   When <html class="dark"> is set, these rules remap the Tailwind utility
+   colours used across the app to dark equivalents, without touching any screen
+   markup. This is a pragmatic bulk approach: one stylesheet flips the whole app.
+
+   Scoped entirely under `.dark`, so with the class absent the app is 100%
+   unchanged (light mode is byte-for-byte what it was before).
+
+   `!important` is used because we're overriding Tailwind's own utility classes,
+   which have the same specificity; the theme override must win.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.dark {
+  color-scheme: dark;
+}
+
+/* ── App page background (set via inline style on the root wrapper) ────────── */
+/* The root uses style="background:#F7F3F3". Inline styles can't be overridden
+   by a class, so we paint the html/body behind it and let cards sit on top.
+   The wrapper's own bg is handled by the bg utilities below where possible. */
+.dark body,
+.dark #root {
+  background: #0E1116 !important;
+}
+
+/* ── Surfaces ─────────────────────────────────────────────────────────────── */
+.dark .bg-white            { background-color: #171B22 !important; }
+.dark .bg-slate-50         { background-color: #1B2029 !important; }
+.dark .bg-slate-100        { background-color: #232A35 !important; }
+.dark .bg-slate-200        { background-color: #2C3441 !important; }
+.dark .bg-slate-800        { background-color: #E2E8F0 !important; }  /* inverted dark chips → light */
+.dark .bg-slate-900        { background-color: #F1F5F9 !important; }
+
+/* ── Text ─────────────────────────────────────────────────────────────────── */
+.dark .text-slate-900      { color: #F1F5F9 !important; }
+.dark .text-slate-800      { color: #E7ECF2 !important; }
+.dark .text-slate-700      { color: #D5DCE5 !important; }
+.dark .text-slate-600      { color: #B3BCC9 !important; }
+.dark .text-slate-500      { color: #94A0B0 !important; }
+.dark .text-slate-400      { color: #7C8797 !important; }
+.dark .text-slate-300      { color: #5D6675 !important; }
+.dark .text-white          { color: #F1F5F9 !important; }
+.dark .text-black          { color: #F1F5F9 !important; }
+
+/* ── Borders ──────────────────────────────────────────────────────────────── */
+.dark .border-slate-100    { border-color: #262D38 !important; }
+.dark .border-slate-200    { border-color: #2E3744 !important; }
+.dark .border-slate-300    { border-color: #3A4453 !important; }
+.dark .border-white        { border-color: #171B22 !important; }
+
+/* ── Dividers ─────────────────────────────────────────────────────────────── */
+.dark .divide-slate-50 > * + *   { border-color: #232A35 !important; }
+.dark .divide-slate-100 > * + *  { border-color: #262D38 !important; }
+
+/* ── Placeholders ─────────────────────────────────────────────────────────── */
+.dark ::placeholder        { color: #6B7280 !important; }
+
+/* ── Inputs / selects / textareas (often no explicit bg class) ────────────── */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #1B2029 !important;
+  color: #E7ECF2 !important;
+  border-color: #2E3744 !important;
+}
+
+/* ── Cards rendered via inline boxShadow keep their shape; nudge the shadow
+      so it reads on a dark background instead of vanishing. ────────────────── */
+.dark [style*="box-shadow"] {
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 16px -8px rgba(0,0,0,0.6) !important;
+}
+
+/* ── Soft brand-tint backgrounds (BRAND.light #F7F3F3 used inline) stay warm
+      but need to darken; handled per-component where it matters. Keep the
+      brand red itself (#8B1A1A) unchanged — it reads fine on dark. ─────────── */
+
+/* ── The fixed top header uses bg-white/90 → make it a dark translucent bar ── */
+.dark header.fixed,
+.dark .bg-white\/90 {
+  background-color: rgba(20, 24, 30, 0.9) !important;
+}
