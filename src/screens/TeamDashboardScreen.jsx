@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, UserPlus, TrendingUp, Calendar,
   CheckCircle2, Clock, Send, X, FolderOpen,
+  ChevronDown, ChevronRight,
 } from "lucide-react";
 import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
 import { todayISO, smartDate } from "../lib/helpers";
@@ -181,6 +182,8 @@ export function TeamDashboardScreen({
   const [shareTarget, setShareTarget]       = useState(null);
   const [detailFU, setDetailFU]             = useState(null);
   const [detailItem, setDetailItem]         = useState(null); // {type, data} for clients/contacts/leads
+  const [collapsedMembers, setCollapsedMembers] = useState({}); // teammate groups collapsed by default
+  const toggleMember = (uid) => setCollapsedMembers(prev => ({ ...prev, [uid]: !prev[uid] }));
 
   const memberMap = useMemo(() => {
     const map = {};
@@ -261,6 +264,26 @@ export function TeamDashboardScreen({
   const rows       = DISPLAY[activeSection] || [];
   const LIMIT      = 30;
   const displayed  = rows.slice(0, LIMIT);
+
+  // Group the displayed clients by responsible teammate (assignee, else creator).
+  // Each group: { uid, email, color, items }. Sorted by teammate name.
+  const clientsByMember = (() => {
+    const map = {};
+    for (const r of displayed) {
+      const uid = r.assigned_to_user_id || r.user_id || "unknown";
+      if (!map[uid]) {
+        map[uid] = {
+          uid,
+          email: memberMap[uid]?.email || r._ownerEmail || uid,
+          color: memberMap[uid]?.color || r._ownerColor || BRAND.primary,
+          items: [],
+        };
+      }
+      map[uid].items.push(r);
+    }
+    return Object.values(map).sort((a, b) =>
+      displayName(a.email, a.uid).localeCompare(displayName(b.email, b.uid)));
+  })();
 
   // Share handler — opens the modal for any record type
   function handleShare(record) {
@@ -353,12 +376,36 @@ export function TeamDashboardScreen({
           </div>
         ) : (
           <div className="px-4">
-            {activeSection === "clients" && displayed.map(r => (
-              <ClientRow key={r.id} client={r} color={r._ownerColor}
-                onTap={() => setDetailItem({ type: "client", data: r })}
-                onOpen={isAdmin ? () => onNavigate?.("Client360", { clientId: r.id, returnTo: "TeamDashboard" }) : undefined}
-                onShare={isAdmin ? () => handleShare({ id: r.id, title: r.company, type: "client" }) : undefined} />
-            ))}
+            {activeSection === "clients" && clientsByMember.map(group => {
+              const isCollapsed = collapsedMembers[group.uid];
+              const name = displayName(group.email, group.uid);
+              return (
+                <div key={group.uid} className="mb-1">
+                  {/* Teammate group header — collapsible */}
+                  <button
+                    type="button"
+                    onClick={() => toggleMember(group.uid)}
+                    className="w-full flex items-center gap-2.5 py-2.5 text-left">
+                    {isCollapsed
+                      ? <ChevronRight size={16} className="text-slate-400 shrink-0" />
+                      : <ChevronDown size={16} className="text-slate-400 shrink-0" />}
+                    <span className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white"
+                      style={{ background: group.color }}>
+                      {name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="text-sm font-black text-slate-800 truncate flex-1">{name}</span>
+                    <span className="text-xs font-bold text-slate-400 shrink-0">{group.items.length}</span>
+                  </button>
+                  {/* Client rows for this teammate */}
+                  {!isCollapsed && group.items.map(r => (
+                    <ClientRow key={r.id} client={r} color={r._ownerColor}
+                      onTap={() => setDetailItem({ type: "client", data: r })}
+                      onOpen={isAdmin ? () => onNavigate?.("Client360", { clientId: r.id, returnTo: "TeamDashboard" }) : undefined}
+                      onShare={isAdmin ? () => handleShare({ id: r.id, title: r.company, type: "client" }) : undefined} />
+                  ))}
+                </div>
+              );
+            })}
             {activeSection === "contacts" && displayed.map(r => (
               <ContactRow key={r.id} contact={r} color={r._ownerColor}
                 onTap={() => setDetailItem({ type: "contact", data: r })}
