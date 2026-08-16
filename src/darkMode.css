@@ -25,6 +25,11 @@
 :root { --pm-page-bg: #F7F3F3; }
 .dark { --pm-page-bg: #000000; }
 
+/* Wordmark "POWER" text + tag: dark on light backgrounds, light in dark mode.
+   (The white "light" variant used on the red drawer is unaffected.) */
+:root { --pm-wordmark: #111111; --pm-wordmark-tag: #6B7280; }
+.dark { --pm-wordmark: #F2F2F7; --pm-wordmark-tag: rgba(235,235,245,0.62); }
+
 /* ── Base canvas — true black like iOS ────────────────────────────────────── */
 .dark body,
 .dark #root {
