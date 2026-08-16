@@ -76,7 +76,7 @@ class ErrorBoundary extends React.Component {
   }
   render() {
     if (this.state.hasError) return (
-      <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center" style={{ background: "#F7F3F3" }}>
+      <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center" style={{ background: "var(--pm-page-bg)" }}>
         <div className="bg-white rounded-2xl max-w-sm w-full p-8 space-y-4 shadow-sm border border-slate-100">
           <div className="text-4xl">⚠️</div>
           <h2 className="text-lg font-black text-slate-900">Something went wrong</h2>
@@ -638,7 +638,7 @@ export default function PowerWorksApp() {
   return (
     <ErrorBoundary>
       <ExportProgressProvider>
-      <div className="min-h-screen pb-32" style={{ background: "#F7F3F3", paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}>
+      <div className="min-h-screen pb-32" style={{ background: "var(--pm-page-bg)", paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}>
 
         {/* ── Top bar (fixed so it pins regardless of ancestor overflow) ── */}
         <header className="fixed top-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100" style={{ paddingTop: "env(safe-area-inset-top)" }}>
