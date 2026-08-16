@@ -1,8 +1,9 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
-import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users } from "lucide-react";
+import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users, Sun, Moon, Smartphone } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, Toast, PageHeader, useConfirm } from "../components/ui";
+import { getStoredTheme, applyTheme } from "../lib/theme";
 import ReportExport from "../ReportExport";
 import { BackupExport } from "../components/BackupExport";
 import { CompanyDocuments } from "../components/CompanyDocuments";
@@ -15,6 +16,11 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
 
   // Push notification state: idle | working | active | denied | ios-install | unsupported | error
   const [toast, setToast]           = useState("");
+  const [theme, setTheme]           = useState(() => getStoredTheme());
+  function chooseTheme(mode) {
+    setTheme(mode);
+    applyTheme(mode);
+  }
   const [targetInput, setTargetInput] = useState(
     () => localStorage.getItem(`pm_revenue_target_${userId}`) || ""
   );
@@ -75,6 +81,36 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
     <div className="space-y-4">
       {dialog}
       <PageHeader title="Settings" subtitle="Sync, security & account" />
+
+      {/* Appearance — Light / Dark / Auto */}
+      <Card className="p-4">
+        <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Appearance</p>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { key: "light", label: "Light", icon: Sun },
+            { key: "dark",  label: "Dark",  icon: Moon },
+            { key: "auto",  label: "Auto",  icon: Smartphone },
+          ].map(opt => {
+            const active = theme === opt.key;
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.key}
+                onClick={() => chooseTheme(opt.key)}
+                className="flex flex-col items-center gap-1.5 rounded-2xl py-3 border transition-colors"
+                style={active
+                  ? { borderColor: BRAND.primary, background: BRAND.light, color: BRAND.primary }
+                  : { borderColor: "#E2E8F0", background: "#fff", color: "#64748B" }}>
+                <Icon size={20} />
+                <span className="text-xs font-bold">{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-slate-400 mt-2.5">
+          Auto follows your phone's system setting.
+        </p>
+      </Card>
 
       {/* Quotes + Expenses shortcuts */}
       {setScreen && (
