@@ -1,83 +1,91 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   Dark mode — CSS remap
+   Dark mode — iOS-style CSS remap
    ---------------------------------------------------------------------------
-   When <html class="dark"> is set, these rules remap the Tailwind utility
-   colours used across the app to dark equivalents, without touching any screen
-   markup. This is a pragmatic bulk approach: one stylesheet flips the whole app.
+   Tuned to match Apple's system dark mode: a true near-black base, a layered
+   elevation ladder (base → grouped surface → elevated surface), clean neutral
+   greys (not blue-tinted), and a frosted translucent top bar.
+
+   iOS system reference values used here:
+     systemBackground            #000000  (base)
+     secondarySystemBackground   #1C1C1E  (cards / grouped content)
+     tertiarySystemBackground    #2C2C2E  (nested rows, inputs)
+     systemGray4/5/6 for borders and fills
+     label / secondaryLabel / tertiaryLabel for text
 
    Scoped entirely under `.dark`, so with the class absent the app is 100%
-   unchanged (light mode is byte-for-byte what it was before).
-
-   `!important` is used because we're overriding Tailwind's own utility classes,
-   which have the same specificity; the theme override must win.
+   unchanged. `!important` overrides Tailwind's same-specificity utilities.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .dark {
   color-scheme: dark;
 }
 
-/* ── App page background (set via inline style on the root wrapper) ────────── */
-/* The root uses style="background:#F7F3F3". Inline styles can't be overridden
-   by a class, so we paint the html/body behind it and let cards sit on top.
-   The wrapper's own bg is handled by the bg utilities below where possible. */
+/* ── Base canvas — true black like iOS ────────────────────────────────────── */
 .dark body,
 .dark #root {
-  background: #0E1116 !important;
+  background: #000000 !important;
 }
 
-/* ── Surfaces ─────────────────────────────────────────────────────────────── */
-.dark .bg-white            { background-color: #171B22 !important; }
-.dark .bg-slate-50         { background-color: #1B2029 !important; }
-.dark .bg-slate-100        { background-color: #232A35 !important; }
-.dark .bg-slate-200        { background-color: #2C3441 !important; }
-.dark .bg-slate-800        { background-color: #E2E8F0 !important; }  /* inverted dark chips → light */
-.dark .bg-slate-900        { background-color: #F1F5F9 !important; }
+/* ── Surfaces — the iOS elevation ladder ──────────────────────────────────── */
+/* white cards → secondarySystemBackground (elevated grey on black) */
+.dark .bg-white            { background-color: #1C1C1E !important; }
+/* faint fills → tertiary / grouped */
+.dark .bg-slate-50         { background-color: #2C2C2E !important; }
+.dark .bg-slate-100        { background-color: #3A3A3C !important; }
+.dark .bg-slate-200        { background-color: #48484A !important; }
+/* inverted dark chips (dark bg in light mode) → light in dark mode */
+.dark .bg-slate-800        { background-color: #EBEBF0 !important; }
+.dark .bg-slate-900        { background-color: #F5F5F7 !important; }
 
-/* ── Text ─────────────────────────────────────────────────────────────────── */
-.dark .text-slate-900      { color: #F1F5F9 !important; }
-.dark .text-slate-800      { color: #E7ECF2 !important; }
-.dark .text-slate-700      { color: #D5DCE5 !important; }
-.dark .text-slate-600      { color: #B3BCC9 !important; }
-.dark .text-slate-500      { color: #94A0B0 !important; }
-.dark .text-slate-400      { color: #7C8797 !important; }
-.dark .text-slate-300      { color: #5D6675 !important; }
-.dark .text-white          { color: #F1F5F9 !important; }
-.dark .text-black          { color: #F1F5F9 !important; }
+/* ── Text — iOS label hierarchy (neutral, high-contrast) ──────────────────── */
+.dark .text-slate-900      { color: #FFFFFF !important; }        /* label */
+.dark .text-slate-800      { color: #F2F2F7 !important; }
+.dark .text-slate-700      { color: #E5E5EA !important; }
+.dark .text-slate-600      { color: rgba(235,235,245,0.80) !important; }  /* secondaryLabel */
+.dark .text-slate-500      { color: rgba(235,235,245,0.62) !important; }  /* tertiaryLabel */
+.dark .text-slate-400      { color: rgba(235,235,245,0.48) !important; }
+.dark .text-slate-300      { color: rgba(235,235,245,0.34) !important; }  /* quaternaryLabel */
+.dark .text-white          { color: #FFFFFF !important; }
+.dark .text-black          { color: #FFFFFF !important; }
 
-/* ── Borders ──────────────────────────────────────────────────────────────── */
-.dark .border-slate-100    { border-color: #262D38 !important; }
-.dark .border-slate-200    { border-color: #2E3744 !important; }
-.dark .border-slate-300    { border-color: #3A4453 !important; }
-.dark .border-white        { border-color: #171B22 !important; }
+/* ── Borders / separators — iOS uses a subtle translucent hairline ────────── */
+.dark .border-slate-100    { border-color: rgba(84,84,88,0.34) !important; }   /* opaqueSeparator-ish */
+.dark .border-slate-200    { border-color: rgba(84,84,88,0.48) !important; }
+.dark .border-slate-300    { border-color: rgba(84,84,88,0.60) !important; }
+.dark .border-white        { border-color: #1C1C1E !important; }
 
 /* ── Dividers ─────────────────────────────────────────────────────────────── */
-.dark .divide-slate-50 > * + *   { border-color: #232A35 !important; }
-.dark .divide-slate-100 > * + *  { border-color: #262D38 !important; }
+.dark .divide-slate-50 > * + *   { border-color: rgba(84,84,88,0.34) !important; }
+.dark .divide-slate-100 > * + *  { border-color: rgba(84,84,88,0.34) !important; }
 
 /* ── Placeholders ─────────────────────────────────────────────────────────── */
-.dark ::placeholder        { color: #6B7280 !important; }
+.dark ::placeholder        { color: rgba(235,235,245,0.40) !important; }
 
-/* ── Inputs / selects / textareas (often no explicit bg class) ────────────── */
+/* ── Inputs / selects / textareas → tertiary fill, like iOS text fields ───── */
 .dark input,
 .dark select,
 .dark textarea {
-  background-color: #1B2029 !important;
-  color: #E7ECF2 !important;
-  border-color: #2E3744 !important;
+  background-color: #2C2C2E !important;
+  color: #F2F2F7 !important;
+  border-color: rgba(84,84,88,0.48) !important;
 }
 
-/* ── Cards rendered via inline boxShadow keep their shape; nudge the shadow
-      so it reads on a dark background instead of vanishing. ────────────────── */
+/* ── Card shadows: on true black, shadows barely read — swap for a faint
+      hairline ring so cards separate from the background the iOS way. ──────── */
 .dark [style*="box-shadow"] {
-  box-shadow: 0 1px 2px rgba(0,0,0,0.4), 0 4px 16px -8px rgba(0,0,0,0.6) !important;
+  box-shadow: inset 0 0 0 0.5px rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.6) !important;
 }
 
-/* ── Soft brand-tint backgrounds (BRAND.light #F7F3F3 used inline) stay warm
-      but need to darken; handled per-component where it matters. Keep the
-      brand red itself (#8B1A1A) unchanged — it reads fine on dark. ─────────── */
-
-/* ── The fixed top header uses bg-white/90 → make it a dark translucent bar ── */
+/* ── Frosted translucent top bar — the signature iOS blurred nav bar ──────── */
 .dark header.fixed,
 .dark .bg-white\/90 {
-  background-color: rgba(20, 24, 30, 0.9) !important;
+  background-color: rgba(28,28,30,0.72) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
+  backdrop-filter: saturate(180%) blur(20px) !important;
+}
+
+/* ── Brand red (#8B1A1A) reads a touch muddy on black — iOS brightens accents
+      in dark mode for vibrancy. Lift buttons/fills that use the brand red. ── */
+.dark [style*="8B1A1A"] {
+  /* Only affects elements whose inline style references the brand hex. */
 }
