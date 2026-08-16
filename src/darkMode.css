@@ -20,6 +20,11 @@
   color-scheme: dark;
 }
 
+/* Page background as a variable so inline-styled wrappers can pick it up.
+   Light mode keeps the warm off-white; dark mode goes true black. */
+:root { --pm-page-bg: #F7F3F3; }
+.dark { --pm-page-bg: #000000; }
+
 /* ── Base canvas — true black like iOS ────────────────────────────────────── */
 .dark body,
 .dark #root {
@@ -88,4 +93,13 @@
       in dark mode for vibrancy. Lift buttons/fills that use the brand red. ── */
 .dark [style*="8B1A1A"] {
   /* Only affects elements whose inline style references the brand hex. */
+}
+
+/* ── Inline brand-light (#F7F3F3) fills scattered across screens ───────────── */
+/* Inline styles can't be overridden by class rules, but an attribute selector
+   matching the inline value can. Remap these warm off-white fills to a dark
+   grouped surface so they don't stay light. The :root/.dark --pm-page-bg
+   variable definitions above are excluded (they're not elements). */
+.dark [style*="#F7F3F3"] {
+  background-color: #2C2C2E !important;
 }
