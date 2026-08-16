@@ -182,8 +182,8 @@ export function TeamDashboardScreen({
   const [shareTarget, setShareTarget]       = useState(null);
   const [detailFU, setDetailFU]             = useState(null);
   const [detailItem, setDetailItem]         = useState(null); // {type, data} for clients/contacts/leads
-  const [collapsedMembers, setCollapsedMembers] = useState({}); // teammate groups collapsed by default
-  const toggleMember = (uid) => setCollapsedMembers(prev => ({ ...prev, [uid]: !prev[uid] }));
+  const [expandedMembers, setExpandedMembers] = useState({}); // teammate groups collapsed by default
+  const toggleMember = (uid) => setExpandedMembers(prev => ({ ...prev, [uid]: !prev[uid] }));
 
   const memberMap = useMemo(() => {
     const map = {};
@@ -377,7 +377,7 @@ export function TeamDashboardScreen({
         ) : (
           <div className="px-4">
             {activeSection === "clients" && clientsByMember.map(group => {
-              const isCollapsed = collapsedMembers[group.uid];
+              const isCollapsed = !expandedMembers[group.uid];
               const name = displayName(group.email, group.uid);
               return (
                 <div key={group.uid} className="mb-1">
