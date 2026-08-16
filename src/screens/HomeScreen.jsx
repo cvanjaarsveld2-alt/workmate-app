@@ -202,10 +202,10 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
     if (pct === 0) return null;
     return { dir: pct >= 0 ? "up" : "down", text: `${Math.abs(pct)}% vs last month` };
   }
-  const expTrend = monthTrend(expMonthTotal, expLastMonthTotal);
-  const revTrend = monthTrend(wonRev, wonRevLastMonth);
   // Use ZAR equivalent so mixed-currency periods sum sensibly.
   const expMonthTotal     = expThisMonth.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
+  const expTrend = monthTrend(expMonthTotal, expLastMonthTotal);
+  const revTrend = monthTrend(wonRev, wonRevLastMonth);
 
 
   const quoteConversion = sentQuotes > 0 ? Math.round((acceptedQ / sentQuotes) * 100) : 0;
