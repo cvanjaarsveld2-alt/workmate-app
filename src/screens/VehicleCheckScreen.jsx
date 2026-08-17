@@ -195,7 +195,7 @@ function SettingsPanel({ settings, userId, onSave, onClose }) {
       // Show preview immediately
       setForm(f => ({ ...f, vehicle_photo_url: base64 }));
       // Upload in background, then swap to the hosted URL
-      const path = `vehicle-profile/${userId}/vehicle.jpg`;
+      const path = `vehicle-profile/${userId}/${genId()}.jpg`;
       const url = await uploadPhotoToSupabase(base64 || file, path);
       if (url) setForm(f => ({ ...f, vehicle_photo_url: url }));
     } catch (e) {
@@ -416,7 +416,7 @@ export function VehicleCheckScreen({ data, setData, userId }) {
     persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...existing, photo: base64 } } });
     try {
       const safeItem = item.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
-      const path = `vehicle-checks/${userId}/${date}/item-${safeItem}.jpg`;
+      const path = `vehicle-checks/${userId}/${date}/item-${safeItem}-${genId()}.jpg`;
       const url = await uploadPhotoToSupabase(base64, path);
       if (url) {
         const latest = getDayData(date);
