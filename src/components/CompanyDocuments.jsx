@@ -101,11 +101,10 @@ export function CompanyDocuments({ userId, teamId }) {
       if (uploadError) throw uploadError;
       setUploadProgress(70);
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("company-docs")
-        .getPublicUrl(path);
-
+      // Store the storage PATH (not a public URL). The bucket should be private;
+      // we generate a short-lived signed URL on demand when the user opens a doc
+      // (see openDoc below). Storing a permanent public URL would expose the file
+      // to anyone with the link.
       setUploadProgress(85);
 
       // Save metadata to table
@@ -116,7 +115,7 @@ export function CompanyDocuments({ userId, teamId }) {
           team_id:   teamId || null,
           name:      docName.trim(),
           category,
-          file_url:  urlData.publicUrl,
+          file_url:  path,  // storage path, not a public URL — resolved to a signed URL on open
           file_name: selectedFile.name,
           file_size: selectedFile.size,
         })
@@ -142,13 +141,34 @@ export function CompanyDocuments({ userId, teamId }) {
     setUploadProgress(0);
   }
 
+  // Open a document via a short-lived signed URL (bucket is private). Handles
+  // both new rows (file_url = storage path) and legacy rows (file_url = full URL).
+  async function openDoc(doc) {
+    try {
+      // Legacy rows may still hold a full public URL — open directly.
+      if (doc.file_url?.startsWith("http")) { window.open(doc.file_url, "_blank"); return; }
+      const path = doc.file_url;
+      const { data, error } = await supabase.storage
+        .from("company-docs")
+        .createSignedUrl(path, 60 * 60); // valid 1 hour
+      if (error || !data?.signedUrl) { setToast?.("Couldn't open document"); return; }
+      window.open(data.signedUrl, "_blank");
+    } catch {
+      setToast?.("Couldn't open document");
+    }
+  }
+
   async function handleDelete(doc) {
     const ok = await confirm(`Delete "${doc.name}"? This cannot be undone.`, { confirmLabel: "Delete" });
     if (!ok) return;
 
     try {
       // Remove from storage
-      const path = doc.file_url.split("/company-docs/")[1];
+      // file_url now holds the storage path directly (not a public URL).
+      // Fall back to the old URL-splitting for any legacy rows still holding a URL.
+      const path = doc.file_url.includes("/company-docs/")
+        ? doc.file_url.split("/company-docs/")[1]
+        : doc.file_url;
       if (path) {
         await supabase.storage.from("company-docs").remove([path]);
       }
@@ -295,10 +315,10 @@ export function CompanyDocuments({ userId, teamId }) {
                           {doc.team_id && doc.user_id !== userId ? " · Shared by team" : ""}
                         </p>
                       </div>
-                      <a href={doc.file_url} target="_blank" rel="noreferrer"
+                      <button onClick={() => openDoc(doc)}
                         className="p-2 rounded-lg text-slate-400 hover:text-blue-600 min-w-[36px] min-h-[36px] flex items-center justify-center">
                         <FileText size={14} />
-                      </a>
+                      </button>
                       {doc.user_id === userId && (
                         <button onClick={() => handleDelete(doc)}
                           className="p-2 rounded-lg text-slate-400 hover:text-red-600 min-w-[36px] min-h-[36px] flex items-center justify-center">
