@@ -585,7 +585,15 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange }) {
     if (myRole !== "admin") return;
     const ok = await confirm("Generate a new invite code? The old one will stop working.", { confirmLabel: "Regenerate" });
     if (!ok) return;
-    const newCode = Math.random().toString(36).slice(2, 10).toUpperCase();
+    // Cryptographically secure invite code — crypto.getRandomValues is
+    // unpredictable, unlike Math.random which can be reverse-engineered from
+    // prior outputs. Produces an 8-char uppercase alphanumeric code.
+    const newCode = (() => {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+      const bytes = new Uint8Array(8);
+      (crypto || window.crypto).getRandomValues(bytes);
+      return Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
+    })();
     const { error } = await supabase.from("teams").update({ invite_code: newCode }).eq("id", team.id);
     if (error) { setToast("Failed to regenerate"); return; }
     setTeam(t => ({ ...t, invite_code: newCode }));
