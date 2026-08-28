@@ -33,6 +33,7 @@ const SECTIONS = [
     title: "MAIN",
     items: [
       { key: "Home",      label: "Dashboard",     icon: Home },
+      { key: "Planner",   label: "Weekly Planner", icon: LayoutDashboard },
       { key: "Analytics", label: "Analytics",      icon: BarChart2 },
       { key: "Leads",     label: "Opportunities",  icon: TrendingUp },
       { key: "Clients",   label: "Clients",        icon: Users },
