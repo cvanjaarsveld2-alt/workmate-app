@@ -534,7 +534,7 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
           </button>
         </div>
         <div className="space-y-2.5">
-          {PIPELINE_STAGES.filter(s => s !== "Lost").map(stage => {
+          {PIPELINE_STAGES.filter(s => s !== "Lost" && s !== "Dormant").map(stage => {
             const count = pCount[stage] || 0;
             const total = inPipeline || 1;
             const c     = STAGE_COLORS[stage];
