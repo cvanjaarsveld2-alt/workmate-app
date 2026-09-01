@@ -139,7 +139,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
     // Skipped if you've contacted them within the snooze window (last_contacted).
     for (const c of clients) {
       const stage = c.stage || "New Lead";
-      if (["Won", "Lost"].includes(stage)) continue;
+      if (["Won", "Lost", "Dormant"].includes(stage)) continue;
       const last = (c.updated_at || c.created_at || "").slice(0, 10);
       if (!last) continue;
       const age = daysBetween(today, last);
