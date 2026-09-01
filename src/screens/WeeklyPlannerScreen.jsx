@@ -23,6 +23,8 @@ import { todayISO, genId } from "../lib/helpers";
 import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { offlineSave } from "../offline/offlineDb";
+import { buildDraft, draftToText } from "../lib/draftMessages";
+import { Mail, MessageCircle, Copy, Check as CheckIcon, Pencil } from "lucide-react";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -53,6 +55,17 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
   const followups = data.followups || [];
   const quotes    = data.quotes    || [];
   const [moving, setMoving] = useState(null); // item being moved (declared before the handlers that use it)
+  const [drafting, setDrafting] = useState(null); // { item, client } for the draft composer
+
+  // Resolve the client record behind an item, so drafts can be personalised.
+  function clientForItem(item) {
+    if (item.source === "client") return item.raw;
+    const id = item.raw?.client_id;
+    if (id) return (data.clients || []).find(c => c.id === id) || null;
+    // fall back to matching by company name
+    const name = item.client;
+    return (data.clients || []).find(c => c.company === name) || null;
+  }
 
   // ── Build the prioritised item list for this week ──────────────────────────
   const { byDay, backlog } = useMemo(() => {
@@ -188,7 +201,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
             </span>
           </div>
           <div className="space-y-1.5">
-            {backlog.map(it => <PlanItem key={it.id} item={it} onMove={() => setMoving(it)} onDone={() => completeFollowup(it)} onOpen={onNavigate} />)}
+            {backlog.map(it => <PlanItem key={it.id} item={it} onMove={() => setMoving(it)} onDone={() => completeFollowup(it)} onOpen={onNavigate} onDraft={() => setDrafting({ item: it, client: clientForItem(it) })} />)}
           </div>
         </Card>
       )}
@@ -212,7 +225,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
             {items.length === 0
               ? <p className="text-xs text-slate-300 py-1">Nothing scheduled</p>
               : <div className="space-y-1.5">
-                  {items.map(it => <PlanItem key={it.id} item={it} onMove={() => setMoving(it)} onDone={() => completeFollowup(it)} onOpen={onNavigate} />)}
+                  {items.map(it => <PlanItem key={it.id} item={it} onMove={() => setMoving(it)} onDone={() => completeFollowup(it)} onOpen={onNavigate} onDraft={() => setDrafting({ item: it, client: clientForItem(it) })} />)}
                 </div>}
           </Card>
         );
@@ -221,6 +234,11 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
       {totalItems === 0 && (
         <Empty icon={Sparkles} title="Your week is clear" text="No overdue follow-ups, cold quotes, or neglected clients. Nicely done." />
       )}
+
+      {/* Draft composer */}
+      <AnimatePresence>
+        {drafting && <DraftComposer draft={drafting} onClose={() => setDrafting(null)} />}
+      </AnimatePresence>
 
       {/* Move-to-day picker */}
       <AnimatePresence>
@@ -267,7 +285,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
 }
 
 // ── A single plan item row ────────────────────────────────────────────────────
-function PlanItem({ item, onMove, onDone, onOpen }) {
+function PlanItem({ item, onMove, onDone, onOpen, onDraft }) {
   const meta = {
     followup: { icon: CalendarIcon, color: "#2563EB", label: "Follow-up" },
     meeting:  { icon: Users,        color: "#7C3AED", label: "Meeting" },
@@ -275,6 +293,8 @@ function PlanItem({ item, onMove, onDone, onOpen }) {
     reachout: { icon: AlertTriangle,color: "#DC2626", label: "Reach out" },
   }[item.kind] || { icon: Clock, color: "#64748B", label: "" };
   const Icon = meta.icon;
+  // Which items are worth drafting a message for.
+  const canDraft = ["quote", "reachout", "meeting"].includes(item.kind);
 
   return (
     <div className="flex items-center gap-2.5 rounded-xl px-3 py-2 bg-slate-50">
@@ -289,11 +309,100 @@ function PlanItem({ item, onMove, onDone, onOpen }) {
         </div>
         {item.client && <span className="text-xs text-slate-400 truncate block">{item.client}</span>}
       </button>
+      {canDraft && (
+        <button onClick={onDraft} className="shrink-0 w-8 h-8 grid place-items-center rounded-full active:bg-slate-200" aria-label="Draft message">
+          <Mail size={15} style={{ color: BRAND.primary }} />
+        </button>
+      )}
       {item.source === "followup" && (
         <button onClick={onDone} className="shrink-0 w-8 h-8 grid place-items-center rounded-full active:bg-slate-200">
           <CheckCircle2 size={17} className="text-slate-300" />
         </button>
       )}
     </div>
+  );
+}
+
+// ── Draft composer — email/WhatsApp toggle, editable text, copy to clipboard ──
+function DraftComposer({ draft, onClose }) {
+  const { item, client } = draft;
+  const [channel, setChannel] = useState("email");
+  const [text, setText] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  // Regenerate the draft whenever the channel changes.
+  React.useEffect(() => {
+    const d = buildDraft(item, channel, client);
+    setText(draftToText(d, channel));
+    setCopied(false);
+  }, [channel, item, client]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard can fail on some browsers; leave text selectable as fallback
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 z-[120] flex items-end justify-center"
+      style={{ background: "rgba(15,23,42,0.4)", backdropFilter: "blur(2px)" }}>
+      <motion.div
+        initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}
+        transition={{ type: "spring", stiffness: 320, damping: 30 }}
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-md m-3 rounded-3xl bg-white p-5"
+        style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}>
+        <div className="flex items-center gap-2 mb-1">
+          <Pencil size={15} style={{ color: BRAND.primary }} />
+          <p className="text-xs font-black uppercase tracking-wider text-slate-400">Draft message</p>
+        </div>
+        <p className="text-base font-black text-slate-900 truncate">{item.client || "Message"}</p>
+
+        {/* Channel toggle */}
+        <div className="grid grid-cols-2 gap-2 my-3">
+          {[
+            { key: "email", label: "Email", icon: Mail },
+            { key: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+          ].map(c => {
+            const active = channel === c.key;
+            const Icon = c.icon;
+            return (
+              <button key={c.key} onClick={() => setChannel(c.key)}
+                className="flex items-center justify-center gap-2 rounded-2xl py-2.5 border text-sm font-bold transition-colors"
+                style={active
+                  ? { borderColor: BRAND.primary, background: BRAND.light, color: BRAND.primary }
+                  : { borderColor: "#E2E8F0", background: "#fff", color: "#64748B" }}>
+                <Icon size={16} /> {c.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Editable draft */}
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          rows={channel === "email" ? 10 : 5}
+          className="w-full rounded-2xl border border-slate-200 p-3 text-[15px] outline-none focus:border-slate-400 resize-none"
+          style={{ fontSize: 16 }} />
+
+        <button onClick={copy}
+          className="w-full mt-3 min-h-[52px] rounded-2xl font-bold text-white flex items-center justify-center gap-2"
+          style={{ background: copied ? "#16A34A" : BRAND.primary }}>
+          {copied ? <><CheckIcon size={18} /> Copied — paste into {channel === "email" ? "Outlook" : "WhatsApp"}</> : <><Copy size={18} /> Copy message</>}
+        </button>
+        <button onClick={onClose}
+          className="w-full mt-2 min-h-[44px] rounded-2xl font-bold text-slate-500 bg-slate-100">
+          Close
+        </button>
+      </motion.div>
+    </motion.div>
   );
 }
