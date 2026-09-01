@@ -366,6 +366,26 @@ function CategoryBadge({ catId, size = "sm" }) {
     setGroupMode("category");
   }
 
+  // Move all selected clients to the Dormant stage (parks them out of active
+  // pipeline/planner/reach-outs, keeps all history). Full-row sync writes.
+  function moveSelectedToDormant() {
+    const ids = bulk.selected;
+    if (ids.size === 0) return;
+    const now = new Date().toISOString();
+    const affected = (data.clients || []).filter(c => ids.has(c.id));
+    setData(d => ({
+      ...d,
+      clients: (d.clients || []).map(c => ids.has(c.id) ? { ...c, stage: "Dormant", sync_status: "pending" } : c),
+      syncQueue: [
+        ...affected.map(c => ({ id: genId(), table: "clients", action: "update", data: { ...c, stage: "Dormant" }, status: "pending", created_at: now })),
+        ...(d.syncQueue || []),
+      ],
+    }));
+    affected.forEach(c => offlineSave("clients", { ...c, stage: "Dormant" }).catch(() => {}));
+    setToast(`${ids.size} client${ids.size !== 1 ? "s" : ""} moved to Dormant`);
+    bulk.cancel();
+  }
+
   // Rename a client group: update every client in it
   function renameClientGroup(oldName, newName) {
     if (oldName === "(No group)") { setRenamingGroup(null); return; }
@@ -678,6 +698,7 @@ function CategoryBadge({ catId, size = "sm" }) {
         onAssign={bulk.openAssign}
         onSelectAll={() => bulk.selectAll(filtered.map(c => c.id))}
         onClear={bulk.clear}
+        onDormant={moveSelectedToDormant}
         label="clients"
       />
 
