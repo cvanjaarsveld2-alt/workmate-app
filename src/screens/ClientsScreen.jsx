@@ -583,6 +583,9 @@ function CategoryBadge({ catId, size = "sm" }) {
   }
 
   const filtered = clients
+    // Dormant clients are parked — hidden from the default "All" view, but visible
+    // when you explicitly filter to "Dormant". They're never deleted, just tucked away.
+    .filter(c => filterStage === "Dormant" ? (c.stage === "Dormant") : ((c.stage || "New Lead") !== "Dormant"))
     .filter(c => filterStage === "All" || (c.stage || "New Lead") === filterStage)
     .filter(c => filterCat === "All" || parseCats(c.division).includes(filterCat))
     .filter(c => !search || [c.company, c.branch, c.contact].some(f => f?.toLowerCase().includes(search.toLowerCase())));
