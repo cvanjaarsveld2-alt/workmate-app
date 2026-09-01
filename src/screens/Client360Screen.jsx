@@ -27,6 +27,7 @@ import { genId, todayISO, smartDate, formatCurrency, daysDiff } from "../lib/hel
 import { withTeamId } from "../lib/teamId";
 import { offlineSave } from "../offline/offlineDb";
 import { Card, Field, StagePill, UrgencyBadge, ServiceBadge, Toast } from "../components/ui";
+import { InteractionLog } from "./InteractionLog";
 import { ShareToTeamModal } from "../components/ShareToTeamModal";
 import { ActivityLogger } from "../components/ActivityLogger";
 
@@ -50,6 +51,7 @@ function mapsLink(loc) { return `https://www.google.com/maps/search/?api=1&query
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 const TABS = [
   { key:"timeline",  label:"Timeline",   icon:Clock },
+  { key:"calls",     label:"Calls",      icon:Phone },
   { key:"contacts",  label:"Contacts",   icon:Users },
   { key:"followups", label:"Follow-ups", icon:Calendar },
   { key:"notes",     label:"Notes",      icon:MessageSquare },
@@ -248,6 +250,9 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
   // ── Tab content ────────────────────────────────────────────────────────────
   function renderTab() {
     switch(activeTab) {
+
+      case "calls":
+        return <div className="px-1"><InteractionLog client={client} setData={setData} userId={userId} teamId={teamId} /></div>;
 
       case "timeline":
         return timeline.length===0
