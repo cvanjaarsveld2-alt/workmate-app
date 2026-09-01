@@ -38,7 +38,6 @@ const SECTIONS = [
       { key: "Leads",     label: "Opportunities",  icon: TrendingUp },
       { key: "Clients",   label: "Clients",        icon: Users },
       { key: "Contacts",  label: "Contacts",       icon: UserPlus,     badgeKey: "leads" },
-      { key: "Followups", label: "Follow-ups",     icon: CalendarIcon, badgeKey: "overdueFU" },
       { key: "Calendar",  label: "Calendar",       icon: CalendarIcon }, // NEW
     ],
   },
