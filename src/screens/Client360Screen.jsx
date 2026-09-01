@@ -29,7 +29,6 @@ import { offlineSave } from "../offline/offlineDb";
 import { Card, Field, StagePill, UrgencyBadge, ServiceBadge, Toast } from "../components/ui";
 import { InteractionLog } from "./InteractionLog";
 import { ShareToTeamModal } from "../components/ShareToTeamModal";
-import { ActivityLogger } from "../components/ActivityLogger";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function timeAgo(iso) {
@@ -154,7 +153,6 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
   const [detailItem, setDetailItem] = useState(null); // {type, data} for inline detail sheet
   const [toast, setToast] = useState("");
   const [shareTarget, setShareTarget] = useState(null);
-  const [activityOpen, setActivityOpen] = useState(false);
   const [addForm, setAddForm] = useState(null); // "followup"|"note"|"contact"|"lead"|"quote"|"equipment"
   const [addData, setAddData] = useState({});
   const [showAllStats, setShowAllStats] = useState(false);
@@ -413,7 +411,7 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
 
       {/* ── Quick actions ── */}
       <div className="flex gap-2">
-        <ActionBtn icon={Plus} label="Log" onClick={()=>setActivityOpen(true)} color="#8B1A1A" bg="#F7F3F3"/>
+        <ActionBtn icon={Plus} label="Log" onClick={()=>setActiveTab("calls")} color="#8B1A1A" bg="#F7F3F3"/>
         {client.phone&&<>
           <ActionBtn icon={Phone} label="Call" onClick={()=>window.open(telLink(client.phone))} color="#1E40AF" bg="#DBEAFE"/>
           <ActionBtn icon={ExternalLink} label="WhatsApp" onClick={()=>window.open(whatsappLink(client.phone,`Hi ${client.contact || ""}`))} color="#166534" bg="#DCFCE7"/>
@@ -514,7 +512,6 @@ export function Client360Screen({ data, setData, userId, userEmail, teamId, team
       {/* ── Modals ── */}
       <ShareToTeamModal open={!!shareTarget} onClose={()=>setShareTarget(null)} record={shareTarget}
         fromUserId={userId} fromEmail={userEmail} teamId={teamId} teamMembers={teamMembers}/>
-      <ActivityLogger open={activityOpen} onClose={()=>setActivityOpen(false)} client={client} userId={userId} teamId={teamId} data={data} setData={setData}/>
 
       {/* ── Inline Add Form Sheet ── */}
       <AnimatePresence>
