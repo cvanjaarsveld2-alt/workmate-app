@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, FolderPlus, Check, Tag } from "lucide-react";
+import { X, FolderPlus, Check, Tag, MoonStar } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
 const BRAND_PRIMARY = BRAND.primary;
@@ -48,7 +48,7 @@ export function useBulkGroup() {
 }
 
 // Toolbar shown while in bulk-select mode
-export function BulkGroupBar({ active, count, allCount, onCancel, onAssign, onSelectAll, onClear, label = "contacts" }) {
+export function BulkGroupBar({ active, count, allCount, onCancel, onAssign, onSelectAll, onClear, onDormant, label = "contacts" }) {
   if (!active) return null;
   const allSelected = count > 0 && count === allCount;
   return (
@@ -56,7 +56,7 @@ export function BulkGroupBar({ active, count, allCount, onCancel, onAssign, onSe
       <div className="flex items-center justify-between mb-2">
         <div>
           <p className="text-base font-black text-slate-900">{count} selected</p>
-          <p className="text-xs text-slate-400">Tap {label} to select, then assign a group</p>
+          <p className="text-xs text-slate-400">Tap {label} to select, then choose an action</p>
         </div>
         <button onClick={onCancel} className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center">
           <X size={18} />
@@ -76,6 +76,14 @@ export function BulkGroupBar({ active, count, allCount, onCancel, onAssign, onSe
           <FolderPlus size={14} /> Assign to group
         </button>
       </div>
+      {onDormant && (
+        <button
+          onClick={onDormant}
+          disabled={count === 0}
+          className="w-full mt-2 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold border border-slate-200 bg-white text-slate-500 disabled:opacity-40 min-h-[44px]">
+          <MoonStar size={14} /> Move to Dormant
+        </button>
+      )}
     </div>
   );
 }
