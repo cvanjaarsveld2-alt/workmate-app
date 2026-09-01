@@ -24,7 +24,7 @@ import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { offlineSave } from "../offline/offlineDb";
 import { buildDraft, draftToText } from "../lib/draftMessages";
-import { Mail, MessageCircle, Copy, Check as CheckIcon, Pencil } from "lucide-react";
+import { Mail, MessageCircle, Copy, Check as CheckIcon, Pencil, ChevronDown } from "lucide-react";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -56,6 +56,30 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
   const quotes    = data.quotes    || [];
   const [moving, setMoving] = useState(null); // item being moved (declared before the handlers that use it)
   const [drafting, setDrafting] = useState(null); // { item, client } for the draft composer
+  const [reachoutsOpen, setReachoutsOpen] = useState(false); // collapsed by default
+  const [snoozeDays, setSnoozeDays] = useState(() => {
+    const v = parseInt(localStorage.getItem("pm_reachout_snooze") || "10", 10);
+    return Number.isFinite(v) && v > 0 ? v : 10;
+  });
+  function changeSnooze(days) {
+    setSnoozeDays(days);
+    try { localStorage.setItem("pm_reachout_snooze", String(days)); } catch {}
+  }
+
+  // Mark a client as contacted today → stamps last_contacted so the planner
+  // snoozes their reach-out for snoozeDays. Called on draft-copy and on the
+  // manual "Contacted" button. Writes through the hardened sync path.
+  function markContacted(client) {
+    if (!client?.id || !setData) return;
+    const updated = withTeamId({ ...client, last_contacted: new Date().toISOString(), sync_status: "pending" }, teamId);
+    setData(d => ({
+      ...d,
+      clients: (d.clients || []).map(c => c.id === client.id ? updated : c),
+      syncQueue: [{ id: genId(), table: "clients", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+    }));
+    offlineSave("clients", updated).catch(() => {});
+    triggerImmediateSync();
+  }
 
   // Resolve the client record behind an item, so drafts can be personalised.
   function clientForItem(item) {
@@ -68,7 +92,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
   }
 
   // ── Build the prioritised item list for this week ──────────────────────────
-  const { byDay, backlog } = useMemo(() => {
+  const { byDay, backlog, reachouts } = useMemo(() => {
     const items = [];
 
     // 1. Follow-ups whose date falls in this week (or overdue → land on today).
@@ -112,6 +136,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
     }
 
     // 3. Neglected clients: active pipeline, no update in 14+ days → reach out.
+    // Skipped if you've contacted them within the snooze window (last_contacted).
     for (const c of clients) {
       const stage = c.stage || "New Lead";
       if (["Won", "Lost"].includes(stage)) continue;
@@ -119,6 +144,9 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
       if (!last) continue;
       const age = daysBetween(today, last);
       if (age < 14) continue;
+      // Snooze: if contacted recently (via draft or "Contacted"), hide for snoozeDays.
+      const contacted = (c.last_contacted || "").slice(0, 10);
+      if (contacted && daysBetween(today, contacted) < snoozeDays) continue;
       items.push({
         id: `client-${c.id}`,
         kind: "reachout",
@@ -132,17 +160,22 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
       });
     }
 
+    // Split reach-outs from the rest — they get their own collapsible group.
+    const reachouts = items.filter(it => it.kind === "reachout");
+    const actionItems = items.filter(it => it.kind !== "reachout");
+
     // Group by day; anything not landing on a week day goes to backlog.
     const byDay = {}; week.forEach(d => (byDay[d] = []));
     const backlog = [];
-    for (const it of items) {
+    for (const it of actionItems) {
       if (byDay[it.day]) byDay[it.day].push(it);
       else backlog.push(it);
     }
     // Sort each day by priority (high first).
     for (const d of week) byDay[d].sort((a, b) => b.priority - a.priority);
-    return { byDay, backlog };
-  }, [followups, quotes, clients, week, today]);
+    reachouts.sort((a, b) => b.priority - a.priority);
+    return { byDay, backlog, reachouts };
+  }, [followups, quotes, clients, week, today, snoozeDays]);
 
   // ── Move a real follow-up to a different day (adjust the plan) ──────────────
   function moveFollowupToDay(item, newDay) {
@@ -172,7 +205,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
     triggerImmediateSync();
   }
 
-  const totalItems = week.reduce((s, d) => s + byDay[d].length, 0) + backlog.length;
+  const totalItems = week.reduce((s, d) => s + byDay[d].length, 0) + backlog.length + reachouts.length;
   const weekLabel = weekOffset === 0 ? "This week"
     : weekOffset === 1 ? "Next week"
     : weekOffset === -1 ? "Last week"
@@ -231,13 +264,72 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
         );
       })}
 
+      {/* Reach-outs — collapsed by default, snooze-aware */}
+      {reachouts.length > 0 && (
+        <Card className="p-3.5">
+          <button onClick={() => setReachoutsOpen(o => !o)} className="w-full flex items-center gap-2 text-left">
+            {reachoutsOpen ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
+            <AlertTriangle size={15} style={{ color: "#DC2626" }} />
+            <span className="text-xs font-black uppercase tracking-wider text-slate-600 flex-1">
+              Reach out ({reachouts.length})
+            </span>
+          </button>
+          <AnimatePresence initial={false}>
+            {reachoutsOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }} className="overflow-hidden">
+                <div className="pt-2.5 space-y-1.5">
+                  {reachouts.map(it => (
+                    <div key={it.id} className="flex items-center gap-2.5 rounded-xl px-3 py-2 bg-slate-50">
+                      <span className="w-7 h-7 rounded-lg shrink-0 grid place-items-center" style={{ background: "#DC262618" }}>
+                        <AlertTriangle size={14} style={{ color: "#DC2626" }} />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-bold text-slate-800 truncate block">{it.client}</span>
+                        <span className="text-xs text-slate-400 truncate block">{it.title}</span>
+                      </div>
+                      <button onClick={() => setDrafting({ item: it, client: clientForItem(it) })}
+                        className="shrink-0 w-8 h-8 grid place-items-center rounded-full active:bg-slate-200" aria-label="Draft message">
+                        <Mail size={15} style={{ color: BRAND.primary }} />
+                      </button>
+                      <button onClick={() => markContacted(it.raw)}
+                        className="shrink-0 px-2.5 h-8 rounded-full text-[11px] font-bold active:bg-slate-200 flex items-center gap-1"
+                        style={{ color: "#16A34A" }} aria-label="Mark contacted">
+                        <CheckIcon size={13} /> Done
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {/* Snooze setting */}
+                <div className="mt-3 pt-2.5 border-t border-slate-100">
+                  <p className="text-[11px] font-bold text-slate-400 mb-1.5">Hide after contacting for:</p>
+                  <div className="flex gap-1.5">
+                    {[7, 10, 14, 21].map(d => (
+                      <button key={d} onClick={() => changeSnooze(d)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors"
+                        style={snoozeDays === d
+                          ? { borderColor: BRAND.primary, background: BRAND.light, color: BRAND.primary }
+                          : { borderColor: "#E2E8F0", background: "#fff", color: "#64748B" }}>
+                        {d}d
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Card>
+      )}
+
       {totalItems === 0 && (
         <Empty icon={Sparkles} title="Your week is clear" text="No overdue follow-ups, cold quotes, or neglected clients. Nicely done." />
       )}
 
       {/* Draft composer */}
       <AnimatePresence>
-        {drafting && <DraftComposer draft={drafting} onClose={() => setDrafting(null)} />}
+        {drafting && <DraftComposer draft={drafting} onClose={() => setDrafting(null)}
+          onContacted={() => { if (drafting.client) markContacted(drafting.client); }} />}
       </AnimatePresence>
 
       {/* Move-to-day picker */}
@@ -324,7 +416,7 @@ function PlanItem({ item, onMove, onDone, onOpen, onDraft }) {
 }
 
 // ── Draft composer — email/WhatsApp toggle, editable text, copy to clipboard ──
-function DraftComposer({ draft, onClose }) {
+function DraftComposer({ draft, onClose, onContacted }) {
   const { item, client } = draft;
   const [channel, setChannel] = useState("email");
   const [text, setText] = useState("");
@@ -341,6 +433,7 @@ function DraftComposer({ draft, onClose }) {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      onContacted?.(); // stamp last_contacted so this client's reach-out snoozes
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // clipboard can fail on some browsers; leave text selectable as fallback
