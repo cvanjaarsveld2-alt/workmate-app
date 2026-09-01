@@ -133,11 +133,6 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
                           style={active ? { color: BRAND.primary } : {}}>
                           {item.label}
                         </span>
-                        {badge > 0 && (
-                          <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black text-white min-w-[20px] text-center" style={{ background: BRAND.primary }}>
-                            {badge}
-                          </span>
-                        )}
                         {active && (
                           <div className="w-1 h-5 rounded-full shrink-0" style={{ background: BRAND.primary }} />
                         )}
