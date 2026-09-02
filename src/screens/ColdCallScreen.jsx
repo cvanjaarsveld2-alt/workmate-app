@@ -201,7 +201,7 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
         </Card>
       )}
 
-      <Toast message={toast} onDone={() => setToast("")} />
+      <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
     </div>
   );
 }
