@@ -49,6 +49,7 @@ const EquipmentScreen = lazy(() => import("./screens/EquipmentScreen").then(m =>
 const MeetingScreen = lazy(() => import("./screens/MeetingScreen").then(m => ({ default: m.MeetingScreen })));
 const VehicleCheckScreen = lazy(() => import("./screens/VehicleCheckScreen").then(m => ({ default: m.VehicleCheckScreen })));
 const WeeklyPlannerScreen = lazy(() => import("./screens/WeeklyPlannerScreen").then(m => ({ default: m.WeeklyPlannerScreen })));
+const ColdCallScreen = lazy(() => import("./screens/ColdCallScreen").then(m => ({ default: m.ColdCallScreen })));
 const BreakdownScreen = lazy(() => import("./screens/BreakdownScreen").then(m => ({ default: m.BreakdownScreen })));
 const AnalyticsScreen = lazy(() => import("./screens/AnalyticsScreen").then(m => ({ default: m.AnalyticsScreen })));
 const LeadsScreen = lazy(() => import("./screens/LeadsScreen").then(m => ({ default: m.LeadsScreen })));
@@ -573,6 +574,7 @@ export default function PowerWorksApp() {
   const screens = {
     Home:      <HomeScreen      data={data} setData={setData} userId={session.user.id} teamId={teamId} setScreen={navigate} user={session.user} onQuickAdd={handleQuickCapture} onNavigate={navigate} />,
     Planner:   <WeeklyPlannerScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} onNavigate={navigate} />,
+    ColdCall:  <ColdCallScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} onNavigate={navigate} />,
     Clients:   <ClientsScreen   data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} onNavigate={navigate} isOnline={isOnline} />,
     Contacts:  <ContactsScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
     Followups: <FollowupsScreen data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} teamId={teamId} teamMembers={teamMembers} quickAddTrigger={quickAddTrigger} searchSeed={searchSeed} />,
