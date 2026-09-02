@@ -33,8 +33,9 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
   const canSave = (name.trim() || company.trim()) && outcome;
 
   // Recent cold calls logged (leads created via this screen), for quick reference.
-  const recent = (data.clients || [])
-    .filter(c => c.source === "Cold call" && (c.user_id === userId || c.assigned_to_user_id === userId))
+  // Identified by the "Cold call — " title prefix (no extra column needed).
+  const recent = (data.leads || [])
+    .filter(l => (l.title || "").startsWith("Cold call — ") && (l.user_id === userId || l.assigned_to_user_id === userId))
     .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
     .slice(0, 6);
 
@@ -42,40 +43,35 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
     if (!canSave) return;
     const now = new Date().toISOString();
     const leadId = genId();
+    const label = (company.trim() || name.trim());
 
-    const interaction = {
-      id: genId(),
-      date: now,
-      outcome: outcome.key,
-      label: outcome.label,
-      note: note.trim(),
-      by: userId,
-    };
-
-    // Create the lead record with the call attached.
+    // Create a LEAD (not a client) — cold-call prospects live in the Leads /
+    // Opportunities pipeline, keeping the Clients list for real clients only.
     const lead = withTeamId({
       id: leadId,
       user_id: userId,
-      company: company.trim() || name.trim(),   // company is the pipeline label
-      contact: name.trim(),
-      phone: phone.trim(),
-      email: "",
-      stage: "New Lead",
-      source: "Cold call",
-      category: "",
-      division: "",
-      notes: "",
-      interactions: [interaction],
-      last_contacted: now,
+      title: `Cold call — ${label}`,
+      description: "",
+      client_name: label,
+      contact_name: name.trim(),
+      stage: "New",
+      estimated_value: "",
+      lead_date: todayISO(),
+      // Capture the outcome + phone + note in the fields leads already have.
+      outcome_notes: outcome.label,
+      notes: [
+        phone.trim() ? `Phone: ${phone.trim()}` : "",
+        `Outcome: ${outcome.label}`,
+        note.trim(),
+      ].filter(Boolean).join("\n"),
       sync_status: "pending",
       created_at: now,
       updated_at: now,
     }, teamId);
 
     const newSyncItems = [
-      { id: genId(), table: "clients", action: "insert", data: lead, status: "pending", created_at: now },
+      { id: genId(), table: "leads", action: "insert", data: lead, status: "pending", created_at: now },
     ];
-    const newClients = [lead];
     const newFollowups = [];
 
     // Callback → create a follow-up on the chosen date.
@@ -83,10 +79,9 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
       const fu = withTeamId({
         id: genId(),
         user_id: userId,
-        client_id: leadId,
-        client: lead.company,
+        client: label,
         branch: "",
-        title: `Call back: ${lead.company}${phone.trim() ? ` (${phone.trim()})` : ""}`,
+        title: `Call back: ${label}${phone.trim() ? ` (${phone.trim()})` : ""}`,
         date: callbackDate,
         time: "09:00",
         reminder: "morning",
@@ -101,15 +96,15 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
 
     setData(d => ({
       ...d,
-      clients: [...newClients, ...(d.clients || [])],
+      leads: [lead, ...(d.leads || [])],
       followups: [...newFollowups, ...(d.followups || [])],
       syncQueue: [...newSyncItems, ...(d.syncQueue || [])],
     }));
-    offlineSave("clients", lead).catch(() => {});
+    offlineSave("leads", lead).catch(() => {});
     newFollowups.forEach(f => offlineSave("followups", f).catch(() => {}));
     triggerImmediateSync();
 
-    setSavedName(lead.company);
+    setSavedName(label);
     setToast(isCallback && callbackDate ? "Logged + callback scheduled ✓" : "Cold call logged ✓");
     // Reset for the next call
     setName(""); setCompany(""); setPhone(""); setOutcome(null); setNote(""); setCallbackDate("");
@@ -181,22 +176,19 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
             <span className="text-xs font-black uppercase tracking-wider text-slate-500">Recent cold calls</span>
           </div>
           <div className="space-y-1.5">
-            {recent.map(c => {
-              const last = Array.isArray(c.interactions) && c.interactions[0];
-              return (
-                <button key={c.id} onClick={() => onNavigate?.("Client360", { clientId: c.id, returnTo: "ColdCall" })}
-                  className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 bg-slate-50 text-left active:bg-slate-100">
-                  <span className="w-7 h-7 rounded-lg shrink-0 grid place-items-center" style={{ background: `${BRAND.primary}18` }}>
-                    <Phone size={13} style={{ color: BRAND.primary }} />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-bold text-slate-800 truncate block">{c.company}</span>
-                    {last && <span className="text-xs text-slate-400 truncate block">{last.label}{last.note ? ` — ${last.note}` : ""}</span>}
-                  </div>
-                  <span className="text-[11px] text-slate-400 shrink-0">{(c.created_at || "").slice(5, 10)}</span>
-                </button>
-              );
-            })}
+            {recent.map(l => (
+              <button key={l.id} onClick={() => onNavigate?.("Leads")}
+                className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 bg-slate-50 text-left active:bg-slate-100">
+                <span className="w-7 h-7 rounded-lg shrink-0 grid place-items-center" style={{ background: `${BRAND.primary}18` }}>
+                  <Phone size={13} style={{ color: BRAND.primary }} />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-bold text-slate-800 truncate block">{l.client_name || l.title}</span>
+                  {l.outcome_notes && <span className="text-xs text-slate-400 truncate block">{l.outcome_notes}</span>}
+                </div>
+                <span className="text-[11px] text-slate-400 shrink-0">{(l.created_at || "").slice(5, 10)}</span>
+              </button>
+            ))}
           </div>
         </Card>
       )}
