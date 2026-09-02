@@ -23,6 +23,7 @@ import {
   Bell,
   LayoutDashboard,
   AlertTriangle,
+  PhoneCall,
   CheckCircle2, // NEW: for Team Dashboard
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
@@ -34,6 +35,7 @@ const SECTIONS = [
     items: [
       { key: "Home",      label: "Dashboard",     icon: Home },
       { key: "Planner",   label: "Weekly Planner", icon: LayoutDashboard },
+      { key: "ColdCall",  label: "Log a Call",     icon: PhoneCall },
       { key: "Analytics", label: "Analytics",      icon: BarChart2 },
       { key: "Leads",     label: "Opportunities",  icon: TrendingUp },
       { key: "Clients",   label: "Clients",        icon: Users },
