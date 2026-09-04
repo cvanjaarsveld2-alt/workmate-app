@@ -11,7 +11,7 @@
 
 import { supabase } from "../supabase";
 import { logEvent } from "./helpers";
-import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { offlineSave, offlineDelete, offlineGetAll } from "../offline/offlineDb";
 import { logCrash } from "../components/ErrorBoundary";
 
 const SYNC_TABLES = [
@@ -291,9 +291,17 @@ export async function pullFromSupabase(uid, setData) {
     const lastSync = localStorage.getItem(cursorKey);
     const lastFull = parseInt(localStorage.getItem(fullPullKey) || "0", 10);
     const SIX_HOURS = 6 * 60 * 60 * 1000;
-    const needFullPull = !lastSync || (Date.now() - lastFull) > SIX_HOURS;
-    const pullSince = needFullPull ? null : new Date(lastSync).toISOString();
+
+    // NOTE: Incremental sync is intentionally DISABLED for now. It caused
+    // mismatched views across devices (each device's cursor drifted, so laptop
+    // and phone pulled different subsets). At the current data volume a full
+    // pull is fast and — critically — always correct: every device shows every
+    // server record, every sync. Re-enable incremental only when data volume
+    // genuinely demands it, and test multi-device round-trips carefully.
+    const needFullPull = true;
+    const pullSince = null; // always full pull
     const now = new Date().toISOString();
+    // (localEmpty check no longer needed while full-pull is forced.)
 
     // Helper: add updated_at filter unless we're doing a full pull.
     function since(query) {
