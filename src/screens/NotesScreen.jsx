@@ -1,7 +1,7 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, ChevronDown, Send, Mail, Share2, FolderPlus, Tag } from "lucide-react";
+import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, ChevronDown, Send, Mail, Share2, FolderPlus, Tag, Calendar } from "lucide-react";
 import { BulkGroupSheet, useCollapsibleGroups, RenameGroupSheet } from "../components/BulkGroup";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
 import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
@@ -27,7 +27,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [filterUrgency, setFilterUrgency] = useState("All");
   const [filterStatus, setFilterStatus] = useState("Unresolved");
   const [toast, setToast]               = useState("");
-  const [form, setForm] = useState({ client_id: "", note: "", urgency: "Normal", resolve_by: "", category: "" });
+  const [form, setForm] = useState({ client_id: "", note: "", urgency: "Normal", resolve_by: "", category: "", visit_date: todayISO() });
   const [pendingMedia, setPendingMedia] = useState([]);
   const [existingMedia, setExistingMedia] = useState([]);
   const [linkedContactIds, setLinkedContactIds] = useState([]);
@@ -70,7 +70,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   function removeLinkedContact(id) { setLinkedContactIds(ids => ids.filter(x => x !== id)); }
 
   function resetForm() {
-    setForm({ client_id: "", note: "", urgency: "Normal", resolve_by: "", category: "" });
+    setForm({ client_id: "", note: "", urgency: "Normal", resolve_by: "", category: "", visit_date: todayISO() });
     setPendingMedia([]);
     setExistingMedia([]);
     setLinkedContactIds([]);
@@ -145,6 +145,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
       urgency:    n.urgency || "Normal",
       resolve_by: n.resolve_by || "",
       category:   n.category || "",
+      visit_date: n.visit_date || (n.created_at || "").slice(0, 10) || todayISO(),
     });
     setExistingMedia(n.media || []);
     setPendingMedia([]);
@@ -349,6 +350,7 @@ Kind regards`;
         urgency:    form.urgency,
         resolve_by: form.resolve_by || null,
         category:   form.category?.trim() || null,
+        visit_date: form.visit_date || null,
         media: [...existingMedia, ...newUploadedMedia],
         linked_contact_ids: linkedContactIds,
         sync_status: "pending",
@@ -394,6 +396,7 @@ Kind regards`;
       urgency:    form.urgency,
       resolve_by: form.resolve_by || null,
       category:   form.category?.trim() || null,
+        visit_date: form.visit_date || null,
       media: uploadedMedia,
       linked_contact_ids: linkedContactIds,
       resolved: false,
@@ -577,6 +580,13 @@ Kind regards`;
           </div>
         </div>
         <Field label="Resolve By (optional)" type="date" value={form.resolve_by} onChange={v => setForm(f => ({ ...f, resolve_by: v }))} />
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1.5">Date I was there</label>
+          <input type="date" value={form.visit_date || ""} max={todayISO()}
+            onChange={e => setForm(f => ({ ...f, visit_date: e.target.value }))}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+            style={{ fontSize: 16 }} />
+        </div>
         <GroupField label="Group / Site (optional)" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} existing={noteGroupNames} placeholder="e.g. Newmont Ghana, Accra site" />
 
         {isEdit && existingMedia.length > 0 && (
@@ -1007,6 +1017,7 @@ Kind regards`;
                     <p className={"text-sm leading-relaxed break-words line-clamp-2 " + (n.resolved ? "text-slate-400" : "text-slate-600")}>{n.note}</p>
 
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      {n.visit_date && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600"><Calendar size={10} />{smartDate(n.visit_date)}</span>}
                       {n.resolve_by && !n.resolved && <p className={"text-xs " + (isOverdue ? "text-red-600 font-bold" : "text-slate-400")}>Resolve by {smartDate(n.resolve_by)}</p>}
                       {mediaCount > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600"><Paperclip size={10} />{mediaCount}</span>}
                       {(n.linked_contact_ids || []).length > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-bold text-blue-700"><Users size={10} />{(n.linked_contact_ids || []).length}</span>}
