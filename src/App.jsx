@@ -40,12 +40,12 @@ import { NavDrawer } from "./components/NavDrawer";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 
 import { HomeScreen }      from "./screens/HomeScreen";
-import { ClientsScreen }   from "./screens/ClientsScreen";
-import { ContactsScreen }  from "./screens/ContactsScreen";
-import { FollowupsScreen } from "./screens/FollowupsScreen";
-import { QuotesScreen }    from "./screens/QuotesScreen";
-import { NotesScreen }     from "./screens/NotesScreen";
 const EquipmentScreen = lazy(() => import("./screens/EquipmentScreen").then(m => ({ default: m.EquipmentScreen })));
+const ClientsScreen = lazy(() => import("./screens/ClientsScreen").then(m => ({ default: m.ClientsScreen })));
+const ContactsScreen = lazy(() => import("./screens/ContactsScreen").then(m => ({ default: m.ContactsScreen })));
+const FollowupsScreen = lazy(() => import("./screens/FollowupsScreen").then(m => ({ default: m.FollowupsScreen })));
+const QuotesScreen = lazy(() => import("./screens/QuotesScreen").then(m => ({ default: m.QuotesScreen })));
+const NotesScreen = lazy(() => import("./screens/NotesScreen").then(m => ({ default: m.NotesScreen })));
 const MeetingScreen = lazy(() => import("./screens/MeetingScreen").then(m => ({ default: m.MeetingScreen })));
 const VehicleCheckScreen = lazy(() => import("./screens/VehicleCheckScreen").then(m => ({ default: m.VehicleCheckScreen })));
 const WeeklyPlannerScreen = lazy(() => import("./screens/WeeklyPlannerScreen").then(m => ({ default: m.WeeklyPlannerScreen })));
