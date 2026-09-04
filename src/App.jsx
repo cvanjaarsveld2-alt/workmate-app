@@ -145,11 +145,40 @@ export default function PowerWorksApp() {
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (mounted) { setSession(s || null); setLoading(false); }
+    let settled = false;
+    const finish = (s) => {
+      if (mounted && !settled) { settled = true; setSession(s || null); setLoading(false); }
+    };
+
+    // getSession() reads the stored session from localStorage and may refresh the
+    // token over the network. On a slow connection that refresh can delay the
+    // result, holding the spinner. To avoid staring at a spinner, if it hasn't
+    // resolved quickly we read the session Supabase already cached in
+    // localStorage and proceed with that — so a returning user goes straight in.
+    supabase.auth.getSession().then(({ data: { session: s } }) => finish(s));
+
+    const failsafe = setTimeout(() => {
+      if (settled) return;
+      // Look for Supabase's cached auth token in localStorage (key ends with
+      // "-auth-token"). If present, the user has a stored session — show the app.
+      let cached = null;
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.endsWith("-auth-token")) {
+            const v = JSON.parse(localStorage.getItem(k) || "null");
+            if (v && (v.access_token || v.currentSession || v.user)) cached = v.currentSession || v;
+            break;
+          }
+        }
+      } catch {}
+      finish(cached); // cached session if found, else null (login) — real result still corrects via onAuthStateChange
+    }, 1500);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => {
+      if (mounted) { setSession(s); setLoading(false); settled = true; }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s));
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => { mounted = false; clearTimeout(failsafe); subscription.unsubscribe(); };
   }, []);
 
   // FIX #3: Single service worker registration — removed from index.html and here.
