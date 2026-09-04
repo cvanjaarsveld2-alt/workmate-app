@@ -124,8 +124,12 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
   const contacts  = (data.contacts  || []).filter(mine);
 
   // ── Neglected clients (no contact in 14+ days) ──
+  // Excludes Won/Lost/Dormant, and cold-call records (source "Cold call") which
+  // are prospects that belong in Opportunities, not real clients to chase here.
   const activeClients = clients.filter(c =>
-    !["Lost","Won"].includes(c.stage) && (c.user_id === uid || c.assigned_to_user_id === uid)
+    !["Lost","Won","Dormant"].includes(c.stage)
+    && c.source !== "Cold call"
+    && (c.user_id === uid || c.assigned_to_user_id === uid)
   );
   const neglected = activeClients
     .map(cl => {
