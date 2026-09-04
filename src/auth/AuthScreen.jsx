@@ -117,6 +117,7 @@ export function AuthScreen() {
 
           <Field label="Email" value={email} onChange={setEmail} placeholder={`you@${ALLOWED_DOMAIN}`} type="email" />
 
+          {mode === "signin" && (
           <div>
             <label className="mb-1.5 block text-sm font-bold text-slate-500">Password</label>
             <div className="relative">
@@ -124,8 +125,8 @@ export function AuthScreen() {
                 type={showPw ? "text" : "password"}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && (mode === "signin" ? login() : signup())}
-                placeholder={mode === "signup" ? "At least 8 characters" : "••••••••"}
+                onKeyDown={e => e.key === "Enter" && login()}
+                placeholder="••••••••"
                 className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 pr-12 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]" />
               <button
                 type="button"
@@ -135,18 +136,6 @@ export function AuthScreen() {
               </button>
             </div>
           </div>
-
-          {mode === "signup" && (
-            <div>
-              <label className="mb-1.5 block text-sm font-bold text-slate-500">Confirm Password</label>
-              <input
-                type={showPw ? "text" : "password"}
-                value={confirmPw}
-                onChange={e => setConfirmPw(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && signup()}
-                placeholder="Re-enter password"
-                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]" />
-            </div>
           )}
 
           {msg.text && (
@@ -156,14 +145,19 @@ export function AuthScreen() {
           )}
 
           {mode === "signup" && (
-            <p className="text-xs text-slate-400 text-center">
-              Sign up is only available for @{ALLOWED_DOMAIN} email addresses.
-            </p>
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-center">
+              <p className="text-sm font-bold text-slate-700 mb-1">Accounts are invite-only</p>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                New accounts are created by your administrator. Please contact your PowerMate admin to be added to the team, then sign in here.
+              </p>
+            </div>
           )}
 
-          <Btn className="w-full" size="lg" onClick={mode === "signin" ? login : signup} disabled={loading}>
-            {loading ? "Please wait…" : mode === "signin" ? "Sign In" : "Create Account"}
-          </Btn>
+          {mode === "signin" && (
+            <Btn className="w-full" size="lg" onClick={login} disabled={loading}>
+              {loading ? "Please wait…" : "Sign In"}
+            </Btn>
+          )}
         </Card>
 
         <p className="mt-6 text-center text-xs text-slate-400">© 2026 Power Works (Pty) Ltd</p>
