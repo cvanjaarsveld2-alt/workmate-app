@@ -281,36 +281,43 @@ export async function pushSyncQueue(syncQueue, setData) {
 // FIX: Activities included in pull
 export async function pullFromSupabase(uid, setData) {
   try {
-    // Incremental sync — only pull records updated since last sync
-    // Falls back to full pull if no cursor exists (first load)
+    // Incremental sync — only pull records updated since last sync.
+    // Falls back to a FULL pull when: no cursor (first load), OR the last full
+    // pull was over 6 hours ago. The periodic full pull reconciles anything an
+    // incremental pull can miss — chiefly deletes that happened while this
+    // device was offline (realtime handles deletes while online).
     const cursorKey = `pm_sync_cursor_${uid}`;
+    const fullPullKey = `pm_sync_fullpull_${uid}`;
     const lastSync = localStorage.getItem(cursorKey);
-    const pullSince = lastSync ? new Date(lastSync).toISOString() : null;
+    const lastFull = parseInt(localStorage.getItem(fullPullKey) || "0", 10);
+    const SIX_HOURS = 6 * 60 * 60 * 1000;
+    const needFullPull = !lastSync || (Date.now() - lastFull) > SIX_HOURS;
+    const pullSince = needFullPull ? null : new Date(lastSync).toISOString();
     const now = new Date().toISOString();
 
-    // Helper: add updated_at filter if we have a cursor
+    // Helper: add updated_at filter unless we're doing a full pull.
     function since(query) {
       return pullSince ? query.gte("updated_at", pullSince) : query;
     }
 
     const [a, b, c, d, leads_res, e, f, g, h, act, bd, rep, cf] = await Promise.all([
-      supabase.from("clients").select("id,user_id,team_id,company,division,contact,phone,email,location,branch,stage,category,sync_status,auto_created,source,notes,assigned_to_user_id,assigned_to,last_contacted,interactions,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("followups").select("id,user_id,team_id,client_id,contact_id,client,branch,title,date,time,reminder,notes,completed,linked_note_id,sync_status,auto_generated,assigned_to_user_id,assigned_to,created_at").order("date", { ascending: false }).limit(1000),
-      supabase.from("quotes").select("id,user_id,team_id,client_name,client_id,description,value,line_items,vat_inclusive,status,sent_date,sync_status,created_at").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("contacts").select("id,user_id,team_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,category,client_id,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("leads").select("id,user_id,team_id,title,description,categories,client_id,client_name,contact_id,contact_name,captured_by,assigned_to,assigned_to_user_id,stage,estimated_value,lead_date,follow_up_date,closed_date,notes,outcome_notes,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("notes").select("id,user_id,team_id,client,client_id,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,category,visit_date,assigned_to_user_id,assigned_to,sync_status,created_at").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("equipment").select("id,user_id,team_id,name,type,make,model,serial,location,client,client_id,service_due,notes,media,assigned_to_user_id,assigned_to,sync_status,created_at").order("created_at", { ascending: false }).limit(1000),
-      supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,amount_zar,exchange_rate,rate_date,rate_source,expense_date,expense_time,category,payment_method,notes,receipt_url,payment_slip_url,status,ai_extracted,client_id,client_name,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(1000),
-      supabase.from("vehicle_checks").select("id,user_id,check_date,vehicle,registration,driver,data,sync_status,created_at,updated_at").eq("user_id", uid).order("check_date", { ascending: false }).limit(1000),
+      since(supabase.from("clients").select("id,user_id,team_id,company,division,contact,phone,email,location,branch,stage,category,sync_status,auto_created,source,notes,assigned_to_user_id,assigned_to,last_contacted,interactions,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
+      since(supabase.from("followups").select("id,user_id,team_id,client_id,contact_id,client,branch,title,date,time,reminder,notes,completed,linked_note_id,sync_status,auto_generated,assigned_to_user_id,assigned_to,created_at,updated_at").order("date", { ascending: false }).limit(1000)),
+      since(supabase.from("quotes").select("id,user_id,team_id,client_name,client_id,description,value,line_items,vat_inclusive,status,sent_date,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
+      since(supabase.from("contacts").select("id,user_id,team_id,name,company,title,email,phone,met_at,met_date,notes,card_photo_url,status,category,client_id,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
+      since(supabase.from("leads").select("id,user_id,team_id,title,description,categories,client_id,client_name,contact_id,contact_name,captured_by,assigned_to,assigned_to_user_id,stage,estimated_value,lead_date,follow_up_date,closed_date,notes,outcome_notes,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
+      since(supabase.from("notes").select("id,user_id,team_id,client,client_id,note,urgency,resolve_by,resolved,resolved_at,last_escalated,media,linked_contact_ids,category,visit_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
+      since(supabase.from("equipment").select("id,user_id,team_id,name,type,make,model,serial,location,client,client_id,service_due,notes,media,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
+      since(supabase.from("expenses").select("id,user_id,vendor,amount,vat_amount,currency,amount_zar,exchange_rate,rate_date,rate_source,expense_date,expense_time,category,payment_method,notes,receipt_url,payment_slip_url,status,ai_extracted,client_id,client_name,sync_status,created_at,updated_at").eq("user_id", uid).order("expense_date", { ascending: false }).limit(1000)),
+      since(supabase.from("vehicle_checks").select("id,user_id,check_date,vehicle,registration,driver,data,sync_status,created_at,updated_at").eq("user_id", uid).order("check_date", { ascending: false }).limit(1000)),
       // FIX: Pull activities
-      supabase.from("activities").select("id,user_id,team_id,client_id,client_name,activity_type,summary,outcome,duration_mins,sync_status,created_at").order("created_at", { ascending: false }).limit(1000),
+      since(supabase.from("activities").select("id,user_id,team_id,client_id,client_name,activity_type,summary,outcome,duration_mins,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
       // NEW: Pull breakdown reports
-      supabase.from("breakdown_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,severity,summary,items,engineering,breakdown_datetime,reported_by,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
+      since(supabase.from("breakdown_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,severity,summary,items,engineering,breakdown_datetime,reported_by,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
       // NEW: Pull repair reports
-      supabase.from("repair_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,summary,items,engineering,linked_breakdown_id,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
+      since(supabase.from("repair_reports").select("id,user_id,team_id,client_id,client_name,title,reference,equipment,location,status,summary,items,engineering,linked_breakdown_id,report_date,assigned_to_user_id,assigned_to,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
       // NEW: Pull custom faults library
-      supabase.from("custom_faults").select("id,user_id,team_id,label,fault_group,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000),
+      since(supabase.from("custom_faults").select("id,user_id,team_id,label,fault_group,sync_status,created_at,updated_at").order("created_at", { ascending: false }).limit(1000)),
     ]);
 
     setData(prev => {
@@ -322,10 +329,16 @@ export async function pullFromSupabase(uid, setData) {
             .map(q => q.data?.id)
             .filter(Boolean)
         );
-        const serverMap = new Map(serverRows.map(r => [r.id, r]));
-        const localPending = (localRows || []).filter(r => pendingIds.has(r.id));
-        localPending.forEach(r => serverMap.set(r.id, r));
-        return Array.from(serverMap.values());
+        // Start from ALL existing local rows, then overlay the server rows that
+        // came back. This is essential for INCREMENTAL sync: the server only
+        // returns records changed since the last pull, so unchanged records must
+        // be preserved from local state rather than dropped.
+        const map = new Map((localRows || []).map(r => [r.id, r]));
+        serverRows.forEach(r => map.set(r.id, r));
+        // Locally-pending edits always win over the server copy (don't clobber
+        // an unsynced local change with an older server version).
+        (localRows || []).filter(r => pendingIds.has(r.id)).forEach(r => map.set(r.id, r));
+        return Array.from(map.values());
       }
 
       const vcRows = h.error ? null : (h.data || []);
@@ -357,6 +370,8 @@ export async function pullFromSupabase(uid, setData) {
 
     // Save sync cursor so next pull is incremental
     localStorage.setItem(cursorKey, now);
+    // If this was a full pull, record when — so we know when the next one is due.
+    if (needFullPull) localStorage.setItem(fullPullKey, String(Date.now()));
     return true;
   } catch (e) {
     console.warn("[Sync] Pull failed:", e);
