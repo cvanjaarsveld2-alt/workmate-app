@@ -35,23 +35,23 @@ const SECTIONS = [
     items: [
       { key: "Home",      label: "Dashboard",     icon: Home },
       { key: "Planner",   label: "Weekly Planner", icon: LayoutDashboard },
-      { key: "ColdCall",  label: "Log a Call",     icon: PhoneCall },
-      { key: "Analytics", label: "Analytics",      icon: BarChart2 },
-      { key: "Leads",     label: "Opportunities",  icon: TrendingUp },
       { key: "Clients",   label: "Clients",        icon: Users },
       { key: "Contacts",  label: "Contacts",       icon: UserPlus,     badgeKey: "leads" },
-      { key: "Calendar",  label: "Calendar",       icon: CalendarIcon }, // NEW
+      { key: "Leads",     label: "Opportunities",  icon: TrendingUp },
+      { key: "Calendar",  label: "Calendar",       icon: CalendarIcon },
+      { key: "ColdCall",  label: "Log a Call",     icon: PhoneCall },
+      { key: "Analytics", label: "Analytics",      icon: BarChart2 },
     ],
   },
   {
     title: "FIELD",
     items: [
       { key: "Notes",        label: "Field Notes",       icon: Clipboard, badgeKey: "criticalNotes" },
-      { key: "Equipment",    label: "Equipment",         icon: Wrench,    badgeKey: "overdueEquip" },
-      { key: "Meeting",      label: "Meeting Recorder", icon: Mic },
       { key: "VehicleCheck", label: "Vehicle Checklist",  icon: Car },
       { key: "Breakdown",    label: "Breakdown Reports", icon: AlertTriangle, badgeKey: "openBreakdowns" },
       { key: "Repair",       label: "Repair Reports",    icon: CheckCircle2 },
+      { key: "Equipment",    label: "Equipment",         icon: Wrench,    badgeKey: "overdueEquip" },
+      { key: "Meeting",      label: "Meeting Recorder", icon: Mic },
     ],
   },
   {
@@ -64,9 +64,9 @@ const SECTIONS = [
   {
     title: "MANAGE",
     items: [
-      { key: "TeamDashboard", label: "Team Overview",    icon: LayoutDashboard },
-      { key: "SharedInbox",   label: "Shared with me",   icon: Inbox,    badgeKey: "sharedInbox" },
       { key: "Notifications", label: "Notifications",    icon: Bell,     badgeKey: "unread" },
+      { key: "SharedInbox",   label: "Shared with me",   icon: Inbox,    badgeKey: "sharedInbox" },
+      { key: "TeamDashboard", label: "Team Overview",    icon: LayoutDashboard },
       { key: "More",          label: "Settings & More",  icon: Settings, badgeKey: "pending" },
     ],
   },
