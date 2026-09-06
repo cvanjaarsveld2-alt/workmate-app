@@ -7,7 +7,7 @@
 // guessed). If a machine has no jack specified yet, the screen says so clearly
 // rather than showing a blank or a guess.
 import React, { useState, useMemo } from "react";
-import { Wrench, Search, ChevronRight, AlertTriangle, Truck } from "lucide-react";
+import { Wrench, Search, ChevronRight, AlertTriangle, Truck, X } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { Card, PageHeader, Empty } from "../components/ui";
 import { MACHINE_DATA, MACHINE_TYPES, recommendForMachine, tyreInfo } from "../lib/machineData";
