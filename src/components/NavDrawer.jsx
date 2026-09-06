@@ -47,6 +47,7 @@ const SECTIONS = [
     title: "FIELD",
     items: [
       { key: "Notes",        label: "Field Notes",       icon: Clipboard, badgeKey: "criticalNotes" },
+      { key: "JackSelector", label: "Jack Selector",     icon: Wrench },
       { key: "VehicleCheck", label: "Vehicle Checklist",  icon: Car },
       { key: "Breakdown",    label: "Breakdown Reports", icon: AlertTriangle, badgeKey: "openBreakdowns" },
       { key: "Repair",       label: "Repair Reports",    icon: CheckCircle2 },
