@@ -55,7 +55,7 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
       client_name: label,
       contact_name: name.trim(),
       stage: "New",
-      estimated_value: "",
+      estimated_value: null,
       lead_date: todayISO(),
       // Capture the outcome + phone + note in the fields leads already have.
       outcome_notes: outcome.label,
