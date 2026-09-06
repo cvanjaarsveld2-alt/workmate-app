@@ -67,6 +67,19 @@ export async function pushItem(item) {
         } catch {} // if the fetch fails, fall through with the payload as-is
       }
 
+      // Safety net for numeric columns: an empty string "" is invalid input for
+      // a Postgres numeric column (error 22P02). Coerce known numeric fields from
+      // "" (or non-numeric) to null before writing, across all tables. This stops
+      // the recurring 22P02 class regardless of which screen built the payload.
+      const NUMERIC_FIELDS = ["estimated_value", "value", "amount", "amount_zar", "quote_value"];
+      for (const f of NUMERIC_FIELDS) {
+        if (f in payload) {
+          const v = payload[f];
+          if (v === "" || v === undefined) payload[f] = null;
+          else if (v !== null && typeof v === "string" && isNaN(parseFloat(v))) payload[f] = null;
+        }
+      }
+
       // Always upsert so it works whether or not the record exists on the server.
       const { error } = await supabase.from(table).upsert({ ...payload, sync_status: "synced" }, { onConflict: "id" });
       if (error) throw error;
