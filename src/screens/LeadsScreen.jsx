@@ -316,6 +316,11 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
       user_id: userId,
       team_id: teamId || null,
       ...form,
+      // Numeric column: an empty string is invalid (Postgres 22P02). Convert to
+      // a number, or null when blank/non-numeric.
+      estimated_value: (form.estimated_value === "" || form.estimated_value == null || isNaN(parseFloat(form.estimated_value)))
+        ? null
+        : parseFloat(form.estimated_value),
       categories: encodeCats(form.categories || []),
       sync_status: "pending",
       created_at: editLead?.created_at || now,
