@@ -77,8 +77,9 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "793", type: "haul_truck",
     tyre: "40.00 R57 (opt 46/90 R57, 50/80 R57)", operatingWeight: 404.0, emptyWeight: 132.0,
     axleNote: "GMW 404t; 265 short ton payload",
+    groundClearance: 1005, rearAxleClearance: 1128,
     closedHeight: "", jack: "", jackStand: "", note: "",
-    source: "Cat 793 spec sheet",
+    source: "Cat 793 spec sheet (ground clr 1005mm, rear axle clr 1128mm)",
   },
 
   // ── BELL ARTICULATED DUMP TRUCKS ──
