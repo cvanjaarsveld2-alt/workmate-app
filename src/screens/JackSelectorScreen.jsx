@@ -123,7 +123,21 @@ function MachineDetail({ machine: m, onClose }) {
           </button>
         </div>
 
-        {/* Jacks */}
+        {/* Published clearances (where available) — labelled honestly. NOT the
+            jacking closed-height; that must be measured on site. */}
+        <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5 mt-3">Clearance (published)</p>
+        <div className="rounded-2xl bg-slate-50 px-4 py-3 mb-1">
+          <div className="flex items-center justify-between py-1">
+            <span className="text-xs font-bold text-slate-500">Ground clearance</span>
+            <span className="text-sm font-black text-slate-800">{m.groundClearance ? `${m.groundClearance} mm` : "— not published —"}</span>
+          </div>
+          <div className="flex items-center justify-between py-1 border-t border-slate-100">
+            <span className="text-xs font-bold text-slate-500">Rear axle clearance</span>
+            <span className="text-sm font-black text-slate-800">{m.rearAxleClearance ? `${m.rearAxleClearance} mm` : "— not published —"}</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1.5">Published machine clearance — not the jacking-point closed height. Always measure the actual gap before selecting the jack.</p>
+        </div>
+
         <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Jack</p>
         <Line n={1} name={rec.jack.name} sub={`Closed ${rec.jack.closedHeight}mm · max lift ${rec.jack.maxLift}mm`} />
         {jack2 && <Line n={2} name={jack2.name} sub={`Closed ${jack2.closedHeight}mm · max lift ${jack2.maxLift}mm`} />}
