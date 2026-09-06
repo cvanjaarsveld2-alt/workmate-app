@@ -96,6 +96,47 @@ export const MACHINE_DATA = [
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell E-series B50E brochure",
   },
+
+  // ── WHEEL LOADERS (jacked for tyre changes) ──
+  {
+    brand: "Caterpillar", model: "982", type: "loader",
+    tyre: "29.5-25", operatingWeight: 35, emptyWeight: 35,
+    axleNote: "Wheel loader ~35t; weight per axle roughly half",
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "lectura-specs / Cat 982",
+  },
+  {
+    brand: "Caterpillar", model: "988", type: "loader",
+    tyre: "35/65-33 (35/65 R33)", operatingWeight: 50.8, emptyWeight: 50.8,
+    axleNote: "Wheel loader ~50.8t; static loaded radius 978mm (Cat)",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Cat 988K spec sheet / lectura-specs",
+  },
+  {
+    brand: "Caterpillar", model: "992", type: "loader",
+    tyre: "45/65-45 (opt 45/65 R45)", operatingWeight: 105.4, emptyWeight: 105.4,
+    axleNote: "Large wheel loader ~105t operating",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Cat 992 spec sheet",
+  },
+
+  // ── EXCAVATORS (tracked — jacked for undercarriage/track work, NOT tyres) ──
+  {
+    brand: "Komatsu", model: "PC1250", type: "excavator",
+    tyre: "Tracked (no tyres)", operatingWeight: 113.2, emptyWeight: 106.7,
+    axleNote: "Crawler excavator — jacked for track/undercarriage work, not tyre changes",
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Komatsu PC1250-7 spec sheet",
+  },
+
+  // ── DOZERS (tracked) ──
+  {
+    brand: "Caterpillar", model: "D11", type: "dozer",
+    tyre: "Tracked (no tyres)", operatingWeight: 112.7, emptyWeight: 104.8,
+    axleNote: "Tracked dozer — jacked for undercarriage work, not tyre changes",
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Cat D11 published specs",
+  },
 ];
 
 // Machine type labels for grouping/filtering in the UI.
@@ -115,26 +156,37 @@ export const MACHINE_TYPES = {
 // tyre sits above the rim). We show the loaded radius as a sourced figure and
 // always tell the team to MEASURE the actual clearance on site, because a flat
 // varies (slow leak vs burst) and even lab tests differ from spec by ~20%.
+// Tyre data. maxLoss = sidewall height = (overall diameter − rim diameter) ÷ 2,
+// in mm — the MAXIMUM possible clearance loss if the tyre is fully deflated (a
+// tyre cannot drop more than its own sidewall). This is a true upper bound from
+// published dimensions, NOT an estimate of actual flat-deflection (which varies
+// and must be measured on site). Rim: R57=1448mm, R63=1600mm, R51=1295mm,
+// R49=1245mm, R25=635mm, R29=737mm.
 export const TYRE_DATA = {
-  "50/80 R57": { loadedRadius: 1197, source: "Michelin XDR 4 Speed MC" },
-  "50/90 R57": { loadedRadius: 1272, source: "Michelin XDR3 (overall dia derived)" },
-  "53/80 R63": { loadedRadius: 1300, source: "Michelin XDR3 (approx from overall dia)" },
-  "40.00 R57": { loadedRadius: 1577, source: "Michelin XDR2/XDR3 E4" },
-  "37 R57":    { loadedRadius: 1533, source: "Michelin XDR2 E4" },
-  "33.00 R51": { loadedRadius: 1318, source: "Michelin XDC" },
-  "27.00 R49": { loadedRadius: 1236, source: "Michelin XDR3" },
-  // ADT sizes — loaded radius approximate from overall diameter; verify with supplier.
-  "23.5 R25":  { loadedRadius: 690,  source: "Approx — confirm with tyre supplier" },
-  "29.5 R25":  { loadedRadius: 820,  source: "Approx — confirm with tyre supplier" },
-  "875/65 R29": { loadedRadius: 800, source: "Approx — confirm with tyre supplier" },
+  "50/80 R57": { overallDia: 3620, rim: 1448, source: "Michelin/Bridgestone 50/80R57" },
+  "50/90 R57": { overallDia: 3825, rim: 1448, source: "Bridgestone 50/90R57" },
+  "53/80 R63": { overallDia: 3980, rim: 1600, source: "Approx 53/80R63" },
+  "40.00 R57": { overallDia: 3570, rim: 1448, source: "Michelin/Bridgestone 40.00R57" },
+  "37 R57":    { overallDia: 3440, rim: 1448, source: "Bridgestone 37.00R57" },
+  "33.00 R51": { overallDia: 2987, rim: 1295, source: "Michelin 33.00R51" },
+  "27.00 R49": { overallDia: 2775, rim: 1245, source: "Michelin 27.00R49" },
+  "23.5 R25":  { overallDia: 1620, rim: 635,  source: "23.5R25 published" },
+  "29.5 R25":  { overallDia: 1855, rim: 635,  source: "29.5R25 published" },
+  "875/65 R29": { overallDia: 1875, rim: 737, source: "875/65R29 published" },
 };
+
+// Compute sidewall (max clearance loss) for a tyre entry.
+function maxLoss(t) {
+  if (!t || !t.overallDia || !t.rim) return null;
+  return Math.round((t.overallDia - t.rim) / 2);
+}
 
 // Look up tyre data by matching the machine's tyre string against known sizes.
 export function tyreInfo(tyreStr) {
   if (!tyreStr) return null;
   const s = tyreStr.toLowerCase();
   for (const size of Object.keys(TYRE_DATA)) {
-    if (s.includes(size.toLowerCase())) return { size, ...TYRE_DATA[size] };
+    if (s.includes(size.toLowerCase())) return { size, ...TYRE_DATA[size], maxLoss: maxLoss(TYRE_DATA[size]) };
   }
   return null;
 }
@@ -242,10 +294,14 @@ export function recommendForMachine(machine) {
     Math.abs(s.closedHeight - jack.closedHeight) === Math.abs(standsByFit[0].closedHeight - jack.closedHeight)
     && s.capacity === wantCapacity
   ) || standsByFit[0];
+  // Alternative stand: the other capacity at the same closed height (or next best fit).
+  const standAlt = JACK_STAND_CATALOGUE.find(s =>
+    s.closedHeight === stand.closedHeight && s.capacity !== stand.capacity
+  ) || standsByFit.find(s => s.name !== stand.name);
 
   // Heavy-machine note: if EMPTY weight is high, remind to confirm per-point load
   // (empty weight is what's actually on the jack — you jack unladen machines).
   const heavy = (machine.emptyWeight || 0) >= 130;
 
-  return { jack, alternatives, stand, heavy, clearanceKnown: Number.isFinite(ch) };
+  return { jack, alternatives, stand, standAlt, heavy, clearanceKnown: Number.isFinite(ch) };
 }
