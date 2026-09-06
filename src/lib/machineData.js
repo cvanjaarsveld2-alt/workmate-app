@@ -43,6 +43,13 @@ export const MACHINE_DATA = [
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu / Wikipedia published specs",
   },
+  {
+    brand: "Komatsu", model: "960E-2", type: "haul_truck",
+    tyre: "53/80 R63 (56/80 R63 on -2K)", operatingWeight: 576, emptyWeight: 249.5,
+    axleNote: "Empty weight ~249.5t; GVW ~576t; 327t net load. Empty split ~49.5% front / 50.5% rear.",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Komatsu 960E-2 / ritchiespecs / lectura-specs",
+  },
 
   // ── CATERPILLAR HAUL TRUCKS ──
   {
@@ -76,11 +83,25 @@ export const MACHINE_DATA = [
 
   // ── BELL ARTICULATED DUMP TRUCKS ──
   {
+    brand: "Bell", model: "B25E", type: "adt",
+    tyre: "23.5 R25", operatingWeight: 42, emptyWeight: 19.5,
+    axleNote: "6x6 ADT; ~24t payload class",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Bell Equipment B25E specs",
+  },
+  {
     brand: "Bell", model: "B30E", type: "adt",
     tyre: "23.5 R25 (opt 750/65 R25)", operatingWeight: 49.2, emptyWeight: 21.2,
     axleNote: "6x6 ADT; laden 49.2t, rated payload 28t",
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell Equipment B30E spec sheet",
+  },
+  {
+    brand: "Bell", model: "B35E", type: "adt",
+    tyre: "23.5 R25", operatingWeight: 56, emptyWeight: 24,
+    axleNote: "6x6 ADT; ~33t payload class",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Bell Equipment B35E specs",
   },
   {
     brand: "Bell", model: "B40E", type: "adt",
@@ -90,11 +111,140 @@ export const MACHINE_DATA = [
     source: "Bell E-series B40E brochure",
   },
   {
+    brand: "Bell", model: "B45E", type: "adt",
+    tyre: "875/65 R29", operatingWeight: 76, emptyWeight: 33,
+    axleNote: "6x6 ADT; ~41t payload class",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Bell Equipment B45E specs",
+  },
+  {
     brand: "Bell", model: "B50E", type: "adt",
     tyre: "875/65 R29", operatingWeight: 81.1, emptyWeight: 35.7,
     axleNote: "Laden 81.1t; rated payload 45.4t",
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell E-series B50E brochure",
+  },
+  {
+    brand: "Bell", model: "B60E", type: "adt",
+    tyre: "875/65 R29", operatingWeight: 108, emptyWeight: 48,
+    axleNote: "Largest Bell ADT; 4x4, ~55t payload",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Bell Equipment B60E specs",
+  },
+
+  // ── KOMATSU HD RIGID DUMP TRUCKS (smaller rigids) ──
+  {
+    brand: "Komatsu", model: "HD465-8", type: "haul_truck",
+    tyre: "24.00 R35", operatingWeight: 99.7, emptyWeight: 43.1,
+    axleNote: "55t class rigid; empty ~43t, empty split ~54% front / 46% rear",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Komatsu HD465 / lectura-specs / ritchiespecs",
+  },
+  {
+    brand: "Komatsu", model: "HD605-8", type: "haul_truck",
+    tyre: "24.00 R35", operatingWeight: 100.5, emptyWeight: 44,
+    axleNote: "70t class rigid; empty ~44t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Komatsu HD605 published specs",
+  },
+  {
+    brand: "Komatsu", model: "HD785-8", type: "haul_truck",
+    tyre: "33.00 R51", operatingWeight: 249, emptyWeight: 99,
+    axleNote: "~91t payload rigid; empty ~99t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Komatsu HD785 published specs",
+  },
+
+  // ── VOLVO ARTICULATED HAULERS ──
+  {
+    brand: "Volvo", model: "A35G", type: "adt",
+    tyre: "26.5 R25", operatingWeight: 62.5, emptyWeight: 28.5,
+    axleNote: "6x6 ADT; payload 33.5t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Volvo A35G brochure",
+  },
+  {
+    brand: "Volvo", model: "A40G", type: "adt",
+    tyre: "29.5 R25", operatingWeight: 69.7, emptyWeight: 30.7,
+    axleNote: "6x6 ADT; empty 30.7t, payload 39t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Volvo A40G brochure / ritchiespecs",
+  },
+  {
+    brand: "Volvo", model: "A45G", type: "adt",
+    tyre: "29.5 R25 (opt 875/65 R29)", operatingWeight: 71.1, emptyWeight: 30.1,
+    axleNote: "6x6 ADT; empty 30.1t, payload 41t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Volvo A45G brochure",
+  },
+  {
+    brand: "Volvo", model: "A60H", type: "adt",
+    tyre: "875/65 R29", operatingWeight: 103.5, emptyWeight: 47.5,
+    axleNote: "Largest Volvo ADT; payload 55t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Volvo A60H brochure",
+  },
+
+  // ── CATERPILLAR ARTICULATED DUMP TRUCKS ──
+  {
+    brand: "Caterpillar", model: "725", type: "adt",
+    tyre: "23.5 R25", operatingWeight: 44, emptyWeight: 21.7,
+    axleNote: "24t class ADT; empty ~21.7t, payload ~24t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Cat 725 / lectura-specs",
+  },
+  {
+    brand: "Caterpillar", model: "730", type: "adt",
+    tyre: "23.5 R25", operatingWeight: 51, emptyWeight: 23.9,
+    axleNote: "28t class ADT; empty axle split ~63% front",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Cat 730 / ritchiespecs",
+  },
+  {
+    brand: "Caterpillar", model: "740", type: "adt",
+    tyre: "29.5 R25", operatingWeight: 76.5, emptyWeight: 38.5,
+    axleNote: "40t class ADT; empty ~38.5t, payload ~38-40t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Cat 740 / makana specs",
+  },
+  {
+    brand: "Caterpillar", model: "745", type: "adt",
+    tyre: "29.5 R25", operatingWeight: 84, emptyWeight: 33.4,
+    axleNote: "45t class ADT; payload ~41t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Cat 745 / makana specs",
+  },
+
+  // ── KOMATSU ARTICULATED DUMP TRUCKS ──
+  {
+    brand: "Komatsu", model: "HM300-5", type: "adt",
+    tyre: "23.5 R25", operatingWeight: 53.5, emptyWeight: 25.4,
+    axleNote: "28t class ADT; empty 25.4t, GVW 53.5t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Komatsu HM300-5 spec sheet",
+  },
+  {
+    brand: "Komatsu", model: "HM400-5", type: "adt",
+    tyre: "29.5 R25", operatingWeight: 75.1, emptyWeight: 35,
+    axleNote: "40t class ADT; empty 35t, GVW 75.1t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Komatsu HM400-5 spec sheet",
+  },
+
+  // ── JOHN DEERE ARTICULATED DUMP TRUCKS ──
+  {
+    brand: "John Deere", model: "410E", type: "adt",
+    tyre: "26.5 R25", operatingWeight: 63, emptyWeight: 28.5,
+    axleNote: "~37t payload ADT",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "John Deere 410E published specs",
+  },
+  {
+    brand: "John Deere", model: "460E", type: "adt",
+    tyre: "29.5 R25", operatingWeight: 74, emptyWeight: 32.2,
+    axleNote: "6x6 ADT; empty ~32.2t, payload ~41.8t",
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "John Deere 460E / ritchiespecs",
   },
 
   // ── WHEEL LOADERS (jacked for tyre changes) ──
@@ -275,10 +425,18 @@ export function recommendForMachine(machine) {
     jack = fitting[0] || JACK_CATALOGUE.slice().sort((a,b)=>a.closedHeight-b.closedHeight)[0];
     alternatives = fitting.filter(j => j.name !== jack.name);
   } else {
-    // No confirmed clearance: recommend the general-purpose 800mm and list the
-    // rest as "may suit — confirm clearance on site".
+    // No confirmed clearance: recommend the general-purpose 800mm as nr1, and
+    // order alternatives by relevance — for big machines the taller 1000mm is
+    // the more likely next choice, so order the big Powerlift/Hydralift jacks by
+    // closeness to nr1, then the small (Yak/Mammut) jacks after. This ensures a
+    // sensible nr2 (not just whatever's first in the array).
     jack = JACK_CATALOGUE.find(j => j.closedHeight === 800) || JACK_CATALOGUE[0];
-    alternatives = JACK_CATALOGUE.filter(j => j.name !== jack.name);
+    const big = JACK_CATALOGUE.filter(j => !j.small && j.name !== jack.name);
+    const small = JACK_CATALOGUE.filter(j => j.small && j.name !== jack.name);
+    // For haul trucks / big machines, prefer the taller 1000mm as nr2.
+    const isBigMachine = ["haul_truck","loader","excavator","dozer"].includes(machine.type);
+    big.sort((a, b) => isBigMachine ? (b.closedHeight - a.closedHeight) : (a.closedHeight - b.closedHeight));
+    alternatives = [...big, ...small];
   }
 
   // Stand: match by closed height closest to the jack, and pick the capacity —
