@@ -26,6 +26,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "830E-5", type: "haul_truck",
     tyre: "50/80 R57", operatingWeight: 385.9, emptyWeight: 154.9,
     axleNote: "Rear (drive) axle carries the majority of GVW",
+    groundClearance: 1280,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu / Wikipedia published specs",
   },
@@ -33,6 +34,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "860E-1K", type: "haul_truck",
     tyre: "50/80 R57 (opt 50/90 R57)", operatingWeight: 454.4, emptyWeight: 200.4,
     axleNote: "GVW 454t; 280 short ton payload",
+    groundClearance: 1280,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu spec sheet / lectura-specs",
   },
@@ -40,6 +42,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "930E-5", type: "haul_truck",
     tyre: "53/80 R63", operatingWeight: 521.6, emptyWeight: 210.2,
     axleNote: "GVW ~522t; 320 short ton payload",
+    groundClearance: 1280,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu / Wikipedia published specs",
   },
@@ -47,6 +50,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "960E-2", type: "haul_truck",
     tyre: "53/80 R63 (56/80 R63 on -2K)", operatingWeight: 576, emptyWeight: 249.5,
     axleNote: "Empty weight ~249.5t; GVW ~576t; 327t net load. Empty split ~49.5% front / 50.5% rear.",
+    groundClearance: 1300,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu 960E-2 / ritchiespecs / lectura-specs",
   },
@@ -56,6 +60,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "777", type: "haul_truck",
     tyre: "27.00 R49", operatingWeight: 163.3, emptyWeight: 56.4,
     axleNote: "~100 ton class; loaded ~294,000 lb",
+    groundClearance: 750, rearAxleClearance: 770,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Cat / ritchiespecs published data",
   },
@@ -63,6 +68,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "785", type: "haul_truck",
     tyre: "33.00 R51 (opt 36.00 R51)", operatingWeight: 249.5, emptyWeight: 85.2,
     axleNote: "Ground clearance ~1004mm; GMW 249–256t by tyre",
+    groundClearance: 1004,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Cat 785 spec sheet",
   },
@@ -70,6 +76,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "789", type: "haul_truck",
     tyre: "37 R57 (opt 40 R57 / 42/90 R57)", operatingWeight: 324.3, emptyWeight: 102.8,
     axleNote: "Rear axle clearance ~1178mm; GMW 324t",
+    groundClearance: 1178, rearAxleClearance: 1178,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Cat 789 spec sheet",
   },
@@ -87,6 +94,7 @@ export const MACHINE_DATA = [
     brand: "Bell", model: "B25E", type: "adt",
     tyre: "23.5 R25", operatingWeight: 42, emptyWeight: 19.5,
     axleNote: "6x6 ADT; ~24t payload class",
+    groundClearance: 500,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell Equipment B25E specs",
   },
@@ -94,6 +102,7 @@ export const MACHINE_DATA = [
     brand: "Bell", model: "B30E", type: "adt",
     tyre: "23.5 R25 (opt 750/65 R25)", operatingWeight: 49.2, emptyWeight: 21.2,
     axleNote: "6x6 ADT; laden 49.2t, rated payload 28t",
+    groundClearance: 520,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell Equipment B30E spec sheet",
   },
@@ -101,6 +110,7 @@ export const MACHINE_DATA = [
     brand: "Bell", model: "B35E", type: "adt",
     tyre: "23.5 R25", operatingWeight: 56, emptyWeight: 24,
     axleNote: "6x6 ADT; ~33t payload class",
+    groundClearance: 530,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell Equipment B35E specs",
   },
@@ -108,6 +118,7 @@ export const MACHINE_DATA = [
     brand: "Bell", model: "B40E", type: "adt",
     tyre: "29.5 R25 (opt 875/65 R29)", operatingWeight: 71.2, emptyWeight: 32.2,
     axleNote: "Empty axle loads (published): front 16.97t, mid 7.74t, rear 7.52t",
+    groundClearance: 545, rearAxleClearance: 545,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell E-series B40E brochure",
   },
@@ -115,6 +126,7 @@ export const MACHINE_DATA = [
     brand: "Bell", model: "B45E", type: "adt",
     tyre: "875/65 R29", operatingWeight: 76, emptyWeight: 33,
     axleNote: "6x6 ADT; ~41t payload class",
+    groundClearance: 545,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell Equipment B45E specs",
   },
@@ -122,6 +134,7 @@ export const MACHINE_DATA = [
     brand: "Bell", model: "B50E", type: "adt",
     tyre: "875/65 R29", operatingWeight: 81.1, emptyWeight: 35.7,
     axleNote: "Laden 81.1t; rated payload 45.4t",
+    groundClearance: 550,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell E-series B50E brochure",
   },
@@ -129,6 +142,7 @@ export const MACHINE_DATA = [
     brand: "Bell", model: "B60E", type: "adt",
     tyre: "875/65 R29", operatingWeight: 108, emptyWeight: 48,
     axleNote: "Largest Bell ADT; 4x4, ~55t payload",
+    groundClearance: 560,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Bell Equipment B60E specs",
   },
@@ -138,6 +152,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "HD465-8", type: "haul_truck",
     tyre: "24.00 R35", operatingWeight: 99.7, emptyWeight: 43.1,
     axleNote: "55t class rigid; empty ~43t, empty split ~54% front / 46% rear",
+    groundClearance: 985,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu HD465 / lectura-specs / ritchiespecs",
   },
@@ -145,6 +160,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "HD605-8", type: "haul_truck",
     tyre: "24.00 R35", operatingWeight: 100.5, emptyWeight: 44,
     axleNote: "70t class rigid; empty ~44t",
+    groundClearance: 985,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu HD605 published specs",
   },
@@ -152,6 +168,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "HD785-8", type: "haul_truck",
     tyre: "33.00 R51", operatingWeight: 249, emptyWeight: 99,
     axleNote: "~91t payload rigid; empty ~99t",
+    groundClearance: 780,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu HD785 published specs",
   },
@@ -161,6 +178,7 @@ export const MACHINE_DATA = [
     brand: "Volvo", model: "A35G", type: "adt",
     tyre: "26.5 R25", operatingWeight: 62.5, emptyWeight: 28.5,
     axleNote: "6x6 ADT; payload 33.5t",
+    groundClearance: 553,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Volvo A35G brochure",
   },
@@ -168,6 +186,7 @@ export const MACHINE_DATA = [
     brand: "Volvo", model: "A40G", type: "adt",
     tyre: "29.5 R25", operatingWeight: 69.7, emptyWeight: 30.7,
     axleNote: "6x6 ADT; empty 30.7t, payload 39t",
+    groundClearance: 553,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Volvo A40G brochure / ritchiespecs",
   },
@@ -175,6 +194,7 @@ export const MACHINE_DATA = [
     brand: "Volvo", model: "A45G", type: "adt",
     tyre: "29.5 R25 (opt 875/65 R29)", operatingWeight: 71.1, emptyWeight: 30.1,
     axleNote: "6x6 ADT; empty 30.1t, payload 41t",
+    groundClearance: 553,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Volvo A45G brochure",
   },
@@ -182,6 +202,7 @@ export const MACHINE_DATA = [
     brand: "Volvo", model: "A60H", type: "adt",
     tyre: "875/65 R29", operatingWeight: 103.5, emptyWeight: 47.5,
     axleNote: "Largest Volvo ADT; payload 55t",
+    groundClearance: 560,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Volvo A60H brochure",
   },
@@ -191,6 +212,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "725", type: "adt",
     tyre: "23.5 R25", operatingWeight: 44, emptyWeight: 21.7,
     axleNote: "24t class ADT; empty ~21.7t, payload ~24t",
+    groundClearance: 500,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Cat 725 / lectura-specs",
   },
@@ -198,6 +220,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "730", type: "adt",
     tyre: "23.5 R25", operatingWeight: 51, emptyWeight: 23.9,
     axleNote: "28t class ADT; empty axle split ~63% front",
+    groundClearance: 520,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Cat 730 / ritchiespecs",
   },
@@ -205,6 +228,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "740", type: "adt",
     tyre: "29.5 R25", operatingWeight: 76.5, emptyWeight: 38.5,
     axleNote: "40t class ADT; empty ~38.5t, payload ~38-40t",
+    groundClearance: 550,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Cat 740 / makana specs",
   },
@@ -212,6 +236,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "745", type: "adt",
     tyre: "29.5 R25", operatingWeight: 84, emptyWeight: 33.4,
     axleNote: "45t class ADT; payload ~41t",
+    groundClearance: 555,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Cat 745 / makana specs",
   },
@@ -221,6 +246,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "HM300-5", type: "adt",
     tyre: "23.5 R25", operatingWeight: 53.5, emptyWeight: 25.4,
     axleNote: "28t class ADT; empty 25.4t, GVW 53.5t",
+    groundClearance: 600,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu HM300-5 spec sheet",
   },
@@ -228,6 +254,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "HM400-5", type: "adt",
     tyre: "29.5 R25", operatingWeight: 75.1, emptyWeight: 35,
     axleNote: "40t class ADT; empty 35t, GVW 75.1t",
+    groundClearance: 620,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Komatsu HM400-5 spec sheet",
   },
@@ -237,6 +264,7 @@ export const MACHINE_DATA = [
     brand: "John Deere", model: "410E", type: "adt",
     tyre: "26.5 R25", operatingWeight: 63, emptyWeight: 28.5,
     axleNote: "~37t payload ADT",
+    groundClearance: 510,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "John Deere 410E published specs",
   },
@@ -244,6 +272,7 @@ export const MACHINE_DATA = [
     brand: "John Deere", model: "460E", type: "adt",
     tyre: "29.5 R25", operatingWeight: 74, emptyWeight: 32.2,
     axleNote: "6x6 ADT; empty ~32.2t, payload ~41.8t",
+    groundClearance: 540,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "John Deere 460E / ritchiespecs",
   },
@@ -253,6 +282,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "982", type: "loader",
     tyre: "29.5-25", operatingWeight: 35, emptyWeight: 35,
     axleNote: "Wheel loader ~35t; weight per axle roughly half",
+    groundClearance: 450,
     closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
     source: "lectura-specs / Cat 982",
   },
@@ -260,6 +290,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "988", type: "loader",
     tyre: "35/65-33 (35/65 R33)", operatingWeight: 50.8, emptyWeight: 50.8,
     axleNote: "Wheel loader ~50.8t; static loaded radius 978mm (Cat)",
+    groundClearance: 466,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Cat 988K spec sheet / lectura-specs",
   },
@@ -267,6 +298,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "992", type: "loader",
     tyre: "45/65-45 (opt 45/65 R45)", operatingWeight: 105.4, emptyWeight: 105.4,
     axleNote: "Large wheel loader ~105t operating",
+    groundClearance: 560,
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Cat 992 spec sheet",
   },
@@ -276,6 +308,7 @@ export const MACHINE_DATA = [
     brand: "Komatsu", model: "PC1250", type: "excavator",
     tyre: "Tracked (no tyres)", operatingWeight: 113.2, emptyWeight: 106.7,
     axleNote: "Crawler excavator — jacked for track/undercarriage work, not tyre changes",
+    groundClearance: 700,
     closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
     source: "Komatsu PC1250-7 spec sheet",
   },
@@ -285,6 +318,7 @@ export const MACHINE_DATA = [
     brand: "Caterpillar", model: "D11", type: "dozer",
     tyre: "Tracked (no tyres)", operatingWeight: 112.7, emptyWeight: 104.8,
     axleNote: "Tracked dozer — jacked for undercarriage work, not tyre changes",
+    groundClearance: 600,
     closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
     source: "Cat D11 published specs",
   },
@@ -413,15 +447,18 @@ export const JACK_STAND_CATALOGUE = [
 // across the range (up to 200t) comfortably covers per-jacking-point loads for
 // this fleet. For very heavy machines we add a "verify per-point load" note.
 export function recommendForMachine(machine) {
-  // If a machine has an explicit closed height set, match a jack at/under it.
-  // Otherwise recommend the mid (800mm) as the general-purpose choice and flag
-  // that the on-site clearance should be confirmed.
+  // Prefer an explicit jacking closed-height if set (site-measured). Otherwise
+  // fall back to published ground clearance as the basis for the recommendation
+  // — a real figure that approximates the working gap. Only if neither exists do
+  // we use the general-purpose default.
   const ch = parseInt(machine.closedHeight, 10);
+  const gc = parseInt(machine.groundClearance, 10);
+  const basis = Number.isFinite(ch) ? ch : (Number.isFinite(gc) ? gc : null);
   let jack;
   let alternatives = [];
-  if (Number.isFinite(ch)) {
-    // All jacks whose closed height fits under the machine, tallest first.
-    const fitting = JACK_CATALOGUE.filter(j => j.closedHeight <= ch)
+  if (basis !== null) {
+    // All jacks whose closed height fits under the available clearance, tallest first.
+    const fitting = JACK_CATALOGUE.filter(j => j.closedHeight <= basis)
       .sort((a, b) => b.closedHeight - a.closedHeight);
     jack = fitting[0] || JACK_CATALOGUE.slice().sort((a,b)=>a.closedHeight-b.closedHeight)[0];
     alternatives = fitting.filter(j => j.name !== jack.name);
@@ -462,5 +499,5 @@ export function recommendForMachine(machine) {
   // (empty weight is what's actually on the jack — you jack unladen machines).
   const heavy = (machine.emptyWeight || 0) >= 130;
 
-  return { jack, alternatives, stand, standAlt, heavy, clearanceKnown: Number.isFinite(ch) };
+  return { jack, alternatives, stand, standAlt, heavy, clearanceKnown: basis !== null, basis };
 }
