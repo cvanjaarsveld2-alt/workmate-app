@@ -384,18 +384,21 @@ export const JACK_CATALOGUE = [
   {
     name: "Powerlift / Hydralift — 600mm",
     range: "Air/hydraulic, 50–200 ton",
+    capacity: 200,
     closedHeight: 600, stroke: 315, maxLift: 915,
     note: "Incl. 50mm swivel load cap. Stepped extension dollies: 100 / 200 / 300 / 300mm.",
   },
   {
     name: "Powerlift / Hydralift — 800mm",
     range: "Air/hydraulic, 50–200 ton",
+    capacity: 200,
     closedHeight: 800, stroke: 515, maxLift: 1315,
     note: "Incl. 50mm swivel load cap.",
   },
   {
     name: "Powerlift / Hydralift — 1000mm",
     range: "Air/hydraulic, 50–200 ton",
+    capacity: 200,
     closedHeight: 1000, stroke: 715, maxLift: 1715,
     note: "Incl. 50mm swivel load cap. Stepped extension dollies: 200 / 300 / 300mm.",
   },
@@ -403,24 +406,28 @@ export const JACK_CATALOGUE = [
   {
     name: "Yak 221/N",
     range: "Air-hydraulic, 40/20 t (2-stage)",
+    capacity: 40,
     closedHeight: 219, stroke: 250, maxLift: 469,
     small: true, note: "Compact. Cattini spec. For light/low-clearance vehicles.",
   },
   {
     name: "Yak 142",
     range: "Air-hydraulic, 50 t",
+    capacity: 50,
     closedHeight: 420, stroke: 277, maxLift: 697,
     small: true, note: "For high-riding vehicles (tractors/plant). Cattini spec.",
   },
   {
     name: "Yak 330/S",
     range: "Air-hydraulic, 80/50/25 t (3-stage)",
+    capacity: 80,
     closedHeight: 313, stroke: 505, maxLift: 818,
     small: true, note: "High-stroke, chassis lifting. Cattini spec.",
   },
   {
     name: "Mammut M80-42",
     range: "Air-hydraulic, 80/50 t (2-stage)",
+    capacity: 80,
     closedHeight: 419, stroke: 405, maxLift: 824,
     small: true, note: "Mining heavy-duty (Cattini Mammut). Cattini spec.",
   },
@@ -457,9 +464,14 @@ export function recommendForMachine(machine) {
   let jack;
   let alternatives = [];
   if (basis !== null) {
-    // All jacks whose closed height fits under the available clearance, tallest first.
+    // All jacks whose closed height fits under the available clearance. Rank by
+    // closed height in ~25mm bands (jacks within a band are treated as the same
+    // height), then by capacity (higher first) within a band — so a heavier-duty
+    // jack like the Mammut M80-42 (80t, 419mm) ranks above the Yak 142 (50t,
+    // 420mm) despite the trivial 1mm height difference.
+    const band = h => Math.round(h / 25);
     const fitting = JACK_CATALOGUE.filter(j => j.closedHeight <= basis)
-      .sort((a, b) => b.closedHeight - a.closedHeight);
+      .sort((a, b) => (band(b.closedHeight) - band(a.closedHeight)) || ((b.capacity || 0) - (a.capacity || 0)));
     jack = fitting[0] || JACK_CATALOGUE.slice().sort((a,b)=>a.closedHeight-b.closedHeight)[0];
     alternatives = fitting.filter(j => j.name !== jack.name);
   } else {
