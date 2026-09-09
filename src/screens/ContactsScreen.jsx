@@ -66,6 +66,7 @@ function ExpandableText({ text, limit = 100, className = "" }) {
 
 export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
   const [showForm, setShowForm]       = useState(false);
+  const [catOpen, setCatOpen]         = useState(false); // category section collapsed by default
   const [showScanner, setShowScanner] = useState(false);
   const [editId, setEditId]           = useState(null);
   const [search, setSearch]           = useState("");
@@ -374,7 +375,19 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Met At" value={form.met_at} onChange={v => setForm(f => ({ ...f, met_at: v }))} placeholder="e.g. Wampex 2026" />
-          <GroupField label="Group / Category" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} existing={contactGroupNames} placeholder="e.g. Expo 2026, Suppliers, Contractors" />
+          <div className="rounded-xl border border-slate-200 overflow-hidden">
+            <button type="button" onClick={() => setCatOpen(o => !o)}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left bg-white">
+              {catOpen ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
+              <span className="text-sm font-bold text-slate-700 flex-1">Group / Category</span>
+              {form.category ? <span className="text-xs font-bold text-red-700 truncate max-w-[120px]">{form.category}</span> : <span className="text-xs text-slate-400">optional</span>}
+            </button>
+            {catOpen && (
+              <div className="px-3 pb-3 pt-1 border-t border-slate-100">
+                <GroupField label="" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} existing={contactGroupNames} placeholder="e.g. Expo 2026, Suppliers, Contractors" />
+              </div>
+            )}
+          </div>
           <Field label="Met On" type="date" value={form.met_date} onChange={v => setForm(f => ({ ...f, met_date: v }))} />
         </div>
         <div>
