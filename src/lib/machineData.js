@@ -461,19 +461,30 @@ export function recommendForMachine(machine) {
   const ch = parseInt(machine.closedHeight, 10);
   const gc = parseInt(machine.groundClearance, 10);
   const basis = Number.isFinite(ch) ? ch : (Number.isFinite(gc) ? gc : null);
+
+  // ── Load on the jack (tonnage check) ──
+  // Conservative worst-case: assume up to 50% of the machine's EMPTY weight sits
+  // on the jack (lifting a whole end). A jack must be rated at/above this. This
+  // never under-rates. If empty weight is unknown we can't check capacity, so we
+  // flag it rather than guess.
+  const emptyWt = Number(machine.emptyWeight) || 0;
+  const jackLoad = emptyWt ? Math.round(emptyWt * 0.5) : null; // tonnes on the jack (worst case)
+
+  // A jack is capacity-adequate if its rating covers the estimated jack load.
+  const capacityOK = j => jackLoad == null ? true : (j.capacity || 0) >= jackLoad;
+
   let jack;
   let alternatives = [];
   if (basis !== null) {
-    // All jacks whose closed height fits under the available clearance. Rank by
-    // closed height in ~25mm bands (jacks within a band are treated as the same
-    // height), then by capacity (higher first) within a band — so a heavier-duty
-    // jack like the Mammut M80-42 (80t, 419mm) ranks above the Yak 142 (50t,
-    // 420mm) despite the trivial 1mm height difference.
+    // Jacks that fit under the clearance, ranked by height band then capacity.
     const band = h => Math.round(h / 25);
-    const fitting = JACK_CATALOGUE.filter(j => j.closedHeight <= basis)
+    const fitsHeight = JACK_CATALOGUE.filter(j => j.closedHeight <= basis)
       .sort((a, b) => (band(b.closedHeight) - band(a.closedHeight)) || ((b.capacity || 0) - (a.capacity || 0)));
-    jack = fitting[0] || JACK_CATALOGUE.slice().sort((a,b)=>a.closedHeight-b.closedHeight)[0];
-    alternatives = fitting.filter(j => j.name !== jack.name);
+    // Prefer jacks that ALSO have adequate capacity for the load.
+    const fitsBoth = fitsHeight.filter(capacityOK);
+    const usable = fitsBoth.length ? fitsBoth : fitsHeight; // fall back to height-fit if none meet capacity
+    jack = usable[0] || JACK_CATALOGUE.slice().sort((a,b)=>a.closedHeight-b.closedHeight)[0];
+    alternatives = usable.filter(j => j.name !== jack.name);
   } else {
     // No confirmed clearance: recommend the general-purpose 800mm as nr1, and
     // order alternatives by relevance — for big machines the taller 1000mm is
@@ -511,5 +522,7 @@ export function recommendForMachine(machine) {
   // (empty weight is what's actually on the jack — you jack unladen machines).
   const heavy = (machine.emptyWeight || 0) >= 130;
 
-  return { jack, alternatives, stand, standAlt, heavy, clearanceKnown: basis !== null, basis };
+  // Does the chosen jack actually cover the load? (for the warning)
+  const overCapacity = (jackLoad != null && jack && (jack.capacity || 0) < jackLoad);
+  return { jack, alternatives, stand, standAlt, heavy, clearanceKnown: basis !== null, basis, jackLoad, overCapacity };
 }
