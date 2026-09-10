@@ -59,6 +59,106 @@ export const EMAIL_TEMPLATES = [
   },
 ];
 
+// ─── Email Composer sheet (open programmatically for a contact) ───────────────
+// Templates + editable subject/body + BOTH copy-to-clipboard and open-in-Outlook.
+// Structured so an AI "polish" step can slot in later (a single async function
+// that rewrites `body` via a server-side Edge Function — not wired yet).
+export function EmailComposer({ contact, onClose }) {
+  const [tpl, setTpl] = useState(null);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  if (!contact) return null;
+  const email = contact.email;
+  const contactName = contact.name;
+  const clientName = contact.company;
+
+  function pick(t) {
+    setTpl(t);
+    setSubject(t.subject(clientName));
+    setBody(t.body(contactName, clientName));
+  }
+  function openOutlook() {
+    const s = encodeURIComponent(subject);
+    const b = encodeURIComponent(body.replace(/\\n/g, "\n"));
+    window.location.href = `mailto:${email}?subject=${s}&body=${b}`;
+  }
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`);
+      setCopied(true); setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50"
+      onClick={onClose}>
+      <motion.div
+        initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }}
+        className="w-full max-w-md bg-white rounded-t-3xl overflow-hidden max-h-[90vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+        <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: "#0078D4" }}>
+              <Mail size={15} color="white" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-black text-slate-900">Email</p>
+              <p className="text-xs text-slate-400 truncate">{contactName} · {email}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-xl bg-slate-50 text-slate-400 shrink-0"><X size={16} /></button>
+        </div>
+
+        {!tpl ? (
+          <div className="p-3 space-y-2 overflow-y-auto">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Choose a template</p>
+            {EMAIL_TEMPLATES.map(t => (
+              <button key={t.id} onClick={() => pick(t)}
+                className="w-full text-left rounded-xl p-3 border border-slate-100 active:scale-[0.98]">
+                <p className="text-sm font-bold text-slate-800">{t.emoji} {t.label}</p>
+                <p className="text-xs text-slate-400 mt-0.5 truncate">{t.subject(clientName)}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="p-4 space-y-3 overflow-y-auto">
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Subject</label>
+              <input value={subject} onChange={e => setSubject(e.target.value)}
+                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300" style={{ fontSize: 16 }} />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Message — edit as needed</label>
+              <textarea value={body} onChange={e => setBody(e.target.value)} rows={9}
+                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 resize-none" style={{ fontSize: 16 }} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={copy}
+                className="rounded-xl py-3 text-sm font-bold border-2"
+                style={{ borderColor: copied ? "#16A34A" : "#E2E8F0", color: copied ? "#16A34A" : "#475569" }}>
+                {copied ? "Copied ✓" : "Copy"}
+              </button>
+              <button onClick={openOutlook}
+                className="rounded-xl py-3 text-sm font-bold text-white" style={{ background: "#0078D4" }}>
+                Open Outlook →
+              </button>
+            </div>
+            <button onClick={() => setTpl(null)}
+              className="w-full rounded-xl border-2 border-slate-100 py-2.5 text-xs font-bold text-slate-500">
+              ← Back to templates
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── Email Button ──────────────────────────────────────────────────────────────
 export function EmailButton({ email, contactName, clientName, size = "sm" }) {
   const [showTemplates, setShowTemplates] = useState(false);
