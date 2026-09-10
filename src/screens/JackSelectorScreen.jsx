@@ -123,24 +123,41 @@ function MachineDetail({ machine: m, onClose }) {
           </button>
         </div>
 
-        {/* Published clearances (where available) — labelled honestly. NOT the
-            jacking closed-height; that must be measured on site. */}
-        <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5 mt-3">Clearance (published)</p>
+        {/* Published clearances where available; otherwise a clear on-site prompt.
+            This is machine clearance, NOT the jacking closed-height. */}
+        <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5 mt-3">Clearance</p>
         <div className="rounded-2xl bg-slate-50 px-4 py-3 mb-1">
           <div className="flex items-center justify-between py-1">
             <span className="text-xs font-bold text-slate-500">Ground clearance</span>
-            <span className="text-sm font-black text-slate-800">{m.groundClearance ? `${m.groundClearance} mm` : "— not published —"}</span>
+            <span className="text-sm font-black" style={{ color: m.groundClearance ? "#0F172A" : "#94A3B8" }}>
+              {m.groundClearance ? `${m.groundClearance} mm` : "Measure on site"}
+            </span>
           </div>
-          <div className="flex items-center justify-between py-1 border-t border-slate-100">
-            <span className="text-xs font-bold text-slate-500">Rear axle clearance</span>
-            <span className="text-sm font-black text-slate-800">{m.rearAxleClearance ? `${m.rearAxleClearance} mm` : "— not published —"}</span>
-          </div>
-          <p className="text-[10px] text-slate-400 mt-1.5">Published machine clearance — not the jacking-point closed height. Always measure the actual gap before selecting the jack.</p>
+          {m.rearAxleClearance && (
+            <div className="flex items-center justify-between py-1 border-t border-slate-100">
+              <span className="text-xs font-bold text-slate-500">Rear axle clearance</span>
+              <span className="text-sm font-black text-slate-800">{m.rearAxleClearance} mm</span>
+            </div>
+          )}
+          <p className="text-[10px] text-slate-400 mt-1.5">Published machine clearance — confirm the actual jacking-point gap on site before lifting.</p>
         </div>
 
         <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Jack</p>
-        <Line n={1} name={rec.jack.name} sub={`Closed ${rec.jack.closedHeight}mm · max lift ${rec.jack.maxLift}mm`} />
-        {jack2 && <Line n={2} name={jack2.name} sub={`Closed ${jack2.closedHeight}mm · max lift ${jack2.maxLift}mm`} />}
+        {rec.jackLoad != null && (
+          <p className="text-xs text-slate-500 mb-1.5">
+            Est. load on jack: <span className="font-bold text-slate-700">~{rec.jackLoad}t</span> (≈50% of {m.emptyWeight}t empty — confirm on site)
+          </p>
+        )}
+        <Line n={1} name={rec.jack.name} sub={`${rec.jack.capacity ? rec.jack.capacity + "t · " : ""}Closed ${rec.jack.closedHeight}mm · max lift ${rec.jack.maxLift}mm`} />
+        {jack2 && <Line n={2} name={jack2.name} sub={`${jack2.capacity ? jack2.capacity + "t · " : ""}Closed ${jack2.closedHeight}mm · max lift ${jack2.maxLift}mm`} />}
+        {rec.overCapacity && (
+          <div className="rounded-xl bg-red-50 border border-red-200 p-3 mt-2 flex gap-2.5">
+            <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-800">
+              <span className="font-bold">Load exceeds jack rating.</span> The estimated jack load (~{rec.jackLoad}t) is above the recommended jack's capacity ({rec.jack.capacity}t). Do not lift — use a higher-rated jack or split the lift. Confirm the actual point load before proceeding.
+            </p>
+          </div>
+        )}
 
         {/* Stands */}
         <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5 mt-3">Jacking stand</p>
