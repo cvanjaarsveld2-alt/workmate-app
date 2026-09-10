@@ -12,7 +12,7 @@ import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
 import { WhatsAppButton } from "../components/WhatsAppButton";
-import { EmailButton } from "../components/EmailButton";
+import { EmailButton, EmailComposer } from "../components/EmailButton";
 import { triggerImmediateSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { CardScanner } from "../components/CardScanner";
@@ -133,6 +133,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   const [cardPhotoUrl, setCardPhotoUrl] = useState(null);
   const [scannedNotice, setScannedNotice] = useState(false);
   const [detailContact, setDetailContact] = useState(null);
+  const [emailContact, setEmailContact]   = useState(null); // contact being emailed
   const [viewerImages, setViewerImages] = useState(null);
   const [shareSheet, setShareSheet]     = useState(null);
   const [form, setForm] = useState({
@@ -487,12 +488,12 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
               </a>
             ) : <div className="rounded-xl bg-slate-100 flex flex-col items-center justify-center gap-1 py-3 text-slate-300"><Send size={18} /><span className="text-xs font-bold">—</span></div>}
             {detailContact.email ? (
-              <a href={`mailto:${detailContact.email}`}
+              <button onClick={() => setEmailContact(detailContact)}
                 className="flex flex-col items-center justify-center gap-1 rounded-xl py-3 text-white min-h-[64px]"
                 style={{ background: "#2563EB" }}>
                 <Mail size={18} />
                 <span className="text-xs font-bold">Email</span>
-              </a>
+              </button>
             ) : <div className="rounded-xl bg-slate-100 flex flex-col items-center justify-center gap-1 py-3 text-slate-300"><Mail size={18} /><span className="text-xs font-bold">—</span></div>}
           </div>
         )}
@@ -561,6 +562,11 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
           </>
         )}
       </DetailSheet>
+
+      {/* ── Email composer (templates + copy + Outlook) ── */}
+      <AnimatePresence>
+        {emailContact && <EmailComposer contact={emailContact} onClose={() => setEmailContact(null)} />}
+      </AnimatePresence>
 
       {/* ── Fullscreen image viewer ── */}
       <AnimatePresence>
