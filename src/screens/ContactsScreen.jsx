@@ -384,7 +384,10 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
               {form.category ? <span className="text-xs font-bold text-red-700 truncate max-w-[120px]">{form.category}</span> : <span className="text-xs text-slate-400">optional</span>}
             </button>
             {catOpen && (
-              <div className="px-3 pb-3 pt-1 border-t border-slate-100">
+              <div className="px-3 pb-3 pt-2.5 border-t border-slate-100 bg-slate-50/50">
+                {contactGroupNames.length > 0 && (
+                  <p className="text-[11px] font-bold text-slate-400 mb-1.5">Tap an existing group or type a new one</p>
+                )}
                 <GroupField label="" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} existing={contactGroupNames} placeholder="e.g. Expo 2026, Suppliers, Contractors" />
               </div>
             )}
