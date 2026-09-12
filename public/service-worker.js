@@ -1,7 +1,7 @@
 // ─── PowerMate Service Worker ─────────────────────────────────────────────────
 // Handles: offline page caching, push notifications, background sync.
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_NAME = "powermate-v2";
+const CACHE_NAME = "powermate-v4";
 const PRECACHE = [
   "/",
   "/index.html",
@@ -121,8 +121,8 @@ self.addEventListener("message", (e) => {
       setTimeout(() => {
         self.registration.showNotification(item.title || "PowerMate Reminder", {
           body: item.body || "",
-          icon: "/logo.png",
-          badge: "/logo.png",
+          icon: "/icons/icon-192.png",
+          badge: "/icons/icon-192.png",
           vibrate: [100, 50, 100],
           data: { url: item.url || "/" },
         });
