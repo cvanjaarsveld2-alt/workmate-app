@@ -8,11 +8,12 @@ import { logCrash } from "../components/ErrorBoundary";
 const SYNC_TABLES = [
   "clients", "followups", "quotes", "contacts", "notes", "equipment",
   "expenses", "leads", "vehicle_checks", "activities", "breakdown_reports", "repair_reports",
-  "custom_faults", "service_reports", "team_notifications",
+  "custom_faults", "service_reports", "team_notifications", "jobs", "invoices", "payments",
 ];
 const TEAM_TABLES = new Set([
   "clients", "followups", "quotes", "contacts", "notes", "equipment",
   "leads", "activities", "breakdown_reports", "repair_reports", "custom_faults", "service_reports",
+  "jobs", "invoices", "payments",
 ]);
 const LOCAL_STORE = {
   breakdown_reports: "breakdowns",
@@ -28,8 +29,8 @@ const RECONCILE_MS = 30000;
 let _syncInProgress = false;
 let _globalSetData = null;
 let _globalQueueRef = null;
-function cleanUUIDs(data) { const fields=["id","user_id","team_id","client_id","contact_id","linked_note_id","linked_breakdown_id","assigned_to_user_id","from_user_id","to_user_id"]; const out={...(data||{})}; fields.forEach(f=>{if(out[f]===""||out[f]===undefined)out[f]=null;}); return out; }
-function cleanNumerics(data) { const out={...(data||{})}; ["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;}); return out; }
+function cleanUUIDs(data) { const fields=["id","user_id","team_id","client_id","contact_id","linked_note_id","linked_breakdown_id","assigned_to_user_id","from_user_id","to_user_id","quote_id","job_id","invoice_id"]; const out={...(data||{})}; fields.forEach(f=>{if(out[f]===""||out[f]===undefined)out[f]=null;}); return out; }
+function cleanNumerics(data) { const out={...(data||{})}; ["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins","subtotal","vat","total","amount_paid","balance_due"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;}); return out; }
 export async function pushItem(item) { try { const table=item?.table;if(!table||!item?.data)throw new Error("Invalid sync item");let payload=cleanNumerics(cleanUUIDs(item.data));if(payload.media)payload={...payload,media:payload.media.map(m=>({...m,base64:undefined}))};if(["insert","upsert","update"].includes(item.action)){if(TEAM_TABLES.has(table)&&!payload.user_id){const {data:authData}=await supabase.auth.getUser();if(authData?.user?.id)payload.user_id=authData.user.id;}if(item.action==="update"&&payload.id){const {data:existing,error:existingError}=await supabase.from(table).select("*").eq("id",payload.id).maybeSingle();if(!existingError&&existing)payload={...existing,...payload};payload=cleanNumerics(cleanUUIDs(payload));}const {error}=await supabase.from(table).upsert({...payload,sync_status:"synced"},{onConflict:"id"});if(error)throw error;}else if(item.action==="delete"){const {error}=await supabase.from(table).delete().eq("id",payload.id);if(error)throw error;}else throw new Error(`Unknown sync action: ${item.action}`);return {ok:true};}catch(error){const detail={code:error?.code,message:error?.message||"Unknown sync error",details:error?.details,hint:error?.hint};console.warn(`[Sync] FAILED ${item?.table} ${item?.action}`,detail);try{logCrash({screen:`Sync (${item?.table} ${item?.action})`,message:`${detail.message}${detail.code?` [${detail.code}]`:""}${detail.details?` — ${detail.details}`:""}`});}catch{}return {ok:false,error:detail};} }
 export async function saveAndSync(item,table,action,setData,isOnline){await offlineSave(localStoreName(table),item);if(isOnline){const result=await pushItem({table,action,data:item});if(result.ok){const synced={...item,sync_status:"synced"};await offlineSave(localStoreName(table),synced);setData(current=>({...current,[localStoreName(table)]: (current[localStoreName(table)]||[]).map(row=>row.id===item.id?synced:row),syncQueue:(current.syncQueue||[]).filter(q=>q.data?.id!==item.id)}));return synced;}}const queueItem={id:`sq_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,table,action,data:item,status:"pending",created_at:new Date().toISOString(),attempts:0};setData(current=>({...current,syncQueue:[queueItem,...(current.syncQueue||[]).filter(q=>!(q.table===table&&q.data?.id===item.id))]}));return {...item,sync_status:"pending"};}
 function collapseQueue(queue){const groups=new Map();for(const item of queue){const key=`${item.table}:${item.data?.id}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}const winners=[];const discarded=new Set();for(const [,ops] of groups){ops.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));const last=ops[ops.length-1];const hasInsert=ops.some(op=>op.action==="insert");const hasDelete=ops.some(op=>op.action==="delete");if(hasInsert&&hasDelete){ops.forEach(op=>discarded.add(op.id));continue;}if(hasDelete)winners.push({...last,action:"delete"});else winners.push({...last,action:hasInsert?"upsert":"update",data:ops.reduce((record,op)=>({...record,...(op.data||{})}),{})});const winner=winners[winners.length-1];ops.forEach(op=>{if(op.id!==winner.id)discarded.add(op.id);});}return {winners,discarded};}
@@ -41,12 +42,7 @@ export function registerSyncHandlers(setData,queueRef){_globalSetData=setData;_g
 export function triggerImmediateSync(){if(_globalSetData&&_globalQueueRef)pushSyncQueue(_globalQueueRef.current||[],_globalSetData).catch(()=>{});}
 export function setupRealtimeSync(uid,setData){
   if(!uid)return()=>{};
-
-  // IMPORTANT: build the array without referencing it from inside its own
-  // initializer. The previous `const channels = SYNC_TABLES.map(...
-  // channels.push(...))` hit the temporal-dead-zone at startup because the
-  // map callback runs before `channels` has been initialized.
-  const channels = SYNC_TABLES.map(table=>{
+  const channels=SYNC_TABLES.map(table=>{
     let channel=supabase.channel(`powermate-${uid}-${table}`);
     channel=channel.on("postgres_changes",{event:"*",schema:"public",table},payload=>{
       const local=localStoreName(table);
@@ -64,13 +60,6 @@ export function setupRealtimeSync(uid,setData){
     channel.subscribe();
     return channel;
   });
-
-  const timer=setInterval(()=>{
-    if(document.visibilityState!=="hidden"&&navigator.onLine)pullFromSupabase(uid,setData).catch(()=>{});
-  },RECONCILE_MS);
-
-  return()=>{
-    clearInterval(timer);
-    channels.forEach(c=>supabase.removeChannel(c));
-  };
+  const timer=setInterval(()=>{if(document.visibilityState!=="hidden"&&navigator.onLine)pullFromSupabase(uid,setData).catch(()=>{});},RECONCILE_MS);
+  return()=>{clearInterval(timer);channels.forEach(c=>supabase.removeChannel(c));};
 }
