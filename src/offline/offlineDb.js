@@ -1,23 +1,30 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // offline/offlineDb.js — User-scoped IndexedDB
 //
-// FIX: Cross-account data exposure
-// Previously all users shared one database ("powermate_offline").
-// Now each user gets their own database ("powermate_offline_<userId>").
-// On logout, clearAllStores() wipes the current user's offline data.
-//
-// FIX: Deleted records never removed
-// offlineDelete() existed but was never called. Now exported and
-// documented — callers MUST call it on every local delete.
+// PowerMate offline storage
+// - Each authenticated user gets a separate IndexedDB database.
+// - Supports all application data stores.
+// - Sync queue is durable across browser restarts.
+// - Full replacements are used when a server pull is authoritative.
 // ═══════════════════════════════════════════════════════════════════════════
 
-const DB_PREFIX  = "powermate_offline_";
-const DB_VERSION = 9;  // bumped for breakdowns store
+const DB_PREFIX = "powermate_offline_";
+const DB_VERSION = 10;
+
 const STORES = [
-  "clients", "followups", "quotes", "notes", "equipment",
-  "contacts", "expenses", "leads", "vehicle_checks",
-  "activities",  // NEW: interaction logging
-  "breakdowns", "repairs", "customFaults",  // NEW: breakdown/repair reports + custom faults
+  "clients",
+  "followups",
+  "quotes",
+  "notes",
+  "equipment",
+  "contacts",
+  "expenses",
+  "leads",
+  "vehicle_checks",
+  "activities",
+  "breakdowns",
+  "repairs",
+  "customFaults",
   "syncQueue",
 ];
 
@@ -25,151 +32,452 @@ let _db = null;
 let _currentUserId = null;
 
 function dbName(userId) {
-  // User-scoped database name. Falls back to shared if no userId (should not happen in practice).
-  return userId ? `${DB_PREFIX}${userId}` : `${DB_PREFIX}shared`;
+  return userId
+    ? `${DB_PREFIX}${userId}`
+    : `${DB_PREFIX}shared`;
 }
 
-// ── Initialize / switch user ──────────────────────────────────────────────────
-// Call this on login (before loading data) and on logout (to close the old DB).
+// ─────────────────────────────────────────────────────────────────────────────
+// USER MANAGEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function setOfflineUser(userId) {
-  if (_currentUserId === userId && _db) return; // already set
+  if (_currentUserId === userId && _db) {
+    return;
+  }
+
   if (_db) {
-    try { _db.close(); } catch {}
+    try {
+      _db.close();
+    } catch {}
+
     _db = null;
   }
-  _currentUserId = userId;
+
+  _currentUserId = userId || null;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DATABASE
+// ─────────────────────────────────────────────────────────────────────────────
+
 function openDB() {
-  if (_db) return Promise.resolve(_db);
+  if (_db) {
+    return Promise.resolve(_db);
+  }
 
   return new Promise((resolve, reject) => {
-    const name = dbName(_currentUserId);
-    const req = indexedDB.open(name, DB_VERSION);
+    if (!window.indexedDB) {
+      reject(new Error("IndexedDB is not supported by this browser."));
+      return;
+    }
 
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      STORES.forEach(store => {
+    const name = dbName(_currentUserId);
+    const request = indexedDB.open(name, DB_VERSION);
+
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+
+      STORES.forEach((store) => {
         if (!db.objectStoreNames.contains(store)) {
-          db.createObjectStore(store, { keyPath: "id" });
+          db.createObjectStore(store, {
+            keyPath: "id",
+          });
         }
       });
     };
 
-    req.onsuccess = (e) => {
-      _db = e.target.result;
+    request.onsuccess = (event) => {
+      _db = event.target.result;
+
+      _db.onversionchange = () => {
+        try {
+          _db.close();
+        } catch {}
+
+        _db = null;
+      };
+
       resolve(_db);
     };
 
-    req.onerror = (e) => {
-      console.warn("[PowerMate offline] IndexedDB open failed:", e.target.error);
-      reject(e.target.error);
+    request.onerror = (event) => {
+      const error = event.target.error;
+
+      console.warn(
+        "[PowerMate offline] IndexedDB open failed:",
+        error
+      );
+
+      reject(error);
+    };
+
+    request.onblocked = () => {
+      console.warn(
+        "[PowerMate offline] IndexedDB upgrade is blocked by another connection."
+      );
     };
   });
 }
 
-// ── CRUD ──────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SAVE / UPSERT
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function offlineSave(store, record) {
-  if (!record || !record.id) return;
+  if (!store || !record || !record.id) {
+    return false;
+  }
+
   try {
     const db = await openDB();
-    return new Promise((resolve, reject) => {
+
+    return await new Promise((resolve) => {
       const tx = db.transaction(store, "readwrite");
-      const req = tx.objectStore(store).put(record);
-      req.onsuccess = () => resolve(record);
-      req.onerror = (e) => {
-        console.warn(`[offline] Save to ${store} failed:`, e.target.error);
-        reject(e.target.error);
+      const objectStore = tx.objectStore(store);
+
+      objectStore.put(record);
+
+      tx.oncomplete = () => {
+        resolve(true);
+      };
+
+      tx.onerror = (event) => {
+        console.warn(
+          `[offline] Save to ${store} failed:`,
+          event.target.error
+        );
+
+        resolve(false);
+      };
+
+      tx.onabort = (event) => {
+        console.warn(
+          `[offline] Save to ${store} aborted:`,
+          event.target.error
+        );
+
+        resolve(false);
       };
     });
-  } catch (e) {
-    console.warn(`[offline] offlineSave failed for ${store}:`, e);
+  } catch (error) {
+    console.warn(
+      `[offline] offlineSave failed for ${store}:`,
+      error
+    );
+
+    return false;
   }
 }
 
-export async function offlineGetAll(store) {
+// ─────────────────────────────────────────────────────────────────────────────
+// REPLACE ENTIRE STORE
+//
+// Used after an authoritative full server pull.
+//
+// IMPORTANT:
+// This clears stale local records that no longer exist on the server.
+// Pending local records should be restored by the sync engine afterwards.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function offlineReplaceAll(store, records = []) {
+  if (!store) {
+    return false;
+  }
+
   try {
     const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(store, "readonly");
-      const req = tx.objectStore(store).getAll();
-      req.onsuccess = (e) => resolve(e.target.result || []);
-      req.onerror = () => resolve([]);
+
+    return await new Promise((resolve) => {
+      const tx = db.transaction(store, "readwrite");
+      const objectStore = tx.objectStore(store);
+
+      objectStore.clear();
+
+      for (const record of records) {
+        if (record && record.id) {
+          objectStore.put(record);
+        }
+      }
+
+      tx.oncomplete = () => {
+        resolve(true);
+      };
+
+      tx.onerror = (event) => {
+        console.warn(
+          `[offline] offlineReplaceAll failed for ${store}:`,
+          event.target.error
+        );
+
+        resolve(false);
+      };
+
+      tx.onabort = (event) => {
+        console.warn(
+          `[offline] offlineReplaceAll aborted for ${store}:`,
+          event.target.error
+        );
+
+        resolve(false);
+      };
     });
-  } catch (e) {
-    console.warn(`[offline] offlineGetAll failed for ${store}:`, e);
+  } catch (error) {
+    console.warn(
+      `[offline] offlineReplaceAll failed for ${store}:`,
+      error
+    );
+
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET ALL
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function offlineGetAll(store) {
+  if (!store) {
+    return [];
+  }
+
+  try {
+    const db = await openDB();
+
+    return await new Promise((resolve) => {
+      const tx = db.transaction(store, "readonly");
+      const objectStore = tx.objectStore(store);
+      const request = objectStore.getAll();
+
+      request.onsuccess = (event) => {
+        resolve(event.target.result || []);
+      };
+
+      request.onerror = () => {
+        resolve([]);
+      };
+
+      tx.onerror = () => {
+        resolve([]);
+      };
+    });
+  } catch (error) {
+    console.warn(
+      `[offline] offlineGetAll failed for ${store}:`,
+      error
+    );
+
     return [];
   }
 }
 
-// FIX: This function existed but was NEVER CALLED by any screen.
-// Every screen that deletes a record MUST call this immediately.
-export async function offlineDelete(store, id) {
-  if (!id) return;
+// ─────────────────────────────────────────────────────────────────────────────
+// GET ONE
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function offlineGet(store, id) {
+  if (!store || !id) {
+    return null;
+  }
+
   try {
     const db = await openDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(store, "readwrite");
-      tx.objectStore(store).delete(id);
-      tx.oncomplete = () => resolve(true);
-      tx.onerror    = () => resolve(false);
+
+    return await new Promise((resolve) => {
+      const tx = db.transaction(store, "readonly");
+      const request = tx.objectStore(store).get(id);
+
+      request.onsuccess = (event) => {
+        resolve(event.target.result || null);
+      };
+
+      request.onerror = () => {
+        resolve(null);
+      };
     });
-  } catch (e) {
-    console.warn(`[offline] offlineDelete failed for ${store}/${id}:`, e);
+  } catch (error) {
+    console.warn(
+      `[offline] offlineGet failed for ${store}/${id}:`,
+      error
+    );
+
+    return null;
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function offlineDelete(store, id) {
+  if (!store || !id) {
+    return false;
+  }
+
+  try {
+    const db = await openDB();
+
+    return await new Promise((resolve) => {
+      const tx = db.transaction(store, "readwrite");
+
+      tx.objectStore(store).delete(id);
+
+      tx.oncomplete = () => {
+        resolve(true);
+      };
+
+      tx.onerror = () => {
+        resolve(false);
+      };
+
+      tx.onabort = () => {
+        resolve(false);
+      };
+    });
+  } catch (error) {
+    console.warn(
+      `[offline] offlineDelete failed for ${store}/${id}:`,
+      error
+    );
+
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLEAR ONE STORE
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function offlineClear(store) {
+  if (!store) {
+    return false;
+  }
+
   try {
     const db = await openDB();
-    return new Promise((resolve) => {
+
+    return await new Promise((resolve) => {
       const tx = db.transaction(store, "readwrite");
+
       tx.objectStore(store).clear();
-      tx.oncomplete = () => resolve();
-      tx.onerror    = () => resolve();
+
+      tx.oncomplete = () => {
+        resolve(true);
+      };
+
+      tx.onerror = () => {
+        resolve(false);
+      };
+
+      tx.onabort = () => {
+        resolve(false);
+      };
     });
-  } catch (e) {
-    console.warn(`[offline] offlineClear failed for ${store}:`, e);
+  } catch (error) {
+    console.warn(
+      `[offline] offlineClear failed for ${store}:`,
+      error
+    );
+
+    return false;
   }
 }
 
-// ── Clear ALL stores (call on logout) ─────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// COUNT
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function offlineCount(store) {
+  if (!store) {
+    return 0;
+  }
+
+  try {
+    const db = await openDB();
+
+    return await new Promise((resolve) => {
+      const tx = db.transaction(store, "readonly");
+      const request = tx.objectStore(store).count();
+
+      request.onsuccess = (event) => {
+        resolve(event.target.result || 0);
+      };
+
+      request.onerror = () => {
+        resolve(0);
+      };
+    });
+  } catch {
+    return 0;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CLEAR ALL USER DATA
+//
+// Call this when the user logs out.
+//
+// Because the DB itself is user-scoped, this only clears the currently
+// authenticated user's local database.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function clearAllStores() {
   try {
     const db = await openDB();
-    await Promise.all(
-      STORES.map(store => new Promise(resolve => {
-        try {
-          const tx = db.transaction(store, "readwrite");
-          tx.objectStore(store).clear();
-          tx.oncomplete = () => resolve();
-          tx.onerror    = () => resolve();
-        } catch { resolve(); }
-      }))
+
+    return await Promise.all(
+      STORES.map(
+        (store) =>
+          new Promise((resolve) => {
+            try {
+              const tx = db.transaction(store, "readwrite");
+
+              tx.objectStore(store).clear();
+
+              tx.oncomplete = () => resolve(true);
+              tx.onerror = () => resolve(false);
+              tx.onabort = () => resolve(false);
+            } catch {
+              resolve(false);
+            }
+          })
+      )
     );
-  } catch (e) {
-    console.warn("[offline] clearAllStores failed:", e);
+  } catch (error) {
+    console.warn(
+      "[offline] clearAllStores failed:",
+      error
+    );
+
+    return [];
   }
 }
 
-// ── Delete the entire database for a user (nuclear option) ────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// DELETE USER DATABASE
+//
+// Used when completely removing local data for a specific user.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function deleteUserDatabase(userId) {
+  if (!userId) {
+    return;
+  }
+
   if (_db && _currentUserId === userId) {
-    try { _db.close(); } catch {}
+    try {
+      _db.close();
+    } catch {}
+
     _db = null;
   }
-  try { indexedDB.deleteDatabase(dbName(userId)); } catch {}
-}
 
-export async function offlineCount(store) {
   try {
-    const db = await openDB();
-    return new Promise((resolve) => {
-      const tx  = db.transaction(store, "readonly");
-      const req = tx.objectStore(store).count();
-      req.onsuccess = (e) => resolve(e.target.result || 0);
-      req.onerror   = () => resolve(0);
-    });
-  } catch { return 0; }
+    indexedDB.deleteDatabase(dbName(userId));
+  } catch (error) {
+    console.warn(
+      "[offline] Failed to delete user database:",
+      error
+    );
+  }
 }
