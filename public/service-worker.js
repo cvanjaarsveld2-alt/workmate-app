@@ -109,24 +109,120 @@ self.addEventListener("notificationclick", (e) => {
   );
 });
 
-// ── Scheduled notifications (from the app via postMessage) ────────────────────
+// ─── Durable scheduled reminders ──────────────────────────────────────────────
+// setTimeout in a service worker is unreliable: the SW is killed after ~30s of
+// inactivity, wiping any pending timers, so a reminder scheduled for hours later
+// never fires. Instead we PERSIST reminders in IndexedDB and CHECK for due ones
+// every time the SW wakes (message, sync, push, or periodic sync). The app also
+// pokes the SW on open/focus. This makes reminders survive SW restarts.
+
+const REMINDER_DB = "pm-reminders";
+const REMINDER_STORE = "scheduled";
+
+function reminderDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(REMINDER_DB, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(REMINDER_STORE)) {
+        db.createObjectStore(REMINDER_STORE, { keyPath: "id" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function putReminders(items) {
+  const db = await reminderDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(REMINDER_STORE, "readwrite");
+    const store = tx.objectStore(REMINDER_STORE);
+    items.forEach(it => { if (it && it.id) store.put(it); });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+async function getAllReminders() {
+  const db = await reminderDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(REMINDER_STORE, "readonly");
+    const req = tx.objectStore(REMINDER_STORE).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => resolve([]);
+  });
+}
+
+async function deleteReminder(id) {
+  const db = await reminderDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction(REMINDER_STORE, "readwrite");
+    tx.objectStore(REMINDER_STORE).delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+// Fire any reminders whose time has arrived; drop stale ones. Called on wake.
+async function checkDueReminders() {
+  const now = Date.now();
+  const items = await getAllReminders();
+  for (const item of items) {
+    const fireAt = new Date(item.fireAt).getTime();
+    if (isNaN(fireAt)) { await deleteReminder(item.id); continue; }
+    // Fire if due; also fire if we missed it by up to 6h (SW was asleep). Drop if older.
+    if (fireAt <= now && (now - fireAt) < 6 * 60 * 60 * 1000) {
+      await self.registration.showNotification(item.title || "PowerMate Reminder", {
+        body: item.body || "",
+        icon: "/icons/icon-192.png",
+        badge: "/icons/icon-192.png",
+        vibrate: [100, 50, 100],
+        tag: item.id,
+        data: { url: item.url || "/" },
+      });
+      await deleteReminder(item.id);
+    } else if (fireAt <= now) {
+      // Missed by more than 6h — too stale to be useful; discard.
+      await deleteReminder(item.id);
+    }
+  }
+}
+
+// ── Message handler: receive the schedule from the app + poke to check ────────
 self.addEventListener("message", (e) => {
   if (e.data?.type === "SCHEDULE_NOTIFICATIONS") {
-    const items = e.data.items || [];
-    items.forEach(item => {
-      const delay = new Date(item.fireAt).getTime() - Date.now();
-      if (delay <= 0) return; // already past
-      if (delay > 24 * 60 * 60 * 1000) return; // more than 24h away — skip
+    const items = (e.data.items || []).filter(it => it && it.id && it.fireAt);
+    // Replace the stored schedule with the app's current one, then check now.
+    e.waitUntil((async () => {
+      // Clear existing then store the fresh set (keeps SW in sync with the app).
+      const existing = await getAllReminders();
+      const db = await reminderDB();
+      await new Promise(res => {
+        const tx = db.transaction(REMINDER_STORE, "readwrite");
+        tx.objectStore(REMINDER_STORE).clear();
+        tx.oncomplete = res; tx.onerror = res;
+      });
+      await putReminders(items);
+      await checkDueReminders();
+    })());
+  }
+  if (e.data?.type === "CHECK_REMINDERS") {
+    e.waitUntil(checkDueReminders());
+  }
+  if (e.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
 
-      setTimeout(() => {
-        self.registration.showNotification(item.title || "PowerMate Reminder", {
-          body: item.body || "",
-          icon: "/icons/icon-192.png",
-          badge: "/icons/icon-192.png",
-          vibrate: [100, 50, 100],
-          data: { url: item.url || "/" },
-        });
-      }, delay);
-    });
+// Check due reminders whenever the SW wakes for a sync or periodic sync.
+self.addEventListener("sync", (e) => {
+  if (e.tag === "pm-reminder-check" || e.tag === "pm-sync") {
+    e.waitUntil(checkDueReminders());
+  }
+});
+self.addEventListener("periodicsync", (e) => {
+  if (e.tag === "pm-reminder-check") {
+    e.waitUntil(checkDueReminders());
   }
 });
