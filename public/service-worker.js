@@ -1,8 +1,8 @@
 // ─── PowerMate Service Worker ────────────────────────────────────────────────
 // Offline shell, push notifications and durable reminder scheduling.
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_NAME = "powermate-v8";
-const PRECACHE = ["/", "/index.html", "/icon-192.png", "/icon-512.png", "/manifest.webmanifest"];
+const CACHE_NAME = "powermate-v9";
+const PRECACHE = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest"];
 const REMINDER_DB = "powermate_sw";
 const REMINDER_STORE = "reminders";
 
@@ -60,8 +60,8 @@ async function fireDueReminders() {
   for (const item of due) {
     await self.registration.showNotification(item.title || "PowerMate Reminder", {
       body: item.body || "",
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
+      icon: "/icon.svg",
+      badge: "/icon.svg",
       vibrate: [100, 50, 100],
       tag: item.tag || item.id,
       data: { url: item.url || "/" },
@@ -89,10 +89,7 @@ self.addEventListener("fetch", e => {
 
   if (e.request.mode === "navigate") {
     e.respondWith(fetch(e.request).then(res => {
-      if (res.ok) {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-      }
+      if (res.ok) { const clone = res.clone(); caches.open(CACHE_NAME).then(c => c.put(e.request, clone)); }
       return res;
     }).catch(() => caches.match(e.request).then(r => r || caches.match("/"))));
     return;
@@ -100,10 +97,7 @@ self.addEventListener("fetch", e => {
 
   if (/\.(js|css)$/i.test(url.pathname)) {
     e.respondWith(fetch(e.request).then(res => {
-      if (res.ok) {
-        const clone = res.clone();
-        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-      }
+      if (res.ok) { const clone = res.clone(); caches.open(CACHE_NAME).then(c => c.put(e.request, clone)); }
       return res;
     }).catch(() => caches.match(e.request).then(r => r || Response.error())));
     return;
@@ -135,8 +129,8 @@ self.addEventListener("push", e => {
   try { if (e.data) data = { ...data, ...e.data.json() }; } catch {}
   e.waitUntil(self.registration.showNotification(data.title, {
     body: data.body,
-    icon: "/icon-192.png",
-    badge: "/icon-192.png",
+    icon: "/icon.svg",
+    badge: "/icon.svg",
     vibrate: [100, 50, 100],
     tag: data.tag || "powermate",
     renotify: !!data.tag,
@@ -157,17 +151,8 @@ self.addEventListener("notificationclick", e => {
 });
 
 self.addEventListener("message", e => {
-  if (e.data?.type === "SKIP_WAITING") {
-    e.waitUntil(Promise.resolve(self.skipWaiting()));
-    return;
-  }
-  if (e.data?.type === "SCHEDULE_NOTIFICATIONS") {
-    e.waitUntil?.(putReminders(e.data.items || [], e.data.replace === true).then(() => fireDueReminders()).catch(() => {}));
-  }
-  if (e.data?.type === "CANCEL_NOTIFICATION") {
-    e.waitUntil?.(deleteReminder(e.data.id));
-  }
-  if (e.data?.type === "FIRE_DUE_REMINDERS") {
-    e.waitUntil?.(fireDueReminders().catch(() => {}));
-  }
+  if (e.data?.type === "SKIP_WAITING") { e.waitUntil(Promise.resolve(self.skipWaiting())); return; }
+  if (e.data?.type === "SCHEDULE_NOTIFICATIONS") e.waitUntil?.(putReminders(e.data.items || [], e.data.replace === true).then(() => fireDueReminders()).catch(() => {}));
+  if (e.data?.type === "CANCEL_NOTIFICATION") e.waitUntil?.(deleteReminder(e.data.id));
+  if (e.data?.type === "FIRE_DUE_REMINDERS") e.waitUntil?.(fireDueReminders().catch(() => {}));
 });
