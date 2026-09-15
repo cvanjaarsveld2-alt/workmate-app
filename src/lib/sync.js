@@ -12,43 +12,35 @@ const localStoreName=table=>LOCAL_STORE[table]||table;
 const MAX_SYNC_ATTEMPTS=5,PAGE_SIZE=1000,RECONCILE_MS=30000;
 let _syncInProgress=false,_globalSetData=null,_globalQueueRef=null;
 
-// Local-only workflow fields are never sent to legacy tables.
+// Legacy/local workflow fields that are not present in production schemas.
 const REMOTE_EXCLUDED_FIELDS={
   quotes:new Set(["contact_id","from_user_id","to_user_id","job_id","invoice_id"]),
   followups:new Set(["invoice_id","job_id"]),
 };
-function sanitizeRemotePayload(table,data){
-  const out={...(data||{})};
-  for(const field of REMOTE_EXCLUDED_FIELDS[table]||[])delete out[field];
-  return out;
-}
-function cleanUUIDs(data){
-  const fields=["id","user_id","team_id","client_id","contact_id","linked_note_id","linked_breakdown_id","assigned_to_user_id","from_user_id","to_user_id","quote_id","job_id","invoice_id"];
-  const out={...(data||{})};fields.forEach(f=>{if(out[f]===""||out[f]===undefined)out[f]=null;});return out;
-}
-function cleanNumerics(data){
-  const out={...(data||{})};
-  ["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins","subtotal","vat","total","amount_paid","balance_due"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;});
-  return out;
-}
+function sanitizeRemotePayload(table,data){const out={...(data||{})};for(const field of REMOTE_EXCLUDED_FIELDS[table]||[])delete out[field];return out;}
+function cleanUUIDs(data){const fields=["id","user_id","team_id","client_id","contact_id","linked_note_id","linked_breakdown_id","assigned_to_user_id","from_user_id","to_user_id","quote_id","job_id","invoice_id"];const out={...(data||{})};fields.forEach(f=>{if(out[f]===""||out[f]===undefined)out[f]=null;});return out;}
+function cleanNumerics(data){const out={...(data||{})};["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins","subtotal","vat","total","amount_paid","balance_due"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;});return out;}
 
-// PostgREST reports unknown columns as PGRST204. Rather than allowing one
-// stale/local property to poison the entire queue, remove the offending
-// property and retry. This is deliberately bounded so real errors still fail.
+// Remove an unknown PostgREST field and retry. This handles stale local payloads
+// without weakening database constraints or silently dropping real errors.
 async function upsertWithSchemaRecovery(table,payload,maxRetries=12){
   let candidate={...payload};
   for(let attempt=0;attempt<=maxRetries;attempt++){
     const {error}=await supabase.from(table).upsert(candidate,{onConflict:"id"});
     if(!error)return;
     if(error.code!=="PGRST204")throw error;
-    const message=String(error.message||"");
-    const match=message.match(/Could not find the '([^']+)' column of '[^']+' in the schema cache/i);
+    const match=String(error.message||"").match(/Could not find the '([^']+)' column of '[^']+' in the schema cache/i);
     const field=match?.[1];
     if(!field||!(field in candidate))throw error;
     delete candidate[field];
   }
   throw new Error(`Sync schema recovery exhausted for ${table}`);
 }
+
+// Parent/child ordering prevents FK races when offline changes contain related
+// records created in the same offline session.
+const SYNC_PRIORITY={clients:10,quotes:20,contacts:30,notes:30,equipment:30,expenses:30,leads:30,vehicle_checks:30,activities:30,breakdown_reports:30,repair_reports:30,custom_faults:30,service_reports:30,team_notifications:30,followups:40,jobs:50,invoices:60,payments:70};
+function sortSyncItems(items){return [...items].sort((a,b)=>{const pa=SYNC_PRIORITY[a.table]??100,pb=SYNC_PRIORITY[b.table]??100;if(pa!==pb)return pa-pb;return new Date(a.created_at||0)-new Date(b.created_at||0);});}
 
 export async function pushItem(item){
   try{
@@ -89,7 +81,7 @@ export async function saveAndSync(item,table,action,setData,isOnline){
 function collapseQueue(queue){
   const groups=new Map();for(const item of queue){const key=`${item.table}:${item.data?.id}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
   const winners=[],discarded=new Set();
-  for(const [,ops] of groups){ops.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));const last=ops[ops.length-1],hasInsert=ops.some(op=>op.action==="insert"),hasDelete=ops.some(op=>op.action==="delete");
+  for(const [,ops] of groups){ops.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0);const last=ops[ops.length-1],hasInsert=ops.some(op=>op.action==="insert"),hasDelete=ops.some(op=>op.action==="delete");
     if(hasInsert&&hasDelete){ops.forEach(op=>discarded.add(op.id));continue;}
     if(hasDelete)winners.push({...last,action:"delete"});else winners.push({...last,action:hasInsert?"upsert":"update",data:ops.reduce((record,op)=>({...record,...(op.data||{})}),{})});
     const winner=winners[winners.length-1];ops.forEach(op=>{if(op.id!==winner.id)discarded.add(op.id);});
@@ -102,8 +94,14 @@ export async function pushSyncQueue(syncQueue,setData){
   try{
     const pending=(syncQueue||[]).filter(item=>item.status==="pending");if(!pending.length)return;
     const {winners,discarded}=collapseQueue(pending);
-    const results=await Promise.allSettled(winners.map(async item=>({queueId:item.id,entityId:item.data?.id,table:item.table,action:item.action,...(await pushItem(item))})));
-    const outcomes=results.map(r=>r.status==="fulfilled"?r.value:{ok:false,error:{message:"Unexpected sync failure"}}),succeeded=outcomes.filter(r=>r.ok),failed=outcomes.filter(r=>!r.ok);
+    const ordered=sortSyncItems(winners);
+    const outcomes=[];
+    // Execute in dependency order. A child is never allowed to race its parent.
+    for(const item of ordered){
+      const result=await pushItem(item);
+      outcomes.push({queueId:item.id,entityId:item.data?.id,table:item.table,action:item.action,...result});
+    }
+    const succeeded=outcomes.filter(r=>r.ok),failed=outcomes.filter(r=>!r.ok);
     for(const result of succeeded)if(result.action==="delete")offlineDelete(localStoreName(result.table),result.entityId).catch(()=>{});
     if(failed.length){logEvent("sync_failed",{count:failed.length});window.dispatchEvent(new CustomEvent("powermate:sync_failed",{detail:{count:failed.length,message:`${failed.length} item${failed.length===1?"":"s"} failed to sync`}}));}
     if(succeeded.length)logEvent("sync_succeeded",{count:succeeded.length});
