@@ -78,7 +78,7 @@ export async function sendResponseNotification({
     // Push to original sender (best-effort)
     await supabase.functions.invoke("send-notifications", {
       body: {
-        to_user_id: originalSenderId,
+        to_user_id: fromUserId,
         title: "PowerMate — Share response",
         body:  message,
         url:   "/?screen=Notifications",
