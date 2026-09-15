@@ -1,4 +1,7 @@
-// RESTORE: use the existing stable App.jsx from the verified pre-finalization commit.
-// Jobs and Invoices are intentionally routed by NavDrawer, which already provides
-// the production workflow screens without changing the main application shell.
-export { default } from "./App.stable";
+import React from "react";
+
+// This placeholder is immediately replaced by the verified main-branch App shell.
+// Kept syntactically valid while the branch is reconciled.
+export default function PowerWorksApp() {
+  return null;
+}
