@@ -3,18 +3,18 @@
 //
 // PowerMate offline storage
 // - Each authenticated user gets a separate IndexedDB database.
-// - Supports all application data stores.
+// - Supports all application data stores, including the job-to-payment workflow.
 // - Sync queue is durable across browser restarts.
 // - Full replacements are used when a server pull is authoritative.
 // ═══════════════════════════════════════════════════════════════════════════
 
 const DB_PREFIX = "powermate_offline_";
-const DB_VERSION = 12;
+const DB_VERSION = 13;
 
 const STORES = [
   "clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses",
   "leads", "vehicle_checks", "activities", "breakdowns", "repairs", "customFaults",
-  "serviceReports", "teamNotifications", "syncQueue",
+  "serviceReports", "teamNotifications", "jobs", "invoices", "payments", "syncQueue",
 ];
 
 let _db = null;
