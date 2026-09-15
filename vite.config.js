@@ -4,30 +4,12 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Core React runtime — loads first, cached aggressively
-          "vendor-react": ["react", "react-dom"],
-
-          // Framer Motion — animations, medium size
-          "vendor-motion": ["framer-motion"],
-
-          // Supabase client
-          "vendor-supabase": ["@supabase/supabase-js"],
-
-          // Lucide icons
-          "vendor-icons": ["lucide-react"],
-
-          // PDF generation — only loads when user generates a PDF
-          "chunk-pdf": ["jspdf", "jspdf-autotable"],
-
-          // Excel export — only loads when user exports to Excel
-          "chunk-excel": ["exceljs"],
-        },
-      },
-    },
-    // Increase warning threshold — chunks are intentionally split
+    // Let Rollup/Vite determine chunk boundaries automatically.
+    // The previous hand-written vendor chunks could split modules involved in
+    // an import cycle and produce a production-only TDZ error such as
+    // "Cannot access 'n' before initialization" after minification.
+    // Lazy-loaded screens are still split automatically by dynamic import().
+    rollupOptions: {},
     chunkSizeWarningLimit: 600,
   },
 });
