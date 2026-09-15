@@ -7,7 +7,7 @@ import { logCrash } from "../components/ErrorBoundary";
 
 const SYNC_TABLES = [
   "clients", "followups", "quotes", "contacts", "notes", "equipment",
-  "expenses", "leads", "activities", "breakdown_reports", "repair_reports",
+  "expenses", "leads", "vehicle_checks", "activities", "breakdown_reports", "repair_reports",
   "custom_faults", "team_notifications",
 ];
 const TEAM_TABLES = new Set([
