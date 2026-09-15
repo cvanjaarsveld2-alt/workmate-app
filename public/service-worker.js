@@ -1,10 +1,8 @@
 // ─── PowerMate Service Worker ────────────────────────────────────────────────
 // Offline shell, push notifications and durable reminder scheduling.
-// Reminder schedules are persisted in IndexedDB instead of relying on a
-// long-lived setTimeout (service workers are routinely suspended/killed).
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_NAME = "powermate-v7";
-const PRECACHE = ["/", "/index.html", "/icon-192.png"];
+const CACHE_NAME = "powermate-v8";
+const PRECACHE = ["/", "/index.html", "/icon-192.png", "/icon-512.png", "/manifest.webmanifest"];
 const REMINDER_DB = "powermate_sw";
 const REMINDER_STORE = "reminders";
 
@@ -80,7 +78,7 @@ self.addEventListener("install", e => e.waitUntil(
 
 self.addEventListener("activate", e => e.waitUntil(
   Promise.all([
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))),
+    caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("powermate-") && k !== CACHE_NAME).map(k => caches.delete(k)))),
     fireDueReminders().catch(() => {}),
   ]).then(() => self.clients.claim())
 ));
@@ -91,8 +89,10 @@ self.addEventListener("fetch", e => {
 
   if (e.request.mode === "navigate") {
     e.respondWith(fetch(e.request).then(res => {
-      const clone = res.clone();
-      caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      if (res.ok) {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
       return res;
     }).catch(() => caches.match(e.request).then(r => r || caches.match("/"))));
     return;
