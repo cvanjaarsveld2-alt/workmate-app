@@ -17,6 +17,30 @@ export async function scheduleNotificationsViaSW(items) {
   }
 }
 
+// Poke the SW to fire any reminders that have come due. Call on app open/focus
+// and after visibility changes — this is the belt-and-braces that catches
+// reminders the SW would otherwise only fire on its own wake events.
+export async function checkRemindersNow() {
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    reg?.active?.postMessage({ type: "CHECK_REMINDERS" });
+  } catch {}
+}
+
+// Ask the browser to wake the SW periodically to check reminders (best-effort;
+// only supported on some browsers/installed PWAs, and gracefully ignored else).
+export async function registerReminderPeriodicSync() {
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    if (reg && "periodicSync" in reg) {
+      const status = await navigator.permissions?.query?.({ name: "periodic-background-sync" }).catch(() => null);
+      if (!status || status.state === "granted") {
+        await reg.periodicSync.register("pm-reminder-check", { minInterval: 60 * 60 * 1000 }).catch(() => {});
+      }
+    }
+  } catch {}
+}
+
 export function buildNotificationItems(followups = [], equipment = [], notes = []) {
   const items    = [];
   const todayStr = todayISO();
