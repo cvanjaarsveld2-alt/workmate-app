@@ -4,12 +4,15 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
-    // Let Rollup/Vite determine chunk boundaries automatically.
-    // The previous hand-written vendor chunks could split modules involved in
-    // an import cycle and produce a production-only TDZ error such as
-    // "Cannot access 'n' before initialization" after minification.
-    // Lazy-loaded screens are still split automatically by dynamic import().
+    // Keep production output readable/stable while we eliminate the
+    // production-only TDZ crash. The previous manual vendor chunking could
+    // split modules involved in an import cycle and, after minification,
+    // surface as "Cannot access 'n' before initialization".
+    //
+    // Dynamic imports still create separate lazy chunks automatically.
     rollupOptions: {},
+    minify: false,
+    sourcemap: true,
     chunkSizeWarningLimit: 600,
   },
 });
