@@ -12,103 +12,24 @@ const localStoreName=table=>LOCAL_STORE[table]||table;
 const MAX_SYNC_ATTEMPTS=5,PAGE_SIZE=1000,RECONCILE_MS=30000;
 let _syncInProgress=false,_globalSetData=null,_globalQueueRef=null;
 
-// Legacy/local workflow fields that are not present in production schemas.
-const REMOTE_EXCLUDED_FIELDS={
-  quotes:new Set(["contact_id","from_user_id","to_user_id","job_id","invoice_id"]),
-  followups:new Set(["invoice_id","job_id"]),
-};
+const REMOTE_EXCLUDED_FIELDS={quotes:new Set(["contact_id","from_user_id","to_user_id","job_id","invoice_id"]),followups:new Set(["invoice_id","job_id"])};
 function sanitizeRemotePayload(table,data){const out={...(data||{})};for(const field of REMOTE_EXCLUDED_FIELDS[table]||[])delete out[field];return out;}
 function cleanUUIDs(data){const fields=["id","user_id","team_id","client_id","contact_id","linked_note_id","linked_breakdown_id","assigned_to_user_id","from_user_id","to_user_id","quote_id","job_id","invoice_id"];const out={...(data||{})};fields.forEach(f=>{if(out[f]===""||out[f]===undefined)out[f]=null;});return out;}
 function cleanNumerics(data){const out={...(data||{})};["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins","subtotal","vat","total","amount_paid","balance_due"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;});return out;}
 
-// Remove an unknown PostgREST field and retry. This handles stale local payloads
-// without weakening database constraints or silently dropping real errors.
-async function upsertWithSchemaRecovery(table,payload,maxRetries=12){
-  let candidate={...payload};
-  for(let attempt=0;attempt<=maxRetries;attempt++){
-    const {error}=await supabase.from(table).upsert(candidate,{onConflict:"id"});
-    if(!error)return;
-    if(error.code!=="PGRST204")throw error;
-    const match=String(error.message||"").match(/Could not find the '([^']+)' column of '[^']+' in the schema cache/i);
-    const field=match?.[1];
-    if(!field||!(field in candidate))throw error;
-    delete candidate[field];
-  }
-  throw new Error(`Sync schema recovery exhausted for ${table}`);
-}
+async function upsertWithSchemaRecovery(table,payload,maxRetries=12){let candidate={...payload};for(let attempt=0;attempt<=maxRetries;attempt++){const {error}=await supabase.from(table).upsert(candidate,{onConflict:"id"});if(!error)return;if(error.code!=="PGRST204")throw error;const match=String(error.message||"").match(/Could not find the '([^']+)' column of '[^']+' in the schema cache/i);const field=match?.[1];if(!field||!(field in candidate))throw error;delete candidate[field];}throw new Error(`Sync schema recovery exhausted for ${table}`);}
 
-// Parent/child ordering prevents FK races when offline changes contain related
-// records created in the same offline session.
+// Parent/child ordering prevents FK races when related offline records are queued together.
 const SYNC_PRIORITY={clients:10,quotes:20,contacts:30,notes:30,equipment:30,expenses:30,leads:30,vehicle_checks:30,activities:30,breakdown_reports:30,repair_reports:30,custom_faults:30,service_reports:30,team_notifications:30,followups:40,jobs:50,invoices:60,payments:70};
 function sortSyncItems(items){return [...items].sort((a,b)=>{const pa=SYNC_PRIORITY[a.table]??100,pb=SYNC_PRIORITY[b.table]??100;if(pa!==pb)return pa-pb;return new Date(a.created_at||0)-new Date(b.created_at||0);});}
 
-export async function pushItem(item){
-  try{
-    const table=item?.table;if(!table||!item?.data)throw new Error("Invalid sync item");
-    let payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(item.data)));
-    if(payload.media)payload={...payload,media:payload.media.map(m=>({...m,base64:undefined}))};
-    if(["insert","upsert","update"].includes(item.action)){
-      if(TEAM_TABLES.has(table)&&!payload.user_id){const {data:authData}=await supabase.auth.getUser();if(authData?.user?.id)payload.user_id=authData.user.id;}
-      if(item.action==="update"&&payload.id){
-        const {data:existing,error:existingError}=await supabase.from(table).select("*").eq("id",payload.id).maybeSingle();
-        if(!existingError&&existing)payload={...existing,...payload};
-        payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(payload)));
-      }
-      await upsertWithSchemaRecovery(table,{...payload,sync_status:"synced"});
-    }else if(item.action==="delete"){
-      const {error}=await supabase.from(table).delete().eq("id",payload.id);if(error)throw error;
-    }else throw new Error(`Unknown sync action: ${item.action}`);
-    return {ok:true};
-  }catch(error){
-    const detail={code:error?.code,message:error?.message||"Unknown sync error",details:error?.details,hint:error?.hint};
-    console.warn(`[Sync] FAILED ${item?.table} ${item?.action}`,detail);
-    try{logCrash({screen:`Sync (${item?.table} ${item?.action})`,message:`${detail.message}${detail.code?` [${detail.code}]`:""}${detail.details?` — ${detail.details}`:""}`});}catch{}
-    return {ok:false,error:detail};
-  }
-}
+export async function pushItem(item){try{const table=item?.table;if(!table||!item?.data)throw new Error("Invalid sync item");let payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(item.data)));if(payload.media)payload={...payload,media:payload.media.map(m=>({...m,base64:undefined}))};if(["insert","upsert","update"].includes(item.action)){if(TEAM_TABLES.has(table)&&!payload.user_id){const {data:authData}=await supabase.auth.getUser();if(authData?.user?.id)payload.user_id=authData.user.id;}if(item.action==="update"&&payload.id){const {data:existing,error:existingError}=await supabase.from(table).select("*").eq("id",payload.id).maybeSingle();if(!existingError&&existing)payload={...existing,...payload};payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(payload)));}await upsertWithSchemaRecovery(table,{...payload,sync_status:"synced"});}else if(item.action==="delete"){const {error}=await supabase.from(table).delete().eq("id",payload.id);if(error)throw error;}else throw new Error(`Unknown sync action: ${item.action}`);return {ok:true};}catch(error){const detail={code:error?.code,message:error?.message||"Unknown sync error",details:error?.details,hint:error?.hint};console.warn(`[Sync] FAILED ${item?.table} ${item?.action}`,detail);try{logCrash({screen:`Sync (${item?.table} ${item?.action})`,message:`${detail.message}${detail.code?` [${detail.code}]`:""}${detail.details?` — ${detail.details}`:""}`});}catch{}return {ok:false,error:detail};}}
 
-export async function saveAndSync(item,table,action,setData,isOnline){
-  await offlineSave(localStoreName(table),item);
-  if(isOnline){
-    const result=await pushItem({table,action,data:item});
-    if(result.ok){const synced={...item,sync_status:"synced"};await offlineSave(localStoreName(table),synced);setData(current=>({...current,[localStoreName(table)]: (current[localStoreName(table)]||[]).map(row=>row.id===item.id?synced:row),syncQueue:(current.syncQueue||[]).filter(q=>q.data?.id!==item.id)}));return synced;}
-  }
-  const queueItem={id:`sq_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,table,action,data:item,status:"pending",created_at:new Date().toISOString(),attempts:0};
-  setData(current=>({...current,syncQueue:[queueItem,...(current.syncQueue||[]).filter(q=>!(q.table===table&&q.data?.id===item.id))]}));
-  return {...item,sync_status:"pending"};
-}
+export async function saveAndSync(item,table,action,setData,isOnline){await offlineSave(localStoreName(table),item);if(isOnline){const result=await pushItem({table,action,data:item});if(result.ok){const synced={...item,sync_status:"synced"};await offlineSave(localStoreName(table),synced);setData(current=>({...current,[localStoreName(table)]: (current[localStoreName(table)]||[]).map(row=>row.id===item.id?synced:row),syncQueue:(current.syncQueue||[]).filter(q=>q.data?.id!==item.id)}));return synced;}}const queueItem={id:`sq_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,table,action,data:item,status:"pending",created_at:new Date().toISOString(),attempts:0};setData(current=>({...current,syncQueue:[queueItem,...(current.syncQueue||[]).filter(q=>!(q.table===table&&q.data?.id===item.id))]}));return {...item,sync_status:"pending"};}
 
-function collapseQueue(queue){
-  const groups=new Map();for(const item of queue){const key=`${item.table}:${item.data?.id}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}
-  const winners=[],discarded=new Set();
-  for(const [,ops] of groups){ops.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0);const last=ops[ops.length-1],hasInsert=ops.some(op=>op.action==="insert"),hasDelete=ops.some(op=>op.action==="delete");
-    if(hasInsert&&hasDelete){ops.forEach(op=>discarded.add(op.id));continue;}
-    if(hasDelete)winners.push({...last,action:"delete"});else winners.push({...last,action:hasInsert?"upsert":"update",data:ops.reduce((record,op)=>({...record,...(op.data||{})}),{})});
-    const winner=winners[winners.length-1];ops.forEach(op=>{if(op.id!==winner.id)discarded.add(op.id);});
-  }
-  return {winners,discarded};
-}
+function collapseQueue(queue){const groups=new Map();for(const item of queue){const key=`${item.table}:${item.data?.id}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}const winners=[],discarded=new Set();for(const [,ops] of groups){ops.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));const last=ops[ops.length-1],hasInsert=ops.some(op=>op.action==="insert"),hasDelete=ops.some(op=>op.action==="delete");if(hasInsert&&hasDelete){ops.forEach(op=>discarded.add(op.id));continue;}if(hasDelete)winners.push({...last,action:"delete"});else winners.push({...last,action:hasInsert?"upsert":"update",data:ops.reduce((record,op)=>({...record,...(op.data||{})}),{})});const winner=winners[winners.length-1];ops.forEach(op=>{if(op.id!==winner.id)discarded.add(op.id);});}return {winners,discarded};}
 
-export async function pushSyncQueue(syncQueue,setData){
-  if(_syncInProgress)return;_syncInProgress=true;
-  try{
-    const pending=(syncQueue||[]).filter(item=>item.status==="pending");if(!pending.length)return;
-    const {winners,discarded}=collapseQueue(pending);
-    const ordered=sortSyncItems(winners);
-    const outcomes=[];
-    // Execute in dependency order. A child is never allowed to race its parent.
-    for(const item of ordered){
-      const result=await pushItem(item);
-      outcomes.push({queueId:item.id,entityId:item.data?.id,table:item.table,action:item.action,...result});
-    }
-    const succeeded=outcomes.filter(r=>r.ok),failed=outcomes.filter(r=>!r.ok);
-    for(const result of succeeded)if(result.action==="delete")offlineDelete(localStoreName(result.table),result.entityId).catch(()=>{});
-    if(failed.length){logEvent("sync_failed",{count:failed.length});window.dispatchEvent(new CustomEvent("powermate:sync_failed",{detail:{count:failed.length,message:`${failed.length} item${failed.length===1?"":"s"} failed to sync`}}));}
-    if(succeeded.length)logEvent("sync_succeeded",{count:succeeded.length});
-    const succeededIds=new Set(succeeded.map(r=>r.queueId)),failedIds=new Set(failed.map(r=>r.queueId)),succeededKeys=new Set(succeeded.map(r=>`${r.table}:${r.entityId}`));
-    setData(current=>{const nextQueue=(current.syncQueue||[]).filter(item=>!succeededIds.has(item.id)&&!(discarded.has(item.id)&&succeededKeys.has(`${item.table}:${item.data?.id}`))).map(item=>{if(!failedIds.has(item.id))return item;const attempts=(item.attempts||0)+1;return attempts>=MAX_SYNC_ATTEMPTS?{...item,attempts,status:"failed"}:{...item,attempts,status:"pending"};});const next={...current,syncQueue:nextQueue};for(const result of succeeded){const key=localStoreName(result.table);if(result.action==="delete")next[key]=(next[key]||[]).filter(row=>row.id!==result.entityId);else if(result.entityId)next[key]=(next[key]||[]).map(row=>row.id===result.entityId?{...row,sync_status:"synced"}:row);}return next;});
-  }finally{_syncInProgress=false;}
-}
+export async function pushSyncQueue(syncQueue,setData){if(_syncInProgress)return;_syncInProgress=true;try{const pending=(syncQueue||[]).filter(item=>item.status==="pending");if(!pending.length)return;const {winners,discarded}=collapseQueue(pending);const ordered=sortSyncItems(winners);const outcomes=[];for(const item of ordered){const result=await pushItem(item);outcomes.push({queueId:item.id,entityId:item.data?.id,table:item.table,action:item.action,...result});}const succeeded=outcomes.filter(r=>r.ok),failed=outcomes.filter(r=>!r.ok);for(const result of succeeded)if(result.action==="delete")offlineDelete(localStoreName(result.table),result.entityId).catch(()=>{});if(failed.length){logEvent("sync_failed",{count:failed.length});window.dispatchEvent(new CustomEvent("powermate:sync_failed",{detail:{count:failed.length,message:`${failed.length} item${failed.length===1?"":"s"} failed to sync`}}));}if(succeeded.length)logEvent("sync_succeeded",{count:succeeded.length});const succeededIds=new Set(succeeded.map(r=>r.queueId)),failedIds=new Set(failed.map(r=>r.queueId)),succeededKeys=new Set(succeeded.map(r=>`${r.table}:${r.entityId}`));setData(current=>{const nextQueue=(current.syncQueue||[]).filter(item=>!succeededIds.has(item.id)&&!(discarded.has(item.id)&&succeededKeys.has(`${item.table}:${item.data?.id}`))).map(item=>{if(!failedIds.has(item.id))return item;const attempts=(item.attempts||0)+1;return attempts>=MAX_SYNC_ATTEMPTS?{...item,attempts,status:"failed"}:{...item,attempts,status:"pending"};});const next={...current,syncQueue:nextQueue};for(const result of succeeded){const key=localStoreName(result.table);if(result.action==="delete")next[key]=(next[key]||[]).filter(row=>row.id!==result.entityId);else if(result.entityId)next[key]=(next[key]||[]).map(row=>row.id===result.entityId?{...row,sync_status:"synced"}:row);}return next;});}finally{_syncInProgress=false;}}
 
 async function pullAll(makeQuery){const rows=[];for(let page=0;;page+=1){const {data,error}=await makeQuery().range(page*PAGE_SIZE,page*PAGE_SIZE+PAGE_SIZE-1);if(error)return {data:null,error};const batch=data||[];rows.push(...batch);if(batch.length<PAGE_SIZE)return {data:rows,error:null};}}
 async function pullTable(table,uid){let query=supabase.from(table).select("*");if(table==="team_notifications")query=query.eq("to_user_id",uid);else if(!TEAM_TABLES.has(table))query=query.eq("user_id",uid);return pullAll(()=>query.order("created_at",{ascending:false}));}
