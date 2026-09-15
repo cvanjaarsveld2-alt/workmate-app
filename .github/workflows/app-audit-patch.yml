@@ -17,23 +17,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Patch App.jsx
+      - name: Patch App.jsx and sync.js
         shell: bash
         run: |
           python3 <<'PY'
           from pathlib import Path
-          p = Path("src/App.jsx")
-          s = p.read_text()
+
+          app = Path("src/App.jsx")
+          s = app.read_text()
 
           old = 'import { offlineSave, offlineGetAll, setOfflineUser, clearAllStores } from "./offline/offlineDb";'
           new = 'import { offlineSave, offlineGetAll, offlineReplaceAll, setOfflineUser, clearAllStores } from "./offline/offlineDb";'
-          if old in s and new not in s:
+          if old in s:
               s = s.replace(old, new, 1)
 
-          old = 'const syncQueueRef = useRef(data.syncQueue);\n  useEffect(() => { syncQueueRef.current = data.syncQueue; }, [data.syncQueue]);'
-          new = '''const syncQueueRef = useRef(data.syncQueue);\n  useEffect(() => { syncQueueRef.current = data.syncQueue; }, [data.syncQueue]);\n\n  // Keep the offline sync queue durable across reloads/browser restarts.\n  useEffect(() => {\n    if (!session?.user?.id) return;\n    const timer = setTimeout(() => {\n      offlineReplaceAll("syncQueue", data.syncQueue || []).catch(() => {});\n    }, 100);\n    return () => clearTimeout(timer);\n  }, [data.syncQueue, session?.user?.id]);\n\n  // Background Sync only wakes the page; authenticated Supabase writes remain\n  // in the page context and never require storing access tokens in the SW.\n  useEffect(() => {\n    if (!("serviceWorker" in navigator)) return;\n    const onMessage = (event) => {\n      if (event.data?.type === "POWERMATE_RETRY_SYNC") {\n        pushSyncQueue(syncQueueRef.current, setData);\n      }\n    };\n    navigator.serviceWorker.addEventListener("message", onMessage);\n    return () => navigator.serviceWorker.removeEventListener("message", onMessage);\n  }, []);'''
-          if old in s and 'Keep the offline sync queue durable across reloads' not in s:
-              s = s.replace(old, new, 1)
+          marker = 'const syncQueueRef = useRef(data.syncQueue);\n  useEffect(() => { syncQueueRef.current = data.syncQueue; }, [data.syncQueue]);'
+          addition = '''const syncQueueRef = useRef(data.syncQueue);\n  useEffect(() => { syncQueueRef.current = data.syncQueue; }, [data.syncQueue]);\n\n  // Keep the offline sync queue durable across browser restarts.\n  useEffect(() => {\n    if (!session?.user?.id) return;\n    const timer = setTimeout(() => {\n      offlineReplaceAll("syncQueue", data.syncQueue || []).catch(() => {});\n    }, 100);\n    return () => clearTimeout(timer);\n  }, [data.syncQueue, session?.user?.id]);\n\n  // Background Sync only wakes the authenticated page; the service worker\n  // never stores or uses the user's Supabase access token.\n  useEffect(() => {\n    if (!("serviceWorker" in navigator)) return;\n    const onMessage = (event) => {\n      if (event.data?.type === "POWERMATE_RETRY_SYNC") {\n        pushSyncQueue(syncQueueRef.current, setData);\n      }\n    };\n    navigator.serviceWorker.addEventListener("message", onMessage);\n    return () => navigator.serviceWorker.removeEventListener("message", onMessage);\n  }, []);'''
+          if marker in s and 'Keep the offline sync queue durable' not in s:
+              s = s.replace(marker, addition, 1)
 
           old = 'const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities"];'
           new = 'const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities", "breakdowns", "repairs", "customFaults", "syncQueue"];'
@@ -46,31 +47,38 @@ jobs:
               s = s.replace(old, new, 1)
 
           old = '''          ...(activities?.length ? { activities }  : {}),\n        }));'''
-          new = '''          ...(activities?.length || activities) ? { activities } : {},\n          ...(breakdowns?.length || breakdowns) ? { breakdowns } : {},\n          ...(repairs?.length || repairs) ? { repairs } : {},\n          ...(customFaults?.length || customFaults) ? { customFaults } : {},\n          ...(syncQueue?.length || syncQueue) ? { syncQueue } : {},\n        }));'''
+          new = '''          ...(activities ? { activities } : {}),\n          ...(breakdowns ? { breakdowns } : {}),\n          ...(repairs ? { repairs } : {}),\n          ...(customFaults ? { customFaults } : {}),\n          ...(syncQueue ? { syncQueue } : {}),\n        }));'''
           if old in s:
               s = s.replace(old, new, 1)
 
-          # Register browser Background Sync whenever a pending queue exists.
           marker = 'const t = setTimeout(() => pushSyncQueue(syncQueueRef.current, setData), 3000);'
           replacement = '''if ("serviceWorker" in navigator) {\n      navigator.serviceWorker.ready.then(reg => {\n        if (reg.sync && typeof reg.sync.register === "function") {\n          reg.sync.register("powermate-sync").catch(() => {});\n        }\n      }).catch(() => {});\n    }\n    const t = setTimeout(() => pushSyncQueue(syncQueueRef.current, setData), 3000);'''
           if marker in s and 'reg.sync.register("powermate-sync")' not in s:
               s = s.replace(marker, replacement, 1)
 
-          p.write_text(s)
+          app.write_text(s)
+
+          sync = Path("src/lib/sync.js")
+          t = sync.read_text()
+          old = '  "expenses", "leads", "activities", "breakdown_reports", "repair_reports",'
+          new = '  "expenses", "leads", "vehicle_checks", "activities", "breakdown_reports", "repair_reports",'
+          if old in t and '"vehicle_checks"' not in t.split('const SYNC_TABLES', 1)[1].split('];', 1)[0]:
+              t = t.replace(old, new, 1)
+          sync.write_text(t)
           PY
 
-      - name: Commit App audit patch
+      - name: Commit audit patch
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if git diff --quiet; then
-            echo "No App.jsx changes were necessary."
-            exit 0
+            echo "No additional source changes were necessary."
+          else
+            git add src/App.jsx src/lib/sync.js
+            git commit -m "fix: harden offline sync lifecycle [skip ci]"
+            git push origin HEAD:powermate-audit-fixes-2026-09-15
           fi
-          git add src/App.jsx
-          git commit -m "fix: harden offline app sync lifecycle [skip ci]"
-          git push origin HEAD:powermate-audit-fixes-2026-09-15
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
