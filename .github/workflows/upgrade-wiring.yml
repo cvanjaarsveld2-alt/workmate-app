@@ -19,31 +19,17 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
           app = Path('src/App.jsx')
           s = app.read_text()
-          s = s.replace(
-              'const TeamDashboardScreen = lazy(() => import("./screens/TeamDashboardScreen").then(m => ({ default: m.TeamDashboardScreen })));',
-              'const TeamDashboardScreen = lazy(() => import("./screens/TeamDashboardScreen").then(m => ({ default: m.TeamDashboardScreen })));\nconst JobsScreen = lazy(() => import("./screens/JobsScreen").then(m => ({ default: m.JobsScreen })));\nconst InvoicesScreen = lazy(() => import("./screens/InvoicesScreen").then(m => ({ default: m.InvoicesScreen })));'
-          )
+          s = s.replace('const TeamDashboardScreen = lazy(() => import("./screens/TeamDashboardScreen").then(m => ({ default: m.TeamDashboardScreen })));', 'const TeamDashboardScreen = lazy(() => import("./screens/TeamDashboardScreen").then(m => ({ default: m.TeamDashboardScreen })));\nconst JobsScreen = lazy(() => import("./screens/JobsScreen").then(m => ({ default: m.JobsScreen })));\nconst InvoicesScreen = lazy(() => import("./screens/InvoicesScreen").then(m => ({ default: m.InvoicesScreen })));')
           s = s.replace('"SharedInbox",\n        // ── NEW ──', '"SharedInbox", "Jobs", "Invoices",\n        // ── NEW ──')
-          s = s.replace(
-              'Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} quickAddTrigger={quickAddTrigger} />',
-              'Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} quickAddTrigger={quickAddTrigger} />,\n    Jobs: <JobsScreen userId={session.user.id} teamId={teamId} />,\n    Invoices: <InvoicesScreen userId={session.user.id} teamId={teamId} />'
-          )
-          s = s.replace(
-              'Expenses:      { label: "Expenses",         addHint: "expense" },',
-              'Expenses:      { label: "Expenses",         addHint: "expense" },\n                    Jobs:          { label: "Jobs",             addHint: null },\n                    Invoices:      { label: "Invoices",         addHint: null },'
-          )
+          s = s.replace('Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} quickAddTrigger={quickAddTrigger} />', 'Expenses:  <ExpensesScreen  data={data} setData={setData} userId={session.user.id} userEmail={session.user.email} quickAddTrigger={quickAddTrigger} />,\n    Jobs: <JobsScreen userId={session.user.id} teamId={teamId} />,\n    Invoices: <InvoicesScreen userId={session.user.id} teamId={teamId} />')
+          s = s.replace('Expenses:      { label: "Expenses",         addHint: "expense" },', 'Expenses:      { label: "Expenses",         addHint: "expense" },\n                    Jobs:          { label: "Jobs",             addHint: null },\n                    Invoices:      { label: "Invoices",         addHint: null },')
           app.write_text(s)
-
           cal = Path('src/screens/CalendarScreen.jsx')
           s = cal.read_text()
           needle = 'const items = followups.map(item => ({ ...item, _source: "followup", _kind: itemType(item) }));'
           replacement = '''const items = followups.map(item => ({ ...item, _source: "followup", _kind: itemType(item) }));
-
-    // Jobs are first-class calendar items so technicians can see scheduled,
-    // in-progress and completed field work alongside meetings and follow-ups.
     (data.jobs || []).filter(job =>
       (job.user_id === userId || job.assigned_to_user_id === userId || (teamId && job.team_id === teamId)) && job.scheduled_date
     ).forEach(job => {
@@ -59,23 +45,13 @@ jobs:
         _source: "job", _kind: "Service", _screen: "Jobs",
       });
     });'''
-          if needle in s:
-              s = s.replace(needle, replacement, 1)
+          if needle in s: s = s.replace(needle, replacement, 1)
           cal.write_text(s)
-
           nav = Path('src/components/NavDrawer.jsx')
           s = nav.read_text()
-          s = s.replace(
-              '{ key: "Meeting",      label: "Meeting Recorder", icon: Mic },',
-              '{ key: "Meeting",      label: "Meeting Recorder", icon: Mic },\n      { key: "Jobs",          label: "Jobs",              icon: CheckCircle2 },'
-          )
-          s = s.replace(
-              '{ key: "Expenses", label: "Expenses", icon: Receipt,  badgeKey: "unsubmittedExp" },',
-              '{ key: "Expenses", label: "Expenses", icon: Receipt,  badgeKey: "unsubmittedExp" },\n      { key: "Invoices", label: "Invoices", icon: Receipt },'
-          )
+          s = s.replace('{ key: "Meeting",      label: "Meeting Recorder", icon: Mic },', '{ key: "Meeting",      label: "Meeting Recorder", icon: Mic },\n      { key: "Jobs",          label: "Jobs",              icon: CheckCircle2 },')
+          s = s.replace('{ key: "Expenses", label: "Expenses", icon: Receipt,  badgeKey: "unsubmittedExp" },', '{ key: "Expenses", label: "Expenses", icon: Receipt,  badgeKey: "unsubmittedExp" },\n      { key: "Invoices", label: "Invoices", icon: Receipt },')
           nav.write_text(s)
-
-          # Remove this temporary workflow before committing, so it cannot run again.
           Path('.github/workflows/upgrade-wiring.yml').unlink()
           PY
           git config user.name "github-actions[bot]"
