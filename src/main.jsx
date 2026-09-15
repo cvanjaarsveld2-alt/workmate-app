@@ -5,6 +5,24 @@ import "./darkMode.css";
 import { initTheme } from "./lib/theme";
 import PowerMateApp from "./App.jsx";
 
+// Vite emits a preloadError when a long-lived tab asks for a lazy chunk from
+// an older deployment. Reload once so the browser receives the current HTML
+// and its current hashed chunk names instead of leaving the user on a broken
+// lazy route. The session guard prevents an infinite reload loop.
+window.addEventListener("vite:preloadError", (event) => {
+  try {
+    event.preventDefault();
+    if (!navigator.onLine) return;
+    const key = "powermate_chunk_reload_at";
+    const last = Number(sessionStorage.getItem(key) || 0);
+    if (Date.now() - last < 15000) return;
+    sessionStorage.setItem(key, String(Date.now()));
+    window.location.reload();
+  } catch {
+    // Let the normal React error boundary handle unexpected failures.
+  }
+});
+
 // Apply the saved theme (and start following the system for "auto") before the
 // first paint, so there's no flash of the wrong theme on load.
 initTheme();
