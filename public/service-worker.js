@@ -3,7 +3,7 @@
 // Reminder schedules are persisted in IndexedDB instead of relying on a
 // long-lived setTimeout (service workers are routinely suspended/killed).
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_NAME = "powermate-v5";
+const CACHE_NAME = "powermate-v6";
 const PRECACHE = ["/", "/index.html", "/icons/icon-192.png"];
 const REMINDER_DB = "powermate_sw";
 const REMINDER_STORE = "reminders";
@@ -88,13 +88,35 @@ self.addEventListener("activate", e => e.waitUntil(
 self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.hostname.includes("supabase")) return;
+
+  // Always prefer the newest HTML. If the network is unavailable, fall back
+  // to the cached app shell so the PWA still opens offline.
   if (e.request.mode === "navigate") {
     e.respondWith(fetch(e.request).then(res => {
-      const clone = res.clone(); caches.open(CACHE_NAME).then(c => c.put(e.request, clone)); return res;
+      const clone = res.clone();
+      caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      return res;
     }).catch(() => caches.match(e.request).then(r => r || caches.match("/"))));
     return;
   }
-  if (/\.(js|css|png|jpg|jpeg|svg|ico|woff2?)$/i.test(url.pathname)) {
+
+  // Hashed JS/CSS filenames change between deployments. Network-first avoids
+  // serving an old chunk to a newly deployed HTML document. When offline,
+  // fall back to whatever version is cached so the PWA remains usable.
+  if (/\.(js|css)$/i.test(url.pathname)) {
+    e.respondWith(fetch(e.request).then(res => {
+      if (res.ok) {
+        const clone = res.clone();
+        caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(e.request).then(r => r || Response.error())));
+    return;
+  }
+
+  // Other static assets can remain cache-first because they are not part of
+  // the JavaScript module graph that is vulnerable to deployment skew.
+  if (/\.(png|jpg|jpeg|svg|ico|woff2?)$/i.test(url.pathname)) {
     e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
       if (res.ok) { const clone = res.clone(); caches.open(CACHE_NAME).then(c => c.put(e.request, clone)); }
       return res;
