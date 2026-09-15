@@ -19,7 +19,7 @@ import { setMediaQueueUser, processMediaQueue } from "./lib/mediaQueue";
 import { todayISO, logEvent, genId } from "./lib/helpers";
 import { localStorageKey, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY, BRAND } from "./lib/constants";
 import { pushSyncQueue, pullFromSupabase, setupRealtimeSync, registerSyncHandlers, triggerImmediateSync } from "./lib/sync";
-import { requestNotificationPermission, scheduleNotificationsViaSW, buildNotificationItems } from "./lib/notifications";
+import { requestNotificationPermission, scheduleNotificationsViaSW, buildNotificationItems, checkRemindersNow, registerReminderPeriodicSync } from "./lib/notifications";
 import { runQuoteAutomations } from "./lib/quoteAutomation"; // NEW — quote auto-expire
 import { getPINHash, isSessionUnlocked, markSessionUnlocked } from "./auth/PINScreens";
 function resetPINAttempts() {
@@ -432,6 +432,22 @@ export default function PowerWorksApp() {
     if (notifPermission !== "granted") return;
     scheduleNotificationsViaSW(buildNotificationItems(data.followups, data.equipment, data.notes));
   }, [data.followups, data.equipment, data.notes, notifPermission]);
+
+  // Durable reminders: register periodic background sync once, and poke the SW
+  // to fire any due reminders whenever the app becomes visible/focused. This is
+  // the belt-and-braces that catches reminders the SW slept through.
+  useEffect(() => {
+    if (notifPermission !== "granted") return;
+    registerReminderPeriodicSync();
+    const onVisible = () => { if (document.visibilityState === "visible") checkRemindersNow(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", checkRemindersNow);
+    checkRemindersNow(); // check once on mount
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", checkRemindersNow);
+    };
+  }, [notifPermission]);
 
   // FIX #10: Read from syncQueueRef so the 3-second-later callback gets the current queue
   useEffect(() => {
