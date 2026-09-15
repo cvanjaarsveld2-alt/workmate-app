@@ -9,12 +9,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const DB_PREFIX = "powermate_offline_";
-const DB_VERSION = 11;
+const DB_VERSION = 12;
 
 const STORES = [
   "clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses",
   "leads", "vehicle_checks", "activities", "breakdowns", "repairs", "customFaults",
-  "serviceReports", "syncQueue",
+  "serviceReports", "teamNotifications", "syncQueue",
 ];
 
 let _db = null;
@@ -36,14 +36,19 @@ function openDB() {
     const request = indexedDB.open(name, DB_VERSION);
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      if (event.oldVersion < 1) {
-        STORES.forEach(storeName => { if (!db.objectStoreNames.contains(storeName)) db.createObjectStore(storeName, { keyPath: "id" }); });
-      } else {
-        STORES.forEach(storeName => { if (!db.objectStoreNames.contains(storeName)) db.createObjectStore(storeName, { keyPath: "id" }); });
-      }
+      STORES.forEach(storeName => {
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.createObjectStore(storeName, { keyPath: "id" });
+        }
+      });
     };
-    request.onsuccess = () => { _db = request.result; resolve(_db); };
+    request.onsuccess = () => {
+      _db = request.result;
+      _db.onversionchange = () => { try { _db.close(); } catch {} _db = null; };
+      resolve(_db);
+    };
     request.onerror = () => reject(request.error);
+    request.onblocked = () => console.warn("[offline] IndexedDB upgrade blocked", name);
   });
 }
 
