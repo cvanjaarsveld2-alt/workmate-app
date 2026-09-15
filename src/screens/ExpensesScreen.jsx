@@ -37,20 +37,38 @@ import {
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 
-const CATEGORIES = [
-  "Fuel", "Accommodation", "Meals & Entertainment", "Tools & Equipment",
-  "Parts & Materials", "Travel", "Office", "Other",
-];
+// ─── Expense categories with GL codes + SA VAT treatment ──────────────────────
+// GL codes are SENSIBLE SA DEFAULTS — your financial manager should edit these
+// once to match your actual Sage chart of accounts (her account numbers may
+// differ). vatClaim flags whether input VAT is claimable per SARS: entertainment
+// is NOT claimable (SARS s17(2)(a)); most others are if you hold a valid tax invoice.
+const CATEGORY_META = {
+  "Fuel":                 { gl: "5200", vatClaim: true,  note: "Diesel/petrol — input VAT claimable with valid tax invoice." },
+  "Accommodation":        { gl: "5210", vatClaim: true,  note: "Business travel accommodation — claimable." },
+  "Subsistence (meals)":  { gl: "5220", vatClaim: true,  note: "Meals while travelling for work — claimable." },
+  "Entertainment":        { gl: "5230", vatClaim: false, note: "Client/staff entertainment — input VAT NOT claimable (SARS)." },
+  "Tools & Equipment":    { gl: "5300", vatClaim: true,  note: "Tools/equipment — claimable (may be capitalised if >R7,000)." },
+  "Parts & Materials":    { gl: "5100", vatClaim: true,  note: "Job materials/consumables — claimable." },
+  "Travel":               { gl: "5240", vatClaim: true,  note: "Flights, parking — claimable (passenger vehicle hire has restrictions)." },
+  "Tolls":                { gl: "5241", vatClaim: true,  note: "SANRAL/e-toll fees — standard-rated 15%, input VAT claimable with the toll slip. Falls under Travel & motor vehicle expenses." },
+  "Office":               { gl: "5400", vatClaim: true,  note: "Office consumables/admin — claimable." },
+  "Other":                { gl: "5900", vatClaim: true,  note: "Uncategorised — confirm GL code with finance." },
+};
+
+const CATEGORIES = Object.keys(CATEGORY_META);
 
 const CATEGORY_COLORS = {
-  "Fuel":                  { bg: "#FEF3C7", text: "#92400E" },
-  "Accommodation":         { bg: "#EDE9FE", text: "#5B21B6" },
-  "Meals & Entertainment": { bg: "#FFE4D9", text: "#7C2D12" },
-  "Tools & Equipment":     { bg: "#DBEAFE", text: "#1E40AF" },
-  "Parts & Materials":     { bg: "#DCFCE7", text: "#166534" },
-  "Travel":                { bg: "#CFFAFE", text: "#0E7490" },
-  "Office":                { bg: "#F1F5F9", text: "#475569" },
-  "Other":                 { bg: "#F1F5F9", text: "#64748B" },
+  "Fuel":                 { bg: "#FEF3C7", text: "#92400E" },
+  "Accommodation":        { bg: "#EDE9FE", text: "#5B21B6" },
+  "Subsistence (meals)":  { bg: "#FFE4D9", text: "#7C2D12" },
+  "Entertainment":        { bg: "#FCE7F3", text: "#9D174D" },
+  "Meals & Entertainment":{ bg: "#FFE4D9", text: "#7C2D12" },
+  "Tools & Equipment":    { bg: "#DBEAFE", text: "#1E40AF" },
+  "Parts & Materials":    { bg: "#DCFCE7", text: "#166534" },
+  "Travel":               { bg: "#CFFAFE", text: "#0E7490" },
+  "Tolls":                { bg: "#E0F2FE", text: "#075985" },
+  "Office":               { bg: "#F1F5F9", text: "#475569" },
+  "Other":                { bg: "#F1F5F9", text: "#64748B" },
 };
 
 // Status used internally — no longer shown as pills on cards
@@ -340,6 +358,11 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
                               ⚠️ No receipt
                             </span>
                           )}
+                          {parseFloat(ex.amount_zar || ex.amount || 0) >= 5000 && !ex.vat_number && (CATEGORY_META[ex.category] || {}).vatClaim !== false && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-bold text-red-700">
+                              ⚠️ VAT no. needed (R5k+)
+                            </span>
+                          )}
                           {ex.payment_slip_url && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">
                               💳 Card slip
@@ -390,7 +413,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   const [detailExpense, setDetailExpense] = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
   const [form, setForm] = useState({
-    vendor: "", amount: "", vat_amount: "", currency: "ZAR",
+    vendor: "", vat_number: "", amount: "", vat_amount: "", currency: "ZAR",
     expense_date: todayISO(), expense_time: "", category: "Other",
     payment_method: "Card", notes: "", client_id: null, client_name: "",
   });
@@ -519,6 +542,8 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       id:               editId || genId(),
       user_id:          userId,
       vendor:           form.vendor,
+      vat_number:       form.vat_number || "",
+      gl_code:          (CATEGORY_META[form.category] || {}).gl || "",
       amount:           parseFloat(form.amount) || 0,
       vat_amount:       parseFloat(form.vat_amount) || null,
       currency:         form.currency || "ZAR",
@@ -581,6 +606,48 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   }
 
   const [financePack, setFinancePack] = React.useState(null);
+
+  // Export selected expenses as a CSV your financial manager can import into
+  // Sage (or any package). Columns cover everything she needs to code + claim VAT.
+  function exportCSV() {
+    const selected = expenses.filter(e => selectedIds.has(e.id));
+    if (selected.length === 0) { setToast("Select expenses to export"); return; }
+    const cols = ["Date","Vendor","Supplier VAT No","Category","GL Code","VAT Claimable",
+                  "Currency","Gross Amount","VAT Amount","Net Amount","ZAR Gross","Payment Method","Has Receipt","VAT No Missing (R5k+)","Notes"];
+    const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = selected.map(e => {
+      const meta = CATEGORY_META[e.category] || {};
+      const gross = parseFloat(e.amount || 0);
+      const vat = parseFloat(e.vat_amount || 0);
+      const net = gross - vat;
+      return [
+        e.expense_date || "",
+        e.vendor || "",
+        e.vat_number || "",
+        e.category || "",
+        e.gl_code || meta.gl || "",
+        meta.vatClaim === false ? "No (SARS)" : "Yes",
+        e.currency || "ZAR",
+        gross.toFixed(2),
+        vat.toFixed(2),
+        net.toFixed(2),
+        parseFloat(e.amount_zar || gross).toFixed(2),
+        e.payment_method || "",
+        (e.receipt_url || e.no_receipt === false) ? "Yes" : "No",
+        (parseFloat(e.amount_zar || gross) >= 5000 && !e.vat_number && meta.vatClaim !== false) ? "YES — chase VAT no." : "",
+        (e.notes || "").replace(/\n/g, " "),
+      ].map(esc).join(",");
+    });
+    const csv = [cols.map(esc).join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `PowerWorks_Expenses_${todayISO()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setToast(`Exported ${selected.length} expense${selected.length !== 1 ? "s" : ""} to CSV`);
+  }
 
   async function sendToFinance() {
     const selected = expenses.filter(e => selectedIds.has(e.id));
@@ -859,6 +926,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
         )}
 
         <Field label="Vendor" value={form.vendor} onChange={v => setForm(f => ({ ...f, vendor: v }))} placeholder="e.g. Engen Garage" />
+        <Field label="Supplier VAT no. (optional)" value={form.vat_number} onChange={v => setForm(f => ({ ...f, vat_number: v }))} placeholder="For input VAT claims — from the tax invoice" />
         <div className="grid grid-cols-2 gap-3">
           <AmountField label="Amount (total)" value={form.amount} onChange={v => setForm(f => ({ ...f, amount: v }))} placeholder="0.00" required />
           <div>
@@ -1189,10 +1257,16 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 : <><Check size={13} /> Select all ({filtered.length})</>}
             </button>
           </div>
-          <button onClick={sendToFinance} disabled={selectedIds.size === 0}
-            className="w-full flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40 min-h-[48px]" style={{ background: "#8B1A1A" }}>
-            <FileDown size={15} /> Export {selectedIds.size > 0 ? `${selectedIds.size} expense${selectedIds.size !== 1 ? "s" : ""} ` : ""}as PDF
-          </button>
+          <div className="flex gap-2">
+            <button onClick={sendToFinance} disabled={selectedIds.size === 0}
+              className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40 min-h-[48px]" style={{ background: "#8B1A1A" }}>
+              <FileDown size={15} /> Export {selectedIds.size > 0 ? `${selectedIds.size} ` : ""}as PDF
+            </button>
+            <button onClick={exportCSV} disabled={selectedIds.size === 0}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 px-4 text-sm font-bold border border-slate-200 bg-white text-slate-700 disabled:opacity-40 min-h-[48px]">
+              <FileDown size={15} /> CSV
+            </button>
+          </div>
         </div>
       )}
 
