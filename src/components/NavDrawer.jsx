@@ -1,7 +1,7 @@
 // ─── Navigation Drawer ────────────────────────────────────────────────────────
 // Slide-out drawer — grouped navigation, brand identity, sign out.
-// UPDATED: Added Calendar + Team Dashboard + Jobs & Billing.
-import React, { useEffect, useState } from "react";
+// Jobs & Billing is loaded lazily to avoid pulling finance screens into the app shell.
+import React, { useEffect, useState, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, Home, Users, UserPlus, Calendar as CalendarIcon, Clipboard, Wrench,
@@ -9,11 +9,11 @@ import {
   TrendingUp, Inbox, Bell, LayoutDashboard, AlertTriangle, PhoneCall,
   CheckCircle2, BriefcaseBusiness,
 } from "lucide-react";
-import { supabase } from "../supabase";
 import { BRAND } from "../lib/constants";
 import { Wordmark } from "./Wordmark";
-import { JobsScreen } from "../screens/JobsScreen";
-import { InvoicesScreen } from "../screens/InvoicesScreen";
+
+const JobsScreen = React.lazy(() => import("../screens/JobsScreen").then(m => ({ default: m.JobsScreen })));
+const InvoicesScreen = React.lazy(() => import("../screens/InvoicesScreen").then(m => ({ default: m.InvoicesScreen })));
 
 const SECTIONS = [
   { title: "MAIN", items: [
@@ -57,11 +57,12 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
   useEffect(() => {
     if (!financeOpen) return;
     let active = true;
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    import("../supabase").then(({ supabase }) => supabase.auth.getSession()).then(async ({ data: { session } }) => {
       if (!active) return;
       const uid = session?.user?.id || null;
       setFinanceUserId(uid);
       if (uid) {
+        const { supabase } = await import("../supabase");
         const { data: membership } = await supabase.from("team_members").select("team_id").eq("user_id", uid).maybeSingle();
         if (active) setFinanceTeamId(membership?.team_id || null);
       }
@@ -89,7 +90,7 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
             <motion.div initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }} transition={{ type: "spring", damping: 28, stiffness: 280 }} className="fixed top-0 left-0 bottom-0 z-[71] w-[82%] max-w-[320px] bg-white shadow-2xl flex flex-col">
               <div className="px-5 pt-12 pb-4 flex items-end justify-between" style={{ background: "linear-gradient(135deg, #8B1A1A 0%, #6B1414 100%)" }}>
                 <Wordmark variant="light" size="md" />
-                <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"><X size={16} className="text-white" /></button>
+                <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mb-0.5" style={{ background: "rgba(255,255,255,0.15)" }}><X size={16} className="text-white" /></button>
               </div>
               <div className="flex-1 overflow-y-auto py-2">
                 {SECTIONS.map(section => (
@@ -125,25 +126,25 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {financeOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[80] bg-slate-100 overflow-y-auto">
-            <div className="min-h-screen px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-10">
-              <div className="mx-auto max-w-2xl space-y-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div><p className="text-xl font-black text-slate-900">Jobs & Billing</p><p className="text-sm text-slate-500">Quote → job → invoice → payment</p></div>
-                  <button onClick={() => setFinanceOpen(false)} className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center" aria-label="Close Jobs & Billing"><X size={20} /></button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setFinanceTab("jobs")} className={`rounded-xl py-3 text-sm font-black ${financeTab === "jobs" ? "bg-slate-900 text-white" : "bg-white text-slate-600 border border-slate-200"}`}>Jobs</button>
-                  <button onClick={() => setFinanceTab("invoices")} className={`rounded-xl py-3 text-sm font-black ${financeTab === "invoices" ? "bg-slate-900 text-white" : "bg-white text-slate-600 border border-slate-200"}`}>Invoices & Payments</button>
-                </div>
-                {!financeUserId ? <div className="rounded-xl bg-white p-6 text-center text-slate-400">Loading billing…</div> : financeTab === "jobs" ? <JobsScreen userId={financeUserId} teamId={financeTeamId} /> : <InvoicesScreen userId={financeUserId} teamId={financeTeamId} />}
-              </div>
+      {financeOpen && (
+        <div className="fixed inset-0 z-[90] bg-slate-100/95 backdrop-blur-sm overflow-y-auto">
+          <div className="mx-auto max-w-2xl min-h-screen px-4 py-6 pb-20">
+            <div className="flex items-center justify-between mb-4">
+              <div><p className="text-xl font-black text-slate-900">Jobs & Billing</p><p className="text-sm text-slate-500">Quote → job → invoice → payment</p></div>
+              <button onClick={() => setFinanceOpen(false)} className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center"><X size={20}/></button>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => setFinanceTab("jobs")} className={`flex-1 rounded-xl py-3 text-sm font-bold ${financeTab === "jobs" ? "bg-slate-900 text-white" : "bg-white text-slate-600 border border-slate-200"}`}>Jobs</button>
+              <button onClick={() => setFinanceTab("invoices")} className={`flex-1 rounded-xl py-3 text-sm font-bold ${financeTab === "invoices" ? "bg-slate-900 text-white" : "bg-white text-slate-600 border border-slate-200"}`}>Invoices</button>
+            </div>
+            {!financeUserId ? <div className="rounded-2xl bg-white p-6 text-center text-slate-500">Loading finance workspace…</div> : (
+              <Suspense fallback={<div className="rounded-2xl bg-white p-6 text-center text-slate-500">Loading…</div>}>
+                {financeTab === "jobs" ? <JobsScreen userId={financeUserId} teamId={financeTeamId} /> : <InvoicesScreen userId={financeUserId} teamId={financeTeamId} />}
+              </Suspense>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
