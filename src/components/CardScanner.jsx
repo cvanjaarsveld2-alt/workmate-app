@@ -40,7 +40,8 @@ async function compressImage(file, maxWidth = 1600, quality = 0.85) {
 }
 
 async function uploadCardImage(blob, userId) {
-  const fileName = `contacts/${userId}/${genId()}.jpg`;
+  // Storage RLS requires the first path segment to be the authenticated user's ID.
+  const fileName = `${userId}/contacts/${genId()}.jpg`;
   const { data, error } = await supabase.storage
     .from("powermate-media")
     .upload(fileName, blob, { contentType: "image/jpeg", upsert: false });
