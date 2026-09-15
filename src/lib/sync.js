@@ -39,4 +39,38 @@ async function pullTable(table,uid){let query=supabase.from(table).select("*");i
 export async function pullFromSupabase(uid,setData){if(!uid)return false;try{const results=await Promise.all(SYNC_TABLES.map(table=>pullTable(table,uid)));const next={};for(let i=0;i<SYNC_TABLES.length;i++){const table=SYNC_TABLES[i],result=results[i];if(result.error){console.warn(`[Sync] pull failed: ${table}`,result.error);continue;}next[localStoreName(table)]=result.data||[];await offlineReplaceAll(localStoreName(table),result.data||[]);}setData(current=>({...current,...next}));return true;}catch(e){console.warn("[Sync] pull failed",e);return false;}}
 export function registerSyncHandlers(setData,queueRef){_globalSetData=setData;_globalQueueRef=queueRef;}
 export function triggerImmediateSync(){if(_globalSetData&&_globalQueueRef)pushSyncQueue(_globalQueueRef.current||[],_globalSetData).catch(()=>{});}
-export function setupRealtimeSync(uid,setData){if(!uid)return()=>{};const channels=SYNC_TABLES.map(table=>{let channel=supabase.channel(`powermate-${uid}-${table}`);channel=channel.on("postgres_changes",{event:"*",schema:"public",table},payload=>{const local=localStoreName(table);if(table==="team_notifications"&&payload.new?.to_user_id!==uid)return;if(TEAM_TABLES.has(table)&&payload.new?.team_id==null)return;setData(current=>{const rows=current[local]||[];if(payload.eventType==="DELETE")return {...current,[local]:rows.filter(r=>r.id!==payload.old?.id)};const row=payload.new;if(!row?.id)return current;const idx=rows.findIndex(r=>r.id===row.id);return {...current,[local]:idx>=0?rows.map((r,i)=>i===idx?row:r):[row,...rows]};});});channel.subscribe();channels.push(channel);return channel;});const timer=setInterval(()=>{if(document.visibilityState!=="hidden"&&navigator.onLine)pullFromSupabase(uid,setData).catch(()=>{});},RECONCILE_MS);return()=>{clearInterval(timer);channels.forEach(c=>supabase.removeChannel(c));};}
+export function setupRealtimeSync(uid,setData){
+  if(!uid)return()=>{};
+
+  // IMPORTANT: build the array without referencing it from inside its own
+  // initializer. The previous `const channels = SYNC_TABLES.map(...
+  // channels.push(...))` hit the temporal-dead-zone at startup because the
+  // map callback runs before `channels` has been initialized.
+  const channels = SYNC_TABLES.map(table=>{
+    let channel=supabase.channel(`powermate-${uid}-${table}`);
+    channel=channel.on("postgres_changes",{event:"*",schema:"public",table},payload=>{
+      const local=localStoreName(table);
+      if(table==="team_notifications"&&payload.new?.to_user_id!==uid)return;
+      if(TEAM_TABLES.has(table)&&payload.new?.team_id==null)return;
+      setData(current=>{
+        const rows=current[local]||[];
+        if(payload.eventType==="DELETE")return {...current,[local]:rows.filter(r=>r.id!==payload.old?.id)};
+        const row=payload.new;
+        if(!row?.id)return current;
+        const idx=rows.findIndex(r=>r.id===row.id);
+        return {...current,[local]:idx>=0?rows.map((r,i)=>i===idx?row:r):[row,...rows]};
+      });
+    });
+    channel.subscribe();
+    return channel;
+  });
+
+  const timer=setInterval(()=>{
+    if(document.visibilityState!=="hidden"&&navigator.onLine)pullFromSupabase(uid,setData).catch(()=>{});
+  },RECONCILE_MS);
+
+  return()=>{
+    clearInterval(timer);
+    channels.forEach(c=>supabase.removeChannel(c));
+  };
+}
