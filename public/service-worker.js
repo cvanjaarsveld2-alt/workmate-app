@@ -3,8 +3,8 @@
 // Reminder schedules are persisted in IndexedDB instead of relying on a
 // long-lived setTimeout (service workers are routinely suspended/killed).
 // ─────────────────────────────────────────────────────────────────────────────
-const CACHE_NAME = "powermate-v6";
-const PRECACHE = ["/", "/index.html", "/icons/icon-192.png"];
+const CACHE_NAME = "powermate-v7";
+const PRECACHE = ["/", "/index.html", "/icon-192.png"];
 const REMINDER_DB = "powermate_sw";
 const REMINDER_STORE = "reminders";
 
@@ -62,8 +62,8 @@ async function fireDueReminders() {
   for (const item of due) {
     await self.registration.showNotification(item.title || "PowerMate Reminder", {
       body: item.body || "",
-      icon: "/icons/icon-192.png",
-      badge: "/icons/icon-192.png",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
       vibrate: [100, 50, 100],
       tag: item.tag || item.id,
       data: { url: item.url || "/" },
@@ -89,8 +89,6 @@ self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.hostname.includes("supabase")) return;
 
-  // Always prefer the newest HTML. If the network is unavailable, fall back
-  // to the cached app shell so the PWA still opens offline.
   if (e.request.mode === "navigate") {
     e.respondWith(fetch(e.request).then(res => {
       const clone = res.clone();
@@ -100,9 +98,6 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // Hashed JS/CSS filenames change between deployments. Network-first avoids
-  // serving an old chunk to a newly deployed HTML document. When offline,
-  // fall back to whatever version is cached so the PWA remains usable.
   if (/\.(js|css)$/i.test(url.pathname)) {
     e.respondWith(fetch(e.request).then(res => {
       if (res.ok) {
@@ -114,8 +109,6 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // Other static assets can remain cache-first because they are not part of
-  // the JavaScript module graph that is vulnerable to deployment skew.
   if (/\.(png|jpg|jpeg|svg|ico|woff2?)$/i.test(url.pathname)) {
     e.respondWith(caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
       if (res.ok) { const clone = res.clone(); caches.open(CACHE_NAME).then(c => c.put(e.request, clone)); }
@@ -124,8 +117,6 @@ self.addEventListener("fetch", e => {
   }
 });
 
-// Background Sync is only used as a wake-up signal. The authenticated page
-// performs the actual Supabase writes, avoiding storing auth tokens in the SW.
 self.addEventListener("sync", e => {
   if (e.tag === "powermate-sync") {
     e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clients => {
@@ -135,7 +126,6 @@ self.addEventListener("sync", e => {
   }
 });
 
-// Periodic Sync is a best-effort wake-up where the browser supports it.
 self.addEventListener("periodicsync", e => {
   if (e.tag === "powermate-reminders") e.waitUntil(fireDueReminders().catch(() => {}));
 });
@@ -144,9 +134,14 @@ self.addEventListener("push", e => {
   let data = { title: "PowerMate", body: "You have a notification", url: "/" };
   try { if (e.data) data = { ...data, ...e.data.json() }; } catch {}
   e.waitUntil(self.registration.showNotification(data.title, {
-    body: data.body, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png",
-    vibrate: [100, 50, 100], tag: data.tag || "powermate", renotify: !!data.tag,
-    data: { url: data.url || "/" }, actions: [{ action: "open", title: "Open PowerMate" }],
+    body: data.body,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    vibrate: [100, 50, 100],
+    tag: data.tag || "powermate",
+    renotify: !!data.tag,
+    data: { url: data.url || "/" },
+    actions: [{ action: "open", title: "Open PowerMate" }],
   }));
 });
 
