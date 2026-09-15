@@ -14,10 +14,16 @@ const TEAM_TABLES = new Set([
   "clients", "followups", "quotes", "contacts", "notes", "equipment",
   "leads", "activities", "breakdown_reports", "repair_reports", "custom_faults",
 ]);
-const LOCAL_STORE = { breakdown_reports: "breakdowns", repair_reports: "repairs", custom_faults: "customFaults" };
+const LOCAL_STORE = {
+  breakdown_reports: "breakdowns",
+  repair_reports: "repairs",
+  custom_faults: "customFaults",
+  team_notifications: "teamNotifications",
+};
 const localStoreName = (table) => LOCAL_STORE[table] || table;
 const MAX_SYNC_ATTEMPTS = 5;
 const PAGE_SIZE = 1000;
+const RECONCILE_MS = 30000;
 let _syncInProgress = false;
 let _globalSetData = null;
 let _globalQueueRef = null;
@@ -169,15 +175,26 @@ async function pullTable(table, uid) {
 }
 
 export async function pullFromSupabase(uid, setData) {
+  if (!uid) return false;
   try {
     const results = await Promise.all(SYNC_TABLES.map((table) => pullTable(table, uid)));
     const byTable = Object.fromEntries(SYNC_TABLES.map((table, i) => [table, results[i]]));
+    let hadErrors = false;
+    for (const table of SYNC_TABLES) {
+      const result = byTable[table];
+      if (result?.error) {
+        hadErrors = true;
+        const detail = { code: result.error.code, message: result.error.message, details: result.error.details, hint: result.error.hint };
+        console.warn(`[Sync] PULL FAILED ${table}`, detail);
+        try { logCrash({ screen: `Sync (pull ${table})`, message: `${detail.message || "Pull failed"}${detail.code ? ` [${detail.code}]` : ""}${detail.details ? ` — ${detail.details}` : ""}` }); } catch {}
+      }
+    }
     setData((current) => {
       const queue = current.syncQueue || [];
       const next = { ...current };
       for (const table of SYNC_TABLES) {
         const result = byTable[table];
-        if (result.error || !result.data) continue;
+        if (result?.error || !result?.data) continue;
         const store = localStoreName(table);
         const pendingIds = new Set(queue.filter((item) => item.table === table && ["pending","failed"].includes(item.status)).map((item) => item.data?.id).filter(Boolean));
         const merged = new Map(result.data.map((row) => [row.id, row]));
@@ -196,9 +213,10 @@ export async function pullFromSupabase(uid, setData) {
     });
     localStorage.setItem(`pm_sync_cursor_${uid}`, new Date().toISOString());
     localStorage.setItem(`pm_sync_fullpull_${uid}`, String(Date.now()));
-    return true;
+    return !hadErrors;
   } catch (error) {
     console.warn("[Sync] Pull failed:", error);
+    try { logCrash({ screen: "Sync (full pull)", message: error?.message || "Pull failed" }); } catch {}
     return false;
   }
 }
@@ -210,13 +228,14 @@ export function resetSyncCursor(uid) {
 }
 
 export function setupRealtimeSync(uid, setData) {
+  if (!uid) return () => {};
   const channels = SYNC_TABLES.map((table) => {
     const config = { event: "*", schema: "public", table };
     if (table === "team_notifications") config.filter = `to_user_id=eq.${uid}`;
     else if (!TEAM_TABLES.has(table)) config.filter = `user_id=eq.${uid}`;
     return supabase.channel(`rt_${table}_${uid}`).on("postgres_changes", config, (payload) => {
       setData((current) => {
-        const key = table === "team_notifications" ? "teamNotifications" : localStoreName(table);
+        const key = localStoreName(table);
         const rows = current[key] || [];
         const changed = payload.eventType === "DELETE" ? payload.old : payload.new;
         if (!changed?.id) return current;
@@ -224,16 +243,43 @@ export function setupRealtimeSync(uid, setData) {
           offlineDelete(key, changed.id).catch(() => {});
           return { ...current, [key]: rows.filter((row) => row.id !== changed.id) };
         }
-        const pending = (current.syncQueue || []).some((item) => item.table === table && item.data?.id === changed.id && item.status === "pending");
+        const pending = (current.syncQueue || []).some((item) => item.table === table && item.data?.id === changed.id && ["pending","failed"].includes(item.status));
         if (pending) return current;
         const row = { ...changed, sync_status: "synced" };
         const updated = rows.some((item) => item.id === changed.id) ? rows.map((item) => item.id === changed.id ? row : item) : [row, ...rows];
         offlineSave(key, row).catch(() => {});
         return { ...current, [key]: updated };
       });
-    }).subscribe();
+    }).subscribe((status) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.warn(`[Sync] Realtime ${table} ${status}; reconciliation will recover it`);
+        try { logCrash({ screen: `Sync (realtime ${table})`, message: `Realtime ${status}` }); } catch {}
+      }
+    });
   });
-  return () => channels.forEach((channel) => supabase.removeChannel(channel));
+
+  // Realtime is the fast path; periodic reconciliation is the safety net for
+  // sleeping phones, dropped sockets, missed events, and app resumes.
+  let pulling = false;
+  const reconcile = async () => {
+    if (pulling || !navigator.onLine || document.visibilityState === "hidden") return;
+    pulling = true;
+    try { await pullFromSupabase(uid, setData); } finally { pulling = false; }
+  };
+  const timer = setInterval(reconcile, RECONCILE_MS);
+  const onVisible = () => { if (document.visibilityState === "visible") reconcile(); };
+  const onOnline = () => reconcile();
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("online", onOnline);
+  window.addEventListener("focus", reconcile);
+
+  return () => {
+    clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVisible);
+    window.removeEventListener("online", onOnline);
+    window.removeEventListener("focus", reconcile);
+    channels.forEach((channel) => supabase.removeChannel(channel));
+  };
 }
 
 export function registerSyncHandlers(setData, queueRef) { _globalSetData = setData; _globalQueueRef = queueRef; }
