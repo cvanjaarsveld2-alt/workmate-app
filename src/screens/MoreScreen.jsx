@@ -8,6 +8,7 @@ import ReportExport from "../ReportExport";
 import { BackupExport } from "../components/BackupExport";
 import { CompanyDocuments } from "../components/CompanyDocuments";
 import { subscribeToPush, pushSupported, iosNeedsInstall } from "../lib/pushManager";
+import { supabase } from "../supabase";
 
 export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen, userId, teamId }) {
   const { confirm, dialog } = useConfirm();
@@ -26,6 +27,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
   );
   const [pushState, setPushState] = useState("idle");
   const [pushError, setPushError] = useState("");
+  const [testPushState, setTestPushState] = useState("idle");
   const [pinEnabled, setPinEnabled] = useState(
     !localStorage.getItem("pm_pin_disabled") && !!localStorage.getItem(PIN_KEY)
   );
@@ -46,6 +48,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
     const result = await subscribeToPush(userId);
     if (result.ok) {
       setPushState("active");
+      setToast("Notifications enabled on this device");
     } else if (result.reason === "ios-needs-install") {
       setPushState("ios-install");
     } else if (result.reason === "denied") {
@@ -61,6 +64,36 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         : `Failed: ${result.reason || "unknown error"}`
       );
     }
+  }
+
+  async function handleTestPush() {
+    if (pushState !== "active") {
+      setToast("Enable Background Notifications first");
+      return;
+    }
+    setTestPushState("working");
+    const { data: result, error } = await supabase.functions.invoke("send-notifications", {
+      body: {
+        to_user_id: userId,
+        title: "PowerMate test ✓",
+        body: "Push notifications are connected. This is a live test from PowerMate.",
+        url: "/?screen=Notifications",
+      },
+    });
+    if (error) {
+      console.error("[Push] Test notification failed:", error);
+      setTestPushState("error");
+      setToast(`Test failed: ${error.message || "send-notifications error"}`);
+      return;
+    }
+    if (!result?.sent) {
+      setTestPushState("error");
+      setToast(result?.reason === "no subscriptions" ? "No push subscription found for this device" : "Push was not delivered");
+      return;
+    }
+    setTestPushState("sent");
+    setToast(`Test notification sent to ${result.sent} device${result.sent === 1 ? "" : "s"}`);
+    window.setTimeout(() => setTestPushState("idle"), 2500);
   }
 
   const flaggedQuotes = (data.quotes || []).filter(q => q.status === "Pending").length;
@@ -225,6 +258,20 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
               </Btn>
           }
         </div>
+        {pushState === "active" && (
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-slate-700">Delivery test</p>
+                <p className="text-[11px] text-slate-400">Sends a real push to this device.</p>
+              </div>
+              <Btn size="sm" variant="secondary" onClick={handleTestPush} disabled={testPushState === "working"}>
+                <Bell size={13} />
+                {testPushState === "working" ? "Sending…" : testPushState === "sent" ? "Sent ✓" : "Send Test"}
+              </Btn>
+            </div>
+          </div>
+        )}
         {pushState === "error" && (
           <div className="rounded-xl bg-red-50 border border-red-200 p-3 space-y-2">
             <p className="text-xs font-bold text-red-800">⚠ Couldn't enable notifications</p>
@@ -249,6 +296,11 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             <p className="text-xs text-slate-500 leading-relaxed">
               Notifications are blocked. Re-enable them in your browser's site settings for this app, then tap Enable.
             </p>
+          </div>
+        )}
+        {pushState === "unsupported" && (
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
+            <p className="text-xs text-slate-500 leading-relaxed">This browser does not support background push notifications. You can still use in-app reminders.</p>
           </div>
         )}
       </Card>
