@@ -11,34 +11,19 @@ export async function requestNotificationPermission() {
 export async function scheduleNotificationsViaSW(items) {
   try {
     const reg = await navigator.serviceWorker?.ready;
-    reg?.active?.postMessage({ type: "SCHEDULE_NOTIFICATIONS", items });
+    reg?.active?.postMessage({ type: "SCHEDULE_NOTIFICATIONS", items, replace: true });
+    // Best-effort browser wake-up for long-range reminders. Unsupported browsers
+    // still retain the durable SW schedule and restore it on the next wake.
+    if (reg?.periodicSync && !reg.periodicSync.getTags) return;
+    if (reg?.periodicSync) {
+      const tags = await reg.periodicSync.getTags();
+      if (!tags.includes("powermate-reminders")) {
+        try { await reg.periodicSync.register("powermate-reminders", { minInterval: 15 * 60 * 1000 }); } catch {}
+      }
+    }
   } catch (e) {
     console.warn("SW schedule failed", e);
   }
-}
-
-// Poke the SW to fire any reminders that have come due. Call on app open/focus
-// and after visibility changes — this is the belt-and-braces that catches
-// reminders the SW would otherwise only fire on its own wake events.
-export async function checkRemindersNow() {
-  try {
-    const reg = await navigator.serviceWorker?.ready;
-    reg?.active?.postMessage({ type: "CHECK_REMINDERS" });
-  } catch {}
-}
-
-// Ask the browser to wake the SW periodically to check reminders (best-effort;
-// only supported on some browsers/installed PWAs, and gracefully ignored else).
-export async function registerReminderPeriodicSync() {
-  try {
-    const reg = await navigator.serviceWorker?.ready;
-    if (reg && "periodicSync" in reg) {
-      const status = await navigator.permissions?.query?.({ name: "periodic-background-sync" }).catch(() => null);
-      if (!status || status.state === "granted") {
-        await reg.periodicSync.register("pm-reminder-check", { minInterval: 60 * 60 * 1000 }).catch(() => {});
-      }
-    }
-  } catch {}
 }
 
 export function buildNotificationItems(followups = [], equipment = [], notes = []) {
