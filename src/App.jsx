@@ -13,7 +13,7 @@ import {
 
 import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
-import { offlineSave, offlineGetAll, setOfflineUser, clearAllStores } from "./offline/offlineDb";
+import { offlineSave, offlineGetAll, offlineReplaceAll, setOfflineUser, clearAllStores } from "./offline/offlineDb";
 import { setMediaQueueUser, processMediaQueue } from "./lib/mediaQueue";
 
 import { todayISO, logEvent, genId } from "./lib/helpers";
@@ -143,6 +143,28 @@ export default function PowerWorksApp() {
   // ── FIX #10 + #11: Use a ref for syncQueue so callbacks always read current data ──
   const syncQueueRef = useRef(data.syncQueue);
   useEffect(() => { syncQueueRef.current = data.syncQueue; }, [data.syncQueue]);
+
+  // Keep the offline sync queue durable across browser restarts.
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const timer = setTimeout(() => {
+      offlineReplaceAll("syncQueue", data.syncQueue || []).catch(() => {});
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [data.syncQueue, session?.user?.id]);
+
+  // Background Sync only wakes the authenticated page; the service worker
+  // never stores or uses the user's Supabase access token.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (event) => {
+      if (event.data?.type === "POWERMATE_RETRY_SYNC") {
+        pushSyncQueue(syncQueueRef.current, setData);
+      }
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -309,9 +331,9 @@ export default function PowerWorksApp() {
       } catch (e) { console.warn("localStorage load failed:", e); }
 
       try {
-        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities"];
+        const tables = ["clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses", "leads", "activities", "breakdowns", "repairs", "customFaults", "syncQueue"];
         const results = await Promise.all(tables.map(t => offlineGetAll(t)));
-        const [clients, followups, quotes, notes, equipment, contacts, expenses, leads, activities] = results;
+        const [clients, followups, quotes, notes, equipment, contacts, expenses, leads, activities, breakdowns, repairs, customFaults, syncQueue] = results;
         setData(d => ({
           ...d,
           ...(clients?.length    ? { clients }    : {}),
@@ -322,7 +344,11 @@ export default function PowerWorksApp() {
           ...(contacts?.length   ? { contacts }   : {}),
           ...(expenses?.length   ? { expenses }   : {}),
           ...(leads?.length      ? { leads }      : {}),
-          ...(activities?.length ? { activities }  : {}),
+          ...(activities ? { activities } : {}),
+          ...(breakdowns ? { breakdowns } : {}),
+          ...(repairs ? { repairs } : {}),
+          ...(customFaults ? { customFaults } : {}),
+          ...(syncQueue ? { syncQueue } : {}),
         }));
       } catch (e) { console.warn("IndexedDB load failed:", e); }
     }
@@ -454,6 +480,13 @@ export default function PowerWorksApp() {
     if (!isOnline || !session) return;
     const pending = (data.syncQueue || []).filter(i => i.status === "pending");
     if (pending.length === 0) return;
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready.then(reg => {
+        if (reg.sync && typeof reg.sync.register === "function") {
+          reg.sync.register("powermate-sync").catch(() => {});
+        }
+      }).catch(() => {});
+    }
     const t = setTimeout(() => pushSyncQueue(syncQueueRef.current, setData), 3000);
     return () => clearTimeout(t);
   }, [isOnline, session, data.syncQueue?.length]);
