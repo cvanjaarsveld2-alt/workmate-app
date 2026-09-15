@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { Card, Btn, PageHeader } from "../components/ui";
-import { MapPin, Play, CheckCircle2, Clock, RefreshCw } from "lucide-react";
-
-const STATUSES = ["scheduled", "in_progress", "completed", "cancelled"];
+import { MapPin, Play, CheckCircle2, Clock, RefreshCw, Sparkles } from "lucide-react";
 
 export function JobsScreen({ userId, teamId }) {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(null);
+  const [assistant, setAssistant] = useState(null);
+  const [assistantLoading, setAssistantLoading] = useState(null);
   const [error, setError] = useState("");
 
   async function load() {
@@ -30,6 +30,15 @@ export function JobsScreen({ userId, teamId }) {
     setSaving(null);
   }
 
+  async function askAssistant(job) {
+    setAssistantLoading(job.id); setAssistant(null); setError("");
+    const { data, error: e } = await supabase.functions.invoke("technician-assist", { body: { fault: job.description || job.title, equipment: job.title } });
+    if (e) setError(e.message || "Technician assistant unavailable");
+    else if (data?.advice) setAssistant({ jobId: job.id, ...data });
+    else setError("No technician guidance was returned.");
+    setAssistantLoading(null);
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader title="Jobs" subtitle="Technician jobs & field work" />
@@ -49,9 +58,11 @@ export function JobsScreen({ userId, teamId }) {
           </div>
           <div className="flex gap-2 flex-wrap">
             {job.location && <a className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600" target="_blank" rel="noreferrer" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.location)}`}>Open route</a>}
+            <Btn size="sm" variant="secondary" onClick={() => askAssistant(job)} disabled={assistantLoading === job.id}><Sparkles size={13}/>{assistantLoading === job.id ? "Thinking…" : "Technician assist"}</Btn>
             {job.status === "scheduled" && <Btn size="sm" onClick={() => setStatus(job, "in_progress")} disabled={saving === job.id}><Play size={13}/> Start job</Btn>}
             {job.status === "in_progress" && <Btn size="sm" onClick={() => setStatus(job, "completed")} disabled={saving === job.id}><CheckCircle2 size={13}/> Complete</Btn>}
           </div>
+          {assistant?.jobId === job.id && <div className="rounded-xl bg-violet-50 border border-violet-200 p-3 space-y-2"><p className="text-xs font-black text-violet-800">Technician assistant · {assistant.mode === "ai" ? "AI" : "safe fallback"}</p><p className="text-sm font-bold text-violet-900">{assistant.advice.diagnosis}</p>{assistant.advice.checks?.map((check, i) => <p key={i} className="text-xs text-violet-800">{i + 1}. {check}</p>)}<p className="text-[11px] text-violet-700">⚠ {assistant.advice.safety}</p></div>}
         </Card>
       ))}
     </div>
