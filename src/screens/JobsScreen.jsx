@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabase";
 import { Card, Btn, PageHeader } from "../components/ui";
-import { MapPin, Play, CheckCircle2, Clock, RefreshCw, Sparkles } from "lucide-react";
+import { MapPin, Play, CheckCircle2, Clock, RefreshCw, Sparkles, FileText } from "lucide-react";
+import { createInvoiceFromJob } from "../lib/jobInvoiceAutomation";
 
 export function JobsScreen({ userId, teamId }) {
   const [jobs, setJobs] = useState([]);
+  const [quotes, setQuotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(null);
   const [assistant, setAssistant] = useState(null);
@@ -14,8 +16,12 @@ export function JobsScreen({ userId, teamId }) {
   async function load() {
     if (!userId) return;
     setLoading(true); setError("");
-    const { data, error: e } = await supabase.from("jobs").select("*").order("scheduled_date", { ascending: true }).order("scheduled_time", { ascending: true });
-    if (e) setError(e.message); else setJobs(data || []);
+    const [{ data: jobsData, error: jobsError }, { data: quotesData, error: quotesError }] = await Promise.all([
+      supabase.from("jobs").select("*").order("scheduled_date", { ascending: true }).order("scheduled_time", { ascending: true }),
+      supabase.from("quotes").select("id, value, client_name, description").eq("user_id", userId),
+    ]);
+    if (jobsError) setError(jobsError.message); else setJobs(jobsData || []);
+    if (!quotesError) setQuotes(quotesData || []);
     setLoading(false);
   }
   useEffect(() => { load(); }, [userId, teamId]);
@@ -30,6 +36,16 @@ export function JobsScreen({ userId, teamId }) {
     setSaving(null);
   }
 
+  async function createInvoice(job) {
+    setSaving(`invoice:${job.id}`); setError("");
+    const quote = quotes.find(q => q.id === job.quote_id);
+    const result = await createInvoiceFromJob({ ...job, _quoteValue: quote?.value || 0 }, userId, teamId);
+    if (!result.ok) setError(result.error?.message || "Could not create invoice.");
+    else if (!result.created) setError(`Invoice ${result.invoice?.invoice_number || "already exists"}.`);
+    else setError(`Invoice ${result.invoice.invoice_number} created.`);
+    setSaving(null);
+  }
+
   async function askAssistant(job) {
     setAssistantLoading(job.id); setAssistant(null); setError("");
     const { data, error: e } = await supabase.functions.invoke("technician-assist", { body: { fault: job.description || job.title, equipment: job.title } });
@@ -41,16 +57,16 @@ export function JobsScreen({ userId, teamId }) {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Jobs" subtitle="Technician jobs & field work" />
-      {error && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
+      <PageHeader title="Jobs" subtitle="Technician jobs, field work & invoicing" />
+      {error && <div className={`rounded-xl border p-3 text-sm ${error.startsWith("Invoice ") ? "bg-green-50 border-green-200 text-green-700" : "bg-red-50 border-red-200 text-red-700"}`}>{error}</div>}
       <div className="flex justify-end"><Btn size="sm" variant="secondary" onClick={load}><RefreshCw size={14}/> Refresh</Btn></div>
       {loading ? <Card className="p-6 text-center text-slate-400">Loading jobs…</Card> : jobs.length === 0 ? (
-        <Card className="p-6 text-center"><p className="font-bold text-slate-700">No jobs yet</p><p className="text-sm text-slate-400 mt-1">Jobs created from accepted quotes will appear here.</p></Card>
+        <Card className="p-6 text-center"><p className="font-bold text-slate-700">No jobs yet</p><p className="text-sm text-slate-400 mt-1">Accepted quotes automatically become jobs.</p></Card>
       ) : jobs.map(job => (
         <Card key={job.id} className="p-4 space-y-3">
           <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0"><p className="font-black text-slate-900 truncate">{job.job_number || "Job"} · {job.title}</p><p className="text-sm text-slate-500">{job.description || "Field service"}</p></div>
-            <span className="text-xs font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600">{job.status.replace("_", " ")}</span>
+            <span className="text-xs font-bold px-2 py-1 rounded-full bg-slate-100 text-slate-600">{(job.status || "scheduled").replace("_", " ")}</span>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
             <span className="flex items-center gap-1"><Clock size={13}/>{job.scheduled_date || "Unscheduled"}{job.scheduled_time ? ` · ${job.scheduled_time}` : ""}</span>
@@ -61,6 +77,7 @@ export function JobsScreen({ userId, teamId }) {
             <Btn size="sm" variant="secondary" onClick={() => askAssistant(job)} disabled={assistantLoading === job.id}><Sparkles size={13}/>{assistantLoading === job.id ? "Thinking…" : "Technician assist"}</Btn>
             {job.status === "scheduled" && <Btn size="sm" onClick={() => setStatus(job, "in_progress")} disabled={saving === job.id}><Play size={13}/> Start job</Btn>}
             {job.status === "in_progress" && <Btn size="sm" onClick={() => setStatus(job, "completed")} disabled={saving === job.id}><CheckCircle2 size={13}/> Complete</Btn>}
+            {job.status === "completed" && <Btn size="sm" variant="secondary" onClick={() => createInvoice(job)} disabled={saving === `invoice:${job.id}`}><FileText size={13}/>{saving === `invoice:${job.id}` ? "Creating…" : "Create invoice"}</Btn>}
           </div>
           {assistant?.jobId === job.id && <div className="rounded-xl bg-violet-50 border border-violet-200 p-3 space-y-2"><p className="text-xs font-black text-violet-800">Technician assistant · {assistant.mode === "ai" ? "AI" : "safe fallback"}</p><p className="text-sm font-bold text-violet-900">{assistant.advice.diagnosis}</p>{assistant.advice.checks?.map((check, i) => <p key={i} className="text-xs text-violet-800">{i + 1}. {check}</p>)}<p className="text-[11px] text-violet-700">⚠ {assistant.advice.safety}</p></div>}
         </Card>
