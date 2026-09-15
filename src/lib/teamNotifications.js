@@ -3,6 +3,26 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { supabase } from "../supabase";
 
+async function sendPush({ toUserId, title, body, url }) {
+  try {
+    const { data, error } = await supabase.functions.invoke("send-notifications", {
+      body: { to_user_id: toUserId, title, body, url },
+    });
+    if (error) {
+      console.warn("[Push] send-notifications failed:", error);
+      return { ok: false, error };
+    }
+    if (!data?.sent) {
+      console.warn("[Push] no device received notification:", data || { ok: false });
+      return { ok: false, data };
+    }
+    return { ok: true, data };
+  } catch (error) {
+    console.warn("[Push] unexpected send failure:", error);
+    return { ok: false, error };
+  }
+}
+
 // ─── Send a share/assignment notification ─────────────────────────────────────
 export async function sendAssignmentNotification({
   fromUserId,
@@ -20,7 +40,7 @@ export async function sendAssignmentNotification({
   const message   = `${fromName} shared a ${typeLabel} with you: ${recordTitle}`;
 
   try {
-    await supabase.rpc("notify_assignment", {
+    const { error: rpcError } = await supabase.rpc("notify_assignment", {
       p_to_user_id:   toUserId,
       p_from_user_id: fromUserId,
       p_team_id:      teamId,
@@ -29,16 +49,17 @@ export async function sendAssignmentNotification({
       p_record_title: recordTitle,
       p_message:      message,
     });
+    if (rpcError) throw rpcError;
 
-    // Edge Function handles subscription lookup server-side (safer)
-    await supabase.functions.invoke("send-notifications", {
-      body: {
-        to_user_id: toUserId,
-        title: `PowerMate — ${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} shared with you`,
-        body:  message,
-        url:   "/?screen=SharedInbox",
-      },
-    }).catch(() => {});
+    // Edge Function handles subscription lookup server-side (safer).
+    // Do not hide delivery failures: in-app notification still succeeds, but
+    // diagnostics/console can now show why the push did not arrive.
+    await sendPush({
+      toUserId,
+      title: `PowerMate — ${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} shared with you`,
+      body: message,
+      url: "/?screen=SharedInbox",
+    });
   } catch (e) {
     console.warn("Assignment notification failed:", e);
   }
@@ -64,26 +85,23 @@ export async function sendResponseNotification({
   const message       = `${emoji} ${responderName} ${verb} your shared ${typeLabel}: ${recordTitle}`;
 
   try {
-    // Write in-app notification to the original sender
-    await supabase.rpc("notify_assignment", {
+    const { error: rpcError } = await supabase.rpc("notify_assignment", {
       p_to_user_id:   fromUserId,
       p_from_user_id: responderUserId,
       p_team_id:      teamId,
       p_record_type:  recordType,
-      p_record_id:    null,        // response notification — no record to open
+      p_record_id:    null,
       p_record_title: recordTitle,
       p_message:      message,
     });
+    if (rpcError) throw rpcError;
 
-    // Push to original sender (best-effort)
-    await supabase.functions.invoke("send-notifications", {
-      body: {
-        to_user_id: fromUserId,
-        title: "PowerMate — Share response",
-        body:  message,
-        url:   "/?screen=Notifications",
-      },
-    }).catch(() => {});
+    await sendPush({
+      toUserId: fromUserId,
+      title: "PowerMate — Share response",
+      body: message,
+      url: "/?screen=Notifications",
+    });
   } catch (e) {
     console.warn("Response notification failed:", e);
   }
