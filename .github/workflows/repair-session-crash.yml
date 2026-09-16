@@ -1,0 +1,35 @@
+name: Repair App session guard
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch session-null render crash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/App.jsx')
+          s = p.read_text()
+          marker = ' const screens='
+          guard = ' if(loading)return <DataLoadingScreen/>;if(!session?.user)return <AuthScreen/>;'
+          if guard.strip() not in s:
+              if marker not in s:
+                  raise SystemExit('App screens marker not found')
+              s = s.replace(marker, guard + marker, 1)
+              p.write_text(s)
+          PY
+      - name: Commit repair and remove one-shot workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx
+          git diff --cached --quiet || git commit -m "fix: guard App render while auth session is null"
+          rm -f .github/workflows/repair-session-crash.yml
+          git add .github/workflows/repair-session-crash.yml
+          git diff --cached --quiet || git commit -m "chore: remove one-shot repair workflow"
+          git push
