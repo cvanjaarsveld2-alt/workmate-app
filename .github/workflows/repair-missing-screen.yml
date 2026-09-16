@@ -1,0 +1,30 @@
+name: Repair missing screen import
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Add RepairScreen import and remove temporary workflow
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/App.jsx')
+          s = p.read_text()
+          anchor = 'const BreakdownScreen = lazy(() => import("./screens/BreakdownScreen").then(m => ({ default: m.BreakdownScreen })));'
+          repair = 'const RepairScreen = lazy(() => import("./screens/RepairScreen").then(m => ({ default: m.RepairScreen })));'
+          if 'const RepairScreen = lazy' not in s:
+              s = s.replace(anchor, anchor + '\n' + repair, 1)
+          p.write_text(s)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.jsx
+          git commit -m "fix: register repair screen component"
+          git rm .github/workflows/repair-missing-screen.yml
+          git commit -m "chore: remove temporary repair workflow"
+          git push
