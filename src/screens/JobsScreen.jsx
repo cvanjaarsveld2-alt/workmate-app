@@ -5,13 +5,14 @@ import{saveAndSync}from"../lib/sync";
 import{Card,Btn,PageHeader}from"../components/ui";
 import{MapPin,Play,CheckCircle2,Clock,RefreshCw,Sparkles,FileText,Save,WifiOff}from"lucide-react";
 import{createInvoiceFromJob}from"../lib/jobInvoiceAutomation";
+import{useOnlineStatus}from"../hooks/useOnlineStatus";
 
 export function JobsScreen({userId,teamId}){
  const[jobs,setJobs]=useState([]),[quotes,setQuotes]=useState([]),[loading,setLoading]=useState(true),[saving,setSaving]=useState(null),[assistant,setAssistant]=useState(null),[assistantLoading,setAssistantLoading]=useState(null),[error,setError]=useState(""),[drafts,setDrafts]=useState({});
- const online=typeof navigator==="undefined"?true:navigator.onLine;
+ const online=useOnlineStatus();
  const apply=(rows)=>{const mine=(rows||[]).filter(j=>j.user_id===userId||j.assigned_to_user_id===userId||(teamId&&j.team_id===teamId));setJobs(mine);setDrafts(d=>{const n={...d};mine.forEach(j=>n[j.id]={technician_notes:j.technician_notes||"",work_done:j.work_done||"",parts_used:Array.isArray(j.parts_used)?j.parts_used.join(", "):""});return n})};
  async function load(){if(!userId)return;setLoading(true);setError("");const[lq,lquotes]=await Promise.all([offlineGetAll("jobs").catch(()=>[]),offlineGetAll("quotes").catch(()=>[])]);apply(lq);setQuotes((lquotes||[]).filter(q=>q.user_id===userId));if(online){const[jq,qq]=await Promise.all([supabase.from("jobs").select("*").order("scheduled_date",{ascending:true}).order("scheduled_time",{ascending:true}),supabase.from("quotes").select("id,value,client_name,description").eq("user_id",userId)]);if(!jq.error){apply(jq.data||[]);await Promise.all((jq.data||[]).map(x=>offlineSave("jobs",x).catch(()=>{})))}else if(!lq.length)setError(jq.error.message);if(!qq.error){setQuotes(qq.data||[]);await Promise.all((qq.data||[]).map(x=>offlineSave("quotes",x).catch(()=>{})))}}setLoading(false)}
- useEffect(()=>{load()},[userId,teamId]);
+ useEffect(()=>{load()},[userId,teamId,online]);
  const draft=j=>drafts[j.id]||{technician_notes:"",work_done:"",parts_used:""};
  async function updateJob(job,patch,key){const updated={...job,...patch,sync_status:"pending"};setSaving(key);setError("");setJobs(r=>r.map(x=>x.id===job.id?updated:x));const set=(fn)=>fn(c=>({...c,jobs:(c.jobs||[]).map(x=>x.id===job.id?updated:x)}));const saved=await saveAndSync(updated,"jobs","update",set,online);if(saved?.sync_status==="synced")setJobs(r=>r.map(x=>x.id===job.id?saved:x));setSaving(null);return saved||updated}
  async function saveWork(job){const d=draft(job);await updateJob(job,{technician_notes:d.technician_notes,work_done:d.work_done,parts_used:d.parts_used.split(",").map(x=>x.trim()).filter(Boolean)},`save:${job.id}`)}
