@@ -1,99 +1,14 @@
 // ─── Quote Automation ─────────────────────────────────────────────────────────
-// Quote lifecycle: chase follow-up, client stage advancement, expiry, and job creation.
 import { todayISO, genId } from "./helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "./sync";
 import { withTeamId } from "./teamId";
 import { createJobFromAcceptedQuote } from "./jobInvoiceAutomation";
 
-function addBusinessDays(dateStr, days) {
-  const d = new Date(`${dateStr}T12:00:00`);
-  let added = 0;
-  while (added < days) {
-    d.setDate(d.getDate() + 1);
-    const day = d.getDay();
-    if (day !== 0 && day !== 6) added++;
-  }
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-export function autoCreateChaseFollowup(quote, userId, setData, teamId = null, existingFollowups = []) {
-  if (!quote?.id || !userId) return null;
-  if (existingFollowups.some(item => item.quote_id === quote.id && item.auto_generated)) return null;
-
-  const today = todayISO();
-  const chaseDate = addBusinessDays(quote.sent_date || today, 3);
-  const item = withTeamId({
-    id: genId(), user_id: userId, client_id: quote.client_id || null,
-    client: quote.client_name || "", branch: "",
-    title: `Chase quote: ${(quote.description || "").slice(0, 60)}`,
-    date: chaseDate, time: "09:00", reminder: "morning",
-    notes: `Auto-created: follow up on quote (${quote.description || ""}) — R ${parseFloat(quote.value || 0).toLocaleString("en-ZA")}`,
-    completed: false, auto_generated: true, quote_id: quote.id,
-    created_at: new Date().toISOString(), sync_status: "pending",
-  }, teamId);
-
-  setData(d => ({
-    ...d,
-    followups: [item, ...(d.followups || [])],
-    syncQueue: [{ id: genId(), table: "followups", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-  }));
-  offlineSave("followups", item).then(() => triggerImmediateSync());
-  return item;
-}
-
-export function autoAdvanceOnAccept(quote, clients, setData) {
-  if (!quote?.client_name) return;
-  const client = (clients || []).find(c => c.company && c.company.toLowerCase() === quote.client_name.toLowerCase());
-  if (!client || client.stage === "Won" || client.stage === "Active") return;
-  const updated = { ...client, stage: "Active", sync_status: "pending" };
-  setData(d => ({
-    ...d,
-    clients: (d.clients || []).map(c => c.id === client.id ? updated : c),
-    syncQueue: [{ id: genId(), table: "clients", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-  }));
-  offlineSave("clients", updated).then(() => triggerImmediateSync());
-}
-
-export function autoExpireStaleQuotes(quotes, setData, userId) {
-  const today = todayISO();
-  const cutoffDate = new Date(`${today}T12:00:00`);
-  cutoffDate.setDate(cutoffDate.getDate() - 14);
-  const cutoff = `${cutoffDate.getFullYear()}-${String(cutoffDate.getMonth() + 1).padStart(2, "0")}-${String(cutoffDate.getDate()).padStart(2, "0")}`;
-  const stale = (quotes || []).filter(q => q.status === "Pending" && q.user_id === userId && (q.sent_date || q.created_at?.slice(0, 10) || "") < cutoff);
-  if (!stale.length) return;
-  const updates = stale.map(q => ({ ...q, status: "Expired", sync_status: "pending" }));
-  setData(d => ({
-    ...d,
-    quotes: (d.quotes || []).map(q => updates.find(u => u.id === q.id) || q),
-    syncQueue: [...updates.map(u => ({ id: genId(), table: "quotes", action: "update", data: u, status: "pending", created_at: new Date().toISOString() })), ...(d.syncQueue || [])],
-  }));
-  updates.forEach(u => offlineSave("quotes", u));
-  triggerImmediateSync();
-}
-
-export async function ensureAcceptedQuotesHaveJobs(quotes, userId, teamId = null) {
-  const accepted = (quotes || []).filter(q => q.status === "Accepted" && q.user_id === userId);
-  const results = [];
-  for (const quote of accepted) results.push(await createJobFromAcceptedQuote(quote, userId, teamId));
-  return results;
-}
-
-export function runQuoteAutomations(data, setData, userId, teamId = null) {
-  if (!userId) return;
-  const quotes = data.quotes || [];
-  const followups = data.followups || [];
-
-  autoExpireStaleQuotes(quotes, setData, userId);
-
-  // A sent quote gets one chase task. Accepted quotes also move the matching
-  // client into Active and are converted into a job.
-  quotes.filter(q => q.user_id === userId && q.sent_date && ["Pending", "Accepted"].includes(q.status))
-    .forEach(q => autoCreateChaseFollowup(q, userId, setData, teamId, followups));
-
-  quotes.filter(q => q.user_id === userId && q.status === "Accepted")
-    .forEach(q => autoAdvanceOnAccept(q, data.clients || [], setData));
-
-  ensureAcceptedQuotesHaveJobs(quotes, userId, teamId)
-    .catch(error => console.warn("Quote→job automation failed:", error));
-}
+function addBusinessDays(dateStr, days){const d=new Date(`${dateStr}T12:00:00`);let n=0;while(n<days){d.setDate(d.getDate()+1);if(d.getDay()!==0&&d.getDay()!==6)n++}return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
+export function autoCreateChaseFollowup(quote,userId,setData,teamId=null,existing=[]){if(!quote?.id||!userId||existing.some(x=>x.quote_id===quote.id&&x.auto_generated))return null;const item=withTeamId({id:genId(),user_id:userId,client_id:quote.client_id||null,client:quote.client_name||"",branch:"",title:`Chase quote: ${(quote.description||"").slice(0,60)}`,date:addBusinessDays(quote.sent_date||todayISO(),3),time:"09:00",reminder:"morning",notes:`Auto-created: follow up on quote (${quote.description||""}) — R ${parseFloat(quote.value||0).toLocaleString("en-ZA")}`,completed:false,auto_generated:true,quote_id:quote.id,created_at:new Date().toISOString(),sync_status:"pending"},teamId);setData(d=>({...d,followups:[item,...(d.followups||[])],syncQueue:[{id:genId(),table:"followups",action:"insert",data:item,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));offlineSave("followups",item).then(()=>triggerImmediateSync());return item}
+export function autoAdvanceOnAccept(quote,clients,setData){if(!quote?.client_name)return;const c=(clients||[]).find(x=>x.company&&x.company.toLowerCase()===quote.client_name.toLowerCase());if(!c||c.stage==="Won"||c.stage==="Active")return;const u={...c,stage:"Active",sync_status:"pending"};setData(d=>({...d,clients:(d.clients||[]).map(x=>x.id===c.id?u:x),syncQueue:[{id:genId(),table:"clients",action:"update",data:u,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));offlineSave("clients",u).then(()=>triggerImmediateSync())}
+export function autoExpireStaleQuotes(quotes,setData,userId){const cutoffDate=new Date(`${todayISO()}T12:00:00`);cutoffDate.setDate(cutoffDate.getDate()-14);const cutoff=`${cutoffDate.getFullYear()}-${String(cutoffDate.getMonth()+1).padStart(2,"0")}-${String(cutoffDate.getDate()).padStart(2,"0")}`;const updates=(quotes||[]).filter(q=>q.status==="Pending"&&q.user_id===userId&&(q.sent_date||q.created_at?.slice(0,10)||"")<cutoff).map(q=>({...q,status:"Expired",sync_status:"pending"}));if(!updates.length)return;setData(d=>({...d,quotes:(d.quotes||[]).map(q=>updates.find(u=>u.id===q.id)||q),syncQueue:[...updates.map(u=>({id:genId(),table:"quotes",action:"update",data:u,status:"pending",created_at:new Date().toISOString()})),...(d.syncQueue||[])]}));updates.forEach(u=>offlineSave("quotes",u));triggerImmediateSync()}
+export async function ensureAcceptedQuotesHaveJobs(quotes,userId,teamId=null,setData=null,isOnline=typeof navigator==="undefined"?true:navigator.onLine){return createJobs(quotes,userId,teamId,setData,isOnline)}
+async function createJobs(quotes,userId,teamId,setData,isOnline){const accepted=(quotes||[]).filter(q=>q.status==="Accepted"&&q.user_id===userId),results=[];for(const q of accepted)results.push(await createJobFromAcceptedQuote(q,userId,teamId,setData,isOnline));return results}
+export function runQuoteAutomations(data,setData,userId,teamId=null){if(!userId)return;const quotes=data.quotes||[],followups=data.followups||[],online=typeof navigator==="undefined"?true:navigator.onLine;autoExpireStaleQuotes(quotes,setData,userId);quotes.filter(q=>q.user_id===userId&&q.sent_date&&["Pending","Accepted"].includes(q.status)).forEach(q=>autoCreateChaseFollowup(q,userId,setData,teamId,followups));quotes.filter(q=>q.user_id===userId&&q.status==="Accepted").forEach(q=>autoAdvanceOnAccept(q,data.clients||[],setData));ensureAcceptedQuotesHaveJobs(quotes,userId,teamId,setData,online).catch(e=>console.warn("Quote→job automation failed:",e))}
