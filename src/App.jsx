@@ -36,6 +36,7 @@ const WeeklyPlannerScreen = lazy(() => import("./screens/WeeklyPlannerScreen").t
 const ColdCallScreen = lazy(() => import("./screens/ColdCallScreen").then(m => ({ default: m.ColdCallScreen })));
 const JackSelectorScreen = lazy(() => import("./screens/JackSelectorScreen").then(m => ({ default: m.JackSelectorScreen })));
 const BreakdownScreen = lazy(() => import("./screens/BreakdownScreen").then(m => ({ default: m.BreakdownScreen })));
+const RepairScreen = lazy(() => import("./screens/RepairScreen").then(m => ({ default: m.RepairScreen })));
 const AnalyticsScreen = lazy(() => import("./screens/AnalyticsScreen").then(m => ({ default: m.AnalyticsScreen })));
 const LeadsScreen = lazy(() => import("./screens/LeadsScreen").then(m => ({ default: m.LeadsScreen })));
 const TeamScreen = lazy(() => import("./screens/TeamScreen").then(m => ({ default: m.TeamScreen })));
