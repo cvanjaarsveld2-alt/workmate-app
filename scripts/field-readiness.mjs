@@ -8,7 +8,7 @@ const fail=[];
 for(const f of required)if(!fs.existsSync(path.join(root,f)))fail.push(`Missing ${f}`);
 const lazy=[...app.matchAll(/const\s+(\w+)\s*=\s*lazy\(\(\)\s*=>\s*import\("\.\/screens\/([^\"]+)"\)/g)];
 for(const[,name,file]of lazy){const candidate=path.join(root,"src/screens",file);if(!fs.existsSync(candidate)&&!fs.existsSync(`${candidate}.jsx`)&&!fs.existsSync(`${candidate}.js`))fail.push(`Missing lazy screen ${name}: ${file}`)}
-const screenKeys=[...app.matchAll(/^\s{4}(\w+):\s*</gm)].map(m=>m[1]);
+const screenKeys=[...app.matchAll(/(?:const screens=\{|,)(\w+):\s*</g)].map(m=>m[1]);
 for(const key of ["Home","Clients","Contacts","Followups","Notes","Equipment","Quotes","Meeting","VehicleCheck","Breakdown","Repair","Analytics","Leads","Team","Expenses","Jobs","Invoices","More","Diagnostics","Notifications","SharedInbox","Client360","Calendar","TeamDashboard"])if(!screenKeys.includes(key))fail.push(`Screen not registered: ${key}`);
 if(!app.includes("<QuickCaptureFAB currentScreen={screen} onTrigger={handleQuickCapture} />"))fail.push("Quick capture FAB is not mounted");
 const all=[app,...required.filter(f=>f.endsWith(".js")||f.endsWith(".jsx")).map(read)].join("\n");
