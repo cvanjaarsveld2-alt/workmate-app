@@ -97,9 +97,9 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
     triggerImmediateSync();
     setMovingClient(null);
   }
-  const DISMISS_KEY = `pm_neglect_dismissed_${user?.id}`;
+  const DISMISS_KEY = `pm_neglect_dismissed_${userId || user?.id}`;
   const [dismissed, setDismissed] = React.useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem(`pm_neglect_dismissed_${user?.id}`) || "[]")); }
+    try { return new Set(JSON.parse(localStorage.getItem(`pm_neglect_dismissed_${userId || user?.id}`) || "[]")); }
     catch { return new Set(); }
   });
 
@@ -107,11 +107,11 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
     setDismissed(prev => {
       const next = new Set(prev);
       next.add(id);
-      localStorage.setItem(`pm_neglect_dismissed_${user?.id}`, JSON.stringify([...next]));
+      localStorage.setItem(`pm_neglect_dismissed_${userId || user?.id}`, JSON.stringify([...next]));
       return next;
     });
   }
-  const uid = user?.id;
+  const uid = userId || user?.id;
   const mine = r => r.user_id === uid || r.assigned_to_user_id === uid;
 
   // ── Data filtered by user ──
