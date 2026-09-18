@@ -96,7 +96,7 @@ export default function PowerWorksApp(){
  // stuck photo uploads, and pull the latest server state, so "back online" actually
  // means "syncing now" rather than "syncing eventually".
  const wasOnlineRef=useRef(isOnline);
- useEffect(()=>{const justReconnected=isOnline&&!wasOnlineRef.current;wasOnlineRef.current=isOnline;if(!justReconnected||!session?.user?.id)return;const uid=session.user.id;(async()=>{setSyncing(true);try{await pushSyncQueue(syncQueueRef.current||[],setData);await retryPendingMedia(uid,setData);await pullFromSupabase(uid,setData);}finally{setSyncing(false)}})();},[isOnline,session?.user?.id]);
+ useEffect(()=>{const justReconnected=isOnline&&!wasOnlineRef.current;wasOnlineRef.current=isOnline;if(!justReconnected||!session?.user?.id)return;const uid=session.user.id;let cancelled=false;(async()=>{setSyncing(true);try{const jitter=Math.floor(Math.random()*2000);await new Promise(resolve=>setTimeout(resolve,jitter));if(cancelled)return;await pushSyncQueue(syncQueueRef.current||[],setData);await retryPendingMedia(uid,setData);await pullFromSupabase(uid,setData);}finally{if(!cancelled)setSyncing(false)}})();return()=>{cancelled=true}},[isOnline,session?.user?.id]);
  const navigate=useCallback((next,context)=>{setScreen(next);setScreenContext(context||{});try{const url=new URL(window.location.href);url.searchParams.set("screen",next);window.history.replaceState({},"",url)}catch{}},[]);const goBack=useCallback(fallback=>navigate(fallback),[navigate]);
  const handleQuickCapture=useCallback(target=>{setQuickAddTrigger({screen:target,ts:Date.now()});navigate(target)},[navigate]);
  const handleSearchNavigate=useCallback((target,term)=>{setSearchSeed({term,ts:Date.now()});navigate(target)},[navigate]);
