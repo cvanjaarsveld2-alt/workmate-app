@@ -39,7 +39,7 @@ function todayAlreadyDone(vehicleChecks) {
   return statuses.length > 0; // any items touched = already started
 }
 
-export function DailyVehiclePrompt({ userId, data, setData, onNavigate }) {
+export function DailyVehiclePrompt({ userId, teamId, data, setData, onNavigate }) {
   const [open, setOpen] = useState(false);
   const [done, setDone]  = useState(false);
   const today = todayISO();
@@ -81,7 +81,7 @@ export function DailyVehiclePrompt({ userId, data, setData, onNavigate }) {
     }
     maybeShow();
     return () => { cancelled = true; };
-  }, [userId, today]);
+  }, [userId, teamId, today]);
 
   function handleSkip() {
     // Don't persist — re-show next time app opens (not set to today)
@@ -100,6 +100,7 @@ export function DailyVehiclePrompt({ userId, data, setData, onNavigate }) {
       vehicle: settings.vehicle || "",
       registration: settings.registration || "",
       driver: settings.driver || "",
+      team_id: teamId || null,
       data: JSON.stringify(dayData),
       sync_status: "pending",
       updated_at: new Date().toISOString(),
