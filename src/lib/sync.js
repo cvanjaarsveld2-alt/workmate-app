@@ -372,6 +372,41 @@ async function retryReportMedia(table,uid,setData){
   }
   return any;
 }
+async function retryVehicleCheckMedia(uid,setData){
+  const local=localStoreName("vehicle_checks");
+  let rows;
+  try{rows=await offlineGetAll(local);}catch{return false;}
+  let any=false;
+  for(const row of rows){
+    const data=row?.data||{};
+    let changed=false;
+    const nextItems={...(data.items||{})};
+    for(const[item,value] of Object.entries(nextItems)){
+      if(typeof value?.photo==="string"&&value.photo.startsWith("data:")){
+        try{
+          const uploaded=await uploadPhotoToSupabaseWithPath(value.photo,`vehicle-checks/${uid}/${row.check_date}/item-${item.replace(/[^a-z0-9]+/gi,"-").toLowerCase()}-${genId()}.jpg`);
+          if(uploaded){nextItems[item]={...value,photo:uploaded.url,storage_path:uploaded.path};changed=true;any=true;}
+        }catch(e){console.warn("[Sync] vehicle item photo retry failed",e);}
+      }
+    }
+    const nextPhotos=Array.isArray(data.photos)?[...data.photos]:[];
+    for(let i=0;i<nextPhotos.length;i++){
+      const p=nextPhotos[i];
+      const source=p?._base64 || (typeof p?.url==="string"&&p.url.startsWith("data:")?p.url:null);
+      if(!source)continue;
+      try{
+        const uploaded=await uploadPhotoToSupabaseWithPath(source,`vehicle-checks/${uid}/${row.check_date}/photo-${p.id||genId()}.jpg`);
+        if(uploaded){nextPhotos[i]={...p,url:uploaded.url,storage_path:uploaded.path,_base64:null};changed=true;any=true;}
+      }catch(e){console.warn("[Sync] vehicle photo retry failed",e);}
+    }
+    if(!changed)continue;
+    const updated={...row,data:{...data,items:nextItems,photos:nextPhotos},sync_status:"pending"};
+    await offlineSave(local,updated);
+    await queueMediaCorrection("vehicle_checks",updated,setData);
+  }
+  return any;
+}
+
 // Call on reconnect, periodically (piggybacked on the realtime reconcile timer below),
 // and after a manual "Sync Now" — anywhere a normal sync retry already happens.
 export async function retryPendingMedia(uid,setData){
@@ -381,7 +416,7 @@ export async function retryPendingMedia(uid,setData){
       retryFlatMedia("notes",setData),
       retryFlatMedia("equipment",setData),
       retryReportMedia("breakdown_reports",uid,setData),
-      retryReportMedia("repair_reports",uid,setData),
+      retryReportMedia("repair_reports",uid,setData),\n      retryVehicleCheckMedia(uid,setData),
     ]);
     const any=results.some(Boolean);
     if(any)triggerImmediateSync();
