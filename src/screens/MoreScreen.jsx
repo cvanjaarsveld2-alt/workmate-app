@@ -536,7 +536,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         <LogOut size={16} />Sign Out
       </Btn>
       <p className="text-center text-xs text-slate-300">PowerMate v2.4 · Power Works (Pty) Ltd</p>
-      {toast && <Toast message={toast} onClose={() => setToast("")} />}
+      {toast && <Toast message={toast} onDone={() => setToast("")} />}
     </div>
   );
 }
