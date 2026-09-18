@@ -9,12 +9,13 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 const DB_PREFIX = "powermate_offline_";
-const DB_VERSION = 13;
+const DB_VERSION = 14;
 
 const STORES = [
   "clients", "followups", "quotes", "notes", "equipment", "contacts", "expenses",
   "leads", "vehicle_checks", "activities", "breakdowns", "repairs", "customFaults",
   "serviceReports", "teamNotifications", "jobs", "invoices", "payments", "syncQueue",
+  "email_quotes",
 ];
 
 let _db = null;
