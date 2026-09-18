@@ -385,6 +385,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
       vehicle: settings.vehicle,
       registration: settings.registration,
       driver: settings.driver,
+      team_id: teamId || null,
       data: dayData,
       sync_status: "pending",
       updated_at: new Date().toISOString(),
