@@ -38,6 +38,19 @@ export function clearCrashLog() {
   try { localStorage.removeItem(CRASH_LOG_KEY); } catch {}
 }
 
+// Remove only stale module-load crashes from older builds. Runtime crashes from
+// other screens remain visible for diagnostics. This prevents a fixed historical
+// lazy-chunk failure from looking like a current application fault.
+export function clearHistoricalFollowupsCrashes() {
+  try {
+    const raw = localStorage.getItem(CRASH_LOG_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    const filtered = list.filter(c => !(c?.screen === "Followups" && /FollowupsScreen/.test(c?.message || "")));
+    if (filtered.length) localStorage.setItem(CRASH_LOG_KEY, JSON.stringify(filtered));
+    else localStorage.removeItem(CRASH_LOG_KEY);
+  } catch {}
+}
+
 export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
