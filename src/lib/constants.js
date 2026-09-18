@@ -85,8 +85,23 @@ export const PIN_KEY          = "pm_pin_hash";        // was "powermate_pin_hash
 export const PIN_UNLOCKED_KEY = "pm_session_unlocked"; // was "powermate_pin_unlocked"
 export const PIN_ATTEMPTS_KEY = "pm_pin_attempts";
 export const PIN_LOCKOUT_KEY  = "pm_pin_lockout_until";
+export const PIN_DISABLED_KEY = "pm_pin_disabled";
 export const PIN_MAX_ATTEMPTS = 5;
 export const PIN_LOCKOUT_MS   = 5 * 60 * 1000; // 5 minutes
+
+// FIX (Build 8, Phase 3) — every PIN/biometric key above used to be read and
+// written completely unscoped. On a shared device that meant User B, signing
+// into their own Supabase account on the same phone, silently inherited User
+// A's PIN hash, lockout state and biometric credential: whichever PIN was set
+// first "protected" every account on the device, and a phone that was
+// unlocked for User A stayed unlocked for User B. Every call site now suffixes
+// the key with the signed-in user's id, the same pattern offlineDb.js already
+// uses for IndexedDB. A missing userId (no one signed in yet) falls back to
+// the bare key so the PIN screens still work at the one moment there truly is
+// no user to scope to.
+export function scopedPinKey(base, userId) {
+  return userId ? `${base}__${userId}` : base;
+}
 
 // ─── Storage ──────────────────────────────────────────────────────────────────
 // FIX: User-scoped storage key — prevents cross-account data bleed
