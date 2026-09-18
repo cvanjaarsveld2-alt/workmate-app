@@ -328,8 +328,8 @@ async function retryFlatMedia(table,setData){
     let changed=false;
     for(const[m,i]of pending){
       try{
-        const url=await uploadPhotoToSupabase(m.file||m.base64,`${table}/${row.id}/${m.id}`);
-        if(url){nextMedia[i]={...m,url,base64:undefined,file:undefined,uploadStatus:"done"};changed=true;any=true;}
+        const uploaded=await uploadPhotoToSupabaseWithPath(m.file||m.base64,`${table}/${row.id}/${m.id}`);
+        if(uploaded){nextMedia[i]={...m,url:uploaded.url,storage_path:uploaded.path,base64:undefined,file:undefined,uploadStatus:"done"};changed=true;any=true;}
       }catch(e){console.warn(`[Sync] media retry failed for ${table}/${row.id}/${m.id}`,e);}
     }
     if(!changed)continue;
@@ -357,8 +357,8 @@ async function retryReportMedia(table,uid,setData){
       for(const p of photos){
         if(p&&typeof p.url==="string"&&p.url.startsWith("data:")){
           try{
-            const url=await uploadPhotoToSupabase(p.url,`${local}/${uid}/${row.id}/${p.id}.jpg`);
-            if(url){nextPhotos.push({...p,url});changed=true;any=true;}
+            const uploaded=await uploadPhotoToSupabaseWithPath(p.url,`${local}/${uid}/${row.id}/${p.id}.jpg`);
+            if(uploaded){nextPhotos.push({...p,url:uploaded.url,storage_path:uploaded.path});changed=true;any=true;}
             else nextPhotos.push(p);
           }catch(e){console.warn(`[Sync] report media retry failed for ${table}/${row.id}/${p.id}`,e);nextPhotos.push(p);}
         }else nextPhotos.push(p);
