@@ -13,7 +13,7 @@ import {
   ChevronRight, ChevronLeft, RotateCcw, FileDown, Send,
   Calendar, History, Check, Camera,
 } from "lucide-react";
-import { todayISO, smartDate, genId, compressImage, uploadPhotoToSupabaseWithPath } from "../lib/helpers";
+import { todayISO, smartDate, genId, compressImage, uploadPhotoToSupabaseWithPath, createFreshMediaUrl } from "../lib/helpers";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
@@ -159,7 +159,7 @@ function IssueSheet({ item, date, currentComment, currentPhoto, onSave, onClose 
             <label className="mb-1.5 block text-sm font-bold text-slate-500">Photo of the fault</label>
             {photo ? (
               <div className="relative rounded-xl overflow-hidden border-2 border-slate-100">
-                <img src={photo} alt="Fault" className="w-full h-44 object-cover" />
+                <img src={photo} onError={async e => { const fresh = await createFreshMediaUrl(photo); if (fresh) e.currentTarget.src = fresh; }} alt="Fault" className="w-full h-44 object-cover" />
                 <button onClick={() => setPhoto(null)}
                   className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center">
                   <X size={15} />
@@ -222,7 +222,7 @@ function SettingsPanel({ settings, userId, onSave, onClose }) {
             <label className="mb-1.5 block text-sm font-bold text-slate-500">Vehicle photo</label>
             {form.vehicle_photo_url ? (
               <div className="relative rounded-2xl overflow-hidden border-2 border-slate-100">
-                <img src={form.vehicle_photo_url} alt="Vehicle" className="w-full h-40 object-cover" />
+                <img src={form.vehicle_photo_url} onError={async e => { const fresh = await createFreshMediaUrl(form.vehicle_photo_url); if (fresh) e.currentTarget.src = fresh; }} alt="Vehicle" className="w-full h-40 object-cover" />
                 <button onClick={() => setForm(f => ({ ...f, vehicle_photo_url: null }))}
                   className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center">
                   <X size={15} />
@@ -690,7 +690,7 @@ export function VehicleCheckScreen({ data, setData, userId }) {
       <Card className="p-4">
         <div className="flex items-center gap-3">
           {settings.vehicle_photo_url ? (
-            <img src={settings.vehicle_photo_url} alt="Vehicle"
+            <img src={settings.vehicle_photo_url} onError={async e => { const fresh = await createFreshMediaUrl(settings.vehicle_photo_url); if (fresh) e.currentTarget.src = fresh; }} alt="Vehicle"
               className="w-14 h-14 rounded-2xl object-cover shrink-0 border border-slate-100" />
           ) : (
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0" style={{ background: "#FEE2E2" }}>
