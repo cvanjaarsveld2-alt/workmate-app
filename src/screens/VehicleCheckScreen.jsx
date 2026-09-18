@@ -446,7 +446,9 @@ export function VehicleCheckScreen({ data, setData, userId }) {
     // Upload to storage, then patch the URL in
     try {
       const path = `vehicle-checks/${userId}/${selectedDate}/${id}.jpg`;
-      const url = await uploadPhotoToSupabase(base64 || file, path);
+      const uploaded = await uploadPhotoToSupabaseWithPath(base64 || file, path);
+      const url = uploaded?.url;
+      const storage_path = uploaded?.path;
       if (url) {
         const latest = getDayData(selectedDate);
         const updated = (latest.photos || []).map(p => p.id === id ? { ...p, url, storage_path, _base64: null } : p);
