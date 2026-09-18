@@ -127,7 +127,7 @@ async function pushOne(table,action,rawData){let payload=sanitizeRemotePayload(t
 // out of signal for an hour shouldn't come back to permanently "failed" records.
 function isNetworkFailure(error){if(error?.code)return false;const msg=String(error?.message||"").toLowerCase();return!msg||/fetch|network|timeout|offline|connection/.test(msg);}
 
-import { classifySyncError, isNetworkFailure } from "./syncError.js";
+import { classifySyncError } from "./syncError.js";
 
 export async function pushItem(item){try{const table=item?.table;if(!table||!item?.data)throw new Error("Invalid sync item");const result=await pushOne(table,item.action,item.data);return{ok:true,duplicate:!!result?.duplicate,canonical:result?.canonical||null};}catch(error){const detail={code:error?.code,message:error?.message||"Unknown sync error",details:error?.details,hint:error?.hint};const classification=classifySyncError(error);detail.syncErrorCode=classification.code;console.warn(`[Sync] FAILED ${item?.table} ${item?.action}`,detail);if(classification.code!=="NETWORK_ERROR"){try{logCrash({screen:`Sync (${item?.table} ${item?.action})`,message:`[${classification.code}] ${detail.message}${detail.code?` (${detail.code})`:""}${detail.details?` — ${detail.details}`:""}`});}catch{}}return{ok:false,error:detail,networkError:classification.code==="NETWORK_ERROR",classification};}}
 async function persistQueue(queue){await offlineReplaceAll("syncQueue",queue);}
