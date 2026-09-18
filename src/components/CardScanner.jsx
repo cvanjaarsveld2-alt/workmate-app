@@ -4,10 +4,10 @@
 import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, X, Loader2, AlertCircle } from "lucide-react";
-import { supabase } from "../supabase";
+import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
 import { genId } from "../lib/helpers";
 
-const EDGE_FUNCTION_URL = "https://hrqzqyfvbfzrfnuxovvr.supabase.co/functions/v1/scan-business-card";
+const EDGE_FUNCTION_URL = `${SUPABASE_FUNCTIONS_URL}/scan-business-card`;
 
 async function compressImage(file, maxWidth = 1600, quality = 0.85) {
   return new Promise((resolve, reject) => {
