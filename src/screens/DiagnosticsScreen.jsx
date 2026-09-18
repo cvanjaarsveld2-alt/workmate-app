@@ -7,10 +7,10 @@ import {
   Wifi, WifiOff, Database, Server, Bug, ClipboardCopy, CreditCard,
 } from "lucide-react";
 import { Card, Btn, useConfirm } from "../components/ui";
-import { supabase } from "../supabase";
+import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
 import { readCrashLog, clearCrashLog } from "../components/ErrorBoundary";
 
-const FUNCTIONS_BASE = "https://hrqzqyfvbfzrfnuxovvr.supabase.co/functions/v1";
+const FUNCTIONS_BASE = SUPABASE_FUNCTIONS_URL;
 
 function StatusDot({ status }) {
   const map = { ok: { bg: "#22C55E", label: "OK" }, warn: { bg: "#F59E0B", label: "Warning" }, error: { bg: "#EF4444", label: "Error" }, idle: { bg: "#94A3B8", label: "Idle" } };
