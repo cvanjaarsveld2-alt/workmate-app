@@ -13,7 +13,7 @@ import {
   ChevronRight, ChevronLeft, RotateCcw, FileDown, Send,
   Calendar, History, Check, Camera,
 } from "lucide-react";
-import { todayISO, smartDate, genId, compressImage, uploadPhotoToSupabase } from "../lib/helpers";
+import { todayISO, smartDate, genId, compressImage, uploadPhotoToSupabaseWithPath } from "../lib/helpers";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
@@ -196,7 +196,7 @@ function SettingsPanel({ settings, userId, onSave, onClose }) {
       setForm(f => ({ ...f, vehicle_photo_url: base64 }));
       // Upload in background, then swap to the hosted URL
       const path = `vehicle-profile/${userId}/${genId()}.jpg`;
-      const url = await uploadPhotoToSupabase(base64 || file, path);
+      const uploaded = await uploadPhotoToSupabaseWithPath(base64 || file, path);\n      const url = uploaded?.url;\n      const storage_path = uploaded?.path;
       if (url) setForm(f => ({ ...f, vehicle_photo_url: url }));
     } catch (e) {
       console.warn("Vehicle photo failed:", e);
@@ -417,11 +417,11 @@ export function VehicleCheckScreen({ data, setData, userId }) {
     try {
       const safeItem = item.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       const path = `vehicle-checks/${userId}/${date}/item-${safeItem}-${genId()}.jpg`;
-      const url = await uploadPhotoToSupabase(base64, path);
+      const uploaded = await uploadPhotoToSupabaseWithPath(base64, path);\n      const url = uploaded?.url;\n      const storage_path = uploaded?.path;
       if (url) {
         const latest = getDayData(date);
         const latestItem = latest.items[item] || existing;
-        persistDay(date, { ...latest, items: { ...latest.items, [item]: { ...latestItem, photo: url } } });
+        persistDay(date, { ...latest, items: { ...latest.items, [item]: { ...latestItem, photo: url, storage_path } } });
       }
     } catch (e) {
       console.warn("Item photo upload failed (kept local):", e);
@@ -449,7 +449,7 @@ export function VehicleCheckScreen({ data, setData, userId }) {
       const url = await uploadPhotoToSupabase(base64 || file, path);
       if (url) {
         const latest = getDayData(selectedDate);
-        const updated = (latest.photos || []).map(p => p.id === id ? { ...p, url, _base64: null } : p);
+        const updated = (latest.photos || []).map(p => p.id === id ? { ...p, url, storage_path, _base64: null } : p);
         persistDay(selectedDate, { ...latest, photos: updated });
       }
     } catch (e) {
