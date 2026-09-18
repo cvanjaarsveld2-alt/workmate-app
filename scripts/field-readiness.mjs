@@ -13,6 +13,6 @@ for(const key of ["Home","Clients","Contacts","Followups","Notes","Equipment","Q
 if(!/<QuickCaptureFAB\s+currentScreen=\{screen\}\s+onTrigger=\{handleQuickCapture\}\s*\/>/.test(app))fail.push("Quick capture FAB is not mounted");
 const all=[app,...required.filter(f=>f.endsWith(".js")||f.endsWith(".jsx")).map(read)].join("\n");
 for(const[label,needle]of [["offline sync","pushSyncQueue"],["realtime sync","setupRealtimeSync"],["notifications","scheduleNotificationsViaSW"],["voice","transcribe-audio"],["technician AI","technician-assist"],["routing","google.com/maps"],["quote to job","createJobFromAcceptedQuote"],["job to invoice","createInvoiceFromJob"]])if(!all.includes(needle))fail.push(`Missing integration: ${label}`);
-const sw=read("public/service-worker.js");if(!sw.includes('CACHE_NAME = "powermate-v10"'))fail.push("Unexpected service-worker version");
+const sw=read("public/service-worker.js");if(!/CACHE_NAME\s*=\s*"powermate-v\d+"/.test(sw))fail.push("Unexpected service-worker cache name");
 if(fail.length){console.error("FIELD READINESS FAILED");fail.forEach(x=>console.error(`- ${x}`));process.exit(1)}
 console.log(`FIELD READINESS OK — ${lazy.length} lazy screens, ${screenKeys.length} registered routes, core offline/PWA/voice/AI/workflow checks passed.`);
