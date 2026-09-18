@@ -1,5 +1,5 @@
 // ─── Media Components ─────────────────────────────────────────────────────────
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Image, Video, X } from "lucide-react";
 import { compressImage, createFreshMediaUrl } from "../lib/helpers";
