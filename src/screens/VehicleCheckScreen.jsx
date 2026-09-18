@@ -390,10 +390,12 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
       sync_status: "pending",
       updated_at: new Date().toISOString(),
     };
+    const queueItem = { id: genId(), table: "vehicle_checks", action: "upsert", data: row, status: "pending", created_at: new Date().toISOString() };
+    offlineSave("vehicle_checks", row).then(() => offlineSave("syncQueue", queueItem)).catch(() => {});
     setData(d => ({
       ...d,
       vehicleChecks: { ...(d.vehicleChecks || {}), [date]: dayData },
-      syncQueue: [{ id: genId(), table: "vehicle_checks", action: "upsert", data: row, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+      syncQueue: [queueItem, ...(d.syncQueue || [])],
     }));
     triggerImmediateSync();
   }
