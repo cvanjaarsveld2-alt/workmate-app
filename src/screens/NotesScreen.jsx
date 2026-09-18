@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, ChevronDown, Send, Mail, Share2, FolderPlus, Tag, Calendar } from "lucide-react";
 import { BulkGroupSheet, useCollapsibleGroups, RenameGroupSheet } from "../components/BulkGroup";
 import { NOTE_URGENCY, URGENCY_ESCALATION } from "../lib/constants";
-import { todayISO, smartDate, genId, uploadPhotoToSupabase } from "../lib/helpers";
+import { todayISO, smartDate, genId, uploadPhotoToSupabaseWithPath } from "../lib/helpers";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
