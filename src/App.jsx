@@ -25,7 +25,7 @@ import { HomeScreen } from "./screens/HomeScreen";
 const EquipmentScreen = lazy(() => import("./screens/EquipmentScreen").then(m => ({ default: m.EquipmentScreen })));
 const ClientsScreen = lazy(() => import("./screens/ClientsScreen").then(m => ({ default: m.ClientsScreen })));
 const ContactsScreen = lazy(() => import("./screens/ContactsScreen").then(m => ({ default: m.ContactsScreen })));
-const FollowupsScreen = lazy(() => import("./screens/FollowupsScreen").then(m => ({ default: m.FollowupsScreen })));
+import { FollowupsScreen } from "./screens/FollowupsScreen";
 const QuotesScreen = lazy(() => import("./screens/QuotesScreen").then(m => ({ default: m.QuotesScreen })));
 const NotesScreen = lazy(() => import("./screens/NotesScreen").then(m => ({ default: m.NotesScreen })));
 const MeetingScreen = lazy(() => import("./screens/MeetingScreen").then(m => ({ default: m.MeetingScreen })));
