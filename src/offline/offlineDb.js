@@ -29,6 +29,14 @@ export function setOfflineUser(userId) {
   _currentUserId = userId || null;
 }
 
+// FIX (Build 8, Phase 2) — lets callers (e.g. logout()) assert which user's
+// database they're about to act on, so a clear/delete can't silently land on
+// the wrong (shared/null) database after the offline-user pointer has
+// already moved. See the ordering fix in App.jsx's logout().
+export function getCurrentOfflineUser() {
+  return _currentUserId;
+}
+
 function openDB() {
   if (_db) return Promise.resolve(_db);
   return new Promise((resolve, reject) => {
