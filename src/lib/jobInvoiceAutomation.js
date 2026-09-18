@@ -19,7 +19,19 @@ export async function createJobFromAcceptedQuote(quote, userId, teamId = null, s
   if (setData) return { ok: true, job: await saveAndSync(item, "jobs", "insert", setData, isOnline), created: true, local: !isOnline };
   if (!isOnline) { await offlineSave("jobs", item); return { ok: true, job: item, created: true, local: true }; }
   const { data: job, error } = await supabase.from("jobs").insert(item).select("*").single();
-  if (error) return { ok: false, reason: "create-failed", error };
+  if (error) {
+    // FIX (Build 8, Phase 1L) — jobs.quote_id now has a DB-level unique
+    // index (one job per accepted quote), so a genuine race between two
+    // devices/tabs both passing the "no existing job" check above lands
+    // here as a 23505 unique_violation instead of silently creating a
+    // duplicate job. That's not a failure — someone else's insert won the
+    // race — so fetch and return THAT job rather than surfacing an error.
+    if (error.code === "23505") {
+      const { data: raced } = await supabase.from("jobs").select("*").eq("quote_id", quote.id).maybeSingle();
+      if (raced) return { ok: true, job: raced, created: false };
+    }
+    return { ok: false, reason: "create-failed", error };
+  }
   return { ok: true, job, created: true };
 }
 
@@ -41,7 +53,15 @@ export async function createInvoiceFromJob(job, userId, teamId = null, setData =
   if (setData) return { ok: true, invoice: await saveAndSync(item, "invoices", "insert", setData, isOnline), created: true, local: !isOnline };
   if (!isOnline) { await offlineSave("invoices", item); return { ok: true, invoice: item, created: true, local: true }; }
   const { data: invoice, error } = await supabase.from("invoices").insert(item).select("*").single();
-  if (error) return { ok: false, reason: "create-failed", error };
+  if (error) {
+    // FIX (Build 8, Phase 1M) — same race-safety as createJobFromAcceptedQuote
+    // above, now that invoices.job_id has a DB-level unique index.
+    if (error.code === "23505") {
+      const { data: raced } = await supabase.from("invoices").select("*").eq("job_id", job.id).maybeSingle();
+      if (raced) return { ok: true, invoice: raced, created: false };
+    }
+    return { ok: false, reason: "create-failed", error };
+  }
   return { ok: true, invoice, created: true };
 }
 
