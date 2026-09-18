@@ -24,3 +24,9 @@ test("server pull protects dirty rows from durable queue, not only React state",
  assert.match(sync,/const durableQueue=await offlineGetAll\("syncQueue"\)/);
  assert.match(sync,/const dirty=\(durableQueue\|\|\[\]\)\.filter/);
 });
+
+test("Followups uses a stable module import",()=>{
+ const app=fs.readFileSync("src/App.jsx","utf8");
+ assert.match(app,/import \{ FollowupsScreen \} from "\.\/screens\/FollowupsScreen"/);
+ assert.doesNotMatch(app,/lazy\(\(\) => import\("\.\/screens\/FollowupsScreen"\)/);
+});
