@@ -40,39 +40,142 @@ function stripEmbeddedBase64(value,depth=0){
   }
   return value;
 }
-async function upsertWithSchemaRecovery(table,payload,maxRetries=16){
-  let candidate={...payload};
-  const droppedFields=[];
-  for(let attempt=0;attempt<=maxRetries;attempt++){
-    const{error}=await supabase.from(table).upsert(candidate,{onConflict:"id"});
-    if(!error){
-      if(droppedFields.length){
-        // The schema cache didn't recognize these columns, so we retried without them
-        // rather than blocking the whole record. That's a silent partial-data-loss risk,
-        // so it's logged instead of vanishing — Diagnostics can surface it.
-        console.warn(`[Sync] ${table} synced with ${droppedFields.length} unrecognized column(s) dropped:`,droppedFields);
-        try{logCrash({screen:`Sync (${table} schema recovery)`,message:`Dropped unrecognized column(s) to sync: ${droppedFields.join(", ")}`});}catch{}
-      }
-      return;
+// ─── Phase G: schema-mismatch handling ─────────────────────────────────────
+// PREVIOUSLY: on PGRST204 ("column not found in schema cache") this silently
+// dropped the offending field and retried, then reported the sync as a plain
+// success once the reduced payload went through. That is a real, permanent
+// data-loss bug dressed up as "Saved": the record's sync_status was set to
+// "synced" and the queue item was removed, so the dropped field's value was
+// gone for good — even in the common case where the "mismatch" was just
+// PostgREST's schema cache being a few seconds stale after a migration and
+// would have resolved itself on the very next retry.
+//
+// FIXED: no more silent drop-and-retry. A PGRST204 is thrown as-is (never
+// swallowed), which pushItem classifies as SCHEMA_ERROR. That keeps the
+// queue item "pending" with the FULL original payload intact — if the
+// mismatch was transient schema-cache lag, the next normal retry (seconds
+// later, via the existing backoff) sends every field and self-heals with
+// zero data loss. If the column genuinely doesn't exist (a real code/schema
+// drift bug), retries keep failing identically and the item is surfaced as
+// "failed" with the real column name in the diagnostic after the normal
+// attempt budget — visibly wrong rather than silently "Saved".
+async function upsertWithSchemaRecovery(table,payload){
+  const{error}=await supabase.from(table).upsert(payload,{onConflict:"id"});
+  if(error)throw error;
+}
+
+// ─── Phase F: unique-constraint races, through the REAL app path ──────────
+// jobInvoiceAutomation.js already treats a losing 23505 race as success on its
+// direct (non-queue) call path, but every real screen (JobsScreen.jsx) saves
+// through saveAndSync -> pushItem -> pushOne, which never went through that
+// code at all — a losing race there just retried the identical payload
+// against jobs_quote_id_uidx / invoices_job_id_uidx forever (now: until
+// classifySyncError's PERMANENT_CODES/UNIQUE_CONSTRAINT budget runs out),
+// because a unique-constraint violation isn't transient — it fails the exact
+// same way every time. This is the one piece of "the row I'm trying to
+// create already exists" that DOES need bespoke handling per constraint,
+// wired in here so it applies no matter which code path triggered the sync.
+const IDEMPOTENT_UNIQUE_RECOVERY={
+  jobs_quote_id_uidx:{table:"jobs",lookup:p=>({quote_id:p.quote_id})},
+  invoices_job_id_uidx:{table:"invoices",lookup:p=>({job_id:p.job_id})},
+  payments_idempotency_key_uidx:{table:"payments",lookup:p=>({idempotency_key:p.idempotency_key})},
+};
+// job_number/invoice_number are generated client-side from Date.now() — collision-
+// resistant, not collision-proof. A genuine collision here isn't "this record
+// already exists", it's "pick a different number" — so this regenerates once and
+// retries, rather than surfacing a confusing permanent failure for something the
+// user never needs to know happened.
+const NUMBER_REGEN={
+  jobs_job_number_scope_uidx:{table:"jobs",field:"job_number",prefix:"JOB"},
+  invoices_invoice_number_scope_uidx:{table:"invoices",field:"invoice_number",prefix:"INV"},
+};
+function regenerateNumber(prefix){const year=new Date().getFullYear();return`${prefix}-${year}-${String(Date.now()).slice(-6)}${Math.floor(Math.random()*10)}`;}
+async function upsertWithIdempotentRecovery(table,payload){
+  try{
+    await upsertWithSchemaRecovery(table,payload);
+    return{duplicate:false};
+  }catch(error){
+    if(error?.code!=="23505")throw error;
+    const constraint=String(error.message||"").match(/violates unique constraint "([^"]+)"/)?.[1];
+    const recovery=constraint&&IDEMPOTENT_UNIQUE_RECOVERY[constraint];
+    if(recovery&&recovery.table===table){
+      let query=supabase.from(table).select("*");
+      for(const[col,val]of Object.entries(recovery.lookup(payload)))query=query.eq(col,val);
+      const{data,error:lookupError}=await query.maybeSingle();
+      // The constraint fired, so a matching row provably exists — if we can't read it
+      // back (e.g. an RLS edge case), surface the ORIGINAL violation rather than
+      // silently pretending nothing happened.
+      if(!lookupError&&data)return{duplicate:true,canonical:data};
+      throw error;
     }
-    if(error.code!=="PGRST204")throw error;
-    const match=String(error.message||"").match(/Could not find the '([^']+)' column of '[^']+' in the schema cache/i);
-    const field=match?.[1];
-    if(!field||!(field in candidate))throw error;
-    delete candidate[field];
-    droppedFields.push(field);
+    const regen=constraint&&NUMBER_REGEN[constraint];
+    if(regen&&regen.table===table){
+      await upsertWithSchemaRecovery(table,{...payload,[regen.field]:regenerateNumber(regen.prefix)});
+      return{duplicate:false};
+    }
+    // An unrecognized unique violation is a real, permanent conflict we don't have a
+    // specific recovery for — surface it as-is (classifySyncError marks 23505 as
+    // non-retryable, so this fails fast instead of burning the retry budget).
+    throw error;
   }
-  throw new Error(`Sync schema recovery exhausted for ${table}`);
 }
 async function stageMissingDependencies(table,payload){const deps=DEPENDENCIES[table]||[];if(!deps.length)return payload;let out={...payload};for(const dep of deps){const id=out[dep.field];if(!id||out[dep.pending])continue;const{data,error}=await supabase.from(dep.table).select("id").eq("id",id).maybeSingle();if(!error&&data)continue;if(dep.pending in out){out[dep.pending]=id;out[dep.field]=null;}}return out;}
-async function pushOne(table,action,rawData){let payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(rawData)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);if(payload.media)payload={...payload,media:payload.media.map(m=>({...m,base64:undefined}))};payload=stripEmbeddedBase64(payload);if(["insert","upsert","update"].includes(action)){if(table==="vehicle_checks"){const{data:authData,error:authError}=await supabase.auth.getUser();if(authError)throw authError;if(authData?.user?.id)payload.user_id=authData.user.id;else throw new Error("Cannot sync vehicle check without an authenticated user");}else if(TEAM_TABLES.has(table)&&!payload.user_id){const{data:authData}=await supabase.auth.getUser();if(authData?.user?.id)payload.user_id=authData.user.id;}if(action==="update"&&payload.id){const{data:existing,error:existingError}=await supabase.from(table).select("*").eq("id",payload.id).maybeSingle();if(!existingError&&existing)payload={...existing,...payload};}payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(payload)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);payload=await stageMissingDependencies(table,payload);await upsertWithSchemaRecovery(table,{...payload,sync_status:"synced"});return;}if(action==="delete"){const{error}=await supabase.from(table).delete().eq("id",payload.id);if(error)throw error;return;}throw new Error(`Unknown sync action: ${action}`);}
+async function pushOne(table,action,rawData){let payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(rawData)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);if(payload.media)payload={...payload,media:payload.media.map(m=>({...m,base64:undefined}))};payload=stripEmbeddedBase64(payload);if(["insert","upsert","update"].includes(action)){if(table==="vehicle_checks"){const{data:authData,error:authError}=await supabase.auth.getUser();if(authError)throw authError;if(authData?.user?.id)payload.user_id=authData.user.id;else throw new Error("Cannot sync vehicle check without an authenticated user");}else if(TEAM_TABLES.has(table)&&!payload.user_id){const{data:authData}=await supabase.auth.getUser();if(authData?.user?.id)payload.user_id=authData.user.id;}if(action==="update"&&payload.id){const{data:existing,error:existingError}=await supabase.from(table).select("*").eq("id",payload.id).maybeSingle();if(!existingError&&existing)payload={...existing,...payload};}payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(payload)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);payload=await stageMissingDependencies(table,payload);return await upsertWithIdempotentRecovery(table,{...payload,sync_status:"synced"});}if(action==="delete"){const{error}=await supabase.from(table).delete().eq("id",payload.id);if(error)throw error;return;}throw new Error(`Unknown sync action: ${action}`);}
 // A failure with no Postgrest/Postgres error code is almost always the network itself
 // (offline, DNS hiccup, request timeout) rather than the server rejecting the data.
 // Those should never count against a record's limited retry budget — a technician
 // out of signal for an hour shouldn't come back to permanently "failed" records.
 function isNetworkFailure(error){if(error?.code)return false;const msg=String(error?.message||"").toLowerCase();return!msg||/fetch|network|timeout|offline|connection/.test(msg);}
-export async function pushItem(item){try{const table=item?.table;if(!table||!item?.data)throw new Error("Invalid sync item");await pushOne(table,item.action,item.data);return{ok:true};}catch(error){const detail={code:error?.code,message:error?.message||"Unknown sync error",details:error?.details,hint:error?.hint};const networkError=isNetworkFailure(error);console.warn(`[Sync] FAILED ${item?.table} ${item?.action}`,detail);if(!networkError){try{logCrash({screen:`Sync (${item?.table} ${item?.action})`,message:`${detail.message}${detail.code?` [${detail.code}]`:""}${detail.details?` — ${detail.details}`:""}`});}catch{}}return{ok:false,error:detail,networkError};}}
+
+// ─── Phase E: sync error classification ────────────────────────────────────
+// Not every non-network failure deserves the same treatment. Retrying a
+// unique-constraint violation or an RLS/permission denial with the *identical*
+// payload will fail identically forever — burning through all 8 attempts (with
+// backoff between each) before giving up wastes minutes of wall-clock time and
+// network calls on something that was never going to succeed. Genuinely
+// transient server-side conditions (a statement timeout, a momentary 5xx, an
+// expired JWT) DO deserve the normal retry/backoff treatment. This function is
+// the single place that tells the two apart; pushSyncQueue and pushOne both
+// read its verdict rather than re-deriving it from raw Postgrest codes.
+const RETRYABLE_CODES=new Set([
+  "57014", // query_canceled — statement timeout, try again
+  "08000","08003","08006","08001","08004", // connection-class errors
+  "PGRST301", // JWT expired — a session refresh may fix this before the next attempt
+]);
+const PERMANENT_CODES=new Set([
+  "23502", // not_null_violation — payload is missing a required field, will never fix itself
+  "22P02", // invalid_text_representation — malformed input (bad uuid/number), same every retry
+  "23514", // check_violation
+  "42501", // insufficient_privilege — RLS/grant denial
+  "42883","42P01","42703", // undefined function/table/column — a real code bug, not transient
+]);
+export function classifySyncError(error){
+  if(isNetworkFailure(error))return{code:"NETWORK_ERROR",retryable:true,consumesAttempt:false};
+  const pgCode=error?.code;
+  if(pgCode==="PGRST204")return{code:"SCHEMA_ERROR",retryable:true,consumesAttempt:true};
+  if(pgCode==="23505")return{code:"UNIQUE_CONSTRAINT",retryable:false,consumesAttempt:true};
+  if(pgCode==="23503")return{code:"FOREIGN_KEY_ERROR",retryable:true,consumesAttempt:true};
+  if(pgCode&&RETRYABLE_CODES.has(pgCode))return{code:pgCode==="PGRST301"?"AUTH_EXPIRED":"TIMEOUT",retryable:true,consumesAttempt:true};
+  if(pgCode&&PERMANENT_CODES.has(pgCode))return{code:pgCode==="42501"?"PERMISSION_ERROR":"VALIDATION_ERROR",retryable:false,consumesAttempt:true};
+  const msg=String(error?.message||"").toLowerCase();
+  if(/rate limit|too many requests|429/.test(msg))return{code:"RATE_LIMITED",retryable:true,consumesAttempt:true};
+  if(/jwt|token/.test(msg)&&/expired|invalid/.test(msg))return{code:"AUTH_EXPIRED",retryable:true,consumesAttempt:true};
+  // Unknown shape: default to the old behaviour (retryable, consumes an attempt) rather
+  // than guessing it's permanent — an unrecognized error is more likely a server-side
+  // condition we haven't catalogued than a payload that can truly never be accepted.
+  return{code:"SERVER_ERROR",retryable:true,consumesAttempt:true};
+}
+
+export async function pushItem(item){try{const table=item?.table;if(!table||!item?.data)throw new Error("Invalid sync item");const result=await pushOne(table,item.action,item.data);return{ok:true,duplicate:!!result?.duplicate,canonical:result?.canonical||null};}catch(error){const detail={code:error?.code,message:error?.message||"Unknown sync error",details:error?.details,hint:error?.hint};const classification=classifySyncError(error);detail.syncErrorCode=classification.code;console.warn(`[Sync] FAILED ${item?.table} ${item?.action}`,detail);if(classification.code!=="NETWORK_ERROR"){try{logCrash({screen:`Sync (${item?.table} ${item?.action})`,message:`[${classification.code}] ${detail.message}${detail.code?` (${detail.code})`:""}${detail.details?` — ${detail.details}`:""}`});}catch{}}return{ok:false,error:detail,networkError:classification.code==="NETWORK_ERROR",classification};}}
 async function persistQueue(queue){await offlineReplaceAll("syncQueue",queue);}
+// Phase I: offlineSave below now throws instead of silently swallowing an IndexedDB
+// failure (see offlineDb.js). That is intentional and NOT caught here: previously,
+// even if this very first local write failed, saveAndSync carried on as if it had
+// succeeded and every caller went on to show the user "Saved" / "saved offline and
+// queued for sync" regardless. Now, a genuine local-write failure propagates as a
+// rejected promise instead — callers that don't already wrap saveAndSync in a
+// try/catch will surface a visible error (or, at minimum, stop short of the
+// misleading "Saved" message) rather than silently lying about what happened.
 export async function saveAndSync(item,table,action,setData,isOnline){await offlineSave(localStoreName(table),item);const queueItem={id:`sq_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,table,action,data:item,status:"pending",created_at:new Date().toISOString(),attempts:0,next_attempt_at:null};if(isOnline){const result=await pushItem({table,action,data:item});if(result.ok){const synced={...item,sync_status:"synced"};await offlineSave(localStoreName(table),synced);setData(current=>({...current,[localStoreName(table)]:(current[localStoreName(table)]||[]).map(row=>row.id===item.id?synced:row),syncQueue:(current.syncQueue||[]).filter(q=>q.data?.id!==item.id)}));return synced;}}setData(current=>({...current,syncQueue:[queueItem,...(current.syncQueue||[]).filter(q=>!(q.table===table&&q.data?.id===item.id))]}));await offlineSave("syncQueue",queueItem);return{...item,sync_status:"pending"};}
 function collapseQueue(queue){const groups=new Map();for(const item of queue){const key=`${item.table}:${item.data?.id}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}const winners=[],discarded=new Set();for(const[,ops]of groups){ops.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));const last=ops[ops.length-1],hasInsert=ops.some(op=>op.action==="insert"),hasDelete=ops.some(op=>op.action==="delete");if(hasInsert&&hasDelete){ops.forEach(op=>discarded.add(op.id));continue;}if(hasDelete)winners.push({...last,action:"delete"});else winners.push({...last,action:hasInsert?"upsert":"update",data:ops.reduce((record,op)=>({...record,...(op.data||{})}),{})});const winner=winners[winners.length-1];ops.forEach(op=>{if(op.id!==winner.id)discarded.add(op.id);});}return{winners,discarded};}
 function sortSyncItems(items){return[...items].sort((a,b)=>{const pa=SYNC_PRIORITY[a.table]??100,pb=SYNC_PRIORITY[b.table]??100;if(pa!==pb)return pa-pb;return new Date(a.created_at||0)-new Date(b.created_at||0);});}
@@ -140,18 +243,42 @@ export async function pushSyncQueue(syncQueue,setData){
     }
     const succeeded=outcomes.filter(r=>r.ok),failed=outcomes.filter(r=>!r.ok&&!r.blocked),blocked=outcomes.filter(r=>r.blocked);
     for(const result of succeeded)if(result.action==="delete")offlineDelete(localStoreName(result.table),result.entityId).catch(()=>{});
-    if(failed.length){logEvent("sync_failed",{count:failed.length});window.dispatchEvent(new CustomEvent("powermate:sync_failed",{detail:{count:failed.length,message:`${failed.length} item${failed.length===1?"":"s"} failed to sync`}}));}
+    // Phase F: a "duplicate" outcome means pushOne discovered this exact row already
+    // exists server-side (a losing race on jobs_quote_id_uidx / invoices_job_id_uidx /
+    // payments_idempotency_key_uidx that pushOne already resolved to the winning
+    // "canonical" row) — the LOCAL copy under the old client-generated id is now an
+    // orphan duplicate of that canonical row, not a second real record. Reconcile local
+    // storage to match: drop the orphan, keep the canonical row. This has to happen in
+    // both IndexedDB (offlineDelete/offlineSave — durable across a browser restart) and
+    // in-memory state, not just one; the normal "flip sync_status" path further down
+    // only touches in-memory state because there's no id to reconcile in that case.
+    for(const result of succeeded){
+      if(!result.duplicate||!result.canonical)continue;
+      const key=localStoreName(result.table);
+      if(result.canonical.id!==result.entityId)offlineDelete(key,result.entityId).catch(()=>{});
+      offlineSave(key,result.canonical).catch(()=>{});
+    }
+    if(failed.length){logEvent("sync_failed",{count:failed.length});window.dispatchEvent(new CustomEvent("powermate:sync_failed",{detail:{count:failed.length,message:`${failed.length} item${failed.length===1?"":"s"} failed to sync`,items:failed.map(f=>({table:f.table,entityId:f.entityId,syncErrorCode:f.error?.syncErrorCode||null}))}}));}
     if(succeeded.length)logEvent("sync_succeeded",{count:succeeded.length});
     const succeededIds=new Set(succeeded.map(r=>r.queueId)),failedIds=new Set(failed.map(r=>r.queueId));
     const nextQueue=(queueSnapshot||[]).filter(item=>!succeededIds.has(item.id)&&!discarded.has(item.id)).map(item=>{
       if(!failedIds.has(item.id))return item;
       const outcome=failed.find(r=>r.queueId===item.id);
-      const networkError=!!outcome?.networkError;
+      const classification=outcome?.classification||classifySyncError({code:outcome?.error?.code,message:outcome?.error?.message});
+      const networkError=classification.code==="NETWORK_ERROR";
       // Network failures don't consume an attempt or ever reach "failed" — only real,
       // server-confirmed rejections do. They still back off so we're not hammering a
       // dead connection in a tight loop.
-      const attempts=networkError?(item.attempts||0):(item.attempts||0)+1;
-      if(!networkError&&attempts>=MAX_SYNC_ATTEMPTS)return{...item,attempts,status:"failed",last_error:outcome?.error||null};
+      const attempts=classification.consumesAttempt?(item.attempts||0)+1:(item.attempts||0);
+      // Phase E: a PERMANENT classification (bad payload, RLS denial, an unrecognized
+      // unique conflict) will fail exactly the same way on every future retry — there is
+      // no reason to spend the full MAX_SYNC_ATTEMPTS budget (and the wall-clock time of
+      // several backoff cycles) proving that 8 times before surfacing it. It goes
+      // straight to "failed", visibly, on the first confirmed occurrence. A RETRYABLE
+      // classification (timeout, schema-cache lag, rate limit, expired auth) keeps the
+      // existing backoff-then-eventually-fail behaviour, since it might genuinely
+      // resolve itself.
+      if(!networkError&&(!classification.retryable||attempts>=MAX_SYNC_ATTEMPTS))return{...item,attempts,status:"failed",last_error:outcome?.error||null};
       return{...item,attempts,status:"pending",next_attempt_at:new Date(Date.now()+backoffMs(Math.max(1,attempts))).toISOString(),last_error:outcome?.error||null};
     });
     await persistQueue(nextQueue);
@@ -160,6 +287,12 @@ export async function pushSyncQueue(syncQueue,setData){
       for(const result of succeeded){
         const key=localStoreName(result.table);
         if(result.action==="delete")next[key]=(next[key]||[]).filter(row=>row.id!==result.entityId);
+        else if(result.duplicate&&result.canonical){
+          // Replace the orphan (old id) with the canonical (server-winning) row rather
+          // than just relabelling the orphan as "synced" — it isn't the real record.
+          const rows=(next[key]||[]).filter(row=>row.id!==result.entityId);
+          next[key]=[{...result.canonical,sync_status:"synced"},...rows.filter(row=>row.id!==result.canonical.id)];
+        }
         else if(result.entityId)next[key]=(next[key]||[]).map(row=>row.id===result.entityId?{...row,sync_status:"synced"}:row);
       }
       return next;
