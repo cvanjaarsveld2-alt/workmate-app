@@ -22,6 +22,20 @@ const SYNC_PRIORITY={clients:10,quotes:20,contacts:30,notes:30,equipment:30,expe
 function sanitizeRemotePayload(table,data){const out={...(data||{})};for(const field of REMOTE_EXCLUDED_FIELDS[table]||[])delete out[field];return out;}
 function cleanUUIDs(data){const fields=["id","user_id","team_id","client_id","contact_id","linked_note_id","linked_breakdown_id","assigned_to_user_id","from_user_id","to_user_id","quote_id","job_id","invoice_id","sync_pending_quote_id","sync_pending_job_id","sync_pending_client_id","sync_pending_note_id","sync_pending_team_id","sync_pending_invoice_id"];const out={...(data||{})};fields.forEach(f=>{if(out[f]===""||out[f]===undefined)out[f]=null;});return out;}
 function cleanNumerics(data){const out={...(data||{})};["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins","subtotal","vat","total","amount_paid","balance_due","extracted_amount"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;});return out;}
+const ARRAY_CONFLICT_FIELDS={jobs:["photos","parts_used"],breakdown_reports:["items"],repair_reports:["items"]};
+function arraysDiffer(a,b){try{return JSON.stringify(a??[])!==JSON.stringify(b??[]);}catch{return true;}}
+function assertNoStaleArrayOverwrite(table,existing,incoming){
+  const fields=ARRAY_CONFLICT_FIELDS[table]||[];
+  for(const field of fields){
+    if(!Array.isArray(existing?.[field])||!Array.isArray(incoming?.[field]))continue;
+    if(arraysDiffer(existing[field],incoming[field])){
+      const error=new Error("This "+table.replaceAll("_"," ")+" was changed on another device while this device was offline. The newer server array was not overwritten.");
+      error.code="PWR_ARRAY_CONFLICT";
+      error.details="Conflict in "+table+"."+field;
+      throw error;
+    }
+  }
+}
 function normalizeVehicleCheckPayload(data){const source=data||{};const out={id:source.id,user_id:source.user_id,check_date:source.check_date,vehicle:source.vehicle??null,registration:source.registration??null,driver:source.driver??null,data:source.data??{},sync_status:source.sync_status??"pending",updated_at:source.updated_at??new Date().toISOString()};if(typeof out.data==="string"){try{out.data=JSON.parse(out.data);}catch{out.data={};}}if(!out.id)throw new Error("vehicle_checks record is missing id");if(!out.check_date||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(out.check_date)))throw new Error("vehicle_checks record has an invalid check_date");return out;}
 // Postgres/Postgrest columns should never receive a raw base64 data: URI — a photo
 // that never made it to Storage has no business being smuggled into a text column as
