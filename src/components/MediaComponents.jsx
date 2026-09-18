@@ -2,8 +2,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Image, Video, X } from "lucide-react";
-import { compressImage, createFreshMediaUrl } from "../lib/helpers";
-import { genId } from "../lib/helpers";
+import { compressImage, createFreshMediaUrl, genId } from "../lib/helpers";
 import { MAX_FILE_SIZE_MB } from "../lib/constants";
 
 // ─── MediaPicker ──────────────────────────────────────────────────────────────
@@ -75,7 +74,7 @@ export function MediaGallery({ media = [], onDelete, readonly = false }) {
                 </div>
               ) : (
                 <img src={resolved[m.id || i] || m.url || m.base64} alt="attachment"
-                  onClick={() => setLightbox(m)}
+                  onClick={() => setLightbox({ ...m, url: resolved[m.id || i] || m.url || m.base64 })}
                   className="w-20 h-20 rounded-xl object-cover cursor-pointer border-2 border-slate-100 hover:border-red-300 transition-colors" />
               )
             }
