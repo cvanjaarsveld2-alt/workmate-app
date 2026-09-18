@@ -11,9 +11,9 @@
 const CACHE_KEY     = "powermate_fx_cache_v1";
 const CACHE_MAX_AGE = 1000 * 60 * 60 * 24 * 7; // 7 days
 const API_BASE      = "https://api.frankfurter.app";
-const HISTORICAL_FUNCTION_URL = "https://hrqzqyfvbfzrfnuxovvr.supabase.co/functions/v1/historical-rate";
+const HISTORICAL_FUNCTION_URL = `${SUPABASE_FUNCTIONS_URL}/historical-rate`;
 
-import { supabase } from "../supabase";
+import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
 
 // Tracks the reason the MOST RECENT lookup failed, so callers that just get
 // `null` back can still show something more useful than a generic message
