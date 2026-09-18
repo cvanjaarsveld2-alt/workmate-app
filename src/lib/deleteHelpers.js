@@ -35,8 +35,16 @@ export async function deleteRecord(table, recordId, userId, setData) {
     ],
   }));
 
-  // 2. Remove from IndexedDB immediately (prevents resurrection on reload)
-  await offlineDelete(table, recordId);
+  // 2. Remove from IndexedDB immediately (prevents resurrection on reload).
+  // offlineDelete now throws on a genuine IndexedDB failure (Phase I) instead of
+  // silently pretending it worked — but the server-side delete below is the real,
+  // authoritative fix and must still happen even if this local cleanup step fails
+  // (the queued delete already landed in React/sync-queue state above). A failed
+  // local delete just means the record could locally resurrect until the next
+  // full pull replaces this store wholesale — logged, not silent, but not allowed
+  // to block the actual delete from reaching the server either.
+  try { await offlineDelete(table, recordId); }
+  catch (e) { console.error("[deleteHelpers] local IndexedDB delete failed — will self-heal on next pull; server delete still proceeding", table, recordId, e); }
 
   // 3. Push to server
   triggerImmediateSync();
