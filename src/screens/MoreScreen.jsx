@@ -1,6 +1,6 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
-import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users, Sun, Moon, Smartphone } from "lucide-react";
+import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users, Sun, Moon, Smartphone, Mail } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
 import { Card, Btn, Toast, PageHeader, useConfirm } from "../components/ui";
 import { getStoredTheme, applyTheme } from "../lib/theme";
@@ -98,6 +98,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
 
   const flaggedQuotes = (data.quotes || []).filter(q => q.status === "Pending").length;
   const unsubmittedExpenses = (data.expenses || []).filter(e => e.status === "unsubmitted").length;
+  const emailQuotesToReview = (data.email_quotes || []).filter(e => e.user_id === userId && e.status === "new").length;
 
   function changePIN() {
     localStorage.removeItem(PIN_KEY);
@@ -148,6 +149,21 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
       {/* Quotes + Expenses shortcuts */}
       {setScreen && (
         <Card className="overflow-hidden">
+          <button onClick={() => setScreen("Assistant")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px] border-b border-slate-100">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#DBEAFE", color: "#1D4ED8" }}>
+              <Mail size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-bold text-slate-800">Assistant</p>
+              <p className="text-sm text-slate-400">
+                {emailQuotesToReview > 0 ? `${emailQuotesToReview} email quote${emailQuotesToReview !== 1 ? "s" : ""} to review` : "Emailed quotes & follow-up reminders"}
+              </p>
+            </div>
+            {emailQuotesToReview > 0 && (
+              <span className="rounded-full bg-red-500 text-white text-xs font-bold px-2 py-0.5 shrink-0">{emailQuotesToReview}</span>
+            )}
+            <ChevronRight size={16} className="text-slate-300 shrink-0" />
+          </button>
           <button onClick={() => setScreen("Quotes")} className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px] border-b border-slate-100">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#DCFCE7", color: "#15803D" }}>
               <FileIcon size={18} />
