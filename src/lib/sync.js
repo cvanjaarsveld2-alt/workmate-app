@@ -127,44 +127,7 @@ async function pushOne(table,action,rawData){let payload=sanitizeRemotePayload(t
 // out of signal for an hour shouldn't come back to permanently "failed" records.
 function isNetworkFailure(error){if(error?.code)return false;const msg=String(error?.message||"").toLowerCase();return!msg||/fetch|network|timeout|offline|connection/.test(msg);}
 
-// ─── Phase E: sync error classification ────────────────────────────────────
-// Not every non-network failure deserves the same treatment. Retrying a
-// unique-constraint violation or an RLS/permission denial with the *identical*
-// payload will fail identically forever — burning through all 8 attempts (with
-// backoff between each) before giving up wastes minutes of wall-clock time and
-// network calls on something that was never going to succeed. Genuinely
-// transient server-side conditions (a statement timeout, a momentary 5xx, an
-// expired JWT) DO deserve the normal retry/backoff treatment. This function is
-// the single place that tells the two apart; pushSyncQueue and pushOne both
-// read its verdict rather than re-deriving it from raw Postgrest codes.
-const RETRYABLE_CODES=new Set([
-  "57014", // query_canceled — statement timeout, try again
-  "08000","08003","08006","08001","08004", // connection-class errors
-  "PGRST301", // JWT expired — a session refresh may fix this before the next attempt
-]);
-const PERMANENT_CODES=new Set([
-  "23502", // not_null_violation — payload is missing a required field, will never fix itself
-  "22P02", // invalid_text_representation — malformed input (bad uuid/number), same every retry
-  "23514", // check_violation
-  "42501", // insufficient_privilege — RLS/grant denial
-  "42883","42P01","42703", // undefined function/table/column — a real code bug, not transient
-]);
-export function classifySyncError(error){
-  if(isNetworkFailure(error))return{code:"NETWORK_ERROR",retryable:true,consumesAttempt:false};
-  const pgCode=error?.code;
-  if(pgCode==="PGRST204")return{code:"SCHEMA_ERROR",retryable:true,consumesAttempt:true};
-  if(pgCode==="23505")return{code:"UNIQUE_CONSTRAINT",retryable:false,consumesAttempt:true};
-  if(pgCode==="23503")return{code:"FOREIGN_KEY_ERROR",retryable:true,consumesAttempt:true};
-  if(pgCode&&RETRYABLE_CODES.has(pgCode))return{code:pgCode==="PGRST301"?"AUTH_EXPIRED":"TIMEOUT",retryable:true,consumesAttempt:true};
-  if(pgCode&&PERMANENT_CODES.has(pgCode))return{code:pgCode==="42501"?"PERMISSION_ERROR":"VALIDATION_ERROR",retryable:false,consumesAttempt:true};
-  const msg=String(error?.message||"").toLowerCase();
-  if(/rate limit|too many requests|429/.test(msg))return{code:"RATE_LIMITED",retryable:true,consumesAttempt:true};
-  if(/jwt|token/.test(msg)&&/expired|invalid/.test(msg))return{code:"AUTH_EXPIRED",retryable:true,consumesAttempt:true};
-  // Unknown shape: default to the old behaviour (retryable, consumes an attempt) rather
-  // than guessing it's permanent — an unrecognized error is more likely a server-side
-  // condition we haven't catalogued than a payload that can truly never be accepted.
-  return{code:"SERVER_ERROR",retryable:true,consumesAttempt:true};
-}
+import { classifySyncError, isNetworkFailure } from "./syncError.js";
 
 export async function pushItem(item){try{const table=item?.table;if(!table||!item?.data)throw new Error("Invalid sync item");const result=await pushOne(table,item.action,item.data);return{ok:true,duplicate:!!result?.duplicate,canonical:result?.canonical||null};}catch(error){const detail={code:error?.code,message:error?.message||"Unknown sync error",details:error?.details,hint:error?.hint};const classification=classifySyncError(error);detail.syncErrorCode=classification.code;console.warn(`[Sync] FAILED ${item?.table} ${item?.action}`,detail);if(classification.code!=="NETWORK_ERROR"){try{logCrash({screen:`Sync (${item?.table} ${item?.action})`,message:`[${classification.code}] ${detail.message}${detail.code?` (${detail.code})`:""}${detail.details?` — ${detail.details}`:""}`});}catch{}}return{ok:false,error:detail,networkError:classification.code==="NETWORK_ERROR",classification};}}
 async function persistQueue(queue){await offlineReplaceAll("syncQueue",queue);}
