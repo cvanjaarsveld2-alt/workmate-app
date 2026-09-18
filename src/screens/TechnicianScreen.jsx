@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Plus, ArrowLeft, CheckCircle2, Clock3, Wrench, Trash2, Camera, Save } from "lucide-react";
 import { BRAND } from "../lib/constants";
-import { genId, todayISO, uploadPhotoToSupabase, compressImage } from "../lib/helpers";
+import { genId, todayISO, uploadPhotoToSupabaseWithPath, compressImage } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { Card, Btn, Field, PageHeader, Empty } from "../components/ui";
 import { MediaPicker } from "../components/MediaComponents";
