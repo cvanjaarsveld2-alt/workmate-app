@@ -160,6 +160,39 @@ export async function uploadPhotoToSupabase(base64OrFile, path) {
   }
 }
 
+// Durable media helpers. Private Storage URLs are intentionally short-lived;
+// persisted records retain the object path so a fresh signed URL can be generated on display.
+export function storagePathFromSignedUrl(value, bucket = "powermate-media") {
+  if (!value || typeof value !== "string" || !value.includes("/storage/v1/object/")) return null;
+  try {
+    const u = new URL(value);
+    for (const kind of ["sign", "authenticated"]) {
+      const marker = `/storage/v1/object/${kind}/${bucket}/`;
+      const i = u.pathname.indexOf(marker);
+      if (i >= 0) return decodeURIComponent(u.pathname.slice(i + marker.length));
+    }
+  } catch {}
+  return null;
+}
+export async function createFreshMediaUrl(stored, bucket = "powermate-media") {
+  const path = typeof stored === "string"
+    ? storagePathFromSignedUrl(stored, bucket) || (stored.includes("/") && !stored.startsWith("http") ? stored : null)
+    : stored?.storage_path || stored?.path || storagePathFromSignedUrl(stored?.url, bucket);
+  if (!path) return typeof stored === "string" ? stored : stored?.url || null;
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60);
+  if (error || !data?.signedUrl) return null;
+  return data.signedUrl;
+}
+export async function uploadPhotoToSupabaseWithPath(base64OrFile, path) {
+  const cleanPath = String(path || "").replace(/^\/+/, "");
+  const url = await uploadPhotoToSupabase(base64OrFile, cleanPath);
+  if (!url) return null;
+  const { data: { session } = {} } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
+  const durablePath = userId && !cleanPath.startsWith(`${userId}/`) ? `${userId}/${cleanPath}` : cleanPath;
+  return { url, path: durablePath };
+}
+
 // ─── Telemetry ────────────────────────────────────────────────────────────────
 export async function logEvent(name, data = {}) {
   if (import.meta.env.DEV) console.log("[PowerMate]", name, data);
