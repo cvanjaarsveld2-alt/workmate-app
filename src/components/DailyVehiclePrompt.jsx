@@ -11,7 +11,7 @@ import { BRAND } from "../lib/constants";
 import { todayISO, smartDate } from "../lib/helpers";
 import { genId } from "../lib/helpers";
 import { triggerImmediateSync } from "../lib/sync";
-import { offlineSave } from "../offline/offlineDb";
+import { offlineSave, offlineGetAll } from "../offline/offlineDb";
 
 // All checklist items — must match VehicleCheckScreen
 const CHECKLIST = [
@@ -52,20 +52,36 @@ export function DailyVehiclePrompt({ userId, data, setData, onNavigate }) {
   const driver       = settings.driver       || "";
 
   useEffect(() => {
-    // Only show on weekdays
-    if (!isWeekday()) return;
-    // Already dismissed today (skipped without completing)
-    const dismissed = localStorage.getItem(DISMISSED_KEY);
-    if (dismissed === today) return;
-    // Already did a check today
-    if (todayAlreadyDone(data.vehicleChecks)) return;
-    // No vehicle configured yet
-    if (!settings.vehicle) return;
+    let cancelled = false;
+    async function maybeShow() {
+      // Only show on weekdays
+      if (!isWeekday()) return;
+      // Already dismissed today (skipped without completing)
+      const dismissed = localStorage.getItem(DISMISSED_KEY);
+      if (dismissed === today) return;
+      // No vehicle configured yet
+      if (!settings.vehicle) return;
 
-    // Small delay so the app renders first
-    const t = setTimeout(() => setOpen(true), 800);
-    return () => clearTimeout(t);
-  }, []); // eslint-disable-line
+      // Check both hydrated React state and the durable per-user IndexedDB
+      // store. On a cold reload, the prompt can mount before App finishes
+      // hydrating vehicleChecks; reading the store here prevents a completed
+      // check from being mistaken for a missing check.
+      let alreadyDone = todayAlreadyDone(data.vehicleChecks);
+      if (!alreadyDone) {
+        try {
+          const rows = await offlineGetAll("vehicle_checks");
+          alreadyDone = (rows || []).some(row => row?.user_id === userId && row?.check_date === today && row?.data);
+        } catch {}
+      }
+      if (cancelled || alreadyDone) return;
+
+      // Small delay so the app renders first
+      const t = setTimeout(() => { if (!cancelled) setOpen(true); }, 800);
+      return () => clearTimeout(t);
+    }
+    maybeShow();
+    return () => { cancelled = true; };
+  }, [userId, today]);
 
   function handleSkip() {
     // Don't persist — re-show next time app opens (not set to today)
