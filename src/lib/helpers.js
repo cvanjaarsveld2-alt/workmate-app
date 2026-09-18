@@ -185,11 +185,17 @@ export async function createFreshMediaUrl(stored, bucket = "powermate-media") {
 }
 export async function uploadPhotoToSupabaseWithPath(base64OrFile, path) {
   const cleanPath = String(path || "").replace(/^\/+/, "");
-  const url = await uploadPhotoToSupabase(base64OrFile, cleanPath);
-  if (!url) return null;
   const { data: { session } = {} } = await supabase.auth.getSession();
   const userId = session?.user?.id;
-  const durablePath = userId && !cleanPath.startsWith(`${userId}/`) ? `${userId}/${cleanPath}` : cleanPath;
+  if (!userId || !cleanPath) return null;
+  const durablePath = cleanPath === userId || cleanPath.startsWith(`${userId}/`)
+    ? cleanPath
+    : `${userId}/${cleanPath}`;
+
+  // Upload once and return both the durable object path and the temporary
+  // display URL. Callers MUST persist storage_path, never the signed URL.
+  const url = await uploadPhotoToSupabase(base64OrFile, durablePath);
+  if (!url) return null;
   return { url, path: durablePath };
 }
 
