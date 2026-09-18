@@ -2,7 +2,7 @@
 import React, { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Image, Video, X } from "lucide-react";
-import { compressImage } from "../lib/helpers";
+import { compressImage, createFreshMediaUrl } from "../lib/helpers";
 import { genId } from "../lib/helpers";
 import { MAX_FILE_SIZE_MB } from "../lib/constants";
 
@@ -48,6 +48,18 @@ export function MediaPicker({ onAdd, disabled = false }) {
 // ─── MediaGallery ─────────────────────────────────────────────────────────────
 export function MediaGallery({ media = [], onDelete, readonly = false }) {
   const [lightbox, setLightbox] = useState(null);
+  const [resolved, setResolved] = useState({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const entries = await Promise.all((media || []).map(async (m, i) => {
+        const url = await createFreshMediaUrl(m);
+        return [m?.id || i, url || m?.url || m?.base64 || null];
+      }));
+      if (alive) setResolved(Object.fromEntries(entries));
+    })();
+    return () => { alive = false; };
+  }, [media]);
   if (!media.length) return null;
 
   return (
@@ -58,11 +70,11 @@ export function MediaGallery({ media = [], onDelete, readonly = false }) {
             {m.isVideo
               ? (
                 <div className="w-20 h-20 rounded-xl bg-slate-900 flex items-center justify-center cursor-pointer border-2 border-slate-200"
-                  onClick={() => setLightbox(m)}>
+                  onClick={() => setLightbox({ ...m, url: resolved[m.id || i] || m.url || m.base64 })}>
                   <Video size={22} className="text-white" />
                 </div>
               ) : (
-                <img src={m.url || m.base64} alt="attachment"
+                <img src={resolved[m.id || i] || m.url || m.base64} alt="attachment"
                   onClick={() => setLightbox(m)}
                   className="w-20 h-20 rounded-xl object-cover cursor-pointer border-2 border-slate-100 hover:border-red-300 transition-colors" />
               )
