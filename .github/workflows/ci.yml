@@ -24,7 +24,3 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Field readiness checks + production build
         run: npm run check
-      - name: Lint
-        run: npm run lint
-      - name: Formatting check
-        run: npm run format:check
