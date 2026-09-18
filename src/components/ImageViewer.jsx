@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
+import { createFreshMediaUrl } from "../lib/helpers";
 
 /**
  * @param {Object[]} images - Array of { url, caption? } — or a single string URL is also accepted.
@@ -17,6 +18,18 @@ export function ImageViewer({ images, startIndex = 0, onClose }) {
     .filter(Boolean)
     .map(it => typeof it === "string" ? { url: it } : it);
   const [idx, setIdx] = useState(Math.min(startIndex, Math.max(0, list.length - 1)));
+  const [resolvedUrls, setResolvedUrls] = useState({});
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const entries = await Promise.all(list.map(async (item, i) => {
+        const url = await createFreshMediaUrl(item);
+        return [i, url || item.url || null];
+      }));
+      if (alive) setResolvedUrls(Object.fromEntries(entries));
+    })();
+    return () => { alive = false; };
+  }, [images]);
 
   // Esc to close.
   useEffect(() => {
@@ -56,7 +69,7 @@ export function ImageViewer({ images, startIndex = 0, onClose }) {
       {/* Image — fills the viewport, browser handles pinch-zoom & pan */}
       <div className="flex-1 flex items-center justify-center overflow-hidden">
         <img
-          src={current.url}
+          src={resolvedUrls[idx] || current.url}
           alt={current.caption || ""}
           className="max-w-full max-h-full object-contain"
           style={{ touchAction: "pinch-zoom" }}
