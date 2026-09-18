@@ -21,8 +21,8 @@ test("repeating and zero values remain cent-safe", () => {
   for (const [amount, inclusive] of [[999.99,true],[0,true],[0,false],[1,true],[1,false]]) {
     const r = calculateVat(amount, inclusive);
     assert.equal(reconcileMoney(r.subtotal, r.vat), r.total);
-    assert.equal(Math.round(r.subtotal * 100), r.subtotal * 100);
-    assert.equal(Math.round(r.vat * 100), r.vat * 100);
-    assert.equal(Math.round(r.total * 100), r.total * 100);
+    assert.equal(roundMoney(r.subtotal), r.subtotal);
+    assert.equal(roundMoney(r.vat), r.vat);
+    assert.equal(roundMoney(r.total), r.total);
   }
 });
