@@ -75,7 +75,7 @@ function money(n) {
   return "R" + Math.round(n || 0).toLocaleString("en-ZA");
 }
 
-export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQuickAdd, onNavigate }) {
+export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, onNavigate }) {
   const today     = todayISO();
   const [neglectSheet, setNeglectSheet] = React.useState(null);
   const [expandedStage, setExpandedStage] = React.useState(null); // which pipeline stage is expanded
@@ -254,7 +254,7 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
             📅 Today's Schedule {todayFU.length > 0 && `(${todayFU.length})`}
           </p>
           {todayFU.length > 0 && (
-            <button onClick={() => setScreen("Followups")} className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1">
+            <button onClick={() => onNavigate("Followups")} className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1">
               All <ArrowRight size={12} />
             </button>
           )}
@@ -269,7 +269,7 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
             {todayList.map(f => (
               <button
                 key={f.id}
-                onClick={() => setScreen("Followups")}
+                onClick={() => onNavigate("Followups")}
                 className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors min-h-[60px]">
                 <div className="shrink-0 w-12 text-center">
                   <p className="text-sm font-black text-slate-900">{f.time || "—"}</p>
@@ -284,7 +284,7 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
               </button>
             ))}
             {todayOverflow > 0 && (
-              <button onClick={() => setScreen("Followups")} className="w-full px-4 py-2.5 text-xs font-bold text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors text-center">
+              <button onClick={() => onNavigate("Followups")} className="w-full px-4 py-2.5 text-xs font-bold text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors text-center">
                 + {todayOverflow} more
               </button>
             )}
@@ -309,7 +309,7 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
                     if (item.selectMode && onQuickAdd) {
                       onQuickAdd(item.screen + ":SelectMode");
                     } else {
-                      setScreen(item.screen);
+                      onNavigate(item.screen);
                     }
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-50 transition-colors min-h-[56px]">
@@ -325,16 +325,16 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
 
       {/* ── Stats Grid (tappable) ── */}
       <div className="grid grid-cols-2 gap-3">
-        <button onClick={() => setScreen("Followups")} className="text-left">
+        <button onClick={() => onNavigate("Followups")} className="text-left">
           <StatCard label="Tasks today" value={todayFU.length} sub={todayFU.length === 0 ? "all clear" : "follow-ups due"} color={BRAND.primary} icon={Calendar} />
         </button>
-        <button onClick={() => setScreen("Quotes")} className="text-left">
+        <button onClick={() => onNavigate("Quotes")} className="text-left">
           <StatCard label="Quotes pending" value={pendingQ.length} sub={pendingQ.length === 0 ? "none awaiting" : "awaiting response"} color="#B45309" icon={FileIcon} />
         </button>
-        <button onClick={() => setScreen("Quotes")} className="text-left">
+        <button onClick={() => onNavigate("Quotes")} className="text-left">
           <StatCard label="Won revenue" value={money(wonRev).replace("R", "R ")} sub={`${acceptedQ} accepted quote${acceptedQ !== 1 ? "s" : ""}`} color="#16A34A" icon={TrendingUp} trend={revTrend} />
         </button>
-        <button onClick={() => setScreen("Expenses")} className="text-left">
+        <button onClick={() => onNavigate("Expenses")} className="text-left">
           <StatCard label="This month" value={money(expMonthTotal)} color="#7C2D12" icon={Receipt} trend={expTrend} invertTrend />
         </button>
       </div>
@@ -519,7 +519,7 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="min-w-0">
-            <button onClick={() => setScreen("Clients")} className="text-xs font-black text-slate-500 uppercase tracking-wider">
+            <button onClick={() => onNavigate("Clients")} className="text-xs font-black text-slate-500 uppercase tracking-wider">
               Sales Pipeline
             </button>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -529,7 +529,7 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
           <Gauge value={quoteConversion} label="Conversion" size={78} />
         </div>
         <div className="flex items-center justify-end mb-3 -mt-1">
-          <button onClick={() => setScreen("Analytics")}
+          <button onClick={() => onNavigate("Analytics")}
             className="flex items-center gap-1.5 rounded-xl px-3 py-2 min-h-[40px] shrink-0"
             style={{ background: BRAND.light }}>
             <BarChart2 size={14} style={{ color: BRAND.primary }} />
@@ -591,7 +591,7 @@ export function HomeScreen({ data, setData, userId, teamId, setScreen, user, onQ
                           </button>
                         ))}
                         {stageClients.length > 8 && (
-                          <button onClick={() => setScreen("Clients")}
+                          <button onClick={() => onNavigate("Clients")}
                             className="w-full text-center py-2 text-xs font-bold" style={{ color: BRAND.primary }}>
                             View all {stageClients.length} in {stage} →
                           </button>
