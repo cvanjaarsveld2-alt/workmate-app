@@ -1,7 +1,7 @@
 // ─── PowerMate Sync Engine ───────────────────────────────────────────────────
 // Durable offline queue + dependency-safe reconciliation + realtime protection.
 import { supabase } from "../supabase";
-import { logEvent, uploadPhotoToSupabase } from "./helpers";
+import { logEvent, uploadPhotoToSupabaseWithPath } from "./helpers";
 import { offlineSave, offlineDelete, offlineGetAll, offlineReplaceAll } from "../offline/offlineDb";
 import { logCrash } from "../components/ErrorBoundary";
 
