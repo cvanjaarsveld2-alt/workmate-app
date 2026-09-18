@@ -12,6 +12,7 @@ import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { VAT_PERCENT, roundMoney, calculateVat } from "../lib/finance";
+import { VAT_PERCENT, roundMoney, calculateVat } from "../lib/finance";
 
 function emptyLine() {
   return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, description: "", qty: "1", unitPrice: "" };
@@ -60,7 +61,7 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
                 </div>
                 <div className="w-24 text-right pt-5">
                   <p className="text-sm font-black text-slate-700">
-                    R {roundMoney((parseFloat(item.qty) || 1) * (parseFloat(item.unitPrice) || 0)).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    R {roundMoneyroundMoney((parseFloat(item.qty) || 1) * (parseFloat(item.unitPrice) || 0)).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
