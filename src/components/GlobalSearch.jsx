@@ -64,11 +64,12 @@ const ENTITY_CONFIG = {
   leads: {
     icon: TrendingUp,
     color: "#5B21B6",
+    bg: "#EDE9FE",
     label: "Leads",
     screen: "Leads",
     fields: ["title", "client_name", "notes", "stage", "outcome_notes"],
-    preview: r => r.title || r.client_name || "Lead",
-    sub: r => [r.client_name, r.stage].filter(Boolean).join(" · "),
+    title: r => r.title || r.client_name || "Lead",
+    subtitle: r => [r.client_name, r.stage].filter(Boolean).join(" · "),
   },
   equipment: {
     label: "Equipment",
