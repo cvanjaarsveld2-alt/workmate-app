@@ -14,6 +14,7 @@ import {
   PIN_LOCKOUT_KEY,
   PIN_MAX_ATTEMPTS,
   PIN_LOCKOUT_MS,
+  scopedPinKey,
 } from "../lib/constants";
 
 const PIN_LENGTH    = 6;
@@ -23,47 +24,56 @@ const RED   = "#8B1A1A";
 const LIGHT = "#F7F3F3";
 
 // ─── PIN helpers ─────────────────────────────────────────────────────────────
+// FIX (Build 8, Phase 3) — every helper below now takes the signed-in user's
+// id and reads/writes the per-user key (scopedPinKey), instead of the one
+// global key every account on the device used to share. See constants.js.
 async function _hashPIN(pin) {
   const data = new TextEncoder().encode(pin + "powermate_salt_v1");
   const buf  = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
-async function savePINHash(pin) {
-  localStorage.setItem(PIN_KEY, await _hashPIN(pin));
+async function savePINHash(pin, userId) {
+  localStorage.setItem(scopedPinKey(PIN_KEY, userId), await _hashPIN(pin));
 }
-async function verifyPIN(pin) {
-  const stored = localStorage.getItem(PIN_KEY);
+async function verifyPIN(pin, userId) {
+  const stored = localStorage.getItem(scopedPinKey(PIN_KEY, userId));
   if (!stored) return false;
   return (await _hashPIN(pin)) === stored;
 }
-export function getPINHash()          { return localStorage.getItem(PIN_KEY); }
-       function getPINAttempts()      { return parseInt(localStorage.getItem(PIN_ATTEMPTS_KEY) || "0", 10); }
-       function incrementPINAttempts(){ localStorage.setItem(PIN_ATTEMPTS_KEY, String(getPINAttempts() + 1)); }
-       function resetPINAttempts()    {
-         localStorage.removeItem(PIN_ATTEMPTS_KEY);
-         localStorage.removeItem(PIN_LOCKOUT_KEY);
-       }
-export function isSessionUnlocked()   { return sessionStorage.getItem(PIN_UNLOCKED_KEY) === "1"; }
-export function markSessionUnlocked() { sessionStorage.setItem(PIN_UNLOCKED_KEY, "1"); }
+export function getPINHash(userId)          { return localStorage.getItem(scopedPinKey(PIN_KEY, userId)); }
+export function getPINAttempts(userId)      { return parseInt(localStorage.getItem(scopedPinKey(PIN_ATTEMPTS_KEY, userId)) || "0", 10); }
+export function incrementPINAttempts(userId){ localStorage.setItem(scopedPinKey(PIN_ATTEMPTS_KEY, userId), String(getPINAttempts(userId) + 1)); }
+export function resetPINAttempts(userId)    {
+  localStorage.removeItem(scopedPinKey(PIN_ATTEMPTS_KEY, userId));
+  localStorage.removeItem(scopedPinKey(PIN_LOCKOUT_KEY, userId));
+}
+export function isSessionUnlocked(userId)   { return sessionStorage.getItem(scopedPinKey(PIN_UNLOCKED_KEY, userId)) === "1"; }
+export function markSessionUnlocked(userId) { sessionStorage.setItem(scopedPinKey(PIN_UNLOCKED_KEY, userId), "1"); }
 
 // FIX #9 — Implement the time-based lockout that was previously defined in
 // constants but never used. After PIN_MAX_ATTEMPTS wrong entries the user
 // must wait PIN_LOCKOUT_MS before trying again. A hard reload no longer
 // bypasses the lockout because the expiry timestamp persists in localStorage.
-function setLockout() {
+function setLockout(userId) {
   const until = Date.now() + PIN_LOCKOUT_MS;
-  localStorage.setItem(PIN_LOCKOUT_KEY, String(until));
+  localStorage.setItem(scopedPinKey(PIN_LOCKOUT_KEY, userId), String(until));
 }
-function getLockoutRemaining() {
-  const until = parseInt(localStorage.getItem(PIN_LOCKOUT_KEY) || "0", 10);
+function getLockoutRemaining(userId) {
+  const until = parseInt(localStorage.getItem(scopedPinKey(PIN_LOCKOUT_KEY, userId)) || "0", 10);
   const remaining = until - Date.now();
   return remaining > 0 ? remaining : 0;
 }
-function isLockedOut() {
-  return getLockoutRemaining() > 0;
+function isLockedOut(userId) {
+  return getLockoutRemaining(userId) > 0;
 }
 
 // ─── Biometric helpers ────────────────────────────────────────────────────────
+// Local app-unlock convenience only: a WebAuthn platform-authenticator check
+// ("is this the same device/finger/face that enrolled") that unlocks the app
+// screen the same way a correct PIN would. It is never sent to Supabase and
+// never stands in for supabase.auth — signing in still requires the real
+// account credentials; this only gates re-entry to an already-authenticated
+// session on this device, exactly like the PIN it's an alternative to.
 function isBiometricAvailable() {
   return !!(
     window.PublicKeyCredential &&
@@ -72,8 +82,8 @@ function isBiometricAvailable() {
     typeof navigator.credentials.get === "function"
   );
 }
-function hasBiometricRegistered() { return !!localStorage.getItem(BIOMETRIC_KEY); }
-function clearBiometric()         { localStorage.removeItem(BIOMETRIC_KEY); }
+function hasBiometricRegistered(userId) { return !!localStorage.getItem(scopedPinKey(BIOMETRIC_KEY, userId)); }
+function clearBiometric(userId)         { localStorage.removeItem(scopedPinKey(BIOMETRIC_KEY, userId)); }
 
 function b64ToArray(b64) {
   const bin = atob(b64.replace(/-/g, "+").replace(/_/g, "/"));
@@ -86,7 +96,7 @@ function arrayToB64(buf) {
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
-async function registerBiometric() {
+async function registerBiometric(userId) {
   if (!isBiometricAvailable()) throw new Error("WebAuthn not supported on this device");
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   const cred = await navigator.credentials.create({
@@ -110,13 +120,13 @@ async function registerBiometric() {
       timeout: 60000,
     },
   });
-  localStorage.setItem(BIOMETRIC_KEY, arrayToB64(cred.rawId));
+  localStorage.setItem(scopedPinKey(BIOMETRIC_KEY, userId), arrayToB64(cred.rawId));
   return true;
 }
 
-async function verifyBiometric() {
+async function verifyBiometric(userId) {
   if (!isBiometricAvailable()) return false;
-  const credId = localStorage.getItem(BIOMETRIC_KEY);
+  const credId = localStorage.getItem(scopedPinKey(BIOMETRIC_KEY, userId));
   if (!credId) return false;
   const challenge = crypto.getRandomValues(new Uint8Array(32));
   try {
@@ -185,7 +195,7 @@ const NUMPAD = [
   [{ d: 7, s: "PQRS" }, { d: 8, s: "TUV" },  { d: 9, s: "WXYZ" }],
 ];
 
-function BiometricButton({ onSuccess, onError, isRegistering }) {
+function BiometricButton({ userId, onSuccess, onError, isRegistering }) {
   const [state, setState] = useState("idle");
   const ua      = navigator.userAgent.toLowerCase();
   const isApple = /iphone|ipad|mac/.test(ua);
@@ -196,7 +206,7 @@ function BiometricButton({ onSuccess, onError, isRegistering }) {
     if (state === "scanning") return;
     setState("scanning");
     try {
-      const success = isRegistering ? await registerBiometric() : await verifyBiometric();
+      const success = isRegistering ? await registerBiometric(userId) : await verifyBiometric(userId);
       if (success) {
         setState("idle");
         onSuccess();
@@ -212,7 +222,7 @@ function BiometricButton({ onSuccess, onError, isRegistering }) {
         onError?.("Biometric cancelled — use your PIN");
       } else if (msg.includes("NotSupportedError") || msg.includes("not supported")) {
         onError?.("Biometric not available on this device");
-        clearBiometric();
+        clearBiometric(userId);
       } else {
         onError?.("Biometric failed — use your PIN");
       }
@@ -243,12 +253,12 @@ function BiometricButton({ onSuccess, onError, isRegistering }) {
 }
 
 // ─── Lockout countdown display ─────────────────────────────────────────────────
-function LockoutTimer({ onExpired }) {
-  const [remaining, setRemaining] = useState(getLockoutRemaining());
+function LockoutTimer({ userId, onExpired }) {
+  const [remaining, setRemaining] = useState(() => getLockoutRemaining(userId));
   useEffect(() => {
     if (remaining <= 0) { onExpired(); return; }
     const id = setInterval(() => {
-      const r = getLockoutRemaining();
+      const r = getLockoutRemaining(userId);
       setRemaining(r);
       if (r <= 0) { clearInterval(id); onExpired(); }
     }, 1000);
@@ -264,13 +274,16 @@ function LockoutTimer({ onExpired }) {
 }
 
 // ─── PIN Lock Screen ──────────────────────────────────────────────────────────
-export function PINLockScreen({ onUnlock, onForgot }) {
+// FIX (Build 8, Phase 3) — `userId` is required so every check below reads and
+// writes THIS signed-in user's PIN/attempts/lockout/biometric state, never a
+// previous user's on a shared device (see scopedPinKey in constants.js).
+export function PINLockScreen({ userId, onUnlock, onForgot }) {
   const [entered, setEntered]   = useState("");
   const [shake, setShake]       = useState(false);
   const [error, setError]       = useState("");
-  const [lockedOut, setLockedOut] = useState(isLockedOut);
+  const [lockedOut, setLockedOut] = useState(() => isLockedOut(userId));
   const [biometricAvailable]    = useState(isBiometricAvailable);
-  const [biometricRegistered, setBiometricRegistered] = useState(hasBiometricRegistered);
+  const [biometricRegistered, setBiometricRegistered] = useState(() => hasBiometricRegistered(userId));
   const prevError = useRef(null);
 
   useEffect(() => {
@@ -291,8 +304,8 @@ export function PINLockScreen({ onUnlock, onForgot }) {
 
   async function triggerBiometric() {
     try {
-      const success = await verifyBiometric();
-      if (success) { resetPINAttempts(); markSessionUnlocked(); onUnlock(); }
+      const success = await verifyBiometric(userId);
+      if (success) { resetPINAttempts(userId); markSessionUnlocked(userId); onUnlock(); }
     } catch {}
   }
 
@@ -310,19 +323,18 @@ export function PINLockScreen({ onUnlock, onForgot }) {
 
   async function handlePINSubmit(pin) {
     // FIX #9 — Check persistent lockout first (survives page reload)
-    if (isLockedOut()) { setLockedOut(true); return; }
+    if (isLockedOut(userId)) { setLockedOut(true); return; }
 
-    const attempts = getPINAttempts();
-    const ok = await verifyPIN(pin);
+    const ok = await verifyPIN(pin, userId);
     if (ok) {
-      resetPINAttempts();
-      markSessionUnlocked();
+      resetPINAttempts(userId);
+      markSessionUnlocked(userId);
       onUnlock();
     } else {
-      incrementPINAttempts();
-      const newAttempts = getPINAttempts();
+      incrementPINAttempts(userId);
+      const newAttempts = getPINAttempts(userId);
       if (newAttempts >= PIN_MAX_ATTEMPTS) {
-        setLockout();
+        setLockout(userId);
         setLockedOut(true);
       } else {
         const remaining = PIN_MAX_ATTEMPTS - newAttempts;
@@ -337,8 +349,8 @@ export function PINLockScreen({ onUnlock, onForgot }) {
 
   function handleBiometricSuccess() {
     if (!biometricRegistered) setBiometricRegistered(true);
-    resetPINAttempts();
-    markSessionUnlocked();
+    resetPINAttempts(userId);
+    markSessionUnlocked(userId);
     onUnlock();
   }
 
@@ -362,7 +374,7 @@ export function PINLockScreen({ onUnlock, onForgot }) {
           <AnimatePresence mode="wait">
             {lockedOut ? (
               <motion.div key="lockout" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <LockoutTimer onExpired={() => setLockedOut(false)} />
+                <LockoutTimer userId={userId} onExpired={() => setLockedOut(false)} />
               </motion.div>
             ) : error ? (
               <motion.p key={error} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -387,7 +399,7 @@ export function PINLockScreen({ onUnlock, onForgot }) {
         ))}
         <div className="grid grid-cols-3 gap-3 sm:gap-4 w-full justify-items-center">
           {biometricAvailable && biometricRegistered && !lockedOut ? (
-            <BiometricButton onSuccess={handleBiometricSuccess} onError={msg => setError(msg || "Biometric failed — use your PIN")} isRegistering={false} />
+            <BiometricButton userId={userId} onSuccess={handleBiometricSuccess} onError={msg => setError(msg || "Biometric failed — use your PIN")} isRegistering={false} />
           ) : (
             <div className="w-[72px] h-[66px] sm:w-[80px] sm:h-[72px]" />
           )}
@@ -397,7 +409,7 @@ export function PINLockScreen({ onUnlock, onForgot }) {
 
         {biometricAvailable && !biometricRegistered && !lockedOut && (
           <div className="mt-2 flex flex-col items-center gap-2">
-            <BiometricButton onSuccess={handleBiometricSuccess} onError={msg => setError(msg || "Biometric failed")} isRegistering={true} />
+            <BiometricButton userId={userId} onSuccess={handleBiometricSuccess} onError={msg => setError(msg || "Biometric failed")} isRegistering={true} />
             <p className="text-xs text-slate-400 text-center max-w-[220px] leading-snug">
               Tap above to enable Face ID or fingerprint for faster unlock
             </p>
@@ -417,7 +429,7 @@ export function PINLockScreen({ onUnlock, onForgot }) {
 }
 
 // ─── PIN Setup Screen ─────────────────────────────────────────────────────────
-export function PINSetupScreen({ onComplete }) {
+export function PINSetupScreen({ userId, onComplete }) {
   const [stage, setStage]     = useState("create");
   const [first, setFirst]     = useState("");
   const [error, setError]     = useState("");
@@ -456,8 +468,8 @@ export function PINSetupScreen({ onComplete }) {
         setStage("create");
         setFirst("");
       } else {
-        await savePINHash(pin);
-        markSessionUnlocked();
+        await savePINHash(pin, userId);
+        markSessionUnlocked(userId);
         onComplete();
       }
     }
