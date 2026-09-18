@@ -394,7 +394,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
         </button>
       </div>
 
-      {toast && <Toast message={toast} onClose={() => setToast("")} />}
+      {toast && <Toast message={toast} onDone={() => setToast("")} />}
     </div>
   );
 
