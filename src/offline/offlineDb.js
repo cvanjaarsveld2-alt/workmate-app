@@ -85,7 +85,7 @@ function openDB() {
 // shown", not a false claim that something was written.
 export async function offlineSave(store, value) {
   try { const db=await openDB(); return await new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).put(value);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }
-  catch(e){ console.error("[offline] SAVE FAILED — record was NOT persisted locally",store,e); throw e; }
+  catch(e){ console.error("[offline] SAVE FAILED — record was NOT persisted locally",store,e); try{window.dispatchEvent(new CustomEvent("powermate:local_write_failed",{detail:{operation:"save",store,message:e?.message||"Local save failed"}}));}catch{} throw e; }
 }
 export async function offlineGetAll(store) {
   try { const db=await openDB(); return new Promise((resolve,reject)=>{const req=db.transaction(store,"readonly").objectStore(store).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);}); }
@@ -97,11 +97,11 @@ export async function offlineGet(store,id) {
 }
 export async function offlineDelete(store,id) {
   try { const db=await openDB(); return await new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);}); }
-  catch(e){ console.error("[offline] DELETE FAILED — record may still exist locally",store,id,e); throw e; }
+  catch(e){ console.error("[offline] DELETE FAILED — record may still exist locally",store,id,e); try{window.dispatchEvent(new CustomEvent("powermate:local_write_failed",{detail:{operation:"delete",store,message:e?.message||"Local delete failed"}}));}catch{} throw e; }
 }
 export async function offlineReplaceAll(store,values) {
   try { const db=await openDB(); return await new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");const s=tx.objectStore(store);s.clear();for(const v of (values||[]))s.put(v);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }
-  catch(e){ console.error("[offline] REPLACE FAILED — local store may be stale/incomplete",store,e); throw e; }
+  catch(e){ console.error("[offline] REPLACE FAILED — local store may be stale/incomplete",store,e); try{window.dispatchEvent(new CustomEvent("powermate:local_write_failed",{detail:{operation:"replace",store,message:e?.message||"Local replace failed"}}));}catch{} throw e; }
 }
 
 export function deleteUserDatabase(userId) {

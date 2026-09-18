@@ -4,7 +4,7 @@ const RETRYABLE_CODES=new Set([
   "57014", "08000","08003","08006","08001","08004", "PGRST301",
 ]);
 const PERMANENT_CODES=new Set([
-  "23502", "22P02", "23514", "42501", "42883","42P01","42703",
+  "23502", "22P02", "23514", "42501", "42883","42P01","42703", "PWR_ARRAY_CONFLICT",
 ]);
 
 export function isNetworkFailure(error){
