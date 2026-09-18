@@ -37,8 +37,8 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
     try {
       const base64 = await compressImage(file, 1600, 0.75);
       const id = genId();
-      const url = await uploadPhotoToSupabase(base64 || file, `service-reports/${userId}/${editing.id}/${id}.jpg`);
-      setEditing(e => ({ ...e, photos: [...(e.photos || []), { id, url: url || base64 }] }));
+      const uploaded = await uploadPhotoToSupabaseWithPath(base64 || file, `service-reports/${userId}/${editing.id}/${id}.jpg`);
+      setEditing(e => ({ ...e, photos: [...(e.photos || []), { id, url: uploaded?.url || base64, storage_path: uploaded?.path || null }] }));
     } catch { /* keep report usable offline */ }
   }
 
