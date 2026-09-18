@@ -3,6 +3,7 @@ import { offlineGetAll, offlineSave } from "../offline/offlineDb";
 import { saveAndSync } from "./sync";
 import { withTeamId } from "./teamId";
 import { genId } from "./helpers";
+import { calculateVat } from "./finance";
 
 const onlineNow = value => value !== undefined ? value : (typeof navigator !== "undefined" ? navigator.onLine : true);
 
@@ -51,11 +52,13 @@ export async function createInvoiceFromJob(job, userId, teamId = null, setData =
     total = Number(quote?.value || 0);
     if (quote?.vat_inclusive !== undefined) quoteVatInclusive = quote.vat_inclusive !== false;
   }
-  const item = withTeamId({ id: genId(), user_id: userId, client_id: job.client_id || null, quote_id: job.quote_id || null, job_id: job.id, invoice_number: `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`, status: "draft", issue_date: new Date().toISOString().slice(0, 10), due_date: null, subtotal: quoteVatInclusive ? total / 1.15 : total,
-    vat: quoteVatInclusive ? total - (total / 1.15) : total * 0.15,
-    total: quoteVatInclusive ? total : total * 1.15,
+  const money = calculateVat(total, quoteVatInclusive);
+  const item = withTeamId({ id: genId(), user_id: userId, client_id: job.client_id || null, quote_id: job.quote_id || null, job_id: job.id, invoice_number: `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`, status: "draft", issue_date: new Date().toISOString().slice(0, 10), due_date: null,
+    subtotal: money.subtotal,
+    vat: money.vat,
+    total: money.total,
     amount_paid: 0,
-    balance_due: quoteVatInclusive ? total : total * 1.15, line_items: [], notes: job.work_done || "", created_at: new Date().toISOString(), sync_status: "pending" }, teamId || job.team_id || null);
+    balance_due: money.total, line_items: [], notes: job.work_done || "", created_at: new Date().toISOString(), sync_status: "pending" }, teamId || job.team_id || null);
   if (setData) return { ok: true, invoice: await saveAndSync(item, "invoices", "insert", setData, isOnline), created: true, local: !isOnline };
   if (!isOnline) { await offlineSave("invoices", item); return { ok: true, invoice: item, created: true, local: true }; }
   const { data: invoice, error } = await supabase.from("invoices").insert(item).select("*").single();
