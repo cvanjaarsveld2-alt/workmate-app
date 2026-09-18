@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip, ChevronRight, Share2 } from "lucide-react";
-import { smartDate, genId, uploadPhotoToSupabase, daysDiff } from "../lib/helpers";
+import { smartDate, genId, uploadPhotoToSupabaseWithPath, daysDiff } from "../lib/helpers";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
@@ -103,7 +103,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
           const url = await uploadPhotoToSupabase(m.file || m.base64, path);
           if (url) {
             setToast("Photo uploaded ✓");
-            return { ...m, url, base64: undefined, uploadStatus: "done" };
+            return { ...m, url: uploaded.url, storage_path: uploaded.path, base64: undefined, uploadStatus: "done" };
           } else {
             setToast("Photo upload failed — check connection");
             return { ...m, uploadStatus: "failed" };
