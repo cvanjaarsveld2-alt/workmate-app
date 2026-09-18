@@ -11,8 +11,7 @@
 import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { BRAND } from "../lib/constants";
-
-const VAT_RATE = 15;
+import { VAT_PERCENT, roundMoney, calculateVat } from "../lib/finance";
 
 function emptyLine() {
   return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, description: "", qty: "1", unitPrice: "" };
@@ -25,15 +24,9 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
   function add() { onChange([...items, emptyLine()]); }
   function remove(id) { onChange(items.filter(i => i.id !== id)); }
 
-  const subtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0), 0);
-  let vatAmount, total;
-  if (vatInclusive) {
-    vatAmount = subtotal - (subtotal / (1 + VAT_RATE / 100));
-    total = subtotal;
-  } else {
-    vatAmount = subtotal * (VAT_RATE / 100);
-    total = subtotal + vatAmount;
-  }
+  const lineSubtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0), 0);
+  const subtotal = roundMoney(lineSubtotal);
+  const { vat: vatAmount, total } = calculateVat(subtotal, vatInclusive);
 
   return (
     <div className="space-y-3">
@@ -67,7 +60,7 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
                 </div>
                 <div className="w-24 text-right pt-5">
                   <p className="text-sm font-black text-slate-700">
-                    R {((parseFloat(item.qty) || 1) * (parseFloat(item.unitPrice) || 0)).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    R {roundMoney((parseFloat(item.qty) || 1) * (parseFloat(item.unitPrice) || 0)).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -95,7 +88,7 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
             </div>
           )}
           <div className="flex justify-between text-sm">
-            <span className="text-slate-500">VAT ({VAT_RATE}%){vatInclusive ? " incl." : ""}</span>
+            <span className="text-slate-500">VAT ({VAT_PERCENT}%){vatInclusive ? " incl." : ""}</span>
             <span className="font-bold text-slate-500">R {vatAmount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
           </div>
           <div className="flex justify-between text-base pt-1 border-t border-slate-100">
