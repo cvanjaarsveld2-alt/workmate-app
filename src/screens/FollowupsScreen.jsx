@@ -149,12 +149,14 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
         assigned_to: updated.assigned_to || "",
         sync_status: "pending",
       };
+      const queueItem = { id: genId(), table: "followups", action: "update", data: syncPayload, status: "pending", created_at: new Date().toISOString() };
+      await offlineSave("followups", updated);
+      await offlineSave("syncQueue", queueItem);
       setData(d => ({
         ...d,
         followups: (d.followups || []).map(f => f.id === editId ? updated : f),
-        syncQueue: [{ id: genId(), table: "followups", action: "update", data: syncPayload, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+        syncQueue: [queueItem, ...(d.syncQueue || [])],
       }));
-      await offlineSave("followups", updated);
       setToast("Follow-up updated");
       triggerImmediateSync();
     } else {
@@ -166,12 +168,14 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
         client: clientName, branch: clientBranch,
         completed: false, created_at: new Date().toISOString(), sync_status: "pending",
       }, teamId);
+      const queueItem = { id: genId(), table: "followups", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() };
+      await offlineSave("followups", item);
+      await offlineSave("syncQueue", queueItem);
       setData(d => ({
         ...d,
         followups: [item, ...(d.followups || [])],
-        syncQueue: [{ id: genId(), table: "followups", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+        syncQueue: [queueItem, ...(d.syncQueue || [])],
       }));
-      await offlineSave("followups", item);
       setToast("Follow-up added");
       triggerImmediateSync();
     }
@@ -188,12 +192,14 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
     // Send the FULL row — sync upserts, so a partial payload would null out
     // required columns like title. `up` already carries every field.
     const syncPayload = { ...up, user_id: t.user_id || userId, team_id: t.team_id || teamId || null };
+    const queueItem = { id: genId(), table: "followups", action: "update", data: syncPayload, status: "pending", created_at: new Date().toISOString() };
+    await offlineSave("followups", up);
+    await offlineSave("syncQueue", queueItem);
     setData(d => ({
       ...d,
       followups: (d.followups || []).map(f => f.id === id ? up : f),
-      syncQueue: [{ id: genId(), table: "followups", action: "update", data: syncPayload, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
+      syncQueue: [queueItem, ...(d.syncQueue || [])],
     }));
-    await offlineSave("followups", up);
     triggerImmediateSync();
     // Show "schedule next action?" prompt when marking complete
     if (completing) {
