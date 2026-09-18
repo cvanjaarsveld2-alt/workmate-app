@@ -27,18 +27,37 @@ const LIGHT = "#F7F3F3";
 // FIX (Build 8, Phase 3) — every helper below now takes the signed-in user's
 // id and reads/writes the per-user key (scopedPinKey), instead of the one
 // global key every account on the device used to share. See constants.js.
-async function _hashPIN(pin) {
-  const data = new TextEncoder().encode(pin + "powermate_salt_v1");
-  const buf  = await crypto.subtle.digest("SHA-256", data);
+async function _digestHex(value) {
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
+function _randomSalt() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+async function _hashPIN(pin, salt) {
+  return _digestHex(pin + salt);
+}
 async function savePINHash(pin, userId) {
-  localStorage.setItem(scopedPinKey(PIN_KEY, userId), await _hashPIN(pin));
+  const salt = _randomSalt();
+  const hash = await _hashPIN(pin, salt);
+  localStorage.setItem(scopedPinKey(PIN_KEY, userId), `v2${salt}${hash}`);
 }
 async function verifyPIN(pin, userId) {
-  const stored = localStorage.getItem(scopedPinKey(PIN_KEY, userId));
+  const key = scopedPinKey(PIN_KEY, userId);
+  const stored = localStorage.getItem(key);
   if (!stored) return false;
-  return (await _hashPIN(pin)) === stored;
+  if (stored.startsWith("v2$")) {
+    const [, salt, hash] = stored.split("$");
+    if (!salt || !hash) return false;
+    return (await _hashPIN(pin, salt)) === hash;
+  }
+  // Legacy Build 8 hash migration: verify once against the old static salt,
+  // then immediately replace it with a per-install random salt.
+  const legacyHash = await _digestHex(pin + "powermate_salt_v1");
+  if (legacyHash !== stored) return false;
+  await savePINHash(pin, userId);
+  return true;
 }
 export function getPINHash(userId)          { return localStorage.getItem(scopedPinKey(PIN_KEY, userId)); }
 export function getPINAttempts(userId)      { return parseInt(localStorage.getItem(scopedPinKey(PIN_ATTEMPTS_KEY, userId)) || "0", 10); }
