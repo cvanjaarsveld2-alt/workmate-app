@@ -315,7 +315,7 @@ function WeekRow({ week, checksMap, selected, onSelect, onDayClick, selectMode }
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
-export function VehicleCheckScreen({ data, setData, userId }) {
+export function VehicleCheckScreen({ data, setData, userId, teamId }) {
   const today = todayISO();
   const exportProgress = useExportProgress();
   const [tab, setTab]                   = useState("daily");   // "daily" | "history"
