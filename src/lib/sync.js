@@ -197,6 +197,18 @@ async function reattachStagedDependencies(setData){
   }catch(e){console.warn("[Sync] reattachStagedDependencies failed",e);}
 }
 export async function pushSyncQueue(syncQueue,setData){
+  // The React queue is a fast in-memory view, not the source of truth. Always
+  // merge it with IndexedDB before draining so a save that happened between
+  // setData() and React's next effect cannot be missed.
+  if(!Array.isArray(syncQueue))syncQueue=[];
+  try{
+    const durable=await offlineGetAll("syncQueue");
+    const merged=new Map();
+    for(const item of durable||[])if(item?.id)merged.set(item.id,item);
+    for(const item of syncQueue||[])if(item?.id)merged.set(item.id,item);
+    syncQueue=[...merged.values()];
+  }catch(e){console.warn("[Sync] durable queue read failed; using in-memory queue",e);}
+  
   // Never spend retry attempts while offline — every attempt below is a real network
   // call, and burning through MAX_SYNC_ATTEMPTS just because there was no signal would
   // permanently "fail" perfectly good records. Anything that asks us to sync while
@@ -291,7 +303,33 @@ export async function pushSyncQueue(syncQueue,setData){
 async function pullAll(makeQuery){const rows=[];for(let page=0;;page+=1){const{data,error}=await makeQuery().range(page*PAGE_SIZE,page*PAGE_SIZE+PAGE_SIZE-1);if(error)return{data:null,error};const batch=data||[];rows.push(...batch);if(batch.length<PAGE_SIZE)return{data:rows,error:null};}}
 async function pullTable(table,uid){let query=supabase.from(table).select("*");if(table==="team_notifications")query=query.eq("to_user_id",uid);else if(!TEAM_TABLES.has(table))query=query.eq("user_id",uid);return pullAll(()=>query.order("created_at",{ascending:false}));}
 function dirtyQueueForTable(table){return(_globalQueueRef?.current||[]).filter(q=>(q.status==="pending"||q.status==="failed")&&q.table===table);}
-export async function pullFromSupabase(uid,setData){if(!uid)return false;try{const results=await Promise.all(SYNC_TABLES.map(table=>pullTable(table,uid))),next={};for(let i=0;i<SYNC_TABLES.length;i++){const table=SYNC_TABLES[i],result=results[i];if(result.error){console.warn(`[Sync] pull failed: ${table}`,result.error);continue;}const local=localStoreName(table),dirty=dirtyQueueForTable(table),localRows=await offlineGetAll(local),dirtyById=new Map(dirty.map(q=>[q.data?.id,q])),serverRows=(result.data||[]).filter(row=>!(dirtyById.get(row.id)?.action==="delete"));for(const row of localRows){const q=dirtyById.get(row.id);if(q&&q.action!=="delete"&&!serverRows.some(r=>r.id===row.id))serverRows.push(row);}next[local]=serverRows;await offlineReplaceAll(local,serverRows);}setData(current=>({...current,...next}));return true;}catch(e){console.warn("[Sync] pull failed",e);return false;}}
+export async function pullFromSupabase(uid,setData){
+  if(!uid)return false;
+  try{
+    // Pull protection uses the durable queue, not only the React ref. This
+    // closes the race where a server pull happens between a local save and
+    // React publishing the new queue into _globalQueueRef.
+    const durableQueue=await offlineGetAll("syncQueue");
+    const results=await Promise.all(SYNC_TABLES.map(table=>pullTable(table,uid))),next={};
+    for(let i=0;i<SYNC_TABLES.length;i++){
+      const table=SYNC_TABLES[i],result=results[i];
+      if(result.error){console.warn(`[Sync] pull failed: ${table}`,result.error);continue;}
+      const local=localStoreName(table);
+      const dirty=(durableQueue||[]).filter(q=>(q.status==="pending"||q.status==="failed")&&q.table===table);
+      const localRows=await offlineGetAll(local);
+      const dirtyById=new Map(dirty.map(q=>[q.data?.id,q]));
+      const serverRows=(result.data||[]).filter(row=>!(dirtyById.get(row.id)?.action==="delete"));
+      for(const row of localRows){
+        const q=dirtyById.get(row.id);
+        if(q&&q.action!=="delete"&&!serverRows.some(r=>r.id===row.id))serverRows.push(row);
+      }
+      next[local]=serverRows;
+      await offlineReplaceAll(local,serverRows);
+    }
+    setData(current=>({...current,...next}));
+    return true;
+  }catch(e){console.warn("[Sync] pull failed",e);return false;}
+}
 export function registerSyncHandlers(setData,queueRef){_globalSetData=setData;_globalQueueRef=queueRef;}
 export function triggerImmediateSync(){if(_globalSetData&&_globalQueueRef)pushSyncQueue(_globalQueueRef.current||[],_globalSetData).catch(()=>{});}
 
