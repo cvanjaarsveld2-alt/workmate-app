@@ -416,7 +416,8 @@ export async function retryPendingMedia(uid,setData){
       retryFlatMedia("notes",setData),
       retryFlatMedia("equipment",setData),
       retryReportMedia("breakdown_reports",uid,setData),
-      retryReportMedia("repair_reports",uid,setData),\n      retryVehicleCheckMedia(uid,setData),
+      retryReportMedia("repair_reports",uid,setData),
+      retryVehicleCheckMedia(uid,setData),
     ]);
     const any=results.some(Boolean);
     if(any)triggerImmediateSync();
