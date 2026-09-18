@@ -196,7 +196,9 @@ function SettingsPanel({ settings, userId, onSave, onClose }) {
       setForm(f => ({ ...f, vehicle_photo_url: base64 }));
       // Upload in background, then swap to the hosted URL
       const path = `vehicle-profile/${userId}/${genId()}.jpg`;
-      const uploaded = await uploadPhotoToSupabaseWithPath(base64 || file, path);\n      const url = uploaded?.url;\n      const storage_path = uploaded?.path;
+      const uploaded = await uploadPhotoToSupabaseWithPath(base64 || file, path);
+      const url = uploaded?.url;
+      const storage_path = uploaded?.path;
       if (url) setForm(f => ({ ...f, vehicle_photo_url: url }));
     } catch (e) {
       console.warn("Vehicle photo failed:", e);
@@ -417,7 +419,9 @@ export function VehicleCheckScreen({ data, setData, userId }) {
     try {
       const safeItem = item.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       const path = `vehicle-checks/${userId}/${date}/item-${safeItem}-${genId()}.jpg`;
-      const uploaded = await uploadPhotoToSupabaseWithPath(base64, path);\n      const url = uploaded?.url;\n      const storage_path = uploaded?.path;
+      const uploaded = await uploadPhotoToSupabaseWithPath(base64, path);
+      const url = uploaded?.url;
+      const storage_path = uploaded?.path;
       if (url) {
         const latest = getDayData(date);
         const latestItem = latest.items[item] || existing;
