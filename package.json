@@ -9,10 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "check": "npm run test && npm run check:field && npm run build",
     "check:field": "node scripts/field-readiness.mjs",
-    "test": "node --test",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "lint": "eslint . --max-warnings=0"
+    "test": "node --test"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
@@ -30,11 +27,7 @@
   "devDependencies": {
     "tailwindcss": "^3.4.17",
     "postcss": "^8.4.49",
-    "autoprefixer": "^10.4.20",
-    "prettier": "^3.6.2",
-    "eslint": "^9.36.0",
-    "@eslint/js": "^9.36.0",
-    "eslint-plugin-react-hooks": "^5.2.0"
+    "autoprefixer": "^10.4.20"
   },
   "overrides": {
     "uuid": "^11.1.1",
