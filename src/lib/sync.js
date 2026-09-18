@@ -4,8 +4,8 @@ import { supabase } from "../supabase";
 import { logEvent, uploadPhotoToSupabase } from "./helpers";
 import { offlineSave, offlineDelete, offlineGetAll, offlineReplaceAll } from "../offline/offlineDb";
 import { logCrash } from "../components/ErrorBoundary";
- 
-const SYNC_TABLES=["clients","followups","quotes","contacts","notes","equipment","expenses","leads","vehicle_checks","activities","breakdown_reports","repair_reports","custom_faults","service_reports","team_notifications","jobs","invoices","payments"];
+
+const SYNC_TABLES=["clients","followups","quotes","contacts","notes","equipment","expenses","leads","vehicle_checks","activities","breakdown_reports","repair_reports","custom_faults","service_reports","team_notifications","jobs","invoices","payments","email_quotes"];
 const TEAM_TABLES=new Set(["clients","followups","quotes","contacts","notes","equipment","leads","activities","breakdown_reports","repair_reports","custom_faults","service_reports","jobs","invoices","payments"]);
 const LOCAL_STORE={breakdown_reports:"breakdowns",repair_reports:"repairs",custom_faults:"customFaults",service_reports:"serviceReports",team_notifications:"teamNotifications"};
 const localStoreName=table=>LOCAL_STORE[table]||table;
@@ -15,13 +15,13 @@ const MAX_SYNC_ATTEMPTS=8,PAGE_SIZE=1000,RECONCILE_MS=30000;
 // already running — without it, a save that lands mid-sync would silently be dropped
 // until the next unrelated trigger (or the 30s reconcile) happened to pick it up.
 let _syncInProgress=false,_syncRerunRequested=false,_globalSetData=null,_globalQueueRef=null;
- 
+
 const REMOTE_EXCLUDED_FIELDS={quotes:new Set(["contact_id","from_user_id","to_user_id","job_id","invoice_id"]),followups:new Set(["invoice_id","job_id"])};
 const DEPENDENCIES={followups:[{field:"quote_id",pending:"sync_pending_quote_id",table:"quotes"},{field:"client_id",pending:"sync_pending_client_id",table:"clients"},{field:"linked_note_id",pending:"sync_pending_note_id",table:"notes"},{field:"team_id",pending:"sync_pending_team_id",table:"teams"}],jobs:[{field:"quote_id",pending:"sync_pending_quote_id",table:"quotes"},{field:"client_id",pending:"sync_pending_client_id",table:"clients"}],invoices:[{field:"quote_id",pending:"sync_pending_quote_id",table:"quotes"},{field:"job_id",pending:"sync_pending_job_id",table:"jobs"},{field:"client_id",pending:"sync_pending_client_id",table:"clients"}],payments:[{field:"invoice_id",pending:"sync_pending_invoice_id",table:"invoices"}]};
-const SYNC_PRIORITY={clients:10,quotes:20,contacts:30,notes:30,equipment:30,expenses:30,leads:30,vehicle_checks:30,activities:30,breakdown_reports:30,repair_reports:30,custom_faults:30,service_reports:30,team_notifications:30,followups:40,jobs:50,invoices:60,payments:70};
+const SYNC_PRIORITY={clients:10,quotes:20,contacts:30,notes:30,equipment:30,expenses:30,leads:30,vehicle_checks:30,activities:30,breakdown_reports:30,repair_reports:30,custom_faults:30,service_reports:30,team_notifications:30,email_quotes:35,followups:40,jobs:50,invoices:60,payments:70};
 function sanitizeRemotePayload(table,data){const out={...(data||{})};for(const field of REMOTE_EXCLUDED_FIELDS[table]||[])delete out[field];return out;}
 function cleanUUIDs(data){const fields=["id","user_id","team_id","client_id","contact_id","linked_note_id","linked_breakdown_id","assigned_to_user_id","from_user_id","to_user_id","quote_id","job_id","invoice_id","sync_pending_quote_id","sync_pending_job_id","sync_pending_client_id","sync_pending_note_id","sync_pending_team_id","sync_pending_invoice_id"];const out={...(data||{})};fields.forEach(f=>{if(out[f]===""||out[f]===undefined)out[f]=null;});return out;}
-function cleanNumerics(data){const out={...(data||{})};["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins","subtotal","vat","total","amount_paid","balance_due"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;});return out;}
+function cleanNumerics(data){const out={...(data||{})};["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins","subtotal","vat","total","amount_paid","balance_due","extracted_amount"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;});return out;}
 function normalizeVehicleCheckPayload(data){const source=data||{};const out={id:source.id,user_id:source.user_id,check_date:source.check_date,vehicle:source.vehicle??null,registration:source.registration??null,driver:source.driver??null,data:source.data??{},sync_status:source.sync_status??"pending",updated_at:source.updated_at??new Date().toISOString()};if(typeof out.data==="string"){try{out.data=JSON.parse(out.data);}catch{out.data={};}}if(!out.id)throw new Error("vehicle_checks record is missing id");if(!out.check_date||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(String(out.check_date)))throw new Error("vehicle_checks record has an invalid check_date");return out;}
 // Postgres/Postgrest columns should never receive a raw base64 data: URI — a photo
 // that never made it to Storage has no business being smuggled into a text column as
@@ -184,7 +184,7 @@ function dirtyQueueForTable(table){return(_globalQueueRef?.current||[]).filter(q
 export async function pullFromSupabase(uid,setData){if(!uid)return false;try{const results=await Promise.all(SYNC_TABLES.map(table=>pullTable(table,uid))),next={};for(let i=0;i<SYNC_TABLES.length;i++){const table=SYNC_TABLES[i],result=results[i];if(result.error){console.warn(`[Sync] pull failed: ${table}`,result.error);continue;}const local=localStoreName(table),dirty=dirtyQueueForTable(table),localRows=await offlineGetAll(local),dirtyById=new Map(dirty.map(q=>[q.data?.id,q])),serverRows=(result.data||[]).filter(row=>!(dirtyById.get(row.id)?.action==="delete"));for(const row of localRows){const q=dirtyById.get(row.id);if(q&&q.action!=="delete"&&!serverRows.some(r=>r.id===row.id))serverRows.push(row);}next[local]=serverRows;await offlineReplaceAll(local,serverRows);}setData(current=>({...current,...next}));return true;}catch(e){console.warn("[Sync] pull failed",e);return false;}}
 export function registerSyncHandlers(setData,queueRef){_globalSetData=setData;_globalQueueRef=queueRef;}
 export function triggerImmediateSync(){if(_globalSetData&&_globalQueueRef)pushSyncQueue(_globalQueueRef.current||[],_globalSetData).catch(()=>{});}
- 
+
 // ─── Media upload retry ──────────────────────────────────────────────────────
 // Photos are attached to a record as base64 first (so saving never blocks on a slow
 // upload), then a screen tries to upload them to Storage. If that upload never
@@ -278,5 +278,5 @@ export async function retryPendingMedia(uid,setData){
     return any;
   }catch(e){console.warn("[Sync] retryPendingMedia failed",e);return false;}
 }
- 
+
 export function setupRealtimeSync(uid,setData){if(!uid)return()=>{};const channels=SYNC_TABLES.map(table=>{let channel=supabase.channel(`powermate-${uid}-${table}`);channel=channel.on("postgres_changes",{event:"*",schema:"public",table},payload=>{const local=localStoreName(table);if(table==="team_notifications"&&payload.new?.to_user_id!==uid)return;const teamId=payload.new?.team_id??payload.old?.team_id;if(TEAM_TABLES.has(table)&&!teamId)return;const dirty=dirtyQueueForTable(table);const id=payload.new?.id||payload.old?.id;if(dirty.some(q=>q.data?.id===id))return;setData(current=>{const rows=current[local]||[];if(payload.eventType==="DELETE")return{...current,[local]:rows.filter(r=>r.id!==payload.old?.id)};const row=payload.new;if(!row?.id)return current;const idx=rows.findIndex(r=>r.id===row.id);return{...current,[local]:idx>=0?rows.map((r,i)=>i===idx?row:r):[row,...rows]};});});channel.subscribe();return channel;});const timer=setInterval(()=>{if(document.visibilityState!=="hidden"&&navigator.onLine){pullFromSupabase(uid,setData).catch(()=>{});retryPendingMedia(uid,setData).catch(()=>{});}},RECONCILE_MS);return()=>{clearInterval(timer);channels.forEach(c=>supabase.removeChannel(c));};}
