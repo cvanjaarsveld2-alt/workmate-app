@@ -5,11 +5,11 @@
 import React, { useState, useRef, useEffect} from "react";
 import { motion } from "framer-motion";
 import { Camera, Loader2, X, Sparkles } from "lucide-react";
-import { supabase } from "../supabase";
+import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
 import { genId } from "../lib/helpers";
 import { Card, Btn } from "../components/ui";
 
-const FUNCTION_URL = "https://hrqzqyfvbfzrfnuxovvr.supabase.co/functions/v1/scan-receipt";
+const FUNCTION_URL = `${SUPABASE_FUNCTIONS_URL}/scan-receipt`;
 
 async function compressImage(file, maxDim = 1600, quality = 0.85) {
   return new Promise((resolve, reject) => {
