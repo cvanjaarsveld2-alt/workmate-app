@@ -12,7 +12,6 @@ import React from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { VAT_PERCENT, roundMoney, calculateVat } from "../lib/finance";
-import { VAT_PERCENT, roundMoney, calculateVat } from "../lib/finance";
 
 function emptyLine() {
   return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, description: "", qty: "1", unitPrice: "" };
