@@ -335,8 +335,8 @@ Kind regards`;
       if (isOnline && pendingMedia.length > 0) {
         newUploadedMedia = await Promise.all(pendingMedia.map(async m => {
           const path = "notes/" + editId + "/" + m.id;
-          const url = await uploadPhotoToSupabase(m.file || m.base64, path);
-          return url ? { ...m, url, base64: undefined, file: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
+          const uploaded = await uploadPhotoToSupabaseWithPath(m.file || m.base64, path);
+          return uploaded ? { ...m, url: uploaded.url, storage_path: uploaded.path, base64: undefined, file: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
         }));
       } else {
         newUploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
@@ -380,8 +380,8 @@ Kind regards`;
     if (isOnline && pendingMedia.length > 0) {
       uploadedMedia = await Promise.all(pendingMedia.map(async m => {
         const path = "notes/" + noteId + "/" + m.id;
-        const url = await uploadPhotoToSupabase(m.file || m.base64, path);
-        return url ? { ...m, url, base64: undefined, file: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
+        const uploaded = await uploadPhotoToSupabaseWithPath(m.file || m.base64, path);
+          return uploaded ? { ...m, url: uploaded.url, storage_path: uploaded.path, base64: undefined, file: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
       }));
     } else {
       uploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
