@@ -389,4 +389,48 @@ export async function retryPendingMedia(uid,setData){
   }catch(e){console.warn("[Sync] retryPendingMedia failed",e);return false;}
 }
 
-export function setupRealtimeSync(uid,setData){if(!uid)return()=>{};const channels=SYNC_TABLES.map(table=>{let channel=supabase.channel(`powermate-${uid}-${table}`);channel=channel.on("postgres_changes",{event:"*",schema:"public",table},payload=>{const local=localStoreName(table);if(table==="team_notifications"&&payload.new?.to_user_id!==uid)return;const teamId=payload.new?.team_id??payload.old?.team_id;if(TEAM_TABLES.has(table)&&!teamId)return;const dirty=dirtyQueueForTable(table);const id=payload.new?.id||payload.old?.id;if(dirty.some(q=>q.data?.id===id))return;setData(current=>{const rows=current[local]||[];if(payload.eventType==="DELETE")return{...current,[local]:rows.filter(r=>r.id!==payload.old?.id)};const row=payload.new;if(!row?.id)return current;const idx=rows.findIndex(r=>r.id===row.id);return{...current,[local]:idx>=0?rows.map((r,i)=>i===idx?row:r):[row,...rows]};});});channel.subscribe();return channel;});const timer=setInterval(()=>{if(document.visibilityState!=="hidden"&&navigator.onLine){pullFromSupabase(uid,setData).catch(()=>{});retryPendingMedia(uid,setData).catch(()=>{});}},RECONCILE_MS);return()=>{clearInterval(timer);channels.forEach(c=>supabase.removeChannel(c));};}
+export function setupRealtimeSync(uid,setData){
+  if(!uid)return()=>{};
+  let stopped=false;
+  let channels=[];
+  const start=async()=>{
+    // Resolve the authoritative team from the database. If this cannot be
+    // resolved, team-scoped realtime rows are never trusted merely because
+    // they contain a team_id; only rows owned/assigned to this user are safe.
+    let currentTeamId=null;
+    try{
+      const {data,error}=await supabase.rpc("current_team_id");
+      if(!error&&data) currentTeamId=Array.isArray(data)?data[0]??null:data;
+    }catch{}
+    if(stopped)return;
+    channels=SYNC_TABLES.map(table=>{
+      let channel=supabase.channel(`powermate-${uid}-${table}`);
+      channel=channel.on("postgres_changes",{event:"*",schema:"public",table},payload=>{
+        const local=localStoreName(table);
+        if(table==="team_notifications"&&payload.new?.to_user_id!==uid)return;
+        const row=payload.new;
+        const oldRow=payload.old;
+        const teamId=row?.team_id??oldRow?.team_id;
+        if(TEAM_TABLES.has(table)){
+          if(!teamId)return;
+          if(currentTeamId ? teamId!==currentTeamId : !(row?.user_id===uid||row?.assigned_to_user_id===uid))return;
+        }
+        const dirty=dirtyQueueForTable(table);
+        const id=row?.id||oldRow?.id;
+        if(dirty.some(q=>q.data?.id===id))return;
+        setData(current=>{
+          const rows=current[local]||[];
+          if(payload.eventType==="DELETE")return{...current,[local]:rows.filter(r=>r.id!==oldRow?.id)};
+          if(!row?.id)return current;
+          const idx=rows.findIndex(r=>r.id===row.id);
+          return{...current,[local]:idx>=0?rows.map((r,i)=>i===idx?row:r):[row,...rows]};
+        });
+      });
+      channel.subscribe();
+      return channel;
+    });
+  };
+  start().catch(()=>{});
+  const timer=setInterval(()=>{if(document.visibilityState!=="hidden"&&navigator.onLine){pullFromSupabase(uid,setData).catch(()=>{});retryPendingMedia(uid,setData).catch(()=>{});}},RECONCILE_MS);
+  return()=>{stopped=true;clearInterval(timer);channels.forEach(c=>supabase.removeChannel(c));};
+}
