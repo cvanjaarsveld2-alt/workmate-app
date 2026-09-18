@@ -13,7 +13,7 @@ import {
   Share2, FileText, FileType, LayoutGrid, ClipboardList,
 } from "lucide-react";
 import { BRAND, MAX_FILE_SIZE_MB } from "../lib/constants";
-import { genId, todayISO, smartDate, uploadPhotoToSupabaseWithPath, compressImage } from "../lib/helpers";
+import { genId, todayISO, smartDate, uploadPhotoToSupabaseWithPath, createFreshMediaUrl, compressImage } from "../lib/helpers";
 import { withTeamId } from "../lib/teamId";
 import { offlineSave } from "../offline/offlineDb";
 import { Card, Field, ClientSelector, Toast, Empty, PageHeader, useConfirm } from "../components/ui";
@@ -584,7 +584,7 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {photos.map(p => (
                   <div key={p.id} className="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-slate-100 border border-slate-200">
-                    <img src={p.url || p._base64} alt="" className="w-full h-full object-cover" />
+                    <img src={p.url || p._base64} onError={async e => { const fresh = await createFreshMediaUrl(p); if (fresh) e.currentTarget.src = fresh; }} alt="" className="w-full h-full object-cover" />
                     <button onClick={() => removePhoto(it.id, p.id)}
                       className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
                       <X size={10} className="text-white" />
