@@ -186,7 +186,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             </div>
             <p className="text-sm text-slate-400 mt-0.5">{isOnline ? "Connected to cloud" : "Changes saved locally, will sync when back online"}</p>
           </div>
-          <Btn size="sm" variant={isOnline ? "solid" : "secondary"} onClick={onSyncNow} disabled={!isOnline || syncing || pendingCount === 0}>
+          <Btn size="sm" variant={isOnline ? "solid" : "secondary"} onClick={onSyncNow} disabled={!isOnline || syncing}>
             <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
             {syncing ? "Syncing…" : "Sync Now"}
           </Btn>
@@ -195,46 +195,45 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           ? <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5">
               <p className="text-sm font-bold text-amber-700">⚠️ {pendingCount} change{pendingCount !== 1 ? "s" : ""} waiting to sync</p>
               <p className="text-xs text-amber-600 mt-0.5">{isOnline ? "Tap Sync Now or wait — syncs automatically" : "Will sync automatically when you reconnect"}</p>
-              <button
-                onClick={() => {
-                  // Only remove items that are genuinely stuck (failed 5+ times or have invalid data)
-                  const stuck = (data.syncQueue || []).filter(q => {
-                    if (q.status === 'failed') return true;
-                    if (q.table === 'equipment' && q.data?.service_due === '') return true;
-                    if (q.table === 'notes' && q.data?.resolve_by === '') return true;
-                    if (q.data?.media && q.data.media.length > 0 && !q.data.media.some(m => m.url)) return true;
-                    return false;
-                  });
-                  if (stuck.length === 0) {
-                    window.alert("No stuck items found. Your queue looks healthy — just wait for sync.");
-                    return;
-                  }
-                  const stuckIds = new Set(stuck.map(s => s.id));
-                  const remaining = (data.syncQueue || []).filter(q => !stuckIds.has(q.id));
-                  onClearQueue(remaining);
-                }}
-                className="mt-2 w-full rounded-xl border border-amber-300 py-2 text-xs font-bold text-amber-700 bg-white">
-                Clear Stuck Items
-              </button>
             </div>
-          : failedCount > 0
-          ? <div className="rounded-xl bg-red-50 border border-red-200 p-3.5">
+          : null}
+        {failedCount > 0
+          ? <div className="rounded-xl bg-red-50 border border-red-200 p-3.5 mt-3">
               <p className="text-sm font-bold text-red-700">⚠️ {failedCount} item{failedCount !== 1 ? "s" : ""} failed to sync</p>
-              <p className="text-xs text-red-600 mt-0.5">Tap Clear Stuck Items to remove them, or check Diagnostics</p>
+              <p className="text-xs text-red-600 mt-0.5">These stopped retrying after repeated failures. Check Diagnostics before clearing — clearing removes them from the sync queue for good; the data stays on this device but will never reach the cloud unless you fix and re-save it.</p>
               <button
-                onClick={() => {
-                  const remaining = (data.syncQueue || []).filter(q => q.status !== "failed");
+                onClick={async () => {
+                  const failedItems = (data.syncQueue || []).filter(q => q.status === "failed");
+                  if (failedItems.length === 0) return;
+                  const ok = await confirm(
+                    `Permanently remove ${failedItems.length} item${failedItems.length !== 1 ? "s" : ""} that failed to sync?\n\nThis data will stay on this device but will NOT be sent to the cloud unless you edit and re-save it. This can't be undone.`,
+                    { confirmLabel: "Remove Permanently", confirmVariant: "danger" }
+                  );
+                  if (!ok) return;
+                  // Keep a local backup of exactly what was removed and when, so a mistaken
+                  // clear isn't a total loss — it's at least recoverable by inspection.
+                  try {
+                    const key = "pm_cleared_sync_items";
+                    const prior = JSON.parse(localStorage.getItem(key) || "[]");
+                    const backup = [{ clearedAt: new Date().toISOString(), items: failedItems }, ...prior].slice(0, 10);
+                    localStorage.setItem(key, JSON.stringify(backup));
+                  } catch {}
+                  const failedIds = new Set(failedItems.map(f => f.id));
+                  const remaining = (data.syncQueue || []).filter(q => !failedIds.has(q.id));
                   onClearQueue(remaining);
+                  setToast(`${failedItems.length} failed item${failedItems.length !== 1 ? "s" : ""} removed`);
                 }}
                 className="mt-2 w-full rounded-xl border border-red-300 py-2 text-xs font-bold text-red-700 bg-white">
                 Clear Failed Items
               </button>
             </div>
-          : <div className="rounded-xl bg-green-50 border border-green-200 p-3.5">
+          : null}
+        {pendingCount === 0 && failedCount === 0
+          ? <div className="rounded-xl bg-green-50 border border-green-200 p-3.5">
               <p className="text-sm font-bold text-green-700">✓ All data synced to cloud</p>
               <p className="text-xs text-green-600 mt-0.5">Your data is safe and visible on all devices</p>
             </div>
-        }
+          : null}
       </Card>
 
       <Card className="p-4 space-y-3">
