@@ -111,16 +111,19 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
       const photos = [];
       for (const p of itemPhotos(it)) {
         let url = p.url;
+        let storage_path = p.storage_path || null;
         if (!url && (p._file || p._base64)) {
           try {
             const path = `${dataKey}/${userId}/${report.id}/${p.id}.jpg`;
-            url = await uploadPhotoToSupabase(p._file || p._base64, path);
+            const uploaded = await uploadPhotoToSupabaseWithPath(p._file || p._base64, path);
+            url = uploaded?.url || null;
+            storage_path = uploaded?.path || null;
           } catch (e) {
             console.warn("Photo upload failed:", e);
             url = p._base64 || null;
           }
         }
-        photos.push({ id: p.id, url: url || null, storage_path: typeof storage_path !== "undefined" ? storage_path : null });
+        photos.push({ id: p.id, url: url || null, storage_path });
       }
       items.push({
         id: it.id,
