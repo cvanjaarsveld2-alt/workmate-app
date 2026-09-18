@@ -106,16 +106,16 @@ export function DailyVehiclePrompt({ userId, teamId, data, setData, onNavigate }
       updated_at: new Date().toISOString(),
     };
 
+    const queueItem = {
+      id: genId(), table: "vehicle_checks", action: "upsert",
+      data: row, status: "pending", created_at: new Date().toISOString(),
+    };
+    offlineSave("vehicle_checks", row).then(() => offlineSave("syncQueue", queueItem)).catch(() => {});
     setData(d => ({
       ...d,
       vehicleChecks: { ...(d.vehicleChecks || {}), [today]: dayData },
-      syncQueue: [{
-        id: genId(), table: "vehicle_checks", action: "upsert",
-        data: row, status: "pending", created_at: new Date().toISOString(),
-      }, ...(d.syncQueue || [])],
+      syncQueue: [queueItem, ...(d.syncQueue || [])],
     }));
-
-    offlineSave("vehicle_checks", row).catch(() => {});
     triggerImmediateSync();
     setDone(true);
     setTimeout(() => setOpen(false), 1800);
