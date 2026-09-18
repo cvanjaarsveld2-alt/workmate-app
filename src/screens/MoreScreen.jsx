@@ -1,7 +1,7 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users, Sun, Moon, Smartphone, Mail } from "lucide-react";
-import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY } from "../lib/constants";
+import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY, PIN_DISABLED_KEY, scopedPinKey } from "../lib/constants";
 import { Card, Btn, Toast, PageHeader, useConfirm } from "../components/ui";
 import { getStoredTheme, applyTheme } from "../lib/theme";
 import ReportExport from "../ReportExport";
@@ -28,8 +28,12 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
   const [pushState, setPushState] = useState("idle");
   const [pushError, setPushError] = useState("");
   const [testPushState, setTestPushState] = useState("idle");
+  // FIX (Build 8, Phase 3) — scoped to this user's key, matching PINScreens.jsx
+  // and App.jsx; previously read/wrote the bare, unscoped keys, so toggling
+  // PIN lock here could disable/inherit a *different* user's PIN on a shared
+  // device even after the storage layer itself was fixed to be per-user.
   const [pinEnabled, setPinEnabled] = useState(
-    !localStorage.getItem("pm_pin_disabled") && !!localStorage.getItem(PIN_KEY)
+    !localStorage.getItem(scopedPinKey(PIN_DISABLED_KEY, userId)) && !!localStorage.getItem(scopedPinKey(PIN_KEY, userId))
   );
 
   useEffect(() => {
@@ -101,8 +105,8 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
   const emailQuotesToReview = (data.email_quotes || []).filter(e => e.user_id === userId && e.status === "new").length;
 
   function changePIN() {
-    localStorage.removeItem(PIN_KEY);
-    sessionStorage.removeItem(PIN_UNLOCKED_KEY);
+    localStorage.removeItem(scopedPinKey(PIN_KEY, userId));
+    sessionStorage.removeItem(scopedPinKey(PIN_UNLOCKED_KEY, userId));
     window.location.reload();
   }
 
@@ -338,14 +342,14 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
                   "Disable PIN lock?\n\nAnyone with access to your phone will be able to open PowerMate and see all your client data.\n\nWe recommend keeping PIN lock on."
                 );
                 if (!sure) return;
-                localStorage.removeItem(PIN_KEY);
-                sessionStorage.removeItem(PIN_UNLOCKED_KEY);
-                localStorage.setItem("pm_pin_disabled", "1");
+                localStorage.removeItem(scopedPinKey(PIN_KEY, userId));
+                sessionStorage.removeItem(scopedPinKey(PIN_UNLOCKED_KEY, userId));
+                localStorage.setItem(scopedPinKey(PIN_DISABLED_KEY, userId), "1");
                 setPinEnabled(false);
               } else {
-                localStorage.removeItem("pm_pin_disabled");
-                localStorage.removeItem(PIN_KEY);
-                sessionStorage.removeItem(PIN_UNLOCKED_KEY);
+                localStorage.removeItem(scopedPinKey(PIN_DISABLED_KEY, userId));
+                localStorage.removeItem(scopedPinKey(PIN_KEY, userId));
+                sessionStorage.removeItem(scopedPinKey(PIN_UNLOCKED_KEY, userId));
                 window.location.reload(); // trigger PIN setup flow
               }
             }}
@@ -381,9 +385,9 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             </div>
             <button
               onClick={() => {
-                localStorage.removeItem("pm_pin_disabled");
-                localStorage.removeItem(PIN_KEY);
-                sessionStorage.removeItem(PIN_UNLOCKED_KEY);
+                localStorage.removeItem(scopedPinKey(PIN_DISABLED_KEY, userId));
+                localStorage.removeItem(scopedPinKey(PIN_KEY, userId));
+                sessionStorage.removeItem(scopedPinKey(PIN_UNLOCKED_KEY, userId));
                 window.location.reload();
               }}
               className="w-full mt-1 rounded-xl py-2.5 text-sm font-black text-white"
