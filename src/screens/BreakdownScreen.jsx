@@ -13,7 +13,7 @@ import {
   Share2, FileText, FileType, LayoutGrid, ClipboardList,
 } from "lucide-react";
 import { BRAND, MAX_FILE_SIZE_MB } from "../lib/constants";
-import { genId, todayISO, smartDate, uploadPhotoToSupabase, compressImage } from "../lib/helpers";
+import { genId, todayISO, smartDate, uploadPhotoToSupabaseWithPath, compressImage } from "../lib/helpers";
 import { withTeamId } from "../lib/teamId";
 import { offlineSave } from "../offline/offlineDb";
 import { Card, Field, ClientSelector, Toast, Empty, PageHeader, useConfirm } from "../components/ui";
@@ -120,7 +120,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
             url = p._base64 || null;
           }
         }
-        photos.push({ id: p.id, url: url || null });
+        photos.push({ id: p.id, url: url || null, storage_path: typeof storage_path !== "undefined" ? storage_path : null });
       }
       items.push({
         id: it.id,
