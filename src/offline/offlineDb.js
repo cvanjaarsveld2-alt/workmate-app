@@ -61,9 +61,31 @@ function openDB() {
   });
 }
 
+// ─── Phase I: offline write failures must not masquerade as success ───────
+// PREVIOUSLY: offlineSave/offlineDelete/offlineReplaceAll each caught EVERY
+// error (IndexedDB unsupported, quota exceeded, the DB blocked by another
+// tab mid-upgrade, a corrupted store) and just console.warn'd — the caller
+// got back a resolved `undefined` indistinguishable from a real success.
+// saveAndSync (sync.js) and every screen that calls these treats that as
+// "the record is safely on this device", and several show the user a literal
+// "Saved" / "saved offline and queued for sync" message right after — which
+// was a LIE whenever the underlying write actually failed. That's silent
+// data loss with a success message on top of it: worse than a normal error,
+// because nothing about the UI told the user (or the sync engine) anything
+// was wrong.
+//
+// FIXED: these three (the ones that ever attempt to persist a WRITE) no
+// longer swallow the error — they log it (for Diagnostics) and then
+// re-throw, so the failure propagates to the caller as a real rejected
+// promise instead of a fake success. saveAndSync no longer catches this
+// silently either (see sync.js), so a genuine IndexedDB failure now surfaces
+// as a visible error rather than a false "Saved". offlineGetAll/offlineGet/
+// offlineCount are READS — returning an empty/null default on failure (as
+// before) is the right behaviour there: an empty result is visibly "no data
+// shown", not a false claim that something was written.
 export async function offlineSave(store, value) {
-  try { const db=await openDB(); return new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).put(value);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }
-  catch(e){ console.warn("[offline] save failed",store,e); }
+  try { const db=await openDB(); return await new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).put(value);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }
+  catch(e){ console.error("[offline] SAVE FAILED — record was NOT persisted locally",store,e); throw e; }
 }
 export async function offlineGetAll(store) {
   try { const db=await openDB(); return new Promise((resolve,reject)=>{const req=db.transaction(store,"readonly").objectStore(store).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error);}); }
@@ -74,12 +96,12 @@ export async function offlineGet(store,id) {
   catch { return null; }
 }
 export async function offlineDelete(store,id) {
-  try { const db=await openDB(); return new Promise(resolve=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>resolve();}); }
-  catch { return; }
+  try { const db=await openDB(); return await new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");tx.objectStore(store).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);}); }
+  catch(e){ console.error("[offline] DELETE FAILED — record may still exist locally",store,id,e); throw e; }
 }
 export async function offlineReplaceAll(store,values) {
-  try { const db=await openDB(); return new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");const s=tx.objectStore(store);s.clear();for(const v of (values||[]))s.put(v);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }
-  catch(e){ console.warn("[offline] replace failed",store,e); }
+  try { const db=await openDB(); return await new Promise((resolve,reject)=>{const tx=db.transaction(store,"readwrite");const s=tx.objectStore(store);s.clear();for(const v of (values||[]))s.put(v);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }
+  catch(e){ console.error("[offline] REPLACE FAILED — local store may be stale/incomplete",store,e); throw e; }
 }
 
 export function deleteUserDatabase(userId) {
