@@ -504,6 +504,7 @@ export function VehicleCheckScreen({ data, setData, userId }) {
     exportProgress.start("Building inspection report");
     try {
       exportProgress.setStage("Rendering checklist & photos", 0.4);
+      const { buildVehicleCheckPDF } = await import("../lib/vehicleCheckPDF");
       const { blob, filename, ref } = await buildVehicleCheckPDF({
         checkDate: date || selectedDate,
         dayData: getDayData(date || selectedDate),
@@ -538,6 +539,7 @@ export function VehicleCheckScreen({ data, setData, userId }) {
       exportProgress.setStage(`Rendering ${allDays.length} day${allDays.length !== 1 ? "s" : ""}`, 0.5);
       // Build one PDF per day, combine into a multi-page blob using jsPDF
       // For now build individual PDFs and share the first; in future merge
+      const { buildVehicleCheckPDF } = await import("../lib/vehicleCheckPDF");
       const { blob, filename, ref } = await buildVehicleCheckPDF({
         checkDate: allDays[0],
         dayData: getDayData(allDays[0]),
