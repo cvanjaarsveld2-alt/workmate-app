@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Plus, ArrowLeft, CheckCircle2, Clock3, Wrench, Trash2, Camera, Save } from "lucide-react";
 import { BRAND } from "../lib/constants";
-import { genId, todayISO, uploadPhotoToSupabaseWithPath, compressImage } from "../lib/helpers";
+import { genId, todayISO, uploadPhotoToSupabaseWithPath, createFreshMediaUrl, compressImage } from "../lib/helpers";
 import { offlineSave } from "../offline/offlineDb";
 import { Card, Btn, Field, PageHeader, Empty } from "../components/ui";
 import { MediaPicker } from "../components/MediaComponents";
@@ -67,7 +67,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
       </Card>
       <Card className="p-4 space-y-3">
         <p className="text-sm font-black text-slate-700">Service photos</p>
-        <div className="grid grid-cols-2 gap-2">{editing.photos.map(p=><img key={p.id} src={p.url} alt="Service" className="w-full h-32 object-cover rounded-xl"/>)}</div>
+        <div className="grid grid-cols-2 gap-2">{editing.photos.map(p=><img key={p.id} src={p.url} onError={async e => { const fresh = await createFreshMediaUrl(p); if (fresh) e.currentTarget.src = fresh; }} alt="Service" className="w-full h-32 object-cover rounded-xl"/>)}</div>
         <MediaPicker onAdd={addPhoto}><Camera size={16}/> Add photo</MediaPicker>
       </Card>
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-100 p-3 max-w-2xl mx-auto flex gap-2">
