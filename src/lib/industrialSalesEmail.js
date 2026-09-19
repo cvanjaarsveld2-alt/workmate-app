@@ -93,7 +93,7 @@ export function generateIndustrialSalesEmail(contact, input) {
   const lines = [
     `Hi ${name},`,
     "",
-    `It was great meeting you ${interaction}${metAt ? ` at ${metAt}` : ""}.`,
+    `It was great meeting you ${metAt ? `at ${metAt}` : interaction}.`,
     topic ? `We spoke about ${topic}.` : "",
     current ? `From our conversation, I understand that ${current}.` : "",
     problem ? `You mentioned that ${problem}.` : "",
