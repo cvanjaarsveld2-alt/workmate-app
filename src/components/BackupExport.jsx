@@ -9,7 +9,7 @@ import { Card, Btn } from "./ui";
 import { supabase } from "../supabase";
 
 const LAST_BACKUP_KEY = "powermate_last_backup";
-const BACKUP_REMINDER_DAYS = 30;
+const BACKUP_REMINDER_DAYS = 7;
 
 function todayISO()  { return new Date().toISOString().slice(0, 10); }
 function nowStamp()  { return new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19); }
@@ -136,7 +136,7 @@ async function generateBackup(data, onProgress = () => {}) {
   // Storage object visible to the signed-in user into this export.
   // This is strictly additive: nothing is deleted, moved or modified.
   const storageManifest = [];
-  const buckets = ["powermate-media", "receipts", "company-docs"];
+  const buckets = ["powermate-media", "receipts", "company-docs", "powermate-quotes", "powermate-files", "Company Documents"];
   let completedFiles = 0;
   for (const bucket of buckets) {
     const objects = await listStorageObjects(bucket);
@@ -190,7 +190,7 @@ HOW TO USE
 - For sharing with accountant/management: open the CSV files
 - For restoring after data loss: keep the JSON file safe
 - Store these somewhere off your phone (Google Drive, OneDrive, email to yourself)
-- Make a new backup at least monthly
+- Make a new backup at least weekly
 
 SUPPORT
 -------
@@ -331,7 +331,7 @@ export function BackupExport({ data }) {
             </p>
             <p className={`text-xs ${isStale ? "text-amber-600" : "text-green-600"} mt-0.5`}>
               {isStale
-                ? "Recommend backing up monthly"
+                ? "Recommend backing up weekly"
                 : "Next reminder in " + (BACKUP_REMINDER_DAYS - daysSinceBackup) + " days"}
             </p>
           </div>
