@@ -72,7 +72,7 @@ export const EMAIL_TEMPLATES = [
 // Templates + editable subject/body + BOTH copy-to-clipboard and open-in-Outlook.
 // Structured so an AI "polish" step can slot in later (a single async function
 // that rewrites `body` via a server-side Edge Function — not wired yet).
-export function EmailComposer({ contact, onClose }) {
+export function EmailComposer({ contact, onClose, onGapSelling }) {
   const [tpl, setTpl] = useState(null);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -85,7 +85,7 @@ export function EmailComposer({ contact, onClose }) {
 
   function pick(t) {
     if (t.kind === "gap") {
-      onClose?.();
+      onGapSelling?.();
       return;
     }
     setTpl(t);
