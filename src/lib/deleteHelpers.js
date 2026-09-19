@@ -17,22 +17,26 @@ import { genId } from "./helpers";
 export async function deleteRecord(table, recordId, userId, setData) {
   if (!recordId) return;
 
-  // 1. Remove from React state + queue the server delete
+  // 1. Create and durably persist the server delete BEFORE publishing it
+  // to React. React state is a view; IndexedDB is the durable queue source of truth.
+  const queueItem = {
+    id: genId(),
+    table,
+    action: "delete",
+    data: { id: recordId, user_id: userId },
+    status: "pending",
+    created_at: new Date().toISOString(),
+  };
+  const existingQueue = await import("../offline/offlineDb").then(m => m.offlineGetAll("syncQueue"));
+  const nextQueue = [
+    queueItem,
+    ...(existingQueue || []).filter(q => q.data?.id !== recordId),
+  ];
+  await import("../offline/offlineDb").then(m => m.offlineReplaceAll("syncQueue", nextQueue));
   setData(d => ({
     ...d,
     [table]: (d[table] || []).filter(r => r.id !== recordId),
-    syncQueue: [
-      {
-        id: genId(),
-        table,
-        action: "delete",
-        data: { id: recordId, user_id: userId },
-        status: "pending",
-        created_at: new Date().toISOString(),
-      },
-      // Remove any pending inserts/updates for this record (they're now moot)
-      ...(d.syncQueue || []).filter(q => q.data?.id !== recordId),
-    ],
+    syncQueue: nextQueue,
   }));
 
   // 2. Remove from IndexedDB immediately (prevents resurrection on reload).
