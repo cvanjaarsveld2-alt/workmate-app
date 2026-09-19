@@ -417,7 +417,7 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
                 <div className="grid grid-cols-3 gap-2">
                   {[{label:"Tomorrow",days:1},{label:"3 days",days:3},{label:"1 week",days:7},{label:"2 weeks",days:14},{label:"1 month",days:30},{label:"Custom",days:null}].map(opt => (
                     <button key={opt.label}
-                      onClick={() => {
+                      onClick={async () => {
                         if (!opt.days) {
                           setForm({title:nextActionPrompt.title,client_id:nextActionPrompt.client_id||null,client:nextActionPrompt.client||"",branch:nextActionPrompt.branch||"",date:todayISO(),time:"",reminder:"30_min",notes:"",linked_note_id:null,assigned_to_user_id:null,assigned_to:""});
                           setShowForm(true); setNextActionPrompt(null); return;
@@ -426,7 +426,12 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
                         const ds=nd.toISOString().slice(0,10);
                         const fu=withTeamId({id:genId(),user_id:userId,title:nextActionPrompt.title,client_id:nextActionPrompt.client_id||null,client:nextActionPrompt.client||"",branch:nextActionPrompt.branch||"",date:ds,time:"",reminder:"30_min",notes:"",completed:false,sync_status:"pending",created_at:new Date().toISOString()},teamId);
                         const queueItem={id:genId(),table:"followups",action:"insert",data:fu,status:"pending",created_at:new Date().toISOString()};
-                        offlineSave("followups",fu).then(()=>offlineSave("syncQueue",queueItem)).catch(()=>{});
+                        try {
+                          await offlineSave("followups",fu);
+                          await offlineSave("syncQueue",queueItem);
+                        } catch {
+                          return;
+                        }
                         setData(d=>({...d,followups:[fu,...(d.followups||[])],syncQueue:[queueItem,...(d.syncQueue||[])]}));
                         triggerImmediateSync();
                         setToast("Next follow-up scheduled");
