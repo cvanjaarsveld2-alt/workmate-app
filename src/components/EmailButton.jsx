@@ -6,9 +6,18 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, X } from "lucide-react";
+import { SalesFollowupComposer } from "../lib/industrialSalesEmail";
 
 // ─── Email message templates ───────────────────────────────────────────────────
 export const EMAIL_TEMPLATES = [
+  {
+    id: "gap_selling",
+    label: "Gap-Selling Follow-Up",
+    emoji: "✨",
+    kind: "gap",
+    subject: () => "Sales Follow-Up — Power Works",
+    body: () => "Build a problem → impact → desired outcome follow-up",
+  },
   {
     id: "quote_followup",
     label: "Quote Follow-up",
@@ -75,6 +84,10 @@ export function EmailComposer({ contact, onClose }) {
   const clientName = contact.company;
 
   function pick(t) {
+    if (t.kind === "gap") {
+      onClose?.();
+      return;
+    }
     setTpl(t);
     setSubject(t.subject(clientName));
     setBody(t.body(contactName, clientName));
@@ -161,15 +174,23 @@ export function EmailComposer({ contact, onClose }) {
 
 // ─── Email Button ──────────────────────────────────────────────────────────────
 export function EmailButton({ email, contactName, clientName, size = "sm" }) {
+  const contact = { email, name: contactName, company: clientName };
   const [showTemplates, setShowTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [customSubject, setCustomSubject] = useState("");
   const [customBody, setCustomBody] = useState("");
   const [editing, setEditing] = useState(false);
+  const [salesFollowupOpen, setSalesFollowupOpen] = useState(false);
 
   if (!email) return null;
 
   function selectTemplate(template) {
+    if (template.kind === "gap") {
+      setShowTemplates(false);
+      setEditing(false);
+      setSalesFollowupOpen(true);
+      return;
+    }
     setSelectedTemplate(template);
     setCustomSubject(template.subject(clientName));
     setCustomBody(template.body(contactName, clientName));
@@ -265,6 +286,15 @@ export function EmailButton({ email, contactName, clientName, size = "sm" }) {
               )}
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {salesFollowupOpen && (
+          <SalesFollowupComposer
+            contact={contact}
+            onClose={() => setSalesFollowupOpen(false)}
+          />
         )}
       </AnimatePresence>
     </>
