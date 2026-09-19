@@ -51,8 +51,15 @@ export function gapCheck(input, email) {
   return checks.map(([id, label, pass]) => ({ id, label, pass }));
 }
 
-function interactionLabel(id) {
-  return SALES_INTERACTIONS.find(x => x[0] === id)?.[2] || "our recent conversation";
+function interactionPhrase(id) {
+  return ({
+    site: "at the site",
+    expo: "at the expo/event",
+    meeting: "at our meeting",
+    call: "on our call",
+    referral: "through the introduction",
+    email: "in our recent emails",
+  })[id] || "recently";
 }
 function goalText(id) {
   return ({
@@ -68,7 +75,7 @@ function goalText(id) {
 export function generateIndustrialSalesEmail(contact, input) {
   const name = firstName(contact?.name);
   const company = clean(contact?.company) || "your team";
-  const interaction = interactionLabel(input.interaction);
+  const interaction = interactionPhrase(input.interaction);
   const current = clean(input.currentSituation);
   const problem = clean(input.problem);
   const impact = clean(input.impact);
@@ -86,7 +93,7 @@ export function generateIndustrialSalesEmail(contact, input) {
   const lines = [
     `Hi ${name},`,
     "",
-    `It was great meeting you ${interaction === "our recent conversation" ? "recently" : interaction.toLowerCase()}${metAt ? ` at ${metAt}` : ""}.`,
+    `It was great meeting you ${interaction}${metAt ? ` at ${metAt}` : ""}.`,
     topic ? `We spoke about ${topic}.` : "",
     current ? `From our conversation, I understand that ${current}.` : "",
     problem ? `You mentioned that ${problem}.` : "",
