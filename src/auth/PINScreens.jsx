@@ -316,6 +316,7 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
   const [biometricAvailable]    = useState(isBiometricAvailable);
   const [biometricRegistered, setBiometricRegistered] = useState(() => hasBiometricRegistered(userId));
   const prevError = useRef(null);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (biometricRegistered && biometricAvailable && !lockedOut) {
@@ -353,17 +354,27 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
   function del() { setEntered(e => e.slice(0, -1)); }
 
   async function handlePINSubmit(pin) {
-    // FIX #9 — Check persistent lockout first (survives page reload)
-    if (isLockedOut(userId)) { setLockedOut(true); return; }
+    // Prevent double-submission from rapid taps while the async hash check runs.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      // FIX #9 — Check persistent lockout first (survives page reload)
+      if (isLockedOut(userId)) { setLockedOut(true); return; }
 
-    const ok = await verifyPIN(pin, userId);
-    if (ok) {
-      resetPINAttempts(userId);
-      markSessionUnlocked(userId);
-      onUnlock();
-    } else {
-      incrementPINAttempts(userId);
-      const newAttempts = getPINAttempts(userId);
+      const ok = await verifyPIN(pin, userId);
+      if (ok) {
+        resetPINAttempts(userId);
+        markSessionUnlocked(userId);
+        onUnlock();
+      } else {
+        // Clamp the local counter so repeated/cross-event submissions can
+        // never push it beyond the configured attempt ceiling.
+        const currentAttempts = Math.min(getPINAttempts(userId), PIN_MAX_ATTEMPTS - 1);
+        localStorage.setItem(
+          scopedPinKey(PIN_ATTEMPTS_KEY, userId),
+          String(currentAttempts + 1)
+        );
+        const newAttempts = getPINAttempts(userId);
       if (newAttempts >= PIN_MAX_ATTEMPTS) {
         setLockout(userId);
         setLockedOut(true);
@@ -374,7 +385,10 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
             ? `Incorrect PIN — ${remaining} attempt${remaining !== 1 ? "s" : ""} left`
             : "Incorrect PIN — try again"
         );
+        }
       }
+    } finally {
+      submittingRef.current = false;
     }
   }
 
