@@ -488,7 +488,7 @@ function SharedWithMe({ userId, data, setData, onRefresh }) {
 }
 
 // ─── Main TeamScreen ──────────────────────────────────────────────────────────
-export function TeamScreen({ userId, userEmail, data, setData, onTeamChange }) {
+export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, userRole: appUserRole }) {
   const [loading, setLoading]         = useState(true);
   const [team, setTeam]               = useState(null);
   const [members, setMembers]         = useState([]);
@@ -525,7 +525,10 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange }) {
       ]);
 
       const effectiveRole =
-        profile?.role === "admin" || membership?.role === "admin" || membership?.role === "owner"
+        appUserRole === "admin" ||
+        profile?.role === "admin" ||
+        membership?.role === "admin" ||
+        membership?.role === "owner"
           ? "admin"
           : "member";
 
