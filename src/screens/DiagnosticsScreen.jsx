@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Card, Btn, useConfirm } from "../components/ui";
 import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
+import { offlineGetAll, offlineReplaceAll } from "../offline/offlineDb";
 import { readCrashLog, clearCrashLog } from "../components/ErrorBoundary";
 
 const FUNCTIONS_BASE = SUPABASE_FUNCTIONS_URL;
@@ -22,7 +23,7 @@ function Row({ icon: Icon, label, value, status, hint }) {
 }
 function money(value) { return `R ${Number(value || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; }
 
-export function DiagnosticsScreen({ data, userId, isOnline, onBack, onBackfill }) {
+export function DiagnosticsScreen({ data, setData, userId, isOnline, onBack, onBackfill }) {
   const { confirm, dialog } = useConfirm();
   const [funcStatus, setFuncStatus] = useState({});
   const [checking, setChecking] = useState(false);
@@ -70,7 +71,10 @@ export function DiagnosticsScreen({ data, userId, isOnline, onBack, onBackfill }
   async function clearAllFailures() {
     const ok = await confirm(`Remove ${failed.length} permanently-failed item${failed.length !== 1 ? "s" : ""} from the sync queue? The data on this device stays — it just won't keep retrying.`, { confirmLabel: "Clear", confirmVariant: "danger" });
     if (!ok) return;
-    window.dispatchEvent(new CustomEvent("powermate-clear-failed-queue"));
+    const durableQueue = await offlineGetAll("syncQueue");
+    const nextQueue = (durableQueue || []).filter(i => i.status !== "failed");
+    await offlineReplaceAll("syncQueue", nextQueue);
+    setData?.(d => ({ ...d, syncQueue: (d.syncQueue || []).filter(i => i.status !== "failed") }));
   }
 
   const jobs = data?.jobs || [];
