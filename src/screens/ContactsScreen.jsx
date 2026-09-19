@@ -18,6 +18,7 @@ import { ShareSheet } from "../components/ShareSheet";
 import { CardScanner } from "../components/CardScanner";
 import { useBulkGroup, BulkGroupBar, BulkGroupSheet, useCollapsibleGroups, RenameGroupSheet } from "../components/BulkGroup";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
+import { SalesFollowupComposer } from "../lib/industrialSalesEmail";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { logCrash } from "../components/ErrorBoundary";
