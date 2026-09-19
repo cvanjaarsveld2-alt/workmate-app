@@ -425,8 +425,9 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
                         const nd=new Date(); nd.setDate(nd.getDate()+opt.days);
                         const ds=nd.toISOString().slice(0,10);
                         const fu=withTeamId({id:genId(),user_id:userId,title:nextActionPrompt.title,client_id:nextActionPrompt.client_id||null,client:nextActionPrompt.client||"",branch:nextActionPrompt.branch||"",date:ds,time:"",reminder:"30_min",notes:"",completed:false,sync_status:"pending",created_at:new Date().toISOString()},teamId);
-                        setData(d=>({...d,followups:[fu,...(d.followups||[])],syncQueue:[{id:genId(),table:"followups",action:"insert",data:fu,status:"pending",created_at:new Date().toISOString()},...(d.syncQueue||[])]}));
-                        offlineSave("followups",fu).catch(()=>{});
+                        const queueItem={id:genId(),table:"followups",action:"insert",data:fu,status:"pending",created_at:new Date().toISOString()};
+                        offlineSave("followups",fu).then(()=>offlineSave("syncQueue",queueItem)).catch(()=>{});
+                        setData(d=>({...d,followups:[fu,...(d.followups||[])],syncQueue:[queueItem,...(d.syncQueue||[])]}));
                         triggerImmediateSync();
                         setToast("Next follow-up scheduled");
                         setNextActionPrompt(null);
