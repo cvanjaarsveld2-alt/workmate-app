@@ -1,6 +1,6 @@
 // ─── PowerMate Service Worker ────────────────────────────────────────────────
 // Offline shell, push notifications and durable reminder scheduling.
-const CACHE_NAME = "powermate-v15";
+const CACHE_NAME = "powermate-v14";
 const PRECACHE = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest"];
 const REMINDER_DB = "powermate_sw";
 const REMINDER_STORE = "reminders";
