@@ -27,7 +27,7 @@ async function bypassLocalPin(page) {
 
 test("signs in and reaches the protected app shell", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "PowerMate" })).toBeVisible();
-  await page.getByLabel("Email").fill(email);
+  await page.locator('input[type="email"]').fill(email);
   await page.locator('input[type="password"]').fill(password);
   await page.getByRole("button", { name: "Sign In" }).click();
 
@@ -60,7 +60,7 @@ test("writes a follow-up offline and survives reload", async ({ page, context })
 
   await page.getByRole("button", { name: /Add/ }).first().click();
   const marker = `E2E ${Date.now()}`;
-  await page.getByLabel("What to follow up on").fill(marker);
+  await page.locator('input[placeholder="e.g. Call mine buyer re quote"]').fill(marker);
 
   await context.setOffline(true);
   await page.getByRole("button", { name: "Add Follow-up", exact: true }).click();
