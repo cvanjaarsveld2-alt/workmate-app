@@ -204,11 +204,15 @@ export async function logEvent(name, data = {}) {
   if (import.meta.env.DEV) console.log("[PowerMate]", name, data);
   if (!navigator.onLine) return;
   try {
+    const { data: { session } = {} } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) return;
     await supabase.from("events").insert({
       name,
       data,
-      timestamp:  new Date().toISOString(),
+      timestamp: new Date().toISOString(),
       user_agent: navigator.userAgent,
+      user_id: userId,
     });
   } catch (e) {
     console.warn("[PowerMate] Telemetry failed:", e?.message);
