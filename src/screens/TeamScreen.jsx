@@ -504,7 +504,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
   const [showManage, setShowManage]   = useState(false);
   const { confirm, dialog }           = useConfirm();
 
-  useEffect(() => { loadTeam(); }, [userId]);
+  useEffect(() => { loadTeam(); }, [userId, appUserRole]);
 
   async function loadTeam() {
     setLoading(true);
@@ -563,7 +563,8 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
       }
     } catch (e) {
       console.error("loadTeam:", e);
-      setMyRole("member");
+      // Preserve the role already resolved by App.jsx if a secondary team query fails.
+      setMyRole(appUserRole === "admin" ? "admin" : "member");
     }
     setLoading(false);
   }
