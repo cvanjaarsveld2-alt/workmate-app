@@ -3,7 +3,7 @@
 // Admin can share/assign any record to a teammate directly from here.
 // Accept/decline notifications flow back to the admin automatically.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users, UserPlus, TrendingUp, Calendar,
@@ -15,6 +15,7 @@ import { todayISO, smartDate } from "../lib/helpers";
 import { CompanyDocuments } from "../components/CompanyDocuments";
 import { Card, StagePill } from "../components/ui";
 import { ShareToTeamModal } from "../components/ShareToTeamModal";
+import { supabase } from "../supabase";
 
 const MEMBER_COLORS = ["#8B1A1A","#1D4ED8","#15803D","#7C3AED","#B45309","#0E7490","#BE123C","#4338CA"];
 function memberColor(i) { return MEMBER_COLORS[i % MEMBER_COLORS.length]; }
@@ -174,9 +175,46 @@ export function TeamDashboardScreen({
   onNavigate,
 }) {
   const today   = todayISO();
-  // Resolve admin status defensively from every role source available to this screen.
-  const currentMember = teamMembers.find(m => m.user_id === userId);
-  const isAdmin = userRole === "admin" || currentMember?.role === "admin" || currentMember?.role === "owner";
+
+  // Resolve the current user's role directly from Supabase as the authoritative
+  // source for this screen. App-level role state can legitimately arrive after
+  // this screen mounts, and teamMembers can be temporarily empty/stale while
+  // the team query is refreshing. Never render the member-only dashboard while
+  // that authoritative role check is still pending.
+  const [resolvedAdmin, setResolvedAdmin] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function resolveRole() {
+      if (!userId) {
+        if (!cancelled) setResolvedAdmin(false);
+        return;
+      }
+      try {
+        const [{ data: profile }, { data: membership }] = await Promise.all([
+          supabase.from("users").select("role").eq("id", userId).maybeSingle(),
+          supabase.from("team_members").select("role").eq("user_id", userId).maybeSingle(),
+        ]);
+        const admin =
+          profile?.role === "admin" ||
+          membership?.role === "admin" ||
+          membership?.role === "owner";
+        if (!cancelled) setResolvedAdmin(admin);
+      } catch (e) {
+        console.error("TeamDashboard role resolution:", e);
+        // Fall back to already-resolved app/team props if the direct check fails.
+        if (!cancelled) {
+          const member = teamMembers.find(m => m.user_id === userId);
+          setResolvedAdmin(
+            userRole === "admin" ||
+            member?.role === "admin" ||
+            member?.role === "owner"
+          );
+        }
+      }
+    }
+    resolveRole();
+    return () => { cancelled = true; };
+  }, [userId, userRole, teamMembers]);
 
   // ALL hooks must be declared before any conditional return
   const [selectedMember, setSelectedMember] = useState(null);
@@ -194,6 +232,25 @@ export function TeamDashboardScreen({
     });
     return map;
   }, [teamMembers]);
+
+  const currentMember = teamMembers.find(m => m.user_id === userId);
+  const propAdmin =
+    userRole === "admin" ||
+    currentMember?.role === "admin" ||
+    currentMember?.role === "owner";
+  const isAdmin = resolvedAdmin === true || (resolvedAdmin === null && propAdmin);
+
+  // Do not default to member while the authoritative role is still resolving.
+  if (resolvedAdmin === null && !propAdmin) {
+    return (
+      <div className="space-y-4">
+        <Card className="p-5 text-center">
+          <p className="text-base font-black text-slate-900">Loading team access…</p>
+          <p className="text-sm text-slate-400 mt-1">Checking your team permissions.</p>
+        </Card>
+      </div>
+    );
+  }
 
   // Members see a simplified view without individual teammate data
   if (!isAdmin) {
