@@ -509,10 +509,35 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange }) {
   async function loadTeam() {
     setLoading(true);
     try {
-      const { data: membership } = await supabase
-        .from("team_members").select("team_id, role").eq("user_id", userId).maybeSingle();
-      if (!membership) { setTeam(null); setLoading(false); return; }
-      setMyRole(membership.role);
+      // Resolve the role from BOTH sources. The users.role value is the
+      // account-level admin flag; team_members.role is the team-level role.
+      // Using both prevents the Team screen from incorrectly showing a real
+      // admin as a member when one source is temporarily stale or incomplete.
+      const [{ data: membership }, { data: profile }] = await Promise.all([
+        supabase.from("team_members")
+          .select("team_id, role")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase.from("users")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle(),
+      ]);
+
+      const effectiveRole =
+        profile?.role === "admin" || membership?.role === "admin" || membership?.role === "owner"
+          ? "admin"
+          : "member";
+
+      if (!membership?.team_id) {
+        setTeam(null);
+        setMyRole(effectiveRole);
+        setMembers([]);
+        setLoading(false);
+        return;
+      }
+
+      setMyRole(effectiveRole);
 
       const { data: teamData } = await supabase
         .from("teams").select("id, name, invite_code").eq("id", membership.team_id).maybeSingle();
@@ -521,16 +546,22 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange }) {
       const { data: memberRows, error } = await supabase
         .rpc("get_team_member_emails", { p_team_id: membership.team_id });
       if (!error && memberRows) {
-        setMembers(memberRows);
+        setMembers(memberRows.map(m =>
+          m.user_id === userId ? { ...m, role: effectiveRole } : m
+        ));
       } else {
         const { data: basicRows } = await supabase
           .from("team_members").select("user_id, role, joined_at").eq("team_id", membership.team_id);
         setMembers((basicRows || []).map(r => ({
           ...r,
+          role: r.user_id === userId ? effectiveRole : r.role,
           email: r.user_id === userId ? userEmail : `Member ${r.user_id.slice(0, 8)}`,
         })));
       }
-    } catch (e) { console.error("loadTeam:", e); }
+    } catch (e) {
+      console.error("loadTeam:", e);
+      setMyRole("member");
+    }
     setLoading(false);
   }
 
