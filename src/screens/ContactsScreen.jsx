@@ -584,7 +584,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
 
       {/* ── Email composer (templates + copy + Outlook) ── */}
       <AnimatePresence>
-        {emailContact && <EmailComposer contact={emailContact} onClose={() => setEmailContact(null)} />}
+        {emailContact && <EmailComposer contact={emailContact} onClose={() => setEmailContact(null)} onGapSelling={() => { setEmailContact(null); setSalesEmailContact(emailContact); }} />}
       </AnimatePresence>
       <AnimatePresence>
         {salesEmailContact && (
