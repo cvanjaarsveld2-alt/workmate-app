@@ -18,6 +18,7 @@ import { ShareSheet } from "../components/ShareSheet";
 import { CardScanner } from "../components/CardScanner";
 import { useBulkGroup, BulkGroupBar, BulkGroupSheet, useCollapsibleGroups, RenameGroupSheet } from "../components/BulkGroup";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
+import { SalesFollowupComposer } from "../lib/industrialSalesEmail";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { logCrash } from "../components/ErrorBoundary";
@@ -134,6 +135,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   const [scannedNotice, setScannedNotice] = useState(false);
   const [detailContact, setDetailContact] = useState(null);
   const [emailContact, setEmailContact]   = useState(null); // contact being emailed
+  const [salesEmailContact, setSalesEmailContact] = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
   const [shareSheet, setShareSheet]     = useState(null);
   const [form, setForm] = useState({
@@ -555,6 +557,13 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
                   className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-blue-200 bg-blue-50 text-blue-700 min-h-[48px]">
                   <Send size={14} /> Send Company Info
                 </button>
+                {detailContact.email && (
+                  <button
+                    onClick={() => { setSalesEmailContact(detailContact); setDetailContact(null); }}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-red-200 bg-red-50 text-red-700 min-h-[48px]">
+                    <Sparkles size={14} /> Sales Follow-Up · Gap Selling
+                  </button>
+                )}
                 <button
                   onClick={() => { const c = detailContact; setDetailContact(null); promoteToClient(c); }}
                   className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-green-200 bg-green-50 text-green-700 min-h-[48px]">
@@ -569,6 +578,11 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
       {/* ── Email composer (templates + copy + Outlook) ── */}
       <AnimatePresence>
         {emailContact && <EmailComposer contact={emailContact} onClose={() => setEmailContact(null)} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {salesEmailContact && (
+          <SalesFollowupComposer contact={salesEmailContact} onClose={() => setSalesEmailContact(null)} />
+        )}
       </AnimatePresence>
 
       {/* ── Fullscreen image viewer ── */}
