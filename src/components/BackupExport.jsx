@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import { Download, Database, CheckCircle2, AlertTriangle, Share2 } from "lucide-react";
 import JSZip from "jszip";
 import { Card, Btn } from "./ui";
+import { supabase } from "../supabase";
 
 const LAST_BACKUP_KEY = "powermate_last_backup";
 const BACKUP_REMINDER_DAYS = 30;
@@ -64,7 +65,7 @@ const COLUMNS = {
 };
 
 // ─── Main backup export ──────────────────────────────────────────────────────
-async function generateBackup(data) {
+async function listStorageObjects(bucket, prefix = "") {\n  const all = [];\n  const queue = [prefix];\n  while (queue.length) {\n    const current = queue.shift();\n    let offset = 0;\n    while (true) {\n      const { data: entries, error } = await supabase.storage.from(bucket).list(current, { limit: 100, offset, sortBy: { column: "name", order: "asc" } });\n      if (error) throw new Error(`Could not list ${bucket}: ${error.message}`);\n      for (const entry of entries || []) {\n        const path = current ? `${current}/${entry.name}` : entry.name;\n        if (entry.id) all.push({ bucket, path, size: entry.metadata?.size ?? null, mime: entry.metadata?.mimetype ?? null });\n        else queue.push(path);\n      }\n      if (!entries || entries.length < 100) break;\n      offset += entries.length;\n    }\n  }\n  return all;\n}\n\nasync function sha256(blob) {\n  const bytes = await blob.arrayBuffer();\n  const digest = await crypto.subtle.digest("SHA-256", bytes);\n  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");\n}\n\nasync function generateBackup(data, onProgress = () => {}) {
   const zip = new JSZip();
   const stamp = nowStamp();
 
@@ -99,7 +100,7 @@ async function generateBackup(data) {
       expenses:  data.expenses  || [],
     },
   };
-  zip.file("powermate_master.json", JSON.stringify(master, null, 2));
+  zip.file("powermate_master.json", JSON.stringify(master, null, 2));\n\n  // IMPORTANT: database backups do not contain Storage binaries. Include every\n  // Storage object visible to the authenticated user so photos, receipts and\n  // documents are protected too. Nothing is deleted or moved by this export.\n  const storageManifest = [];\n  const buckets = ["powermate-media", "receipts", "company-docs"];\n  let completedFiles = 0;\n  for (const bucket of buckets) {\n    const objects = await listStorageObjects(bucket);\n    for (const object of objects) {\n      const { data: file, error } = await supabase.storage.from(bucket).download(object.path);\n      if (error || !file) throw new Error(`Could not download ${bucket}/${object.path}: ${error?.message || "empty file"}`);\n      const hash = await sha256(file);\n      const safePath = object.path.replace(/\\\\/g, "/").replace(/^\\/+/, "");\n      zip.file(`storage/${bucket}/${safePath}`, file);\n      storageManifest.push({ bucket, path: object.path, size: file.size, mime: file.type || object.mime || null, sha256: hash });\n      completedFiles += 1;\n      onProgress({ completedFiles, bucket, path: object.path });\n    }\n  }\n  zip.file("storage_manifest.json", JSON.stringify({ exported_at: new Date().toISOString(), files: storageManifest }, null, 2));\n  zip.file("DATA_SAFETY.txt", `DATA SAFETY GUARANTEE FOR THIS EXPORT\\n\\nThis backup is additive only. It does not delete, overwrite, move or modify any PowerMate database row or Storage object.\\n\\nThe ZIP contains application state plus accessible PowerMate Storage objects from powermate-media, receipts and company-docs. Each stored file has a SHA-256 checksum in storage_manifest.json.\\n\\nSupabase database backups do NOT include Storage binaries, so this file backup is intentionally separate and includes the actual files.\\n`);
 
   // Add a README for future-you
   const readme = `POWERMATE BACKUP
@@ -179,7 +180,7 @@ export function BackupExport({ data }) {
   async function handleExport(mode) {
     setExporting(true);
     try {
-      const { blob, filename, counts } = await generateBackup(data);
+      const { blob, filename, counts } = await generateBackup(data, () => {});
       setLastResult(counts);
       setLastBackup(new Date());
 
@@ -271,14 +272,14 @@ export function BackupExport({ data }) {
 
       <Btn variant="solid" className="w-full" onClick={() => handleExport("share")} disabled={exporting}>
         <Share2 size={15} />
-        {exporting ? "Generating backup…" : `Share Backup to Drive/Email (${totalRows} items)`}
+        {exporting ? "Creating complete backup…" : `Complete Backup — Data + Photos + Files`}
       </Btn>
       <Btn variant="secondary" className="w-full" onClick={() => handleExport("download")} disabled={exporting}>
         <Download size={15} />
-        {exporting ? "Generating backup…" : "Just download to this phone"}
+        {exporting ? "Creating complete backup…" : "Download complete backup"}
       </Btn>
       <p className="text-xs text-slate-400 text-center -mt-1">
-        Share opens your device's share sheet — pick Google Drive, iCloud, Mail, or WhatsApp.
+        This backup includes app data plus accessible photos, receipts and company documents. Nothing is deleted or moved.
       </p>
 
       {lastResult && !exporting && (
