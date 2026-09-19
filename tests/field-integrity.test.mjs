@@ -45,7 +45,7 @@ test("financial calculations remain cent-safe and VAT is explicit", async () => 
 });
 
 test("client RPCs expose invoker wrappers, while privileged implementations are private", () => {
-  const migration = read("supabase/migrations/20260919100000_harden_exposed_security_definer_rpcs.sql");
+  const migration = read("supabase/migrations/20260919092201_harden_exposed_security_definer_rpcs.sql");
   const names = ["accept_shared_record","create_team_for_user","current_team_id","get_team_member_emails","join_team_by_code","migrate_user_data_to_team","notify_assignment","reassign_record","same_team"];
   for (const name of names) {
     assert.ok(migration.includes("alter function public." + name + "("), name);
