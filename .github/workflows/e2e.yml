@@ -10,8 +10,11 @@ permissions:
 
 jobs:
   authenticated-e2e:
-    if: ${{ secrets.E2E_EMAIL != '' && secrets.E2E_PASSWORD != '' && secrets.E2E_BASE_URL != '' }}
     runs-on: ubuntu-latest
+    env:
+      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -22,18 +25,25 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Check E2E configuration
+        run: |
+          if [ -z "$E2E_BASE_URL" ] || [ -z "$E2E_EMAIL" ] || [ -z "$E2E_PASSWORD" ]; then
+            echo "Authenticated E2E is not configured; add E2E_BASE_URL, E2E_EMAIL and E2E_PASSWORD repository secrets."
+            exit 0
+          fi
+
       - name: Install application dependencies
+        if: env.E2E_EMAIL != '' && env.E2E_PASSWORD != '' && env.E2E_BASE_URL != ''
         run: npm ci --no-audit --no-fund
 
       - name: Install Playwright
+        if: env.E2E_EMAIL != '' && env.E2E_PASSWORD != '' && env.E2E_BASE_URL != ''
         run: npm install --no-save --no-package-lock @playwright/test@1.55.0
 
       - name: Install Chromium
+        if: env.E2E_EMAIL != '' && env.E2E_PASSWORD != '' && env.E2E_BASE_URL != ''
         run: npx playwright install --with-deps chromium
 
       - name: Run authenticated browser E2E
-        env:
-          E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
-          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
-          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+        if: env.E2E_EMAIL != '' && env.E2E_PASSWORD != '' && env.E2E_BASE_URL != ''
         run: npx playwright test
