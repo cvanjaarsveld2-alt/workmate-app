@@ -22,7 +22,11 @@ test("critical lazy screens expose the exports App expects", () => {
     ["JobsScreen", "JobsScreen"],
     ["InvoicesScreen", "InvoicesScreen"],
   ]) {
-    assert.match(app, new RegExp(`import\\("\\./screens/${screen}"\\)`));
+    if (screen === "FollowupsScreen") {
+      assert.match(app, /import \{ FollowupsScreen \} from "\.\/screens\/FollowupsScreen"/);
+    } else {
+      assert.match(app, new RegExp(`import\\("\\\./screens/${screen}"\\)`));
+    }
     const source = fs.readFileSync(`src/screens/${screen}.jsx`, "utf8");
     assert.match(source, new RegExp(`export function ${exportName}\\b`));
   }
