@@ -190,14 +190,15 @@ export function TeamDashboardScreen({
         return;
       }
       try {
-        const [{ data: profile }, { data: membership }] = await Promise.all([
+        const [{ data: profile }, { data: membership }, { data: effectiveRole }] = await Promise.all([
           supabase.from("users").select("role").eq("id", userId).maybeSingle(),
           supabase.from("team_members").select("role").eq("user_id", userId).maybeSingle(),
+          supabase.rpc("get_my_effective_role"),
         ]);
         const admin =
+          effectiveRole === "admin" ||
           profile?.role === "admin" ||
-          membership?.role === "admin" ||
-          membership?.role === "owner";
+          membership?.role === "admin";
         if (!cancelled) setResolvedAdmin(admin);
       } catch (e) {
         console.error("TeamDashboard role resolution:", e);
