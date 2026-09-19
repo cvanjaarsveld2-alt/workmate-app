@@ -6,7 +6,7 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, X } from "lucide-react";
-import { SalesFollowupComposer } from "../lib/industrialSalesEmail";
+import { SalesFollowupComposer } from "../lib/industrialSalesEmail.jsx";
 
 // ─── Email message templates ───────────────────────────────────────────────────
 export const EMAIL_TEMPLATES = [
