@@ -408,6 +408,7 @@ function CategoryBadge({ catId, size = "sm" }) {
   const { confirm, dialog } = useConfirm();
 
   const clients   = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+  const companyCount = new Set(clients.map(c => c.company?.trim()).filter(Boolean)).size;
   const followups = data.followups || [];
   const notes     = data.notes     || [];
   const today     = todayISO();
@@ -648,7 +649,7 @@ function CategoryBadge({ catId, size = "sm" }) {
       </AnimatePresence>
 
       <div className="flex items-center justify-between">
-        <PageHeader title="Clients & Leads" subtitle={`${clients.length} total · add new clients here`} />
+        <PageHeader title="Clients & Leads" subtitle={`${companyCount} compan${companyCount === 1 ? "y" : "ies"} · ${clients.length} client records · add new clients here`} />
         <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
           {(showForm || editId) ? <X size={15} /> : <Plus size={15} />}{(showForm || editId) ? "Cancel" : "Add Lead"}
         </Btn>
