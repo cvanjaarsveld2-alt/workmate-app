@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, X } from "lucide-react";
+import { Mail, X, Sparkles } from "lucide-react";
 
 // ─── Email message templates ───────────────────────────────────────────────────
 export const EMAIL_TEMPLATES = [
@@ -63,7 +63,7 @@ export const EMAIL_TEMPLATES = [
 // Templates + editable subject/body + BOTH copy-to-clipboard and open-in-Outlook.
 // Structured so an AI "polish" step can slot in later (a single async function
 // that rewrites `body` via a server-side Edge Function — not wired yet).
-export function EmailComposer({ contact, onClose }) {
+export function EmailComposer({ contact, onClose, onGapSelling }) {
   const [tpl, setTpl] = useState(null);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -116,6 +116,15 @@ export function EmailComposer({ contact, onClose }) {
 
         {!tpl ? (
           <div className="p-3 space-y-2 overflow-y-auto">
+            {onGapSelling && (
+              <button
+                type="button"
+                onClick={onGapSelling}
+                className="w-full text-left rounded-xl p-3 border-2 border-red-200 bg-red-50 active:scale-[0.98] mb-1">
+                <p className="text-sm font-black text-red-800"><Sparkles size={14} className="inline mr-1" /> Gap-Selling Follow-Up</p>
+                <p className="text-xs text-red-600 mt-0.5">Build a problem → impact → desired outcome follow-up</p>
+              </button>
+            )}
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Choose a template</p>
             {EMAIL_TEMPLATES.map(t => (
               <button key={t.id} onClick={() => pick(t)}
