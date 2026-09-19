@@ -10,7 +10,7 @@
 //   import { deleteRecord } from "../lib/deleteHelpers";
 //   await deleteRecord("clients", clientId, userId, setData);
 // ─────────────────────────────────────────────────────────────────────────────
-import { offlineDelete } from "../offline/offlineDb";
+import { offlineDelete, offlineGetAll, offlineReplaceAll } from "../offline/offlineDb";
 import { triggerImmediateSync } from "./sync";
 import { genId } from "./helpers";
 
@@ -27,12 +27,12 @@ export async function deleteRecord(table, recordId, userId, setData) {
     status: "pending",
     created_at: new Date().toISOString(),
   };
-  const existingQueue = await import("../offline/offlineDb").then(m => m.offlineGetAll("syncQueue"));
+  const existingQueue = await offlineGetAll("syncQueue");
   const nextQueue = [
     queueItem,
     ...(existingQueue || []).filter(q => q.data?.id !== recordId),
   ];
-  await import("../offline/offlineDb").then(m => m.offlineReplaceAll("syncQueue", nextQueue));
+  await offlineReplaceAll("syncQueue", nextQueue);
   setData(d => ({
     ...d,
     [table]: (d[table] || []).filter(r => r.id !== recordId),
