@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Home, Calendar, Settings, Search, Menu, Plus, Bell } from "lucide-react";
 import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
-import { offlineGetAll, setOfflineUser, clearAllStores } from "./offline/offlineDb";
+import { offlineGetAll, setOfflineUser } from "./offline/offlineDb";
 import { todayISO, logEvent, genId } from "./lib/helpers";
 import { localStorageKey, URGENCY_ESCALATION, PIN_KEY, PIN_UNLOCKED_KEY, PIN_DISABLED_KEY, scopedPinKey, BRAND } from "./lib/constants";
 import { pushSyncQueue, pullFromSupabase, setupRealtimeSync, registerSyncHandlers, triggerImmediateSync, retryPendingMedia } from "./lib/sync";
@@ -71,7 +71,21 @@ export default function PowerWorksApp(){
  useEffect(()=>{syncQueueRef.current=data.syncQueue},[data.syncQueue]);useEffect(()=>{if(!("serviceWorker"in navigator))return;const onMessage=event=>{if(event.data?.type==="POWERMATE_RETRY_SYNC")pushSyncQueue(syncQueueRef.current,setData)};navigator.serviceWorker.addEventListener("message",onMessage);return()=>navigator.serviceWorker.removeEventListener("message",onMessage)},[]);
  useEffect(()=>{let mounted=true,settled=false;const finish=s=>{if(mounted&&!settled){settled=true;setSession(s||null);setLoading(false)}};supabase.auth.getSession().then(({data:{session:s}})=>finish(s));const failsafe=setTimeout(()=>{if(settled)return;let cached=null;try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.endsWith("-auth-token")){const v=JSON.parse(localStorage.getItem(k)||"null");if(v&&(v.access_token||v.currentSession||v.user))cached=v.currentSession||v;break}}}catch{}finish(cached)},1500);const{data:{subscription}}=supabase.auth.onAuthStateChange((_,s)=>{if(mounted){setSession(s);setLoading(false);settled=true}});return()=>{mounted=false;clearTimeout(failsafe);subscription.unsubscribe()}},[]);
  useEffect(()=>{clearHistoricalFollowupsCrashes()},[]);useEffect(()=>{if(session?.user?.id){setOfflineUser(session.user.id);if(shouldShowOnboarding(session.user.id))setShowOnboarding(true)}},[session?.user?.id]);useEffect(()=>{function onFocusIn(e){const el=e.target;if(!el||!/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))return;setTimeout(()=>el.scrollIntoView({block:"center",behavior:"smooth"}),300)}window.addEventListener("focusin",onFocusIn);return()=>window.removeEventListener("focusin",onFocusIn)},[]);useEffect(()=>{registerSyncHandlers(setData,syncQueueRef)},[]);
- useEffect(()=>{if(!session?.user?.id)return;let pollInterval;async function loadTeamState(){try{const{data:authUser}=await supabase.auth.getUser();const uid=authUser?.user?.id||session.user.id;const{data:profile}=await supabase.from("users").select("role").eq("id",uid).maybeSingle();const{data:membership}=await supabase.from("team_members").select("team_id, role").eq("user_id",uid).maybeSingle();const{data:effectiveRole}=await supabase.rpc("get_my_effective_role");const isAdmin=effectiveRole==="admin"||profile?.role==="admin"||membership?.role==="admin";if(!membership?.team_id){setTeamId(null);setTeamMembers([]);setUserRole(isAdmin?"admin":"member");return}setTeamId(membership.team_id);setUserRole(isAdmin?"admin":"member");const{data:rows,error:rpcError}=await supabase.rpc("get_team_member_emails",{p_team_id:membership.team_id});if(!rpcError&&rows)setTeamMembers(rows);else{const{data:basicRows}=await supabase.from("team_members").select("user_id, role, joined_at").eq("team_id",membership.team_id);if(basicRows)setTeamMembers(basicRows.map(r=>({...r,email:r.user_id===session.user.id?session.user.email:`Member ${r.user_id.slice(0,8)}`})))}async function checkUnread(){try{const{count}=await supabase.from("team_notifications").select("id",{count:"exact",head:true}).eq("to_user_id",session.user.id).eq("read",false);setUnreadCount(count||0)}catch{}}checkUnread();pollInterval=setInterval(checkUnread,30000)}catch(e){console.warn("Team load failed:",e)}}loadTeamState();return()=>clearInterval(pollInterval)},[session?.user?.id,teamRefreshKey]);
+ useEffect(()=>{if(!session?.user?.id)return;let pollInterval;async function loadTeamState(){try{const{data:authUser}=await supabase.auth.getUser();const uid=authUser?.user?.id||session.user.id;const{data:profile}=await supabase.from("users").select("role").eq("id",uid).maybeSingle();const{data:membership}=await supabase.from("team_members").select("team_id, role").eq("user_id",uid).maybeSingle();const{data:effectiveRole}=await supabase.rpc("get_my_effective_role");const isAdmin=effectiveRole==="admin"||profile?.role==="admin"||membership?.role==="admin";if(!membership?.team_id){setTeamId(null);setTeamMembers([]);setUserRole(isAdmin?"admin":"member");return}setTeamId(membership.team_id);setUserRole(isAdmin?"admin":"member");const{data:rows,error:rpcError}=await supabase.rpc("get_team_member_emails",{p_team_id:membership.team_id});if(!rpcError&&rows){
+  const memberRows=rows;
+  const ids=memberRows.map(r=>r.user_id).filter(Boolean);
+  const {data:profileRows}=ids.length?await supabase.from("users").select("id,full_name,email").in("id",ids):{data:[]};
+  const profileMap=new Map((profileRows||[]).map(p=>[p.id,p]));
+  setTeamMembers(memberRows.map(r=>({...r,full_name:profileMap.get(r.user_id)?.full_name||"",email:r.email||profileMap.get(r.user_id)?.email||session.user.email})));
+}else{
+  const{data:basicRows}=await supabase.from("team_members").select("user_id, role, joined_at").eq("team_id",membership.team_id);
+  if(basicRows){
+    const ids=basicRows.map(r=>r.user_id).filter(Boolean);
+    const{data:profileRows}=ids.length?await supabase.from("users").select("id,full_name,email").in("id",ids):{data:[]};
+    const profileMap=new Map((profileRows||[]).map(p=>[p.id,p]));
+    setTeamMembers(basicRows.map(r=>({...r,full_name:profileMap.get(r.user_id)?.full_name||"",email:profileMap.get(r.user_id)?.email||(r.user_id===session.user.id?session.user.email:"Team member")})));
+  }
+}async function checkUnread(){try{const{count}=await supabase.from("team_notifications").select("id",{count:"exact",head:true}).eq("to_user_id",session.user.id).eq("read",false);setUnreadCount(count||0)}catch{}}checkUnread();pollInterval=setInterval(checkUnread,30000)}catch(e){console.warn("Team load failed:",e)}}loadTeamState();return()=>clearInterval(pollInterval)},[session?.user?.id,teamRefreshKey]);
  const handleTeamChange=useCallback(newTeamId=>{if(!newTeamId){setTeamId(null);setTeamMembers([]);setUserRole("member")}setTeamRefreshKey(k=>k+1)},[]);
  // The "Sync Now" button used to be wired to a no-op (onSyncNow={()=>{}}) — tapping it
  // did literally nothing, silently, with no error. This actually pushes the queue,
@@ -101,27 +115,27 @@ export default function PowerWorksApp(){
  const handleQuickCapture=useCallback(target=>{setQuickAddTrigger({screen:target,ts:Date.now()});navigate(target)},[navigate]);
  const handleSearchNavigate=useCallback((target,term)=>{setSearchSeed({term,ts:Date.now()});navigate(target)},[navigate]);
  async function logout(){
-   try{await supabase.auth.signOut()}
-   finally{
-     // FIX (Build 8, Phase 2) — clearAllStores() has to run BEFORE the
-     // offline-DB pointer moves off this user. setOfflineUser(null) switches
-     // openDB() over to the shared/no-user database, so calling
-     // clearAllStores() after that point was silently clearing the wrong
-     // (empty) database — this user's real IndexedDB records were never
-     // actually wiped on sign-out.
-     try{await clearAllStores()}catch{}
-     // A successful PIN unlock is session-scoped. Never let the unlock marker
-     // survive an explicit account logout and silently bypass the PIN after
-     // the same account signs back in on this tab.
+   const uid = session?.user?.id;
+   try {
+     // Flush durable local changes before signing out so a pending change cannot
+     // disappear when the same user signs back in.
+     if (uid && navigator.onLine) {
+       try {
+         await pushSyncQueue(syncQueueRef.current || [], setData);
+         await pullFromSupabase(uid, setData);
+       } catch (e) {
+         console.warn("Logout sync failed; preserving this user's local store:", e);
+       }
+     }
+   } finally {
+     try { await supabase.auth.signOut(); } catch {}
      try {
-       const uid = session?.user?.id;
        if (uid) sessionStorage.removeItem(scopedPinKey(PIN_UNLOCKED_KEY, uid));
      } catch {}
+     // User stores are intentionally retained across logout. They are keyed by
+     // authenticated user, so keeping them is required for reliable offline
+     // persistence and prevents local-only changes vanishing after re-login.
      setSession(null);
-     // FIX (Build 8, Phase 1) — logout() used to leave `data` untouched, so a
-     // second user signing in right after on the same device would see the
-     // first user's in-memory records for a moment (and permanently, for any
-     // table where they have no local rows of their own — see loadLocalData).
      setData(INITIAL_DATA);
      setOfflineUser(null);
    }
