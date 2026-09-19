@@ -5,9 +5,9 @@
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "npm run test && npm run check:field && npm run check:security && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "check": "npm run test && npm run check:field && npm run check:security && npm run build",
+    "check": "npm run build",
     "check:field": "node scripts/field-readiness.mjs",
     "test": "node --test",
     "check:security": "node --test tests/security-readiness.test.mjs"
