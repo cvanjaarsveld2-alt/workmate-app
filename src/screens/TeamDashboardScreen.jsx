@@ -174,7 +174,9 @@ export function TeamDashboardScreen({
   onNavigate,
 }) {
   const today   = todayISO();
-  const isAdmin = userRole === "admin";
+  // Resolve admin status defensively from every role source available to this screen.
+  const currentMember = teamMembers.find(m => m.user_id === userId);
+  const isAdmin = userRole === "admin" || currentMember?.role === "admin" || currentMember?.role === "owner";
 
   // ALL hooks must be declared before any conditional return
   const [selectedMember, setSelectedMember] = useState(null);
