@@ -134,6 +134,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   const [scannedNotice, setScannedNotice] = useState(false);
   const [detailContact, setDetailContact] = useState(null);
   const [emailContact, setEmailContact]   = useState(null); // contact being emailed
+  const [salesEmailContact, setSalesEmailContact] = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
   const [shareSheet, setShareSheet]     = useState(null);
   const [form, setForm] = useState({
@@ -568,7 +569,25 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
 
       {/* ── Email composer (templates + copy + Outlook) ── */}
       <AnimatePresence>
-        {emailContact && <EmailComposer contact={emailContact} onClose={() => setEmailContact(null)} />}
+        {emailContact && (
+          <EmailComposer
+            contact={emailContact}
+            onClose={() => setEmailContact(null)}
+            onGapSelling={() => {
+              setSalesEmailContact(emailContact);
+              setEmailContact(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {salesEmailContact && (
+          <SalesFollowupComposer
+            contact={salesEmailContact}
+            onClose={() => setSalesEmailContact(null)}
+          />
+        )}
       </AnimatePresence>
 
       {/* ── Fullscreen image viewer ── */}
