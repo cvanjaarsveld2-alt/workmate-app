@@ -25,14 +25,10 @@ function csvEscape(val) {
 }
 
 function toCSV(rows, columns) {
-  if (!rows || rows.length === 0) return columns.join(",") + "
-";
+  if (!rows || rows.length === 0) return columns.join(",") + "\n";
   const header = columns.join(",");
-  const body = rows.map(r => columns.map(c => csvEscape(r[c])).join(",")).join("
-");
-  return "\uFEFF" + header + "
-" + body + "
-"; // BOM for Excel
+  const body = rows.map(r => columns.map(c => csvEscape(r[c])).join(",")).join("\n");
+  return "\uFEFF" + header + "\n" + body + "\n"; // BOM for Excel
 }
 
 // ─── Column definitions per entity ───────────────────────────────────────────
@@ -76,7 +72,9 @@ async function listStorageObjects(bucket, prefix = "") {
     const current = queue.shift();
     let offset = 0;
     while (true) {
-      const { data: entries, error } = await supabase.storage.from(bucket).list(current, { limit: 100, offset, sortBy: { column: "name", order: "asc" } });
+      const { data: entries, error } = await supabase.storage.from(bucket).list(current, {
+        limit: 100, offset, sortBy: { column: "name", order: "asc" },
+      });
       if (error) throw new Error(`Could not list ${bucket}: ${error.message}`);
       for (const entry of entries || []) {
         const path = current ? `${current}/${entry.name}` : entry.name;
@@ -134,9 +132,9 @@ async function generateBackup(data, onProgress = () => {}) {
   };
   zip.file("powermate_master.json", JSON.stringify(master, null, 2));
 
-  // IMPORTANT: database backups do not contain Storage binaries. Include every
-  // Storage object visible to the authenticated user so photos, receipts and
-  // documents are protected too. Nothing is deleted or moved by this export.
+  // Supabase database backups do not contain Storage binaries. Copy every
+  // Storage object visible to the signed-in user into this export.
+  // This is strictly additive: nothing is deleted, moved or modified.
   const storageManifest = [];
   const buckets = ["powermate-media", "receipts", "company-docs"];
   let completedFiles = 0;
@@ -144,24 +142,29 @@ async function generateBackup(data, onProgress = () => {}) {
     const objects = await listStorageObjects(bucket);
     for (const object of objects) {
       const { data: file, error } = await supabase.storage.from(bucket).download(object.path);
-      if (error || !file) throw new Error(`Could not download ${bucket}/${object.path}: ${error?.message || "empty file"}`);
+      if (error || !file) {
+        throw new Error(`Could not download ${bucket}/${object.path}: ${error?.message || "empty file"}`);
+      }
       const hash = await sha256(file);
-      const safePath = object.path.replace(/\\\\/g, "/").replace(/^\\/+/, "");
-      zip.file(`storage/${bucket}/${safePath}`, file);
-      storageManifest.push({ bucket, path: object.path, size: file.size, mime: file.type || object.mime || null, sha256: hash });
+      zip.file(`storage/${bucket}/${object.path}`, file);
+      storageManifest.push({
+        bucket, path: object.path, size: file.size,
+        mime: file.type || object.mime || null, sha256: hash,
+      });
       completedFiles += 1;
       onProgress({ completedFiles, bucket, path: object.path });
     }
   }
-  zip.file("storage_manifest.json", JSON.stringify({ exported_at: new Date().toISOString(), files: storageManifest }, null, 2));
-  zip.file("DATA_SAFETY.txt", `DATA SAFETY GUARANTEE FOR THIS EXPORT\
-\
-This backup is additive only. It does not delete, overwrite, move or modify any PowerMate database row or Storage object.\
-\
-The ZIP contains application state plus accessible PowerMate Storage objects from powermate-media, receipts and company-docs. Each stored file has a SHA-256 checksum in storage_manifest.json.\
-\
-Supabase database backups do NOT include Storage binaries, so this file backup is intentionally separate and includes the actual files.\
-`);
+  zip.file("storage_manifest.json", JSON.stringify({
+    exported_at: new Date().toISOString(), files: storageManifest,
+  }, null, 2));
+  zip.file("DATA_SAFETY.txt", [
+    "This backup is additive only.",
+    "It does not delete, overwrite, move or modify any PowerMate database row or Storage object.",
+    "It contains full serializable app state plus accessible Storage objects.",
+    "Each Storage file has a SHA-256 checksum in storage_manifest.json.",
+    "Supabase database backups do not include Storage binaries, so the actual files are included here.",
+  ].join("\n"));
 
   // Add a README for future-you
   const readme = `POWERMATE BACKUP
@@ -241,7 +244,7 @@ export function BackupExport({ data }) {
   async function handleExport(mode) {
     setExporting(true);
     try {
-      const { blob, filename, counts } = await generateBackup(data, () => {});
+      const { blob, filename, counts } = await generateBackup(data);
       setLastResult(counts);
       setLastBackup(new Date());
 
@@ -296,10 +299,7 @@ export function BackupExport({ data }) {
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Data Backup</p>
       </div>
       <p className="text-sm text-slate-500">
-        Save all your PowerMate data as a ZIP file. Open the CSVs in Excel,
-        or keep the JSON for full restore.
-        <strong> Share it to Google Drive, iCloud, or email it to yourself</strong> — a
-        backup that only lives on this phone isn't really a backup.
+        Create a protected ZIP containing your PowerMate data plus the actual accessible photos, receipts and company documents. <strong>Nothing is deleted or moved.</strong>
       </p>
 
       {/* Status indicator */}
@@ -333,14 +333,14 @@ export function BackupExport({ data }) {
 
       <Btn variant="solid" className="w-full" onClick={() => handleExport("share")} disabled={exporting}>
         <Share2 size={15} />
-        {exporting ? "Creating complete backup…" : `Complete Backup — Data + Photos + Files`}
+        {exporting ? "Creating complete backup…" : "Complete Backup — Data + Photos + Files"}
       </Btn>
       <Btn variant="secondary" className="w-full" onClick={() => handleExport("download")} disabled={exporting}>
         <Download size={15} />
         {exporting ? "Creating complete backup…" : "Download complete backup"}
       </Btn>
       <p className="text-xs text-slate-400 text-center -mt-1">
-        This backup includes app data plus accessible photos, receipts and company documents. Nothing is deleted or moved.
+        Share opens your device's share sheet — pick Google Drive, iCloud, Mail, or WhatsApp.
       </p>
 
       {lastResult && !exporting && (
