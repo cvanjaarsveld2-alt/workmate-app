@@ -18,12 +18,23 @@ function jsonResponse(payload: unknown, status = 200) {
 }
 
 function fallback(subject: string, body: string, reason?: string) {
-  return {
-    ok: true,
-    mode: "fallback",
-    reason,
-    email: { subject, body },
-  };
+  return { ok: true, mode: "fallback", reason, email: { subject, body } };
+}
+
+function extractOutputText(result: any) {
+  if (clean(result?.output_text)) return clean(result.output_text);
+
+  const parts: string[] = [];
+  for (const item of Array.isArray(result?.output) ? result.output : []) {
+    for (const content of Array.isArray(item?.content) ? item.content : []) {
+      if (content?.type === "output_text" && clean(content?.text)) {
+        parts.push(clean(content.text));
+      } else if (clean(content?.text)) {
+        parts.push(clean(content.text));
+      }
+    }
+  }
+  return parts.join("\n\n").trim();
 }
 
 Deno.serve(async (req: Request) => {
@@ -82,10 +93,7 @@ Rules:
 - Return ONLY the finished email body. Do not return a subject line, JSON, markdown, quotation marks or commentary.`;
 
     const userPrompt = JSON.stringify({
-      contact: {
-        name: clean(context.name),
-        company: clean(context.company),
-      },
+      contact: { name: clean(context.name), company: clean(context.company) },
       interaction: clean(context.interaction),
       siteOrEvent: clean(context.metAt),
       topic: clean(context.topic),
@@ -108,11 +116,12 @@ Rules:
       },
       body: JSON.stringify({
         model,
+        reasoning: { effort: "low" },
         input: [
           { role: "system", content: [{ type: "input_text", text: systemPrompt }] },
           { role: "user", content: [{ type: "input_text", text: userPrompt }] },
         ],
-        max_output_tokens: 900,
+        max_output_tokens: 1600,
       }),
     });
 
@@ -127,19 +136,30 @@ Rules:
     }
 
     const result = await ai.json();
+
     if (result?.status && result.status !== "completed") {
-      console.error("polish-sales-email: OpenAI response incomplete", result.status);
+      console.error("polish-sales-email: OpenAI response incomplete", {
+        status: result.status,
+        incomplete: result?.incomplete_details || null,
+      });
       return jsonResponse(fallback(subject, email, "openai_incomplete"));
     }
 
-    let polishedBody = clean(result?.output_text);
+    const polishedBody = extractOutputText(result);
 
     if (!polishedBody) {
-      console.error("polish-sales-email: OpenAI returned empty output");
-      return jsonResponse(fallback(subject, email, "openai_empty_output"));
+      console.error("polish-sales-email: OpenAI returned no text", {
+        status: result?.status || null,
+        output_items: Array.isArray(result?.output) ? result.output.map((x: any) => ({
+          type: x?.type,
+          role: x?.role,
+          content_types: Array.isArray(x?.content) ? x.content.map((c: any) => c?.type) : [],
+        })) : [],
+      });
+      return jsonResponse(fallback(subject, email, "openai_no_text"));
     }
 
-    polishedBody = polishedBody
+    const cleanedBody = polishedBody
       .replace(/^\`\`\`(?:text|email)?\s*/i, "")
       .replace(/\s*\`\`\`$/i, "")
       .trim();
@@ -147,7 +167,7 @@ Rules:
     return jsonResponse({
       ok: true,
       mode: "ai",
-      email: { subject, body: polishedBody },
+      email: { subject, body: cleanedBody },
     });
   } catch (e) {
     console.error("polish-sales-email: unexpected error", e);
