@@ -550,6 +550,13 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
               </div>
             )}
 
+            {detailContact.email && (
+              <button
+                onClick={() => { setSalesEmailContact(detailContact); setDetailContact(null); }}
+                className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-red-200 bg-red-50 text-red-700 min-h-[48px]">
+                <Sparkles size={14} /> Sales Follow-Up · Gap Selling
+              </button>
+            )}
             {((detailContact.status === "lead" || detailContact.status === "active") && detailContact.company?.trim()) && (
               <div className="pt-2 space-y-2 border-t border-slate-100">
                 <button
