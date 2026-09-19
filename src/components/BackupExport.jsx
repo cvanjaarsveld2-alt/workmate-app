@@ -21,8 +21,7 @@ function csvEscape(val) {
   // Convert objects/arrays to JSON strings
   if (typeof val === "object") str = JSON.stringify(val);
   str = str.replace(/"/g, '""');
-  return /[,"
-\r]/.test(str) ? `"${str}"` : str;
+  return /[,"\n\r]/.test(str) ? `"${str}"` : str;
 }
 
 function toCSV(rows, columns) {
