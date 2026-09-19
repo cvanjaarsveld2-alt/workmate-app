@@ -52,6 +52,18 @@ async function verifyPIN(pin, userId) {
     if (!salt || !hash) return false;
     return (await _hashPIN(pin, salt)) === hash;
   }
+  // Repair the short-lived malformed v2 format from the previous build
+  // (v2 + salt + hash, without separators). Existing PINs remain valid;
+  // a successful verification is immediately rewritten to canonical v2$ form.
+  if (/^v2[0-9a-f]{96}$/i.test(stored)) {
+    const salt = stored.slice(2, 34);
+    const hash = stored.slice(34);
+    if ((await _hashPIN(pin, salt)) === hash) {
+      await savePINHash(pin, userId);
+      return true;
+    }
+    return false;
+  }
   // Legacy Build 8 hash migration: verify once against the old static salt,
   // then immediately replace it with a per-install random salt.
   const legacyHash = await _digestHex(pin + "powermate_salt_v1");
