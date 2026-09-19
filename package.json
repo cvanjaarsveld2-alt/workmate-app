@@ -7,9 +7,10 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "check": "npm run test && npm run check:field && npm run build",
+    "check": "npm run test && npm run check:field && npm run check:security && npm run build",
     "check:field": "node scripts/field-readiness.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "check:security": "node --test tests/security-readiness.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.0",
