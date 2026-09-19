@@ -5,25 +5,6 @@ import "./darkMode.css";
 import { initTheme } from "./lib/theme";
 import PowerMateApp from "./App.jsx";
 
-// One-time cache migration for users who still have an older PowerMate service worker.
-// The dashboard identity/count fixes are code-level changes, but an older service
-// worker can keep an old index/chunk alive. Clear that old shell once, online only,
-// then reload so the browser starts from the current production build.
-if ("serviceWorker" in navigator && navigator.onLine) {
-  try {
-    const key = "powermate_cache_migration_v16";
-    if (localStorage.getItem(key) !== "1") {
-      localStorage.setItem(key, "1");
-      Promise.all([
-        navigator.serviceWorker.getRegistrations().then(rs => Promise.all(rs.map(r => r.unregister()))),
-        caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith("powermate-")).map(k => caches.delete(k))))
-      ]).finally(() => window.location.reload());
-    }
-  } catch {
-    // Continue normally if cache APIs are unavailable.
-  }
-}
-
 // Vite emits a preloadError when a long-lived tab asks for a lazy chunk from
 // an older deployment. Reload once so the browser receives the current HTML
 // and its current hashed chunk names instead of leaving the user on a broken
