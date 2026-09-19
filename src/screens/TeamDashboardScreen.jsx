@@ -410,7 +410,7 @@ export function TeamDashboardScreen({
                   style={{ background: isActive ? "rgba(255,255,255,0.35)" : color }}>
                   {(m.email || "?").slice(0, 1).toUpperCase()}
                 </span>
-                {isMe ? "Me" : name}
+                {name}
                 {isAdmin && m.role === "admin" && <span className="opacity-60">★</span>}
               </button>
             );
@@ -444,7 +444,7 @@ export function TeamDashboardScreen({
       <Card className="overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-50">
           <SectionHead icon={activeS.icon}
-            label={selectedMember ? `${displayName(memberMap[selectedMember]?.email, selectedMember)}'s ${activeS.label}` : `All ${activeS.label}`}
+            label={selectedMember ? `${displayName(memberMap[selectedMember]?.email, selectedMember, memberMap[selectedMember]?.fullName)}'s ${activeS.label}` : `All ${activeS.label}`}
             count={rows.length} color={activeS.color} bg={activeS.bg} />
         </div>
 
@@ -459,7 +459,7 @@ export function TeamDashboardScreen({
           <div className="px-4">
             {activeSection === "clients" && clientsByMember.map(group => {
               const isCollapsed = !expandedMembers[group.uid];
-              const name = displayName(group.email, group.uid);
+              const name = displayName(group.email, group.uid, group.fullName);
               return (
                 <div key={group.uid} className="mb-1">
                   {/* Teammate group header — collapsible */}
@@ -689,9 +689,9 @@ export function TeamDashboardScreen({
                 <div className="rounded-xl bg-slate-50 p-3.5">
                   <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Assigned to</p>
                   <div className="flex items-center gap-2.5">
-                    <MemberChip email={detailFU._ownerEmail} userId={detailFU.user_id} color={detailFU._ownerColor} />
+                    <MemberChip email={detailFU._ownerEmail} userId={detailFU.user_id} fullName={detailFU._ownerName} color={detailFU._ownerColor} />
                     <p className="text-sm font-bold text-slate-700">
-                      {detailFU.assigned_to || detailFU._ownerEmail?.split("@")[0] || "Unassigned"}
+                      {detailFU.assigned_to || detailFU._ownerName || displayName(detailFU._ownerEmail, detailFU.user_id, detailFU._ownerName)}
                     </p>
                   </div>
                 </div>
