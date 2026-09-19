@@ -54,3 +54,19 @@ test("client RPCs expose invoker wrappers, while privileged implementations are 
     assert.ok(migration.includes("revoke execute on function private." + name), name);
   }
 });
+
+
+test("job invoice and payment uniqueness/idempotency protections stay wired into sync", () => {
+  const sync = read("src/lib/sync.js");
+  for (const marker of ["jobs_quote_id_uidx","invoices_job_id_uidx","payments_idempotency_key_uidx"]) {
+    assert.ok(sync.includes(marker), marker);
+  }
+  assert.match(sync, /upsertWithIdempotentRecovery/);
+});
+
+test("team/customer records stay user/team scoped during sync", () => {
+  const sync = read("src/lib/sync.js");
+  assert.match(sync, /const TEAM_TABLES=new Set/);
+  assert.match(sync, /payload\.user_id=authData\.user\.id/);
+  assert.match(sync, /sanitizeRemotePayload/);
+});
