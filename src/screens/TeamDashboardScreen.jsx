@@ -19,17 +19,21 @@ import { supabase } from "../supabase";
 
 const MEMBER_COLORS = ["#8B1A1A","#1D4ED8","#15803D","#7C3AED","#B45309","#0E7490","#BE123C","#4338CA"];
 function memberColor(i) { return MEMBER_COLORS[i % MEMBER_COLORS.length]; }
-function displayName(email, userId) {
-  if (!email) return (userId || "?").slice(0, 8);
-  const name = email.split("@")[0];
-  return name.charAt(0).toUpperCase() + name.slice(1);
+function displayName(email, userId, fullName) {
+  if (fullName?.trim()) return fullName.trim();
+  if (email) {
+    const name = email.split("@")[0].replace(/[._-]+/g, " ").replace(/[0-9]+$/g, "").trim();
+    return name ? name.replace(/\b\w/g, c => c.toUpperCase()) : "Team member";
+  }
+  return "Team member";
 }
 
-function MemberChip({ email, userId, color }) {
+function MemberChip({ email, userId, fullName, color }) {
+  const label = displayName(email, userId, fullName);
   return (
     <span className="w-5 h-5 rounded-full inline-flex items-center justify-center text-white text-[9px] font-black shrink-0"
       style={{ background: color }}>
-      {(email || userId || "?").slice(0, 2).toUpperCase()}
+      {label.split(/\s+/).map(p => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()}
     </span>
   );
 }
@@ -63,7 +67,7 @@ function ClientRow({ client, color, onOpen, onShare, onTap }) {
   return (
     <div className="border-b border-slate-50 last:border-0">
       <button onClick={onTap} className="w-full text-left flex items-center gap-3 py-3 hover:bg-slate-50/60 transition-colors -mx-1 px-1 rounded-lg">
-        <MemberChip email={client._ownerEmail} userId={client.user_id} color={color} />
+        <MemberChip email={client._ownerEmail} userId={client.user_id} fullName={client._ownerName} color={color} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-slate-900 truncate">{client.company}</p>
           <p className="text-xs text-slate-400 truncate">{[client.branch, client.contact].filter(Boolean).join(" · ")}</p>
@@ -91,7 +95,7 @@ function ContactRow({ contact, color, onShare, onTap }) {
   return (
     <div className="border-b border-slate-50 last:border-0">
       <button onClick={onTap} className="w-full text-left flex items-center gap-3 py-3 hover:bg-slate-50/60 transition-colors -mx-1 px-1 rounded-lg">
-        <MemberChip email={contact._ownerEmail} userId={contact.user_id} color={color} />
+        <MemberChip email={contact._ownerEmail} userId={contact.user_id} fullName={contact._ownerName} color={color} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
           <p className="text-xs text-slate-400 truncate">{[contact.company, contact.title].filter(Boolean).join(" · ")}</p>
@@ -115,7 +119,7 @@ function LeadRow({ lead, color, onShare, onTap }) {
   return (
     <div className="border-b border-slate-50 last:border-0">
       <button onClick={onTap} className="w-full text-left flex items-center gap-3 py-3 hover:bg-slate-50/60 transition-colors -mx-1 px-1 rounded-lg">
-        <MemberChip email={lead._ownerEmail} userId={lead.user_id} color={color} />
+        <MemberChip email={lead._ownerEmail} userId={lead.user_id} fullName={lead._ownerName} color={color} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-slate-900 truncate">{lead.title || lead.client_name}</p>
           <p className="text-xs text-slate-400 truncate">{lead.client_name}</p>
@@ -138,7 +142,7 @@ function FollowupRow({ fu, today, color, onShare, onTap }) {
   return (
     <div className="border-b border-slate-50 last:border-0">
       <button onClick={onTap} className="w-full text-left flex items-center gap-3 py-3 hover:bg-slate-50/60 transition-colors -mx-1 px-1 rounded-lg">
-        <MemberChip email={fu._ownerEmail} userId={fu.user_id} color={color} />
+        <MemberChip email={fu._ownerEmail} userId={fu.user_id} fullName={fu._ownerName} color={color} />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-slate-900 truncate">{fu.title}</p>
           <p className="text-xs text-slate-400 truncate">{fu.client}{fu.branch ? ` — ${fu.branch}` : ""}</p>
@@ -182,6 +186,7 @@ export function TeamDashboardScreen({
   // the team query is refreshing. Never render the member-only dashboard while
   // that authoritative role check is still pending.
   const [resolvedAdmin, setResolvedAdmin] = useState(null);
+  const [serverClientCount, setServerClientCount] = useState(null);
   useEffect(() => {
     let cancelled = false;
     async function resolveRole() {
@@ -217,6 +222,20 @@ export function TeamDashboardScreen({
     return () => { cancelled = true; };
   }, [userId, userRole, teamMembers]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadAuthoritativeClientCount() {
+      if (!teamId) {
+        if (!cancelled) setServerClientCount(null);
+        return;
+      }
+      const { count, error } = await supabase.from("clients").select("id", { count: "exact", head: true }).eq("team_id", teamId);
+      if (!cancelled) setServerClientCount(error ? null : (count ?? 0));
+    }
+    loadAuthoritativeClientCount();
+    return () => { cancelled = true; };
+  }, [teamId]);
+
   // ALL hooks must be declared before any conditional return
   const [selectedMember, setSelectedMember] = useState(null);
   const [activeSection, setActiveSection]   = useState("clients");
@@ -229,7 +248,7 @@ export function TeamDashboardScreen({
   const memberMap = useMemo(() => {
     const map = {};
     teamMembers.forEach((m, i) => {
-      map[m.user_id] = { email: m.email, role: m.role, color: memberColor(i) };
+      map[m.user_id] = { email: m.email, fullName: m.full_name, role: m.role, color: memberColor(i) };
     });
     return map;
   }, [teamMembers]);
@@ -281,7 +300,8 @@ export function TeamDashboardScreen({
   function annotate(rows) {
     return (rows || []).map(r => ({
       ...r,
-      _ownerEmail: memberMap[r.user_id]?.email || r.user_id,
+      _ownerEmail: memberMap[r.user_id]?.email || "",
+      _ownerName: memberMap[r.user_id]?.fullName || "",
       _ownerColor: memberMap[r.user_id]?.color || BRAND.primary,
     }));
   }
@@ -306,13 +326,13 @@ export function TeamDashboardScreen({
   const followups = filterByMember(allFollowups).filter(f => !f.completed);
   const overdueFU = followups.filter(f => f.date < today);
 
-  const totalClients   = allClients.length;
+  const totalClients   = selectedMember ? clients.length : (serverClientCount ?? allClients.length);
   const totalOpenLeads = allLeads.filter(l => !["Won","Lost"].includes(l.stage)).length;
   const totalOpenFU    = allFollowups.filter(f => !f.completed).length;
   const totalOverdueFU = allFollowups.filter(f => !f.completed && f.date < today).length;
 
   const SECTIONS = [
-    { key: "clients",   label: "Clients",    icon: Users,      count: clients.length,   color: "#166534", bg: "#DCFCE7" },
+    { key: "clients",   label: "Clients",    icon: Users,      count: selectedMember ? clients.length : (serverClientCount ?? clients.length),   color: "#166534", bg: "#DCFCE7" },
     { key: "leads",     label: "Leads",      icon: TrendingUp, count: leads.length,     color: "#5B21B6", bg: "#EDE9FE" },
     { key: "followups", label: "Follow-ups", icon: Calendar,   count: followups.length, color: "#1E40AF", bg: "#DBEAFE" },
     { key: "contacts",  label: "Contacts",   icon: UserPlus,   count: contacts.length,  color: "#92400E", bg: "#FEF3C7" },
@@ -334,7 +354,8 @@ export function TeamDashboardScreen({
       if (!map[uid]) {
         map[uid] = {
           uid,
-          email: memberMap[uid]?.email || r._ownerEmail || uid,
+          email: memberMap[uid]?.email || r._ownerEmail || "",
+          fullName: memberMap[uid]?.fullName || r._ownerName || "",
           color: memberMap[uid]?.color || r._ownerColor || BRAND.primary,
           items: [],
         };
@@ -342,7 +363,7 @@ export function TeamDashboardScreen({
       map[uid].items.push(r);
     }
     return Object.values(map).sort((a, b) =>
-      displayName(a.email, a.uid).localeCompare(displayName(b.email, b.uid)));
+      displayName(a.email, a.uid, a.fullName).localeCompare(displayName(b.email, b.uid, b.fullName)));
   })();
 
   // Share handler — opens the modal for any record type
@@ -376,7 +397,7 @@ export function TeamDashboardScreen({
             Everyone
           </button>
           {teamMembers.map((m, i) => {
-            const name = displayName(m.email, m.user_id);
+            const name = displayName(m.email, m.user_id, m.full_name);
             const color = memberColor(i);
             const isMe = m.user_id === userId;
             const isActive = selectedMember === m.user_id;
