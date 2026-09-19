@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronLeft, Mail, Sparkles, X } from "lucide-react";
+import { supabase } from "../supabase";
 
 export const SALES_INTERACTIONS = [
   ["site", "🏭", "Met at site"],
@@ -119,6 +120,8 @@ export function generateIndustrialSalesEmail(contact, input) {
 export function SalesFollowupComposer({ contact, onClose }) {
   const [step, setStep] = useState(1);
   const [copied, setCopied] = useState(false);
+  const [aiPolishing, setAiPolishing] = useState(false);
+  const [aiMessage, setAiMessage] = useState("");
   const [input, setInput] = useState({
     interaction: contact?.met_at ? "site" : "site",
     metAt: contact?.met_at || "",
@@ -138,6 +141,40 @@ export function SalesFollowupComposer({ contact, onClose }) {
     setEmail(generateIndustrialSalesEmail(contact, input));
     setStep(3);
   }
+  async function professionaliseWithAI() {
+    if (!email || aiPolishing) return;
+    setAiPolishing(true);
+    setAiMessage("");
+    try {
+      const { data, error } = await supabase.functions.invoke("polish-sales-email", {
+        body: {
+          subject: email.subject,
+          email: email.body,
+          context: {
+            name: contact?.name,
+            company: contact?.company,
+            interaction: input.interaction,
+            metAt: input.metAt,
+            topic: input.topic,
+            currentSituation: input.currentSituation,
+            problem: input.problem,
+            impact: input.impact,
+            desiredOutcome: input.desiredOutcome,
+            goal: input.goal,
+          },
+        },
+      });
+      if (error) throw error;
+      if (!data?.email?.body) throw new Error("No polished email returned");
+      setEmail({ subject: data.email.subject || email.subject, body: data.email.body });
+      setAiMessage(data.mode === "ai" ? "AI refined the wording without adding new facts." : "AI service unavailable — original email retained.");
+    } catch {
+      setAiMessage("AI could not refine this email right now. Your original draft is still available.");
+    } finally {
+      setAiPolishing(false);
+    }
+  }
+
   async function copy() {
     if (!email) return;
     try {
@@ -237,6 +274,15 @@ export function SalesFollowupComposer({ contact, onClose }) {
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Email — edit before sending</label>
               <textarea value={email.body} onChange={e=>setEmail(v=>({...v,body:e.target.value}))} rows={13} className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm resize-none" style={{fontSize:16}} />
             </div>
+            <button
+              onClick={professionaliseWithAI}
+              disabled={aiPolishing}
+              className="w-full rounded-xl py-3 text-sm font-bold border-2 disabled:opacity-60"
+              style={{borderColor:"#F3C4C4",background:"#FFF7F7",color:"#8B1A1A"}}>
+              <Sparkles size={15} className="inline mr-1" />
+              {aiPolishing ? "Professionalising…" : "Professionalise with AI"}
+            </button>
+            {aiMessage && <p className="text-[11px] text-center text-slate-400">{aiMessage}</p>}
             <div className="grid grid-cols-2 gap-2">
               <button onClick={copy} className="rounded-xl border-2 py-3 text-sm font-bold" style={{borderColor:copied?"#16A34A":"#E2E8F0",color:copied?"#16A34A":"#475569"}}>{copied ? "Copied ✓" : "Copy"}</button>
               <button onClick={openEmail} disabled={!contact.email} className="rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40" style={{background:"#0078D4"}}><Mail size={14} className="inline mr-1"/> Open Email</button>
