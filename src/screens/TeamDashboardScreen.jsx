@@ -245,15 +245,48 @@ export function TeamDashboardScreen({
   const [expandedMembers, setExpandedMembers] = useState({}); // teammate groups collapsed by default
   const toggleMember = (uid) => setExpandedMembers(prev => ({ ...prev, [uid]: !prev[uid] }));
 
+  // Resolve teammate identities directly on this screen as well as from App state.
+  // This prevents the dashboard from ever falling back to the generic "Team member"
+  // label while App is still refreshing its team-members list.
+  const [dashboardMembers, setDashboardMembers] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDashboardMembers() {
+      if (!teamId) {
+        if (!cancelled) setDashboardMembers([]);
+        return;
+      }
+      const { data: rows, error } = await supabase.rpc("get_team_member_emails", { p_team_id: teamId });
+      if (!cancelled && !error && rows) setDashboardMembers(rows);
+    }
+    loadDashboardMembers();
+    return () => { cancelled = true; };
+  }, [teamId, userId]);
+
+  const effectiveTeamMembers = useMemo(() => {
+    const map = new Map();
+    [...teamMembers, ...dashboardMembers].forEach(m => {
+      if (!m?.user_id) return;
+      const existing = map.get(m.user_id) || {};
+      map.set(m.user_id, {
+        ...existing,
+        ...m,
+        full_name: m.full_name || existing.full_name || "",
+        email: m.email || existing.email || "",
+      });
+    });
+    return Array.from(map.values());
+  }, [teamMembers, dashboardMembers]);
+
   const memberMap = useMemo(() => {
     const map = {};
-    teamMembers.forEach((m, i) => {
+    effectiveTeamMembers.forEach((m, i) => {
       map[m.user_id] = { email: m.email, fullName: m.full_name, role: m.role, color: memberColor(i) };
     });
     return map;
-  }, [teamMembers]);
+  }, [effectiveTeamMembers]);
 
-  const currentMember = teamMembers.find(m => m.user_id === userId);
+  const currentMember = effectiveTeamMembers.find(m => m.user_id === userId);
   const propAdmin =
     userRole === "admin" ||
     currentMember?.role === "admin" ||
