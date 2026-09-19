@@ -25,12 +25,23 @@ export function AuthScreen() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    // Normalise the identifier only; never trim or alter the password.
+    const emailLower = email.trim().toLowerCase();
+    setEmail(emailLower);
+    const { error } = await supabase.auth.signInWithPassword({ email: emailLower, password });
     if (error) {
+      const code = String(error.code || "").toLowerCase();
+      const message = String(error.message || "").toLowerCase();
       const text =
-        error.message?.includes("Invalid login") || error.message?.includes("invalid")
-          ? "Incorrect email or password. Please try again."
-          : error.message?.includes("network") || error.message?.includes("fetch")
+        code === "invalid_credentials" || message.includes("invalid login credentials")
+          ? "Incorrect email or password. Please check the email address and password and try again."
+          : code === "email_not_confirmed"
+          ? "This account has not been confirmed yet. Please confirm the email address first."
+          : code === "user_banned"
+          ? "This account is currently disabled. Please contact your PowerMate administrator."
+          : code === "over_request_rate_limit"
+          ? "Too many sign-in attempts. Please wait a moment and try again."
+          : message.includes("network") || message.includes("fetch")
           ? "No internet connection. Please check your network and try again."
           : "Sign in failed. Please try again.";
       setMsg({ text, type: "error" });
