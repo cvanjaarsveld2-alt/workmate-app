@@ -21,14 +21,19 @@ function csvEscape(val) {
   // Convert objects/arrays to JSON strings
   if (typeof val === "object") str = JSON.stringify(val);
   str = str.replace(/"/g, '""');
-  return /[,"\n\r]/.test(str) ? `"${str}"` : str;
+  return /[,"
+\r]/.test(str) ? `"${str}"` : str;
 }
 
 function toCSV(rows, columns) {
-  if (!rows || rows.length === 0) return columns.join(",") + "\n";
+  if (!rows || rows.length === 0) return columns.join(",") + "
+";
   const header = columns.join(",");
-  const body = rows.map(r => columns.map(c => csvEscape(r[c])).join(",")).join("\n");
-  return "\uFEFF" + header + "\n" + body + "\n"; // BOM for Excel
+  const body = rows.map(r => columns.map(c => csvEscape(r[c])).join(",")).join("
+");
+  return "\uFEFF" + header + "
+" + body + "
+"; // BOM for Excel
 }
 
 // ─── Column definitions per entity ───────────────────────────────────────────
@@ -65,7 +70,34 @@ const COLUMNS = {
 };
 
 // ─── Main backup export ──────────────────────────────────────────────────────
-async function listStorageObjects(bucket, prefix = "") {\n  const all = [];\n  const queue = [prefix];\n  while (queue.length) {\n    const current = queue.shift();\n    let offset = 0;\n    while (true) {\n      const { data: entries, error } = await supabase.storage.from(bucket).list(current, { limit: 100, offset, sortBy: { column: "name", order: "asc" } });\n      if (error) throw new Error(`Could not list ${bucket}: ${error.message}`);\n      for (const entry of entries || []) {\n        const path = current ? `${current}/${entry.name}` : entry.name;\n        if (entry.id) all.push({ bucket, path, size: entry.metadata?.size ?? null, mime: entry.metadata?.mimetype ?? null });\n        else queue.push(path);\n      }\n      if (!entries || entries.length < 100) break;\n      offset += entries.length;\n    }\n  }\n  return all;\n}\n\nasync function sha256(blob) {\n  const bytes = await blob.arrayBuffer();\n  const digest = await crypto.subtle.digest("SHA-256", bytes);\n  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");\n}\n\nasync function generateBackup(data, onProgress = () => {}) {
+async function listStorageObjects(bucket, prefix = "") {
+  const all = [];
+  const queue = [prefix];
+  while (queue.length) {
+    const current = queue.shift();
+    let offset = 0;
+    while (true) {
+      const { data: entries, error } = await supabase.storage.from(bucket).list(current, { limit: 100, offset, sortBy: { column: "name", order: "asc" } });
+      if (error) throw new Error(`Could not list ${bucket}: ${error.message}`);
+      for (const entry of entries || []) {
+        const path = current ? `${current}/${entry.name}` : entry.name;
+        if (entry.id) all.push({ bucket, path, size: entry.metadata?.size ?? null, mime: entry.metadata?.mimetype ?? null });
+        else queue.push(path);
+      }
+      if (!entries || entries.length < 100) break;
+      offset += entries.length;
+    }
+  }
+  return all;
+}
+
+async function sha256(blob) {
+  const bytes = await blob.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function generateBackup(data, onProgress = () => {}) {
   const zip = new JSZip();
   const stamp = nowStamp();
 
@@ -80,7 +112,7 @@ async function listStorageObjects(bucket, prefix = "") {\n  const all = [];\n  c
     exported_at: new Date().toISOString(),
     app: "PowerMate",
     company: "Power Works (Pty) Ltd",
-    version: 1,
+    version: 2,
     counts: {
       clients:   (data.clients   || []).length,
       contacts:  (data.contacts  || []).length,
@@ -91,6 +123,7 @@ async function listStorageObjects(bucket, prefix = "") {\n  const all = [];\n  c
       expenses:  (data.expenses  || []).length,
     },
     data: {
+      _all_state: data,
       clients:   data.clients   || [],
       contacts:  data.contacts  || [],
       followups: data.followups || [],
@@ -100,7 +133,36 @@ async function listStorageObjects(bucket, prefix = "") {\n  const all = [];\n  c
       expenses:  data.expenses  || [],
     },
   };
-  zip.file("powermate_master.json", JSON.stringify(master, null, 2));\n\n  // IMPORTANT: database backups do not contain Storage binaries. Include every\n  // Storage object visible to the authenticated user so photos, receipts and\n  // documents are protected too. Nothing is deleted or moved by this export.\n  const storageManifest = [];\n  const buckets = ["powermate-media", "receipts", "company-docs"];\n  let completedFiles = 0;\n  for (const bucket of buckets) {\n    const objects = await listStorageObjects(bucket);\n    for (const object of objects) {\n      const { data: file, error } = await supabase.storage.from(bucket).download(object.path);\n      if (error || !file) throw new Error(`Could not download ${bucket}/${object.path}: ${error?.message || "empty file"}`);\n      const hash = await sha256(file);\n      const safePath = object.path.replace(/\\\\/g, "/").replace(/^\\/+/, "");\n      zip.file(`storage/${bucket}/${safePath}`, file);\n      storageManifest.push({ bucket, path: object.path, size: file.size, mime: file.type || object.mime || null, sha256: hash });\n      completedFiles += 1;\n      onProgress({ completedFiles, bucket, path: object.path });\n    }\n  }\n  zip.file("storage_manifest.json", JSON.stringify({ exported_at: new Date().toISOString(), files: storageManifest }, null, 2));\n  zip.file("DATA_SAFETY.txt", `DATA SAFETY GUARANTEE FOR THIS EXPORT\\n\\nThis backup is additive only. It does not delete, overwrite, move or modify any PowerMate database row or Storage object.\\n\\nThe ZIP contains application state plus accessible PowerMate Storage objects from powermate-media, receipts and company-docs. Each stored file has a SHA-256 checksum in storage_manifest.json.\\n\\nSupabase database backups do NOT include Storage binaries, so this file backup is intentionally separate and includes the actual files.\\n`);
+  zip.file("powermate_master.json", JSON.stringify(master, null, 2));
+
+  // IMPORTANT: database backups do not contain Storage binaries. Include every
+  // Storage object visible to the authenticated user so photos, receipts and
+  // documents are protected too. Nothing is deleted or moved by this export.
+  const storageManifest = [];
+  const buckets = ["powermate-media", "receipts", "company-docs"];
+  let completedFiles = 0;
+  for (const bucket of buckets) {
+    const objects = await listStorageObjects(bucket);
+    for (const object of objects) {
+      const { data: file, error } = await supabase.storage.from(bucket).download(object.path);
+      if (error || !file) throw new Error(`Could not download ${bucket}/${object.path}: ${error?.message || "empty file"}`);
+      const hash = await sha256(file);
+      const safePath = object.path.replace(/\\\\/g, "/").replace(/^\\/+/, "");
+      zip.file(`storage/${bucket}/${safePath}`, file);
+      storageManifest.push({ bucket, path: object.path, size: file.size, mime: file.type || object.mime || null, sha256: hash });
+      completedFiles += 1;
+      onProgress({ completedFiles, bucket, path: object.path });
+    }
+  }
+  zip.file("storage_manifest.json", JSON.stringify({ exported_at: new Date().toISOString(), files: storageManifest }, null, 2));
+  zip.file("DATA_SAFETY.txt", `DATA SAFETY GUARANTEE FOR THIS EXPORT\
+\
+This backup is additive only. It does not delete, overwrite, move or modify any PowerMate database row or Storage object.\
+\
+The ZIP contains application state plus accessible PowerMate Storage objects from powermate-media, receipts and company-docs. Each stored file has a SHA-256 checksum in storage_manifest.json.\
+\
+Supabase database backups do NOT include Storage binaries, so this file backup is intentionally separate and includes the actual files.\
+`);
 
   // Add a README for future-you
   const readme = `POWERMATE BACKUP
