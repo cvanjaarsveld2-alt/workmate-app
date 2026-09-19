@@ -110,6 +110,13 @@ export default function PowerWorksApp(){
      // (empty) database — this user's real IndexedDB records were never
      // actually wiped on sign-out.
      try{await clearAllStores()}catch{}
+     // A successful PIN unlock is session-scoped. Never let the unlock marker
+     // survive an explicit account logout and silently bypass the PIN after
+     // the same account signs back in on this tab.
+     try {
+       const uid = session?.user?.id;
+       if (uid) sessionStorage.removeItem(scopedPinKey(PIN_UNLOCKED_KEY, uid));
+     } catch {}
      setSession(null);
      // FIX (Build 8, Phase 1) — logout() used to leave `data` untouched, so a
      // second user signing in right after on the same device would see the
