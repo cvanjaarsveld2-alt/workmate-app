@@ -208,12 +208,11 @@ The JSON file is human-readable and can be re-imported into the system.
 
   const filename = `PowerMate_Backup_${stamp}.zip`;
 
-  // Record the backup time
-  try {
-    localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
-  } catch {}
-
   return { blob, filename, counts: master.counts };
+}
+
+function markBackupComplete() {
+  try { localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString()); } catch {}
 }
 
 // Trigger a plain browser download (desktop fallback / explicit "Save to phone").
@@ -245,8 +244,7 @@ export function BackupExport({ data }) {
     setExporting(true);
     try {
       const { blob, filename, counts } = await generateBackup(data);
-      setLastResult(counts);
-      setLastBackup(new Date());
+      let delivered = false;
 
       if (mode === "share") {
         const file = new File([blob], filename, { type: "application/zip" });
@@ -257,25 +255,34 @@ export function BackupExport({ data }) {
               text: `PowerMate backup — ${new Date().toLocaleDateString("en-GB")}`,
               files: [file],
             });
+            delivered = true;
           } catch (e) {
-            // User cancelled the share sheet — not an error, don't alert.
             if (e.name !== "AbortError") {
               console.warn("Share failed, falling back to download:", e);
               downloadBlob(blob, filename);
+              delivered = true;
             }
           }
         } else {
-          // No Web Share file support (most desktop browsers) — just download.
           downloadBlob(blob, filename);
+          delivered = true;
         }
       } else {
         downloadBlob(blob, filename);
+        delivered = true;
+      }
+
+      if (delivered) {
+        setLastResult(counts);
+        setLastBackup(new Date());
+        markBackupComplete();
       }
     } catch (e) {
       console.error("Backup failed:", e);
       alert("Backup failed: " + (e.message || "unknown error"));
+    } finally {
+      setExporting(false);
     }
-    setExporting(false);
   }
 
   const daysSinceBackup = lastBackup
