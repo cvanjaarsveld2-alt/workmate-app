@@ -42,7 +42,7 @@ export function gapCheck(input, email) {
     ["context", "Interaction is established", !!clean(input.interaction)],
     ["current", "Current situation is clear", !!clean(input.currentSituation)],
     ["problem", "Problem / requirement is identified", !!clean(input.problem)],
-    ["impact", "Operational impact is supported by known facts", !clean(input.impact) || !!clean(input.impact)],
+    ["impact", "Operational impact is supported by known facts", !clean(input.impact) || !/\b(no concern|none|n\/a|not known|unknown)\b/i.test(clean(input.impact))],
     ["desired", "Desired outcome is clear", !!clean(input.desiredOutcome)],
     ["gap", "Current-to-desired gap is understandable", !!clean(input.problem) && !!clean(input.desiredOutcome)],
     ["evidence", "No unsupported financial or operational claims", !/R\\s?\\d|\\$\\s?\\d|\\d+%|\\bguarantee(d)?\\b|\\bwill save\\b|\\bwill reduce\\b/i.test(email)],
@@ -167,7 +167,7 @@ export function SalesFollowupComposer({ contact, onClose }) {
       if (error) throw error;
       if (!data?.email?.body) throw new Error("No polished email returned");
       setEmail({ subject: data.email.subject || email.subject, body: data.email.body });
-      setAiMessage(data.mode === "ai" ? "AI refined the wording without adding new facts." : "AI service unavailable — original email retained.");
+      setAiMessage(data.mode === "ai" ? "AI refined the wording without adding new facts." : data?.reason ? `AI unavailable (${data.reason}) — original email retained.` : "AI service unavailable — original email retained.");
     } catch {
       setAiMessage("AI could not refine this email right now. Your original draft is still available.");
     } finally {
