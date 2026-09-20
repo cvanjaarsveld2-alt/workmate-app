@@ -15,56 +15,110 @@ export const EMAIL_TEMPLATES = [
     label: "Gap-Selling Follow-Up",
     emoji: "✨",
     kind: "gap",
-    subject: () => "Sales Follow-Up — Power Works",
+    subject: () => "Following up — Power Works",
     body: () => "Build a problem → impact → desired outcome follow-up",
   },
   {
     id: "quote_followup",
     label: "Quote Follow-up",
     emoji: "📄",
-    subject: (client) => `Quote Follow-up — Power Works`,
+    subject: () => "Following up on the quote",
     body: (contact, client) =>
-      `Dear ${contact || "Sir/Madam"},\n\nI hope this email finds you well.\n\nI am following up on the quote we recently submitted to ${client || "you"}. Please do not hesitate to contact me should you require any clarification or wish to discuss the details further.\n\nWe look forward to hearing from you.\n\nKind regards\nPower Works (Pty) Ltd`,
+      `Hi ${contact || "there"},
+
+Just checking in on the quote we sent through for ${client || "your team"}.
+
+If you've had a chance to look at it, I'd be happy to run through anything you'd like clarified or changed.
+
+Please let me know what works for you.
+
+Regards,
+Renita
+Power Works (Pty) Ltd`,
   },
   {
     id: "meeting_request",
     label: "Meeting Request",
     emoji: "📅",
-    subject: (client) => `Meeting Request — Power Works`,
+    subject: () => "A quick meeting",
     body: (contact, client) =>
-      `Dear ${contact || "Sir/Madam"},\n\nI hope you are well.\n\nI would like to request a meeting to discuss how Power Works can assist ${client || "your organisation"}. Please let me know your availability and I will arrange accordingly.\n\nKind regards\nPower Works (Pty) Ltd`,
+      `Hi ${contact || "there"},
+
+I'd like to set up a short meeting to understand what ${client || "your team"} is working on and where we may be able to help.
+
+If you're open to it, send me a time that suits you and I'll work around it.
+
+Regards,
+Renita
+Power Works (Pty) Ltd`,
   },
   {
     id: "general_checkin",
     label: "General Check-in",
     emoji: "👋",
-    subject: (client) => `Checking In — Power Works`,
+    subject: () => "Just checking in",
     body: (contact, client) =>
-      `Dear ${contact || "Sir/Madam"},\n\nI trust you are well.\n\nI am reaching out to check in and enquire whether there is anything Power Works can assist ${client || "your team"} with at this time.\n\nPlease feel free to contact me at any time.\n\nKind regards\nPower Works (Pty) Ltd`,
+      `Hi ${contact || "there"},
+
+Just checking in to see how things are going at ${client || "your side"}.
+
+If there's anything you're dealing with at the moment where Power Works could help, feel free to send it my way.
+
+Regards,
+Renita
+Power Works (Pty) Ltd`,
   },
   {
     id: "product_intro",
     label: "Product Introduction",
     emoji: "🔧",
-    subject: (client) => `Power Works — Product Introduction`,
+    subject: () => "Power Works",
     body: (contact, client) =>
-      `Dear ${contact || "Sir/Madam"},\n\nI hope this email finds you well.\n\nI would like to introduce our range of jacks, tyre handlers, mobile load testing equipment, and industrial solutions that may benefit ${client || "your operations"}.\n\nI would welcome the opportunity to present our products at your convenience.\n\nKind regards\nPower Works (Pty) Ltd`,
+      `Hi ${contact || "there"},
+
+I wanted to introduce Power Works and the industrial equipment and services we provide.
+
+We work with businesses on areas such as jacks, tyre handlers, load testing and industrial repairs.
+
+If any of these are relevant to ${client || "your operation"}, I'm happy to send through some information or have a quick chat.
+
+Regards,
+Renita
+Power Works (Pty) Ltd`,
   },
   {
     id: "after_visit",
     label: "After Site Visit",
     emoji: "🏭",
-    subject: (client) => `Thank You — Power Works Site Visit`,
+    subject: () => "Good meeting you",
     body: (contact, client) =>
-      `Dear ${contact || "Sir/Madam"},\n\nThank you for your time during our recent visit to ${client || "your site"}. It was a pleasure meeting with you.\n\nAs discussed, I will follow up with the relevant information shortly. Please do not hesitate to contact me in the meantime.\n\nKind regards\nPower Works (Pty) Ltd`,
+      `Hi ${contact || "there"},
+
+Thanks for your time when I was at ${client || "your site"}.
+
+It was good to meet you and get a better understanding of what you're working with. As discussed, I'll follow up with the information we spoke about.
+
+If anything comes up in the meantime, just let me know.
+
+Regards,
+Renita
+Power Works (Pty) Ltd`,
   },
   {
     id: "urgent_followup",
-    label: "Urgent Follow-up",
+    label: "Time-Sensitive Follow-up",
     emoji: "⚡",
-    subject: (client) => `Urgent: Follow-up Required — Power Works`,
+    subject: () => "Following up",
     body: (contact, client) =>
-      `Dear ${contact || "Sir/Madam"},\n\nI hope you are well.\n\nI am following up urgently regarding ${client || "your account"} and would appreciate your earliest response.\n\nPlease contact me directly at your convenience.\n\nKind regards\nPower Works (Pty) Ltd`,
+      `Hi ${contact || "there"},
+
+I'm following up on ${client || "the matter we discussed"}.
+
+When you get a chance, please let me know where things stand and whether there's anything you need from my side.
+
+Thanks,
+Renita
+Power Works (Pty) Ltd`,
   },
 ];
 
