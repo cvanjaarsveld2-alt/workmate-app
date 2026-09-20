@@ -618,6 +618,206 @@ export const MACHINE_DATA = [
     closedHeight: "", jack: "", jackStand: "", note: "",
     source: "Volvo G990 official spec sheet (volvoce.com)",
   },
+
+  // ── ADDITIONAL CATERPILLAR WHEEL LOADERS (mid-size, added) ──
+  {
+    brand: "Caterpillar", model: "966M", type: "loader",
+    tyre: "26.5-25", operatingWeight: 23.21, emptyWeight: 23.21,
+    axleNote: "Mid-size wheel loader; single published weight figure used for both fields. Front axle fixed, rear oscillating ±13°.",
+    groundClearance: 433,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Cat 966M (ritchiespecs / lectura-specs)",
+  },
+  {
+    brand: "Caterpillar", model: "972M", type: "loader",
+    tyre: "26.5-25", operatingWeight: 24.89, emptyWeight: 24.89,
+    axleNote: "Mid-size wheel loader; single published weight figure used for both fields.",
+    groundClearance: 433,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Cat 972M (ritchiespecs / lectura-specs)",
+  },
+  {
+    brand: "Caterpillar", model: "990K", type: "loader",
+    tyre: "45/65R39", operatingWeight: 80.97, emptyWeight: 80.97,
+    axleNote: "Large wheel loader sitting between the 992 and 994K in Cat's range; single published weight figure used for both fields.",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders. Ground clearance not published — measure on site.",
+    source: "Cat 990K (ritchiespecs / lectura-specs)",
+  },
+
+  // ── ADDITIONAL KOMATSU WHEEL LOADERS (mid/large, added) ──
+  {
+    brand: "Komatsu", model: "WA500-8", type: "loader",
+    tyre: "29.5-25", operatingWeight: 35.5, emptyWeight: 35.5,
+    axleNote: "Mid-size wheel loader; single weight figure per bucket/counterweight config, used for both fields (range 35.5–35.7t).",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders. Ground clearance not published — measure on site.",
+    source: "Komatsu WA500-8 (komatsu.com)",
+  },
+  {
+    brand: "Komatsu", model: "WA600-8", type: "loader",
+    tyre: "35/65-33", operatingWeight: 54.17, emptyWeight: 54.17,
+    axleNote: "Mid-large wheel loader; single weight figure per config, used for both fields (range 54.2–56.7t).",
+    groundClearance: 525,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Komatsu WA600-8 (komatsu.eu brochure)",
+  },
+  {
+    brand: "Komatsu", model: "WA900-8", type: "loader",
+    tyre: "45/65-R45", operatingWeight: 116.4, emptyWeight: 116.4,
+    axleNote: "Large wheel loader sitting between the WA600 and WA1200; single published weight figure used for both fields.",
+    groundClearance: 485,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Komatsu WA900-8 official spec sheet",
+  },
+
+  // ── VOLVO WHEEL LOADERS (added — new category for this brand) ──
+  {
+    brand: "Volvo", model: "L150H", type: "loader",
+    tyre: "26.5R25", operatingWeight: 24.09, emptyWeight: 24.09,
+    axleNote: "Mid-size wheel loader; single published weight figure used for both fields.",
+    groundClearance: 613,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Volvo L150H (lectura-specs / ritchiespecs)",
+  },
+  {
+    brand: "Volvo", model: "L220H", type: "loader",
+    tyre: "29.5R25", operatingWeight: 32.81, emptyWeight: 32.81,
+    axleNote: "Mid-large wheel loader; single published weight figure used for both fields.",
+    groundClearance: 600,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Volvo L220H (lectura-specs / ritchiespecs)",
+  },
+
+  // ── ADDITIONAL HITACHI WHEEL LOADER (mid-size, added) ──
+  {
+    brand: "Hitachi", model: "ZW310-6", type: "loader",
+    tyre: "26.5R25", operatingWeight: 24.18, emptyWeight: 24.18,
+    axleNote: "Mid-size wheel loader; single weight figure per arm/bucket config, used for both fields (range 24.18–24.67t).",
+    groundClearance: 505,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Hitachi ZW310-6 spec sheet",
+  },
+
+  // ── ADDITIONAL LIEBHERR WHEEL LOADER (mid-size, added) ──
+  {
+    brand: "Liebherr", model: "L550 XPower", type: "loader",
+    tyre: "23.5R25", operatingWeight: 18.55, emptyWeight: 18.55,
+    axleNote: "Mid-size wheel loader (standard Z-bar config, 3.4m³ bucket); single published weight figure used for both fields.",
+    groundClearance: 490,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Liebherr L550 XPower (lectura-specs)",
+  },
+
+  // ── BELL WHEEL LOADER (added — new category for this brand) ──
+  {
+    brand: "Bell", model: "L1706E", type: "loader",
+    tyre: "20.5R25", operatingWeight: 16.26, emptyWeight: 16.26,
+    axleNote: "Bell's largest wheel loader; single published weight figure used for both fields.",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders. Ground clearance not published for this generation — measure on site.",
+    source: "Bell L1706E (lectura-specs)",
+  },
+
+  // ── JOHN DEERE WHEEL LOADER (added — new category for this brand) ──
+  {
+    brand: "John Deere", model: "944K Hybrid", type: "loader",
+    tyre: "35/65R33", operatingWeight: 53.49, emptyWeight: 53.49,
+    axleNote: "John Deere's largest/mining-class wheel loader (hydraulic-hybrid regenerative system); single published weight figure used for both fields. Sources vary 53.5–54.3t by config/model year.",
+    groundClearance: 582,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "John Deere 944K Hybrid (ritchiespecs / lectura-specs)",
+  },
+
+  // ── ADDITIONAL CATERPILLAR ADT (added) ──
+  {
+    brand: "Caterpillar", model: "735", type: "adt",
+    tyre: "750/65 R25", operatingWeight: 56.88, emptyWeight: 24.88,
+    axleNote: "6x6 ADT sitting between the 730 and 740; automatic clutched inter- and cross-axle differential locks",
+    groundClearance: 536,
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Cat 735 official technical specifications sheet",
+  },
+
+  // ── ADDITIONAL VOLVO ADT (added) ──
+  {
+    brand: "Volvo", model: "A25G", type: "adt",
+    tyre: "23.5R25", operatingWeight: 47.7, emptyWeight: 22.7,
+    axleNote: "Volvo's smallest current ADT, sits below the A35G; 6x4/6x6 auto-engaged drive, dog-clutch diff-locks on all axles",
+    groundClearance: 521,
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Volvo A25G official product guide",
+  },
+
+  // ── ADDITIONAL JOHN DEERE ADT (added) ──
+  {
+    brand: "John Deere", model: "370E", type: "adt",
+    tyre: "26.5R25", operatingWeight: 64.41, emptyWeight: 30.78,
+    axleNote: "Smaller ADT sitting below the 410E; full-time 6x6, hydraulic cross-axle differential lock",
+    groundClearance: 530,
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "John Deere 370E/410E/460E official spec sheet",
+  },
+
+  // ── ADDITIONAL BELL ADT (added) ──
+  {
+    brand: "Bell", model: "B18E", type: "adt",
+    tyre: "20.5R25", operatingWeight: 34.4, emptyWeight: 16.4,
+    axleNote: "Bell's smallest ADT, sits below the B25E. Note: this model is 6x4, not 6x6 like the rest of Bell's range — confirm drive config on site.",
+    groundClearance: 452,
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Bell B18E official data sheet (bellequipment.com)",
+  },
+
+  // ── ADDITIONAL KOMATSU ADT (added — new model, launched 2026) ──
+  {
+    brand: "Komatsu", model: "HM460-6", type: "adt",
+    tyre: "29.5R25", operatingWeight: 74.9, emptyWeight: 32.9,
+    axleNote: "New model (launched March 2026) sitting above the HM400-5; 6x6, Komatsu Traction Control System, hydro-pneumatic suspension",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Komatsu HM460-6 official brochure",
+  },
+
+  // ── ADDITIONAL CATERPILLAR HAUL TRUCK (added) ──
+  {
+    brand: "Caterpillar", model: "775", type: "haul_truck",
+    tyre: "24.00R35", operatingWeight: 111.8, emptyWeight: 47.8,
+    axleNote: "Mid-size rigid haul truck sitting between the 772 and 777. Empty: 52% front/48% rear; loaded: 34% front/66% rear. Nominal payload 64t — emptyWeight derived as GVW minus nominal payload (Cat does not publish a separate empty-weight figure).",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Cat 775 (cat.com product page)",
+  },
+
+  // ── ADDITIONAL HITACHI HAUL TRUCK (added) ──
+  {
+    brand: "Hitachi", model: "EH4000AC-3", type: "haul_truck",
+    tyre: "46/90R57", operatingWeight: 384, emptyWeight: 163,
+    axleNote: "Mid-size rigid mining truck sitting between the EH3500AC-3 and EH5000AC-3. Empty: 48% front/52% rear; loaded: 33% front/67% rear; ~221t nominal payload.",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Hitachi EH4000AC-3 brochure (tatahitachi.co.in / hitachicm.com)",
+  },
+
+  // ── ADDITIONAL LIEBHERR HAUL TRUCK (added) ──
+  {
+    brand: "Liebherr", model: "T236", type: "haul_truck",
+    tyre: "27.00R49", operatingWeight: 180, emptyWeight: 80,
+    axleNote: "Smaller Liebherr mining truck sitting below the T274. Empty: 51% front/49% rear; loaded: 34.5% front/65.5% rear; ~100t nominal payload.",
+    groundClearance: 1073, rearAxleClearance: 876,
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Liebherr T236 official spec sheet",
+  },
+
+  // ── ADDITIONAL BELAZ HAUL TRUCK (added) ──
+  {
+    brand: "Belaz", model: "7555B", type: "haul_truck",
+    tyre: "24.00R35", operatingWeight: 95.5, emptyWeight: 40.5,
+    axleNote: "Mid-size Belaz truck, standard equipment package; no front/rear axle split published.",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Belaz official product page (belaz.by)",
+  },
 ];
 
 // Machine type labels for grouping/filtering in the UI.
