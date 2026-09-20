@@ -4,14 +4,17 @@
 // safety-critical and must be filled in by Power Works. Never guess a jack
 // rating under a machine.
 //
-// By default the nr1/nr2 jack shown on the Jack Selector screen is computed
+// By default the jacks shown on the Jack Selector screen are computed
 // automatically by recommendForMachine() from closedHeight/groundClearance and
-// estimated load (see the matching logic below). Set `jack` (and optionally
-// `jackAlt`) on a machine ONLY when you want to override that automatic pick
-// with a specific catalogue entry — e.g. because you know from experience which
-// physical jack the crew should grab, regardless of what the algorithm would
-// otherwise rank highest. The value must match a JACK_CATALOGUE `name` exactly,
-// or it's silently ignored and the automatic recommendation is used instead.
+// estimated load (see the matching logic below) — normally just a primary +
+// one alternate. Set `jackOverrides` on a machine ONLY when you want to bypass
+// that automatic pick and show a specific, ordered list of catalogue jacks
+// instead — e.g. because you know from experience which physical jacks the
+// crew should grab, regardless of what the algorithm would otherwise rank
+// highest. It's a list of one or more JACK_CATALOGUE `name` values, shown in
+// the order given (first = primary/nr1, rest = alternates nr2, nr3, ...).
+// Any name that doesn't match a catalogue entry is silently dropped; if none
+// match, the automatic recommendation is used instead.
 //
 // To add a new machine: copy an entry and fill the specs.
 //
@@ -26,11 +29,10 @@
 //                       This can differ from groundClearance (see below) when the
 //                       actual jacking point clears more/less than the published
 //                       ground clearance figure.
-//   jack              — OPTIONAL: force the nr1 jack to this exact JACK_CATALOGUE
-//                       name, bypassing automatic matching. Leave blank to let
-//                       recommendForMachine() pick automatically.
-//   jackAlt           — OPTIONAL: force the nr2 (alternative) jack the same way.
-//                       Only used when `jack` is also set.
+//   jackOverrides     — OPTIONAL: array of exact JACK_CATALOGUE `name` values to
+//                       show, in display order, bypassing automatic matching.
+//                       Leave unset/empty to let recommendForMachine() pick
+//                       automatically.
 //   jackStand         — recommended jacking stand — not yet wired into the
 //                       matching logic (the stand is still always auto-picked
 //                       to match whichever jack is shown); reserved for future use.
@@ -80,10 +82,14 @@ export const MACHINE_DATA = [
     axleNote: "~100 ton class; loaded ~294,000 lb",
     groundClearance: 750, rearAxleClearance: 770,
     closedHeight: 800,
-    jack: "Powerlift / Hydralift — 600mm (100t)",
-    jackAlt: "Powerlift / Hydralift — 600mm (150t)",
+    jackOverrides: [
+      "Powerlift / Hydralift — 600mm (100t)",
+      "Powerlift / Hydralift — 600mm (150t)",
+      "Powerlift / Hydralift — 800mm (100t)",
+      "Powerlift / Hydralift — 800mm (150t)",
+    ],
     jackStand: "",
-    note: "Jacking-point clearance measured on site at 800mm+ (published ground clearance of 750mm is measured lower down, not at the jacking point). The 600mm 100t/150t jacks are the preferred lower-profile fit; the 800mm 100t/150t variants also fit if needed.",
+    note: "Jacking-point clearance measured on site at 800mm+ (published ground clearance of 750mm is measured lower down, not at the jacking point). Both the 600mm and 800mm 100t/150t jacks fit; 600mm is listed first as the lower-profile option.",
     source: "Cat / ritchiespecs published data",
   },
   {
@@ -92,8 +98,10 @@ export const MACHINE_DATA = [
     axleNote: "Ground clearance ~1004mm; GMW 249–256t by tyre",
     groundClearance: 1004,
     closedHeight: "",
-    jack: "Powerlift / Hydralift — 800mm (100t)",
-    jackAlt: "Powerlift / Hydralift — 800mm (150t)",
+    jackOverrides: [
+      "Powerlift / Hydralift — 800mm (100t)",
+      "Powerlift / Hydralift — 800mm (150t)",
+    ],
     jackStand: "", note: "",
     source: "Cat 785 spec sheet",
   },
@@ -195,10 +203,14 @@ export const MACHINE_DATA = [
     axleNote: "~91t payload rigid; empty ~99t",
     groundClearance: 780,
     closedHeight: 800,
-    jack: "Powerlift / Hydralift — 600mm (100t)",
-    jackAlt: "Powerlift / Hydralift — 600mm (150t)",
+    jackOverrides: [
+      "Powerlift / Hydralift — 600mm (100t)",
+      "Powerlift / Hydralift — 600mm (150t)",
+      "Powerlift / Hydralift — 800mm (100t)",
+      "Powerlift / Hydralift — 800mm (150t)",
+    ],
     jackStand: "",
-    note: "Jacking-point clearance measured on site at 800mm+ (published ground clearance of 780mm is measured lower down, not at the jacking point). The 600mm 100t/150t jacks are the preferred lower-profile fit; the 800mm 100t/150t variants also fit if needed.",
+    note: "Jacking-point clearance measured on site at 800mm+ (published ground clearance of 780mm is measured lower down, not at the jacking point). Both the 600mm and 800mm 100t/150t jacks fit; 600mm is listed first as the lower-profile option.",
     source: "Komatsu HD785 published specs",
   },
 
@@ -531,19 +543,20 @@ export function recommendForMachine(machine) {
   const capacityOK = j => jackLoad == null ? true : (j.capacity || 0) >= jackLoad;
 
   // ── Manual override ──
-  // If this machine names a specific catalogue jack (see the field docs at the
-  // top of this file), use it directly instead of auto-matching by height/load.
-  // An unrecognised name is ignored (falls through to automatic matching) rather
-  // than silently showing nothing.
+  // If this machine lists specific catalogue jacks (see the field docs at the
+  // top of this file), use them directly and in that order, instead of
+  // auto-matching by height/load. Names that don't match a catalogue entry are
+  // dropped; if nothing in the list matches, we fall through to automatic
+  // matching rather than silently showing nothing.
   const findJackByName = name => JACK_CATALOGUE.find(j => j.name === name);
-  const overrideJack = machine.jack ? findJackByName(machine.jack) : null;
+  const overrideList = Array.isArray(machine.jackOverrides)
+    ? machine.jackOverrides.map(findJackByName).filter(Boolean)
+    : [];
 
   let jack;
   let alternatives = [];
-  if (overrideJack) {
-    jack = overrideJack;
-    const overrideAlt = machine.jackAlt ? findJackByName(machine.jackAlt) : null;
-    alternatives = overrideAlt ? [overrideAlt] : [];
+  if (overrideList.length) {
+    [jack, ...alternatives] = overrideList;
   } else if (basis !== null) {
     // Jacks that fit under the clearance, ranked by height band then capacity.
     const band = h => Math.round(h / 25);
@@ -553,7 +566,9 @@ export function recommendForMachine(machine) {
     const fitsBoth = fitsHeight.filter(capacityOK);
     const usable = fitsBoth.length ? fitsBoth : fitsHeight; // fall back to height-fit if none meet capacity
     jack = usable[0] || JACK_CATALOGUE.slice().sort((a,b)=>a.closedHeight-b.closedHeight)[0];
-    alternatives = usable.filter(j => j.name !== jack.name);
+    // Only ever surface ONE automatic alternate (nr2) — the screen is meant to
+    // show a short, decisive pick, not every jack that happens to fit.
+    alternatives = usable.filter(j => j.name !== jack.name).slice(0, 1);
   } else {
     // No confirmed clearance: recommend the general-purpose 800mm as nr1, and
     // order alternatives by relevance — for big machines the taller 1000mm is
@@ -566,7 +581,8 @@ export function recommendForMachine(machine) {
     // For haul trucks / big machines, prefer the taller 1000mm as nr2.
     const isBigMachine = ["haul_truck","loader","excavator","dozer"].includes(machine.type);
     big.sort((a, b) => isBigMachine ? (b.closedHeight - a.closedHeight) : (a.closedHeight - b.closedHeight));
-    alternatives = [...big, ...small];
+    // Only ever surface ONE automatic alternate (nr2) — same reasoning as above.
+    alternatives = [...big, ...small].slice(0, 1);
   }
 
   // Stand: match by closed height closest to the jack, and pick the capacity —
