@@ -6,19 +6,27 @@
 // MACHINE_DATA file and are filled in by Power Works (safety-critical — never
 // guessed). If a machine has no jack specified yet, the screen says so clearly
 // rather than showing a blank or a guess.
-import React, { useState, useMemo } from "react";
-import { Wrench, Search, ChevronRight, ChevronDown, AlertTriangle, Truck, X } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Wrench, Search, ChevronRight, ChevronDown, AlertTriangle, Truck, X, Pencil } from "lucide-react";
 import { BRAND } from "../lib/constants";
-import { Card, PageHeader, Empty } from "../components/ui";
-import { MACHINE_DATA, MACHINE_TYPES, recommendForMachine, tyreInfo } from "../lib/machineData";
+import { Card, PageHeader, Empty, Btn, Field, Toast } from "../components/ui";
+import { MACHINE_DATA, MACHINE_TYPES, JACK_CATALOGUE, recommendForMachine, tyreInfo } from "../lib/machineData";
+import { fetchJackConfirmations, saveJackConfirmation, deleteJackConfirmation, applyConfirmation, keyFor } from "../lib/jackConfirmations";
 
-export function JackSelectorScreen() {
+export function JackSelectorScreen({ userId, teamId }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   // Brand sections and, inside them, category sections are independently
   // collapsible — both start collapsed. Keys: brand name, and `${brand}::${type}`.
   const [openBrands, setOpenBrands] = useState(() => new Set());
   const [openCats, setOpenCats] = useState(() => new Set());
+  // Site-confirmed jack data from Supabase (see lib/jackConfirmations.js) —
+  // merged on top of the static catalogue below so a confirmed fit always
+  // wins over the automatic estimate, for everyone on the team, without a
+  // code change or redeploy.
+  const [confirmations, setConfirmations] = useState({});
+  const refreshConfirmations = () => fetchJackConfirmations().then(setConfirmations);
+  useEffect(() => { refreshConfirmations(); }, []);
 
   const toggleBrand = brand => setOpenBrands(prev => {
     const next = new Set(prev);
@@ -35,9 +43,9 @@ export function JackSelectorScreen() {
   // biggest (by operating weight) within each category.
   const { brandNames, grouped, totalShown } = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const filtered = MACHINE_DATA.filter(m =>
-      !q || `${m.brand} ${m.model}`.toLowerCase().includes(q) || (m.tyre || "").toLowerCase().includes(q)
-    );
+    const filtered = MACHINE_DATA
+      .filter(m => !q || `${m.brand} ${m.model}`.toLowerCase().includes(q) || (m.tyre || "").toLowerCase().includes(q))
+      .map(m => applyConfirmation(m, confirmations[keyFor(m.brand, m.model)]));
     const byBrand = {};
     for (const m of filtered) {
       const byType = (byBrand[m.brand] = byBrand[m.brand] || {});
@@ -53,7 +61,7 @@ export function JackSelectorScreen() {
       grouped: byBrand,
       totalShown: filtered.length,
     };
-  }, [search]);
+  }, [search, confirmations]);
 
   // While actively searching, force everything open so matches are never
   // hidden behind a collapsed toggle — clearing the search restores whatever
@@ -131,7 +139,12 @@ export function JackSelectorScreen() {
                               onClick={() => setSelected(m)}
                               className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-slate-50">
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-slate-800">{m.brand} {m.model}</p>
+                                <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                                  {m.brand} {m.model}
+                                  {m._confirmation && (
+                                    <span title="Jack fit confirmed on site" className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: "#16A34A" }} />
+                                  )}
+                                </p>
                                 <p className="text-xs text-slate-400">{m.tyre} · {m.emptyWeight}t empty</p>
                               </div>
                               <ChevronRight size={16} className="text-slate-300 shrink-0" />
@@ -149,7 +162,15 @@ export function JackSelectorScreen() {
       })}
 
       {/* Detail modal */}
-      {selected && <MachineDetail machine={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <MachineDetail
+          machine={selected}
+          onClose={() => setSelected(null)}
+          userId={userId}
+          teamId={teamId}
+          onSaved={refreshConfirmations}
+        />
+      )}
     </div>
   );
 }
@@ -158,11 +179,61 @@ export function JackSelectorScreen() {
 // ── Machine detail: jacks (primary + as many alternates as the machine
 //    provides — usually 1, sometimes more for a manual override list),
 //    stands (nr1+nr2), and the honest max-clearance-loss line. Nothing else. ──
-function MachineDetail({ machine: m, onClose }) {
+function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
   const rec = recommendForMachine(m);
   const t = tyreInfo(m.tyre);
   const jackSub = j => `${j.capacity ? j.capacity + "t · " : ""}Closed ${j.closedHeight}mm · max lift ${j.maxLift}mm`;
   const tracked = /tracked/i.test(m.tyre || "");
+
+  // ── Confirm-fit editor: anyone on the team can confirm site-measured jack
+  //    data straight from the app — saved to Supabase, no code change needed.
+  //    See lib/jackConfirmations.js for how this merges onto the catalogue.
+  const [editing, setEditing] = useState(false);
+  const [closedHeight, setClosedHeight] = useState(m.closedHeight ?? "");
+  const [selJacks, setSelJacks] = useState(Array.isArray(m.jackOverrides) ? [...m.jackOverrides] : []);
+  const [jackStand, setJackStand] = useState(m.jackStand || "");
+  const [note, setNote] = useState(m.note || "");
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState("");
+
+  const toggleJack = name => setSelJacks(prev =>
+    prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
+  );
+
+  const handleSave = async () => {
+    if (!userId) return;
+    setSaving(true);
+    try {
+      await saveJackConfirmation({
+        id: m._confirmation?.id,
+        userId, teamId,
+        brand: m.brand, model: m.model,
+        closedHeight, jackOverrides: selJacks, jackStand, note,
+      });
+      setToast("Saved — this jack fit is now confirmed for the whole team.");
+      setEditing(false);
+      onSaved?.();
+    } catch (e) {
+      setToast("Couldn't save — check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRevert = async () => {
+    if (!m._confirmation?.id) return;
+    setSaving(true);
+    try {
+      await deleteJackConfirmation(m._confirmation.id);
+      setToast("Reverted to the automatic estimate.");
+      setEditing(false);
+      onSaved?.();
+    } catch (e) {
+      setToast("Couldn't revert — check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const Line = ({ n, name, sub }) => (
     <div className="rounded-2xl border px-4 py-3 mb-2" style={{ borderColor: "rgba(139,26,26,0.2)" }}>
@@ -222,6 +293,7 @@ function MachineDetail({ machine: m, onClose }) {
         {(rec.alternatives || []).map((alt, i) => (
           <Line key={alt.name} n={i + 2} name={alt.name} sub={jackSub(alt)} />
         ))}
+        {m.note && <p className="text-xs text-slate-500 -mt-1 mb-2 pl-1">{m.note}</p>}
         {rec.overCapacity && (
           <div className="rounded-xl bg-red-50 border border-red-200 p-3 mt-2 flex gap-2.5">
             <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
@@ -249,7 +321,97 @@ function MachineDetail({ machine: m, onClose }) {
             </p>
           </div>
         ) : null}
+
+        {/* Confirm-fit editor — anyone on the team can lock in a site-measured
+            jack fit here; it saves to Supabase and shows up for everyone
+            immediately, no code change or redeploy required. */}
+        <div className="mt-4 pt-3 border-t border-slate-100">
+          {!editing ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                {m._confirmation ? (
+                  <p className="text-xs text-slate-500">
+                    <span className="font-bold" style={{ color: "#16A34A" }}>✓ Confirmed on site</span>
+                    {m._confirmation.updated_at && ` · ${new Date(m._confirmation.updated_at).toLocaleDateString()}`}
+                  </p>
+                ) : (
+                  <p className="text-xs text-slate-400">Jack above is an automatic estimate — not yet confirmed on site.</p>
+                )}
+              </div>
+              {userId && (
+                <button
+                  onClick={() => setEditing(true)}
+                  className="shrink-0 flex items-center gap-1.5 text-xs font-bold rounded-xl px-3 py-2 min-h-[40px]"
+                  style={{ color: BRAND.primary, background: BRAND.light }}>
+                  <Pencil size={13} /> {m._confirmation ? "Edit" : "Confirm fit"}
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Confirm jack fit</p>
+
+              <Field
+                label="Measured closed height (mm)"
+                type="number"
+                value={closedHeight}
+                onChange={setClosedHeight}
+                placeholder="e.g. 800" />
+
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-500">Jacks that fit (tap to select, in order)</label>
+                <div className="space-y-1.5">
+                  {JACK_CATALOGUE.map(j => {
+                    const order = selJacks.indexOf(j.name);
+                    const checked = order !== -1;
+                    return (
+                      <button
+                        key={j.name}
+                        type="button"
+                        onClick={() => toggleJack(j.name)}
+                        className="w-full flex items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left transition-colors"
+                        style={{ borderColor: checked ? BRAND.primary : "#F1F5F9", background: checked ? BRAND.light : "#F8FAFC" }}>
+                        <span
+                          className="w-6 h-6 rounded-full grid place-items-center text-[11px] font-black shrink-0"
+                          style={{ background: checked ? BRAND.primary : "#E2E8F0", color: checked ? "#fff" : "#94A3B8" }}>
+                          {checked ? order + 1 : ""}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-bold text-slate-800">{j.name}</span>
+                          <span className="block text-[11px] text-slate-400">{j.capacity ? j.capacity + "t · " : ""}Closed {j.closedHeight}mm</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 text-[11px] text-slate-400">Leave nothing selected to let the automatic estimate keep using the closed height above.</p>
+              </div>
+
+              <Field label="Jacking stand note (optional)" value={jackStand} onChange={setJackStand} placeholder="e.g. 100t / 800mm" />
+              <Field label="Note for the team (optional)" value={note} onChange={setNote} multiline placeholder="Anything the next person jacking this machine should know" />
+
+              <div className="flex gap-2">
+                <Btn variant="ghost" size="sm" onClick={() => setEditing(false)} className="flex-1">Cancel</Btn>
+                {m._confirmation && (
+                  <Btn variant="outline" size="sm" onClick={handleRevert} disabled={saving} className="flex-1">Revert</Btn>
+                )}
+                <Btn variant="solid" size="sm" onClick={handleSave} disabled={saving} className="flex-1">
+                  {saving ? "Saving…" : "Save"}
+                </Btn>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      {toast && (
+        // Wrapped in its own fixed, higher-z layer — the modal backdrop above
+        // is z-[120], which would otherwise sit in front of Toast's own z-50
+        // and hide it.
+        <div className="fixed inset-0 z-[200] pointer-events-none">
+          <Toast message={toast} type={toast.startsWith("Couldn't") ? "error" : "success"} onDone={() => setToast("")} />
+        </div>
+      )}
     </div>
   );
 }
