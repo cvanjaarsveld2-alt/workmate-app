@@ -86,12 +86,13 @@ export function JackSelectorScreen() {
 }
 
 
-// ── Machine detail: ONLY jacks (nr1+nr2), stands (nr1+nr2), and the honest
-//    max-clearance-loss line. Nothing else. ──
+// ── Machine detail: jacks (primary + as many alternates as the machine
+//    provides — usually 1, sometimes more for a manual override list),
+//    stands (nr1+nr2), and the honest max-clearance-loss line. Nothing else. ──
 function MachineDetail({ machine: m, onClose }) {
   const rec = recommendForMachine(m);
   const t = tyreInfo(m.tyre);
-  const jack2 = rec.alternatives && rec.alternatives[0];
+  const jackSub = j => `${j.capacity ? j.capacity + "t · " : ""}Closed ${j.closedHeight}mm · max lift ${j.maxLift}mm`;
   const tracked = /tracked/i.test(m.tyre || "");
 
   const Line = ({ n, name, sub }) => (
@@ -148,8 +149,10 @@ function MachineDetail({ machine: m, onClose }) {
             Est. load on jack: <span className="font-bold text-slate-700">~{rec.jackLoad}t</span> (≈50% of {m.emptyWeight}t empty — confirm on site)
           </p>
         )}
-        <Line n={1} name={rec.jack.name} sub={`${rec.jack.capacity ? rec.jack.capacity + "t · " : ""}Closed ${rec.jack.closedHeight}mm · max lift ${rec.jack.maxLift}mm`} />
-        {jack2 && <Line n={2} name={jack2.name} sub={`${jack2.capacity ? jack2.capacity + "t · " : ""}Closed ${jack2.closedHeight}mm · max lift ${jack2.maxLift}mm`} />}
+        <Line n={1} name={rec.jack.name} sub={jackSub(rec.jack)} />
+        {(rec.alternatives || []).map((alt, i) => (
+          <Line key={alt.name} n={i + 2} name={alt.name} sub={jackSub(alt)} />
+        ))}
         {rec.overCapacity && (
           <div className="rounded-xl bg-red-50 border border-red-200 p-3 mt-2 flex gap-2.5">
             <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5" />
