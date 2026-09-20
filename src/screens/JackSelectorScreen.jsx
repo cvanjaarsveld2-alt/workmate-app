@@ -7,7 +7,7 @@
 // guessed). If a machine has no jack specified yet, the screen says so clearly
 // rather than showing a blank or a guess.
 import React, { useState, useMemo } from "react";
-import { Wrench, Search, ChevronRight, AlertTriangle, Truck, X } from "lucide-react";
+import { Wrench, Search, ChevronRight, ChevronDown, AlertTriangle, Truck, X } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { Card, PageHeader, Empty } from "../components/ui";
 import { MACHINE_DATA, MACHINE_TYPES, recommendForMachine, tyreInfo } from "../lib/machineData";
@@ -15,21 +15,50 @@ import { MACHINE_DATA, MACHINE_TYPES, recommendForMachine, tyreInfo } from "../l
 export function JackSelectorScreen() {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
+  // Brand sections and, inside them, category sections are independently
+  // collapsible — both start collapsed. Keys: brand name, and `${brand}::${type}`.
+  const [openBrands, setOpenBrands] = useState(() => new Set());
+  const [openCats, setOpenCats] = useState(() => new Set());
 
-  // Filter + group machines by type.
-  const grouped = useMemo(() => {
+  const toggleBrand = brand => setOpenBrands(prev => {
+    const next = new Set(prev);
+    next.has(brand) ? next.delete(brand) : next.add(brand);
+    return next;
+  });
+  const toggleCat = key => setOpenCats(prev => {
+    const next = new Set(prev);
+    next.has(key) ? next.delete(key) : next.add(key);
+    return next;
+  });
+
+  // Filter, then group brand → category → machines, sorted smallest to
+  // biggest (by operating weight) within each category.
+  const { brandNames, grouped, totalShown } = useMemo(() => {
     const q = search.trim().toLowerCase();
     const filtered = MACHINE_DATA.filter(m =>
       !q || `${m.brand} ${m.model}`.toLowerCase().includes(q) || (m.tyre || "").toLowerCase().includes(q)
     );
-    const groups = {};
+    const byBrand = {};
     for (const m of filtered) {
-      (groups[m.type] = groups[m.type] || []).push(m);
+      const byType = (byBrand[m.brand] = byBrand[m.brand] || {});
+      (byType[m.type] = byType[m.type] || []).push(m);
     }
-    return groups;
+    for (const brand of Object.keys(byBrand)) {
+      for (const type of Object.keys(byBrand[brand])) {
+        byBrand[brand][type].sort((a, b) => (Number(a.operatingWeight) || 0) - (Number(b.operatingWeight) || 0));
+      }
+    }
+    return {
+      brandNames: Object.keys(byBrand).sort((a, b) => a.localeCompare(b)),
+      grouped: byBrand,
+      totalShown: filtered.length,
+    };
   }, [search]);
 
-  const totalShown = Object.values(grouped).reduce((s, arr) => s + arr.length, 0);
+  // While actively searching, force everything open so matches are never
+  // hidden behind a collapsed toggle — clearing the search restores whatever
+  // the user had manually expanded.
+  const isSearching = search.trim().length > 0;
 
   return (
     <div className="space-y-3">
@@ -50,31 +79,71 @@ export function JackSelectorScreen() {
         <Empty icon={Truck} title="No machines found" text="Try a different search, or the machine may not be in the list yet." />
       )}
 
-      {/* Grouped machine list */}
-      {Object.keys(MACHINE_TYPES).map(type => {
-        const machines = grouped[type];
-        if (!machines || machines.length === 0) return null;
+      {/* Brand → category → machine list, collapsed by default */}
+      {brandNames.map(brand => {
+        const cats = grouped[brand];
+        const catTypes = Object.keys(MACHINE_TYPES).filter(t => cats[t]?.length);
+        const brandCount = catTypes.reduce((s, t) => s + cats[t].length, 0);
+        const brandOpen = isSearching || openBrands.has(brand);
         return (
-          <div key={type}>
-            <p className="text-xs font-black uppercase tracking-wider text-slate-400 px-1 mb-1.5">
-              {MACHINE_TYPES[type]}
-            </p>
-            <Card className="overflow-hidden divide-y divide-slate-100">
-              {machines.map(m => {
-                return (
-                  <button
-                    key={`${m.brand}-${m.model}`}
-                    onClick={() => setSelected(m)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-slate-50">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-slate-800">{m.brand} {m.model}</p>
-                      <p className="text-xs text-slate-400">{m.tyre} · {m.emptyWeight}t empty</p>
+          <div key={brand}>
+            <button
+              onClick={() => toggleBrand(brand)}
+              className="w-full flex items-center justify-between rounded-xl bg-white border border-slate-200 px-4 py-3 active:bg-slate-50">
+              <span className="text-sm font-black text-slate-800">{brand}</span>
+              <span className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-400">{brandCount}</span>
+                <ChevronDown
+                  size={16}
+                  className="text-slate-400 transition-transform"
+                  style={{ transform: brandOpen ? "rotate(180deg)" : "none" }} />
+              </span>
+            </button>
+
+            {brandOpen && (
+              <div className="pl-2 mt-1.5 space-y-1.5">
+                {catTypes.map(type => {
+                  const machines = cats[type];
+                  const catKey = `${brand}::${type}`;
+                  const catOpen = isSearching || openCats.has(catKey);
+                  return (
+                    <div key={type}>
+                      <button
+                        onClick={() => toggleCat(catKey)}
+                        className="w-full flex items-center justify-between rounded-lg px-2.5 py-2 active:bg-slate-50">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">
+                          {MACHINE_TYPES[type]}
+                        </span>
+                        <span className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-slate-300">{machines.length}</span>
+                          <ChevronDown
+                            size={14}
+                            className="text-slate-300 transition-transform"
+                            style={{ transform: catOpen ? "rotate(180deg)" : "none" }} />
+                        </span>
+                      </button>
+
+                      {catOpen && (
+                        <Card className="overflow-hidden divide-y divide-slate-100">
+                          {machines.map(m => (
+                            <button
+                              key={`${m.brand}-${m.model}`}
+                              onClick={() => setSelected(m)}
+                              className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-slate-50">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-slate-800">{m.brand} {m.model}</p>
+                                <p className="text-xs text-slate-400">{m.tyre} · {m.emptyWeight}t empty</p>
+                              </div>
+                              <ChevronRight size={16} className="text-slate-300 shrink-0" />
+                            </button>
+                          ))}
+                        </Card>
+                      )}
                     </div>
-                    <ChevronRight size={16} className="text-slate-300 shrink-0" />
-                  </button>
-                );
-              })}
-            </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
