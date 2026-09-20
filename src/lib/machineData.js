@@ -363,6 +363,261 @@ export const MACHINE_DATA = [
     closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
     source: "Cat D11 published specs",
   },
+
+  // ── CATERPILLAR HAUL TRUCKS — FLAGSHIP + SMALLER CLASS (added) ──
+  {
+    brand: "Caterpillar", model: "797F", type: "haul_truck",
+    tyre: "59/80 R63", operatingWeight: 623.7, emptyWeight: 258.2,
+    axleNote: "Flagship mechanical-drive mining truck; loaded ~33% front / 67% rear (rear axle carries majority of GVW); ~364t nominal payload",
+    groundClearance: 786, rearAxleClearance: 947,
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Cat 797F / lectura-specs / ritchiespecs published data",
+  },
+  {
+    brand: "Caterpillar", model: "772", type: "haul_truck",
+    tyre: "21.00R33", operatingWeight: 82.1, emptyWeight: 35.5,
+    axleNote: "Smaller/mid-size haul truck; empty 48% front/52% rear, loaded 34% front/66% rear",
+    groundClearance: 719, rearAxleClearance: 561,
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Cat 772 / ritchiespecs published data",
+  },
+
+  // ── KOMATSU HAUL TRUCKS — FLAGSHIP + SMALLER CLASS (added) ──
+  {
+    brand: "Komatsu", model: "980E-5", type: "haul_truck",
+    tyre: "59/80 R63", operatingWeight: 628, emptyWeight: 265.1,
+    axleNote: "Flagship electric-drive mining truck; empty front 127.3t/rear 137.9t, loaded front 34% (209.3t)/rear 66% (418.7t)",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Komatsu 980E-5 published specs (komatsu.com)",
+  },
+  {
+    brand: "Komatsu", model: "HD325-8", type: "haul_truck",
+    tyre: "18.00 R33", operatingWeight: 70.76, emptyWeight: 34.26,
+    axleNote: "Smaller/mid-size mechanical-drive haul truck; loaded 33.7% front/66.3% rear, empty 56.5% front/43.5% rear",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Komatsu HD325-8 published specs (komatsu.com)",
+  },
+
+  // ── HITACHI HAUL TRUCKS (added — new manufacturer) ──
+  {
+    brand: "Hitachi", model: "EH5000AC-3", type: "haul_truck",
+    tyre: "53/80 R63", operatingWeight: 500, emptyWeight: 204,
+    axleNote: "Flagship electric-drive mining truck; ~296t nominal payload",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Hitachi EH5000AC-3 spec sheet (directindustry.com / hitachicm.com)",
+  },
+  {
+    brand: "Hitachi", model: "EH3500AC-3", type: "haul_truck",
+    tyre: "37.00R57", operatingWeight: 322, emptyWeight: 141,
+    axleNote: "Smaller/mid-size pairing to the EH5000AC-3; empty 48% front/52% rear, loaded 33% front/67% rear; ~181t nominal payload",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Hitachi EH3500AC-3 spec sheet (directindustry.com)",
+  },
+
+  // ── LIEBHERR HAUL TRUCKS (added — new manufacturer) ──
+  {
+    brand: "Liebherr", model: "T284", type: "haul_truck",
+    tyre: "56/80 R63", operatingWeight: 600, emptyWeight: 237,
+    axleNote: "Flagship electric-drive mining truck; empty 50/50 front-rear, loaded 33% front/67% rear; ~363t nominal payload",
+    groundClearance: 1240, rearAxleClearance: 1057,
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Liebherr T284 official brochure",
+  },
+  {
+    brand: "Liebherr", model: "T274", type: "haul_truck",
+    tyre: "53/80 R63", operatingWeight: 528, emptyWeight: 223,
+    axleNote: "Smaller/mid-size pairing to the T284; ~305t payload class",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Liebherr T274 (liebherr.com / lectura-specs)",
+  },
+
+  // ── BELAZ HAUL TRUCKS (added — new manufacturer) ──
+  {
+    brand: "Belaz", model: "75710", type: "haul_truck",
+    tyre: "59/80R63", operatingWeight: 810, emptyWeight: 360,
+    axleNote: "Flagship — one of the largest haul trucks in the world; empty 60% front/40% rear, loaded 50/50; ~450t payload",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Belaz 75710 spec sheet",
+  },
+  {
+    brand: "Belaz", model: "75131", type: "haul_truck",
+    tyre: "33.00R51", operatingWeight: 237.1, emptyWeight: 107.1,
+    axleNote: "Smaller/mid-size pairing to the 75710; ~130–140t payload capacity",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Ground clearance not published — measure on site.",
+    source: "Belaz official product page (belaz.by)",
+  },
+
+  // ── ADDITIONAL MINING WHEEL LOADERS (added) ──
+  {
+    brand: "Caterpillar", model: "994K", type: "loader",
+    tyre: "58/85-57", operatingWeight: 242.6, emptyWeight: 242.6,
+    axleNote: "Flagship mining wheel loader; only one weight figure published (operating, standard equipment/fluids/operator) — used for both fields",
+    groundClearance: 1355,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Cat 994K spec sheet / ritchiespecs",
+  },
+  {
+    brand: "Komatsu", model: "WA1200-6", type: "loader",
+    tyre: "60/80 R57", operatingWeight: 220.55, emptyWeight: 220.55,
+    axleNote: "Flagship mining wheel loader; single published weight figure used for both fields",
+    groundClearance: 552,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Komatsu WA1200-6 (komatsu.eu) / ritchiespecs (ground clearance)",
+  },
+  {
+    brand: "Volvo", model: "L350H", type: "loader",
+    tyre: "875/65 R33", operatingWeight: 53.22, emptyWeight: 53.22,
+    axleNote: "Large wheel loader; single published weight figure used for both fields",
+    groundClearance: 550,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Volvo L350H official brochure (volvoce.com)",
+  },
+  {
+    brand: "Hitachi", model: "ZW550-6", type: "loader",
+    tyre: "35/65 R33", operatingWeight: 47.57, emptyWeight: 47.57,
+    axleNote: "Large wheel loader; single published weight figure used for both fields",
+    groundClearance: 545,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Hitachi ZW550-6 spec sheet (hitachicm.com)",
+  },
+  {
+    brand: "Liebherr", model: "L586 XPower", type: "loader",
+    tyre: "29.5 R25", operatingWeight: 32.6, emptyWeight: 32.6,
+    axleNote: "Large wheel loader; single published weight figure used for both fields",
+    groundClearance: 575,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "Liebherr L586 XPower official brochure",
+  },
+
+  // ── LETOURNEAU WHEEL LOADERS (added — new manufacturer) ──
+  {
+    brand: "LeTourneau", model: "L-2350", type: "loader",
+    tyre: "70/70-57", operatingWeight: 262.18, emptyWeight: 262.18,
+    axleNote: "One of the largest wheel loaders in the world; single published weight figure used for both fields",
+    groundClearance: 460,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "LeTourneau L-2350 dealer spec sheet",
+  },
+  {
+    brand: "LeTourneau", model: "L-1850", type: "loader",
+    tyre: "58/85-57", operatingWeight: 229.52, emptyWeight: 229.52,
+    axleNote: "Large mining wheel loader, smaller pairing to the L-2350; single published weight figure used for both fields",
+    groundClearance: 760,
+    closedHeight: "", jack: "", jackStand: "", note: "Operating weight ≈ working weight for loaders.",
+    source: "LeTourneau L-1850 spec sheet",
+  },
+
+  // ── ADDITIONAL MINING EXCAVATORS (added) ──
+  {
+    brand: "Caterpillar", model: "6020B", type: "excavator",
+    tyre: "Tracked (no tyres)", operatingWeight: 224, emptyWeight: 224,
+    axleNote: "Crawler mining excavator — jacked for track/undercarriage work, not tyre changes. Sources vary 220–230t by configuration.",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres. Ground clearance not published — measure on site.",
+    source: "Cat 6020B factory spec sheet / lectura-specs",
+  },
+  {
+    brand: "Caterpillar", model: "390F L", type: "excavator",
+    tyre: "Tracked (no tyres)", operatingWeight: 86.27, emptyWeight: 70.97,
+    axleNote: "Crawler excavator — jacked for track/undercarriage work, not tyre changes. emptyWeight is Cat's published 'minimum operating weight', the closest available lower-bound figure.",
+    groundClearance: 902,
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Cat 390F L (ritchiespecs)",
+  },
+  {
+    brand: "Komatsu", model: "PC3000-6", type: "excavator",
+    tyre: "Tracked (no tyres)", operatingWeight: 262, emptyWeight: 262,
+    axleNote: "Crawler mining excavator — jacked for track/undercarriage work, not tyre changes. Backhoe config; front-shovel config ~258t.",
+    groundClearance: 920,
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Komatsu PC3000-6 brochure (komatsu.com) / ritchiespecs (ground clearance)",
+  },
+  {
+    brand: "Hitachi", model: "EX3600-7", type: "excavator",
+    tyre: "Tracked (no tyres)", operatingWeight: 370, emptyWeight: 370,
+    axleNote: "Crawler mining excavator — jacked for track/undercarriage work, not tyre changes. Backhoe config (loading-shovel config ~369t).",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres. Ground clearance not published — measure on site.",
+    source: "Hitachi EX3600-7 brochure (hitachicm.com)",
+  },
+  {
+    brand: "Hitachi", model: "EX1200-7", type: "excavator",
+    tyre: "Tracked (no tyres)", operatingWeight: 115, emptyWeight: 115,
+    axleNote: "Crawler excavator — jacked for track/undercarriage work, not tyre changes. Backhoe (FCO) config; other configs 115–119t.",
+    groundClearance: 1020,
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Hitachi EX1200-7 spec sheet",
+  },
+  {
+    brand: "Liebherr", model: "R 9400", type: "excavator",
+    tyre: "Tracked (no tyres)", operatingWeight: 345.5, emptyWeight: 345.5,
+    axleNote: "Crawler mining excavator — jacked for track/undercarriage work, not tyre changes. Backhoe config (face-shovel config 353t).",
+    groundClearance: 1049,
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Liebherr R9400 (liebherr.com) / ritchiespecs (ground clearance)",
+  },
+  {
+    brand: "Liebherr", model: "R 9800", type: "excavator",
+    tyre: "Tracked (no tyres)", operatingWeight: 800, emptyWeight: 800,
+    axleNote: "Crawler mining excavator — one of the largest hydraulic excavators in the world; jacked for track/undercarriage work, not tyre changes. Backhoe config (face-shovel 810t).",
+    groundClearance: 1572,
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Liebherr R9800 (liebherr.com) / ritchiespecs (ground clearance)",
+  },
+
+  // ── ADDITIONAL MINING DOZERS (added) ──
+  {
+    brand: "Komatsu", model: "D475A-8", type: "dozer",
+    tyre: "Tracked (no tyres)", operatingWeight: 115.3, emptyWeight: 88.2,
+    axleNote: "Tracked dozer — jacked for undercarriage work, not tyre changes. emptyWeight is Komatsu's published 'tractor weight' (base machine without blade/ripper).",
+    groundClearance: 615,
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Komatsu D475A-8 (komatsu.com)",
+  },
+  {
+    brand: "Komatsu", model: "D375A-8", type: "dozer",
+    tyre: "Tracked (no tyres)", operatingWeight: 74.09, emptyWeight: 56.34,
+    axleNote: "Tracked dozer — jacked for undercarriage work, not tyre changes. emptyWeight is Komatsu's published 'tractor weight' (base machine without blade/ripper).",
+    groundClearance: 610,
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Komatsu D375A-8 (komatsu.com)",
+  },
+  {
+    brand: "Liebherr", model: "PR776", type: "dozer",
+    tyre: "Tracked (no tyres)", operatingWeight: 73.19, emptyWeight: 54.07,
+    axleNote: "Tracked mining dozer — jacked for undercarriage work, not tyre changes. Figures vary 71.8–73.2t (operating) / 53.1–54.1t (tractor w/o attachments) by shoe width; upper end used here.",
+    groundClearance: 703,
+    closedHeight: "", jack: "", jackStand: "", note: "Tracked machine — jacking is for undercarriage, not tyres.",
+    source: "Liebherr PR776 (liebherr.com)",
+  },
+
+  // ── GRADERS (added — first entries in this category) ──
+  // Note: Komatsu GD955-5 was researched but no verifiable published spec sheet
+  // could be found under that exact designation (searches only surface the
+  // current GD955-7 generation) — deliberately left out rather than guessed.
+  {
+    brand: "Caterpillar", model: "24M", type: "grader",
+    tyre: "29.5-29", operatingWeight: 66.1, emptyWeight: 66.1,
+    axleNote: "Largest production motor grader; 3-axle (front steer + rear tandem). Cat publishes several configuration weights (62.4–66.1t) rather than one figure — upper end used here. Front axle clearance ~884mm, rear ~607mm.",
+    groundClearance: "",
+    closedHeight: "", jack: "", jackStand: "", note: "No single published ground clearance figure — measure on site.",
+    source: "Cat 24M (ritchiespecs / constructionequipmentguide)",
+  },
+  {
+    brand: "Volvo", model: "G990", type: "grader",
+    tyre: "16.00 x 24", operatingWeight: 27.2, emptyWeight: 22.1,
+    axleNote: "3-axle motor grader (articulated front steer + oscillating rear tandem). 22.1t standard operating weight; up to 27.2t with ballast.",
+    groundClearance: 615,
+    closedHeight: "", jack: "", jackStand: "", note: "",
+    source: "Volvo G990 official spec sheet (volvoce.com)",
+  },
 ];
 
 // Machine type labels for grouping/filtering in the UI.
