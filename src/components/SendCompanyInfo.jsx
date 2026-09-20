@@ -61,17 +61,17 @@ export function SendCompanyInfoSheet({ recipientName, recipientEmail, recipientP
 
     return `Hi ${firstName},
 
-Thank you for your interest in Power Works (Pty) Ltd.
+Good to connect with you.
 
-Please find the requested documents below:
+As discussed, I've included the Power Works information below:
 
 ${docLines}
 
-Should you have any questions or require further information, please do not hesitate to contact us.
+Have a look when you get a chance. If there's anything you'd like to know more about, just let me know.
 
-Kind regards,
-Power Works (Pty) Ltd
-Powerworks — Built for Industry`.trim();
+Regards,
+Renita
+Power Works (Pty) Ltd`.trim();
   }
 
   function buildWhatsAppBody(selectedDocs) {
@@ -84,7 +84,7 @@ Powerworks — Built for Industry`.trim();
   function handleEmail() {
     const sel = getSelectedDocs();
     if (sel.length === 0) return;
-    const subject = encodeURIComponent("Powerworks Pty Ltd - Company Profile");
+    const subject = encodeURIComponent("Power Works information");
     const body    = encodeURIComponent(buildEmailBody(sel));
     const to      = encodeURIComponent(recipientEmail || "");
     window.open(`mailto:${to}?subject=${subject}&body=${body}`, "_blank");
