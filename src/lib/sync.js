@@ -153,7 +153,85 @@ async function persistQueue(queue){await offlineReplaceAll("syncQueue",queue);}
 // rejected promise instead — callers that don't already wrap saveAndSync in a
 // try/catch will surface a visible error (or, at minimum, stop short of the
 // misleading "Saved" message) rather than silently lying about what happened.
-export async function saveAndSync(item,table,action,setData,isOnline){await offlineSave(localStoreName(table),item);const queueItem={id:`sq_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,table,action,data:item,status:"pending",created_at:new Date().toISOString(),attempts:0,next_attempt_at:null};if(isOnline){const result=await pushItem({table,action,data:item});if(result.ok){const synced={...item,sync_status:"synced"};await offlineSave(localStoreName(table),synced);setData(current=>({...current,[localStoreName(table)]:(current[localStoreName(table)]||[]).map(row=>row.id===item.id?synced:row),syncQueue:(current.syncQueue||[]).filter(q=>q.data?.id!==item.id)}));return synced;}}setData(current=>({...current,syncQueue:[queueItem,...(current.syncQueue||[]).filter(q=>!(q.table===table&&q.data?.id===item.id))]}));await offlineSave("syncQueue",queueItem);return{...item,sync_status:"pending"};}
+function applyLocalRecord(current, local, item) {
+  // Keep React state in lockstep with the durable local write. This makes
+  // saveAndSync safe for new records as well as updates; callers no longer
+  // need to hand-build syncQueue entries or remember to insert into state.
+  if (local === "vehicleChecks") {
+    const date = item?.check_date;
+    if (!date) return current;
+    return {
+      ...current,
+      vehicleChecks: { ...(current.vehicleChecks || {}), [date]: item.data ?? item },
+    };
+  }
+  const rows = Array.isArray(current[local]) ? current[local] : [];
+  const index = rows.findIndex(row => row?.id === item?.id);
+  const next = index >= 0
+    ? rows.map((row, i) => i === index ? item : row)
+    : [item, ...rows];
+  return { ...current, [local]: next };
+}
+
+export async function saveAndSync(item, table, action, setData, isOnline) {
+  const local = localStoreName(table);
+  const now = new Date().toISOString();
+  const queueItem = {
+    id: newQueueId(),
+    table,
+    action,
+    data: item,
+    status: "pending",
+    created_at: now,
+    attempts: 0,
+    next_attempt_at: null,
+  };
+
+  // Durable local-first write. Do this before touching React state so a failed
+  // IndexedDB write can never look like a successful save.
+  await offlineSave(local, { ...item, sync_status: "pending" });
+
+  // The queue is also durable before we publish the state change. A crash
+  // between these operations therefore cannot lose the sync intent.
+  await offlineSave("syncQueue", queueItem);
+
+  setData(current => ({
+    ...applyLocalRecord(current, local, { ...item, sync_status: "pending" }),
+    syncQueue: [
+      queueItem,
+      ...(current.syncQueue || []).filter(q => !(q.table === table && q.data?.id === item?.id)),
+    ],
+  }));
+
+  if (!isOnline) return { ...item, sync_status: "pending" };
+
+  const result = await pushItem({ table, action, data: item });
+  if (!result.ok) return { ...item, sync_status: "pending" };
+
+  // A unique-constraint race can return the canonical server row. Reconcile
+  // to that row rather than leaving an orphan client-generated record locally.
+  const canonical = result.duplicate && result.canonical ? result.canonical : { ...item, sync_status: "synced" };
+  const synced = { ...canonical, sync_status: "synced" };
+
+  if (result.duplicate && canonical.id && canonical.id !== item.id) {
+    await offlineDelete(local, item.id);
+  }
+  await offlineSave(local, synced);
+  await offlineReplaceAll(
+    "syncQueue",
+    (await offlineGetAll("syncQueue")).filter(q => !(q.table === table && q.data?.id === item.id)),
+  );
+
+  setData(current => ({
+    ...applyLocalRecord(current, local, synced),
+    ...(result.duplicate && canonical.id !== item.id && local !== "vehicleChecks" && {
+      [local]: (current[local] || []).filter(row => row.id !== item.id),
+    }),
+    syncQueue: (current.syncQueue || []).filter(q => !(q.table === table && q.data?.id === item.id)),
+  }));
+
+  return synced;
+}
 function collapseQueue(queue){const groups=new Map();for(const item of queue){const key=`${item.table}:${item.data?.id}`;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(item);}const winners=[],discarded=new Set();for(const[,ops]of groups){ops.sort((a,b)=>new Date(a.created_at||0)-new Date(b.created_at||0));const last=ops[ops.length-1],hasInsert=ops.some(op=>op.action==="insert"),hasDelete=ops.some(op=>op.action==="delete");if(hasInsert&&hasDelete){ops.forEach(op=>discarded.add(op.id));continue;}if(hasDelete)winners.push({...last,action:"delete"});else winners.push({...last,action:hasInsert?"upsert":"update",data:ops.reduce((record,op)=>({...record,...(op.data||{})}),{})});const winner=winners[winners.length-1];ops.forEach(op=>{if(op.id!==winner.id)discarded.add(op.id);});}return{winners,discarded};}
 function sortSyncItems(items){return[...items].sort((a,b)=>{const pa=SYNC_PRIORITY[a.table]??100,pb=SYNC_PRIORITY[b.table]??100;if(pa!==pb)return pa-pb;return new Date(a.created_at||0)-new Date(b.created_at||0);});}
 function dependencyReady(item,queue){const deps=DEPENDENCIES[item.table]||[];for(const dep of deps){const id=item.data?.[dep.field];if(!id)continue;const parentQueued=queue.some(q=>q.status==="pending"&&q.table===dep.table&&q.data?.id===id&&q.action!=="delete");if(parentQueued)return false;}return true;}
