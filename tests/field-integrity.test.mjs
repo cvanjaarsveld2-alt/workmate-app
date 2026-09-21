@@ -80,6 +80,14 @@ test("receipt scanner avoids iOS data-URL fetch failures", () => {
   assert.doesNotMatch(source, /fetch\(compressed\)/);
 });
 
+test("receipt failures preserve the uploaded photo for manual entry", () => {
+  const source = read("src/components/ReceiptScanner.jsx");
+  assert.match(source, /uploadedPathRef/);
+  assert.match(source, /Receipt saved safely/);
+  assert.match(source, /Keep receipt & enter details manually/);
+  assert.match(source, /onExtracted\(\{ receipt_url: uploadedPath, scan_failed: true \}\)/);
+});
+
 test("expense saves use the durable sync path", () => {
   const source = read("src/screens/ExpensesScreen.jsx");
   assert.match(source, /import \{ saveAndSync \} from "\.\.\/lib\/sync"/);
