@@ -33,7 +33,10 @@ serve(async (req) => {
     // Storage is deliberately handled server-side so iOS/WebKit never has to upload
     // the receipt directly to Supabase Storage.
     const authHeader = req.headers.get("Authorization") || "";
-    const jwt = authHeader.replace(/^Bearer\\s+/i, "");
+    // IMPORTANT: match the actual whitespace after "Bearer".
+    // The previous deployed build contained /^Bearer\\s+/ which matched a literal
+    // backslash+s instead of whitespace, so the JWT was never stripped correctly.
+    const jwt = authHeader.replace(/^Bearer\s+/i, "");
     const userId = (() => {
       try {
         const payload = jwt.split(".")[1];
