@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useRef, useEffect } from "react";
 import { Camera, Loader2, X, Sparkles } from "lucide-react";
-import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
+import { supabase, SUPABASE_FUNCTIONS_URL, SUPABASE_URL, SUPABASE_ANON_KEY } from "../supabase";
 import { genId } from "../lib/helpers";
 import { Card } from "../components/ui";
 
@@ -48,6 +48,54 @@ async function compressImage(file, maxDim = 1600, quality = 0.85) {
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
+}
+
+async function uploadReceiptBlob(path, blob) {
+  // Use the SDK first. On iOS/WebKit, a low-level fetch failure can surface
+  // only as the opaque "Load failed" message. Fall back to XHR so we can
+  // complete the same authenticated Storage upload without changing RLS.
+  const { error } = await supabase.storage.from("receipts").upload(path, blob, {
+    contentType: "image/jpeg",
+    upsert: false,
+  });
+
+  if (!error) return;
+
+  const networkFailure = /load failed|failed to fetch|networkerror|network request failed/i.test(error.message || "");
+  if (!networkFailure) {
+    throw new Error(`Receipt upload failed (${error.statusCode || "storage"}): ${error.message || "unknown storage error"}`);
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) {
+    throw new Error("Receipt upload failed: no auth session available");
+  }
+
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  const endpoint = `${SUPABASE_URL.replace(/\\/$/, "")}/storage/v1/object/receipts/${encodedPath}`;
+
+  await new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", endpoint, true);
+    xhr.timeout = 60000;
+    xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY || "");
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("Content-Type", "image/jpeg");
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+        return;
+      }
+      let detail = "";
+      try { detail = JSON.parse(xhr.responseText || "{}")?.message || ""; } catch {}
+      reject(new Error(`Receipt upload failed (HTTP ${xhr.status})${detail ? `: ${detail}` : ""}`));
+    };
+    xhr.onerror = () => reject(new Error("Receipt upload failed: network error"));
+    xhr.ontimeout = () => reject(new Error("Receipt upload timed out after 60s"));
+    xhr.send(blob);
+  });
 }
 
 function blobToDataUrl(blob) {
@@ -112,12 +160,11 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       const subfolder = slipType === "payment" ? "payment-slips" : "receipts";
       const path = `receipts/${userId}/${subfolder}/${genId()}.jpg`;
       log(`Uploading to ${path}`);
-      const { error: upErr } = await supabase.storage.from("receipts").upload(path, compressedBlob, {
-        contentType: "image/jpeg", upsert: false,
-      });
-      if (upErr) {
-        console.error("Receipt upload failed:", upErr);
-        throw new Error(`Receipt upload failed (${upErr.statusCode || "network"}): ${upErr.message || "unknown storage error"}`);
+      try {
+        await uploadReceiptBlob(path, compressedBlob);
+      } catch (uploadErr) {
+        console.error("Receipt upload failed:", uploadErr);
+        throw uploadErr;
       }
       setUploadedPath(path);
       uploadedPathRef.current = path;
