@@ -64,7 +64,9 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
   const [preview, setPreview]   = useState(null);
   const [error, setError]       = useState("");
   const [debug, setDebug]       = useState([]); // visible step log for iOS
+  const [uploadedPath, setUploadedPath] = useState(null);
   const previewUrlRef = useRef(null);
+  const uploadedPathRef = useRef(null);
   const cameraRef  = useRef(null);
   const galleryRef = useRef(null);
 
@@ -92,6 +94,8 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
     }
     setError("");
     setDebug([]);
+    setUploadedPath(null);
+    uploadedPathRef.current = null;
     try {
       log("Compressing image…");
       const compressedBlob = await compressImage(file);
@@ -111,8 +115,13 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       const { error: upErr } = await supabase.storage.from("receipts").upload(path, compressedBlob, {
         contentType: "image/jpeg", upsert: false,
       });
-      if (upErr) throw new Error("Upload failed: " + upErr.message);
-      log("Upload OK ✓");
+      if (upErr) {
+        console.error("Receipt upload failed:", upErr);
+        throw new Error(`Receipt upload failed (${upErr.statusCode || "network"}): ${upErr.message || "unknown storage error"}`);
+      }
+      setUploadedPath(path);
+      uploadedPathRef.current = path;
+      log("Upload OK ✓ — receipt is safely stored");
 
       // Call AI scan — with a hard 60 second timeout.
       setStage("scanning");
@@ -159,7 +168,13 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       onExtracted({ ...extracted, receipt_url: path });
     } catch (e) {
       console.error("Receipt scan error:", e);
-      setError(e.message || "Something went wrong");
+      const message = e?.message || "Automatic receipt scanning failed";
+      if (uploadedPathRef.current) {
+        setError(`Receipt saved safely, but automatic reading failed: ${message}`);
+        log("Receipt is saved — manual entry is safe");
+      } else {
+        setError(message);
+      }
       setStage("idle");
     }
   }
@@ -191,9 +206,20 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       )}
 
       {error && (
-        <div className="rounded-xl bg-red-50 border border-red-200 p-3">
+        <div className="rounded-xl bg-red-50 border border-red-200 p-3 space-y-2">
           <p className="text-sm font-bold text-red-700">{error}</p>
-          <p className="text-xs text-red-500 mt-0.5">Try again, or enter the details manually.</p>
+          <p className="text-xs text-red-500 mt-0.5">
+            {uploadedPath ? "Your photo is already stored. You will not lose it." : "No receipt was stored yet."}
+          </p>
+          {uploadedPath && (
+            <button
+              type="button"
+              onClick={() => onExtracted({ receipt_url: uploadedPath, scan_failed: true })}
+              className="w-full rounded-xl bg-white border-2 border-red-200 py-3 text-sm font-bold text-red-700 min-h-[48px]"
+            >
+              Keep receipt & enter details manually
+            </button>
+          )}
         </div>
       )}
 
