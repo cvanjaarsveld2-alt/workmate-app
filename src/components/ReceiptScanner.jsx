@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useRef, useEffect } from "react";
 import { Camera, Loader2, X, Sparkles } from "lucide-react";
-import { supabase, SUPABASE_FUNCTIONS_URL, SUPABASE_URL, SUPABASE_ANON_KEY } from "../supabase";
+import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
 import { genId } from "../lib/helpers";
 import { Card } from "../components/ui";
 
@@ -48,54 +48,6 @@ async function compressImage(file, maxDim = 1600, quality = 0.85) {
   } finally {
     URL.revokeObjectURL(sourceUrl);
   }
-}
-
-async function uploadReceiptBlob(path, blob) {
-  // Use the SDK first. On iOS/WebKit, a low-level fetch failure can surface
-  // only as the opaque "Load failed" message. Fall back to XHR so we can
-  // complete the same authenticated Storage upload without changing RLS.
-  const { error } = await supabase.storage.from("receipts").upload(path, blob, {
-    contentType: "image/jpeg",
-    upsert: false,
-  });
-
-  if (!error) return;
-
-  const networkFailure = /load failed|failed to fetch|networkerror|network request failed/i.test(error.message || "");
-  if (!networkFailure) {
-    throw new Error(`Receipt upload failed (${error.statusCode || "storage"}): ${error.message || "unknown storage error"}`);
-  }
-
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) {
-    throw new Error("Receipt upload failed: no auth session available");
-  }
-
-  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
-  const endpoint = `${SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/receipts/${encodedPath}`;
-
-  await new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", endpoint, true);
-    xhr.timeout = 60000;
-    xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY || "");
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.setRequestHeader("Content-Type", "image/jpeg");
-
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve();
-        return;
-      }
-      let detail = "";
-      try { detail = JSON.parse(xhr.responseText || "{}")?.message || ""; } catch {}
-      reject(new Error(`Receipt upload failed (HTTP ${xhr.status})${detail ? `: ${detail}` : ""}`));
-    };
-    xhr.onerror = () => reject(new Error("Receipt upload failed: network error"));
-    xhr.ontimeout = () => reject(new Error("Receipt upload timed out after 60s"));
-    xhr.send(blob);
-  });
 }
 
 function blobToDataUrl(blob) {
@@ -157,46 +109,35 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       setPreview(previewUrl);
       setStage("uploading");
 
-      const subfolder = slipType === "payment" ? "payment-slips" : "receipts";
-      const path = `receipts/${userId}/${subfolder}/${genId()}.jpg`;
-      log(`Uploading to ${path}`);
-      try {
-        await uploadReceiptBlob(path, compressedBlob);
-      } catch (uploadErr) {
-        console.error("Receipt upload failed:", uploadErr);
-        throw uploadErr;
-      }
-      setUploadedPath(path);
-      uploadedPathRef.current = path;
-      log("Upload OK ✓ — receipt is safely stored");
-
-      // Call AI scan — with a hard 60 second timeout.
+      // iOS/WebKit was failing during direct browser-to-Storage uploads.
+      // Send the compressed image to the authenticated Edge Function instead.
+      // The server stores it first, then runs AI, so the browser never uploads to Storage.
       setStage("scanning");
-      log("Getting auth token…");
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error("No auth session — please sign in again");
-      log("Token OK ✓");
-
+      log("Preparing secure receipt scan…");
+      const imageBase64 = await blobToDataUrl(compressedBlob);
+      log(`Prepared image (${Math.round(imageBase64.length / 1024)} KB)`);
+      log(`Sending to secure scanner (${slipType})…`);
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
-
-      const imageBase64 = await blobToDataUrl(compressedBlob);
-      log(`Prepared AI image (${Math.round(imageBase64.length / 1024)} KB)`);
-      log(`Calling AI (${slipType})…`);
       let res;
       try {
         res = await fetch(FUNCTION_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+            "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ""}`,
           },
           body: JSON.stringify({ imageBase64, slipType }),
           signal: controller.signal,
         });
       } catch (fetchErr) {
         clearTimeout(timeoutId);
+        if (fetchErr.name === "AbortError") {
+          throw new Error("Receipt scan timed out after 60s");
+        }
+        throw new Error("Network error reaching receipt scanner: " + (fetchErr.message || "unknown"));
+      }
+      clearTimeout(timeoutId);
         if (fetchErr.name === "AbortError") {
           throw new Error("AI scan timed out after 60s — the Edge Function may not be deployed correctly. Check Supabase → Edge Functions → scan-receipt → Logs.");
         }
@@ -207,12 +148,21 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        throw new Error(errBody.error || `AI scan failed (HTTP ${res.status}) — check Edge Function logs`);
+        if (errBody.receipt_url) {
+          setUploadedPath(errBody.receipt_url);
+          uploadedPathRef.current = errBody.receipt_url;
+          log("Receipt saved ✓ — AI reading failed");
+        }
+        throw new Error(errBody.error || `Receipt scan failed (HTTP ${res.status})`);
       }
 
       const extracted = await res.json();
+      if (extracted.receipt_url) {
+        setUploadedPath(extracted.receipt_url);
+        uploadedPathRef.current = extracted.receipt_url;
+      }
       log("Got extracted data ✓");
-      onExtracted({ ...extracted, receipt_url: path });
+      onExtracted({ ...extracted });
     } catch (e) {
       console.error("Receipt scan error:", e);
       const message = e?.message || "Automatic receipt scanning failed";
