@@ -487,10 +487,14 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       notes:          "",
     });
     setReceiptUrl(extracted.receipt_url || null);
-    setScannedNotice(true);
+    setScannedNotice(!extracted.scan_failed);
     setShowScanner(false);
     setShowForm(true);
-    setTimeout(() => setScannedNotice(false), 6000);
+    if (extracted.scan_failed) {
+      setToast("Receipt saved ✓ — enter the details manually.");
+    } else {
+      setTimeout(() => setScannedNotice(false), 6000);
+    }
   }
 
   function startEdit(ex) {
