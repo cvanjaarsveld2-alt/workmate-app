@@ -2,35 +2,60 @@
 // Capture a receipt photo (camera or gallery), compress, upload to Storage,
 // and call the scan-receipt Edge Function for AI extraction.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState, useRef, useEffect} from "react";
-import { motion } from "framer-motion";
+import React, { useState, useRef, useEffect } from "react";
 import { Camera, Loader2, X, Sparkles } from "lucide-react";
 import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
 import { genId } from "../lib/helpers";
-import { Card, Btn } from "../components/ui";
+import { Card } from "../components/ui";
 
 const FUNCTION_URL = `${SUPABASE_FUNCTIONS_URL}/scan-receipt`;
 
 async function compressImage(file, maxDim = 1600, quality = 0.85) {
+  const sourceUrl = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Could not read the selected image"));
+      image.src = sourceUrl;
+    });
+
+    let { width, height } = img;
+    if (width > height && width > maxDim) {
+      height = (height * maxDim) / width;
+      width = maxDim;
+    } else if (height > maxDim) {
+      width = (width * maxDim) / height;
+      height = maxDim;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width));
+    canvas.height = Math.max(1, Math.round(height));
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) throw new Error("Could not prepare the image for scanning");
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        result => result ? resolve(result) : reject(new Error("Could not compress the image")),
+        "image/jpeg",
+        quality,
+      );
+    });
+
+    return blob;
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+function blobToDataUrl(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > height && width > maxDim) { height = (height * maxDim) / width; width = maxDim; }
-        else if (height > maxDim) { width = (width * maxDim) / height; height = maxDim; }
-        const canvas = document.createElement("canvas");
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", quality));
-      };
-      img.onerror = reject;
-      img.src = e.target.result;
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Could not prepare the image for AI scanning"));
+    reader.readAsDataURL(blob);
   });
 }
 
@@ -39,8 +64,13 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
   const [preview, setPreview]   = useState(null);
   const [error, setError]       = useState("");
   const [debug, setDebug]       = useState([]); // visible step log for iOS
+  const previewUrlRef = useRef(null);
   const cameraRef  = useRef(null);
   const galleryRef = useRef(null);
+
+  useEffect(() => () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }, []);
 
   // Auto-open camera immediately on mount — no choice screen needed
   React.useEffect(() => {
@@ -56,21 +86,29 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
 
   async function handleFile(file) {
     if (!file) return;
+    if (!file.type?.startsWith("image/")) {
+      setError("Please select an image file.");
+      return;
+    }
     setError("");
     setDebug([]);
     try {
       log("Compressing image…");
-      const compressed = await compressImage(file);
-      log(`Compressed (${Math.round(compressed.length / 1024)} KB)`);
-      setPreview(compressed);
+      const compressedBlob = await compressImage(file);
+      log(`Compressed (${Math.round(compressedBlob.size / 1024)} KB)`);
+
+      // WebKit/iOS can throw the opaque "Load failed" error for fetch(data:image/...).
+      // Upload the Blob directly; only convert it to base64 for the AI request.
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      const previewUrl = URL.createObjectURL(compressedBlob);
+      previewUrlRef.current = previewUrl;
+      setPreview(previewUrl);
       setStage("uploading");
 
-      // Upload to Storage
       const subfolder = slipType === "payment" ? "payment-slips" : "receipts";
       const path = `receipts/${userId}/${subfolder}/${genId()}.jpg`;
       log(`Uploading to ${path}`);
-      const blob = await (await fetch(compressed)).blob();
-      const { error: upErr } = await supabase.storage.from("receipts").upload(path, blob, {
+      const { error: upErr } = await supabase.storage.from("receipts").upload(path, compressedBlob, {
         contentType: "image/jpeg", upsert: false,
       });
       if (upErr) throw new Error("Upload failed: " + upErr.message);
@@ -87,6 +125,8 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 60000);
 
+      const imageBase64 = await blobToDataUrl(compressedBlob);
+      log(`Prepared AI image (${Math.round(imageBase64.length / 1024)} KB)`);
       log(`Calling AI (${slipType})…`);
       let res;
       try {
@@ -96,7 +136,7 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}`,
           },
-          body: JSON.stringify({ imageBase64: compressed, slipType }),
+          body: JSON.stringify({ imageBase64, slipType }),
           signal: controller.signal,
         });
       } catch (fetchErr) {
@@ -204,7 +244,7 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
         </>
       )}
 
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => handleFile(e.target.files?.[0])} className="hidden" />
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; handleFile(file); }} className="hidden" />
       <input ref={galleryRef} type="file" accept="image/*" onChange={(e) => handleFile(e.target.files?.[0])} className="hidden" />
     </Card>
   );
