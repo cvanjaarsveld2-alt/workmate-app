@@ -53,7 +53,7 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
                   <input type="number" min="1" value={item.qty} onChange={e => update(item.id, "qty", e.target.value)}
                     className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-red-300 text-center" />
                 </div>
-                <div className="flex-1">
+                <div className="min-w-0">
                   <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">Unit price (R)</label>
                   <input type="number" step="0.01" value={item.unitPrice} onChange={e => update(item.id, "unitPrice", e.target.value)}
                     placeholder="0.00" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-red-300" />
