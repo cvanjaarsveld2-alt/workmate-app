@@ -183,6 +183,8 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
         uploadedPathRef.current = extracted.receipt_url;
       }
       log("Got extracted data ✓");
+      log("Returning extracted data to Expenses…");
+      onExtracted(extracted);
 
     } catch (e) {
       console.error("Receipt scan error:", e);
