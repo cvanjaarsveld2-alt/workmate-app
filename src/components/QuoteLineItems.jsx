@@ -60,7 +60,7 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
                 </div>
                 <div className="w-24 text-right pt-5">
                   <p className="text-sm font-black text-slate-700">
-                    R {roundMoneyroundMoney((parseFloat(item.qty) || 1) * (parseFloat(item.unitPrice) || 0)).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    R {roundMoney((parseFloat(item.qty) || 1) * (parseFloat(item.unitPrice) || 0)).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
