@@ -86,3 +86,24 @@ test("expense saves use the durable sync path", () => {
   assert.match(source, /await saveAndSync\(/);
   assert.doesNotMatch(source, /syncQueue:\s*\[\{id:\s*genId\(\),table:\s*"expenses"/);
 });
+
+
+test("saveAndSync writes the local record and durable queue before publishing React state", () => {
+  const source = read("src/lib/sync.js");
+  const start = source.indexOf("export async function saveAndSync");
+  assert.notEqual(start, -1);
+  const body = source.slice(start, source.indexOf("\nfunction collapseQueue", start));
+  assert.match(body, /await offlineSave\(local/);
+  assert.match(body, /await offlineSave\("syncQueue",queueItem\)/);
+  assert.match(body, /applyLocalRecord/);
+  assert.match(body, /result\.duplicate/);
+});
+
+test("critical screens no longer hand-build sync queue entries for their primary saves", () => {
+  const notes = read("src/screens/NotesScreen.jsx");
+  const clients = read("src/screens/ClientsScreen.jsx");
+  const vehicle = read("src/screens/VehicleCheckScreen.jsx");
+  assert.match(notes, /await saveAndSync\(item, "notes"/);
+  assert.match(clients, /await saveAndSync\(item, "clients"/);
+  assert.match(vehicle, /await saveAndSync\(/);
+});
