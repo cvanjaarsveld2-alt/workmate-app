@@ -47,7 +47,7 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
             <div className="flex-1 min-w-0">
               <input value={item.description} onChange={e => update(item.id, "description", e.target.value)}
                 placeholder="Item description" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-300" />
-              <div className="flex gap-2 mt-2">
+              <div className="grid grid-cols-[72px_1fr] gap-2 mt-2">
                 <div className="w-20">
                   <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">Qty</label>
                   <input type="number" min="1" value={item.qty} onChange={e => update(item.id, "qty", e.target.value)}
@@ -58,8 +58,8 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
                   <input type="number" step="0.01" value={item.unitPrice} onChange={e => update(item.id, "unitPrice", e.target.value)}
                     placeholder="0.00" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-red-300" />
                 </div>
-                <div className="w-24 text-right pt-5">
-                  <p className="text-sm font-black text-slate-700">
+                <div className="col-span-2 flex items-center justify-between gap-2 pt-1">
+                  <p className="text-sm font-black text-slate-700 truncate">
                     R {roundMoney((parseFloat(item.qty) || 1) * (parseFloat(item.unitPrice) || 0)).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
