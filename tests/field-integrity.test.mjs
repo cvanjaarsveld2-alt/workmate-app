@@ -75,10 +75,19 @@ test("team/customer records stay user/team scoped during sync", () => {
 test("receipt scanner avoids iOS data-URL fetch failures", () => {
   const source = read("src/components/ReceiptScanner.jsx");
   assert.match(source, /canvas\.toBlob/);
-  assert.match(source, /uploadReceiptBlob\(path, compressedBlob\)/);
+  assert.doesNotMatch(source, /storage\.from\("receipts"\)\.upload/);
   assert.match(source, /blobToDataUrl\(compressedBlob\)/);
   assert.doesNotMatch(source, /fetch\(compressed\)/);
-  assert.match(source, /XMLHttpRequest/);
+  assert.doesNotMatch(source, /XMLHttpRequest/);\n  assert.match(source, /Sending to secure scanner/);
+});
+
+
+test("receipt scanner stores the image server-side before AI", () => {
+  const source = read("supabase/functions/scan-receipt/index.ts");
+  assert.match(source, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(source, /storage\/v1\/object\/receipts/);
+  assert.match(source, /Receipt could not be saved/);
+  assert.match(source, /receipt_url/);
 });
 
 test("receipt failures preserve the uploaded photo for manual entry", () => {
