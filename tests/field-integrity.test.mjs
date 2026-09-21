@@ -94,7 +94,7 @@ test("saveAndSync writes the local record and durable queue before publishing Re
   assert.notEqual(start, -1);
   const body = source.slice(start, source.indexOf("\nfunction collapseQueue", start));
   assert.match(body, /await offlineSave\(local/);
-  assert.match(body, /await offlineSave\("syncQueue",queueItem\)/);
+  assert.match(body, /await offlineSave\("syncQueue",\s*queueItem\)/);
   assert.match(body, /applyLocalRecord/);
   assert.match(body, /result\.duplicate/);
 });
