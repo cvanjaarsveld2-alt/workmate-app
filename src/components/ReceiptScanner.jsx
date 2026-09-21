@@ -73,7 +73,7 @@ async function uploadReceiptBlob(path, blob) {
   }
 
   const encodedPath = path.split("/").map(encodeURIComponent).join("/");
-  const endpoint = `${SUPABASE_URL.replace(/\\/$/, "")}/storage/v1/object/receipts/${encodedPath}`;
+  const endpoint = `${SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/receipts/${encodedPath}`;
 
   await new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
