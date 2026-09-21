@@ -458,7 +458,7 @@ function CategoryBadge({ catId, size = "sm" }) {
         }, teamId);
 
     try {
-      await saveAndSync(item, "clients", editId ? "update" : "insert", setData, isOnline);
+      await saveAndSync(item, "clients", editId ? "update" : "insert", setData, typeof navigator === "undefined" ? true : navigator.onLine);
       setToast(editId ? "Client updated" : "Client added");
       resetForm();
     } catch (error) {
