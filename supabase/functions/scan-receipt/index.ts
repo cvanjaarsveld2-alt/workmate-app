@@ -29,10 +29,72 @@ serve(async (req) => {
       });
     }
 
+    // The browser only sends the compressed image to this authenticated Edge Function.
+    // Storage is deliberately handled server-side so iOS/WebKit never has to upload
+    // the receipt directly to Supabase Storage.
+    const authHeader = req.headers.get("Authorization") || "";
+    const jwt = authHeader.replace(/^Bearer\\s+/i, "");
+    const userId = (() => {
+      try {
+        const payload = jwt.split(".")[1];
+        if (!payload) return "";
+        const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+        return JSON.parse(atob(padded)).sub || "";
+      } catch {
+        return "";
+      }
+    })();
+
+    if (!userId) {
+      return new Response(JSON.stringify({ error: "Authenticated user could not be identified" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return new Response(JSON.stringify({ error: "Supabase server configuration is incomplete" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     if (!OPENAI_API_KEY) {
       return new Response(JSON.stringify({ error: "OpenAI key not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Persist the receipt before calling AI. This means a failed AI call can never
+    // make the user's photo disappear.
+    const comma = imageBase64.indexOf(",");
+    const base64Payload = comma >= 0 ? imageBase64.slice(comma + 1) : imageBase64;
+    const binary = atob(base64Payload);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+    const subfolder = slipType === "payment" ? "payment-slips" : "receipts";
+    const receiptPath = `receipts/${userId}/${subfolder}/${crypto.randomUUID()}.jpg`;
+    const storageUrl = `${SUPABASE_URL.replace(/\\/$/, "")}/storage/v1/object/receipts/${receiptPath}`;
+
+    const storageRes = await fetch(storageUrl, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Content-Type": "image/jpeg",
+        "x-upsert": "false",
+      },
+      body: bytes,
+    });
+
+    if (!storageRes.ok) {
+      const storageText = await storageRes.text();
+      console.error("Receipt storage error:", storageRes.status, storageText);
+      return new Response(JSON.stringify({ error: "Receipt could not be saved", detail: storageText }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -90,7 +152,7 @@ Return numbers as plain numbers.`;
     if (!openaiRes.ok) {
       const errText = await openaiRes.text();
       console.error("OpenAI error:", errText);
-      return new Response(JSON.stringify({ error: "AI scan failed", detail: errText }), {
+      return new Response(JSON.stringify({ error: "AI scan failed", detail: errText, receipt_url: receiptPath, scan_failed: true }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -120,6 +182,7 @@ Return numbers as plain numbers.`;
           expense_date: parsed.expense_date || "",
           expense_time: parsed.expense_time || "",
           approved:     !!parsed.approved,
+          receipt_url:  receiptPath,
         }
       : {
           vendor:         parsed.vendor || "",
@@ -130,6 +193,7 @@ Return numbers as plain numbers.`;
           expense_time:   parsed.expense_time || "",
           category:       CATEGORIES.includes(parsed.category) ? parsed.category : "Other",
           payment_method: ["Card", "Cash", "Account"].includes(parsed.payment_method) ? parsed.payment_method : "Card",
+          receipt_url:     receiptPath,
         };
 
     return new Response(JSON.stringify(result), {
