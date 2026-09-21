@@ -77,7 +77,7 @@ serve(async (req) => {
 
     const subfolder = slipType === "payment" ? "payment-slips" : "receipts";
     const receiptPath = `receipts/${userId}/${subfolder}/${crypto.randomUUID()}.jpg`;
-    const storageUrl = `${SUPABASE_URL.replace(/\\/$/, "")}/storage/v1/object/receipts/${receiptPath}`;
+    const storageUrl = `${SUPABASE_URL.replace(/\/$/, "")}/storage/v1/object/receipts/${receiptPath}`;
 
     const storageRes = await fetch(storageUrl, {
       method: "POST",
