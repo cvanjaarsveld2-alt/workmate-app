@@ -24,7 +24,7 @@ import { todayISO, smartDate, genId } from "../lib/helpers";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
-import { triggerImmediateSync } from "../lib/sync";
+import { saveAndSync } from "../lib/sync";
 import { useExportProgress } from "../components/ExportProgress";
 import { supabase } from "../supabase";
 import { ReceiptScanner } from "../components/ReceiptScanner";
@@ -572,265 +572,30 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       updated_at:       now,
     };
 
-    setData(d => ({
-      ...d,
-      expenses: editId
-        ? (d.expenses || []).map(e => e.id === editId ? row : e)
-        : [row, ...(d.expenses || [])],
-      syncQueue: [{
-        id: genId(), table: "expenses",
-        action: editId ? "update" : "insert",
-        data: row, status: "pending", created_at: now,
-      }, ...(d.syncQueue || [])],
-    }));
-    offlineSave("expenses", row);
-    setToast(editId ? "Expense updated ✓" : "Expense saved ✓");
-    triggerImmediateSync();
-    resetForm();
-  }
-
-  async function deleteExpense(id) {
-    const ok = await confirm("Delete this expense?", { confirmLabel: "Delete" });
-    if (!ok) return;
-    if (editId === id) resetForm();
-    await deleteRecord("expenses", id, userId, setData);
-    setToast("Expense deleted");
-  }
-
-  function toggleSelect(id) {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  const [financePack, setFinancePack] = React.useState(null);
-
-  // Export selected expenses as a CSV your financial manager can import into
-  // Sage (or any package). Columns cover everything she needs to code + claim VAT.
-  function exportCSV() {
-    const selected = expenses.filter(e => selectedIds.has(e.id));
-    if (selected.length === 0) { setToast("Select expenses to export"); return; }
-    const cols = ["Date","Vendor","Supplier VAT No","Category","GL Code","VAT Claimable",
-                  "Currency","Gross Amount","VAT Amount","Net Amount","ZAR Gross","Payment Method","Has Receipt","VAT No Missing (R5k+)","Notes"];
-    const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const rows = selected.map(e => {
-      const meta = CATEGORY_META[e.category] || {};
-      const gross = parseFloat(e.amount || 0);
-      const vat = parseFloat(e.vat_amount || 0);
-      const net = gross - vat;
-      return [
-        e.expense_date || "",
-        e.vendor || "",
-        e.vat_number || "",
-        e.category || "",
-        e.gl_code || meta.gl || "",
-        meta.vatClaim === false ? "No (SARS)" : "Yes",
-        e.currency || "ZAR",
-        gross.toFixed(2),
-        vat.toFixed(2),
-        net.toFixed(2),
-        parseFloat(e.amount_zar || gross).toFixed(2),
-        e.payment_method || "",
-        (e.receipt_url || e.no_receipt === false) ? "Yes" : "No",
-        (parseFloat(e.amount_zar || gross) >= 5000 && !e.vat_number && meta.vatClaim !== false) ? "YES — chase VAT no." : "",
-        (e.notes || "").replace(/\n/g, " "),
-      ].map(esc).join(",");
-    });
-    const csv = [cols.map(esc).join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `PowerWorks_Expenses_${todayISO()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setToast(`Exported ${selected.length} expense${selected.length !== 1 ? "s" : ""} to CSV`);
-  }
-
-  async function sendToFinance() {
-    const selected = expenses.filter(e => selectedIds.has(e.id));
-    if (selected.length === 0) { setToast("Select expenses to export"); return; }
-    exportProgress.start("Building expense PDF");
-    const sampleDate = selected[0]?.expense_date;
-    const period = sampleDate ? calendarMonth(sampleDate) : currentCalendarMonth();
-
-    let pdfBlob, filename, ref;
     try {
-      exportProgress.setStage("Loading generator…", 0.15);
-      const { buildExpensePDF } = await import("../lib/expenseFinancePDF");
-      // Build proper date range from actual selected expenses
-      const dates = selected.map(e => e.expense_date).filter(Boolean).sort();
-      const firstDate = dates[0];
-      const lastDate  = dates[dates.length - 1];
-      const fmt = d => new Date(d + "T12:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
-      const rangeLabel = firstDate && lastDate && firstDate !== lastDate
-        ? `${fmt(firstDate)} – ${fmt(lastDate)}`
-        : firstDate ? fmt(firstDate) : (period?.label || "—");
+      // saveAndSync owns the durable local write and durable sync queue.
+      const saved = await saveAndSync(
+        row,
+        "expenses",
+        editId ? "update" : "insert",
+        setData,
+        typeof navigator === "undefined" ? true : navigator.onLine,
+      );
 
-      // Submitter name from email (Christo@pwrstart.com → Christo)
-      const submitterName = userEmail
-        ? userEmail.split("@")[0].replace(/[._]/g, " ").replace(/\w/g, l => l.toUpperCase())
-        : "—";
-
-      exportProgress.setStage(`Rendering ${selected.length} expense${selected.length !== 1 ? "s" : ""} & receipts`, 0.4);
-      const result = await buildExpensePDF({
-        expenses: selected,
-        submitter: { name: submitterName, email: userEmail },
-        periodLabel: rangeLabel,
-      });
-      exportProgress.setStage("Finalising document", 0.9);
-      pdfBlob = result.blob;
-      filename = result.filename;
-      ref = result.ref;
-    } catch (e) {
-      console.error("PDF build failed:", e);
-      exportProgress.fail("Couldn't build PDF — try again");
-      return;
-    }
-    const totalZAR = selected.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
-    const url = URL.createObjectURL(pdfBlob);
-    setFinancePack({ blob: pdfBlob, url, filename, ref, periodLabel: period?.label || "—", totalZAR, count: selected.length, ids: Array.from(selectedIds) });
-    exportProgress.done("Expense PDF ready");
-  }
-
-  function markPackSubmitted() {
-    if (!financePack) return;
-    const ids = new Set(financePack.ids);
-    const now = new Date().toISOString();
-    const updates = expenses.filter(e => ids.has(e.id));
-    setData(d => ({
-      ...d,
-      expenses: (d.expenses || []).map(e => ids.has(e.id) ? { ...e, status: "submitted", sync_status: "pending" } : e),
-      syncQueue: [
-        ...updates.map(e => ({ id: genId(), table: "expenses", action: "update", data: { ...e, status: "submitted", sync_status: "pending" }, status: "pending", created_at: now })),
-        ...(d.syncQueue || []),
-      ],
-    }));
-    updates.forEach(e => offlineSave("expenses", { ...e, status: "submitted" }));
-    triggerImmediateSync();
-    setToast(`${financePack.count} expense${financePack.count !== 1 ? "s" : ""} marked submitted ✓`);
-    setSelectMode(false);
-    setSelectedIds(new Set());
-    closeFinancePack();
-  }
-
-  function closeFinancePack() {
-    if (financePack?.url) URL.revokeObjectURL(financePack.url);
-    setFinancePack(null);
-  }
-
-  async function openExpenseImages(ex, startWith = "till") {
-    const items = [];
-    const tillSigned = await signReceipt(ex.receipt_url);
-    if (tillSigned) items.push({ url: tillSigned, caption: `Till slip — ${ex.vendor || ""}` });
-    const paySigned = await signReceipt(ex.payment_slip_url);
-    if (paySigned) items.push({ url: paySigned, caption: `Payment slip — ${ex.vendor || ""}` });
-    if (items.length === 0) { setToast("No images on this expense"); return; }
-    const startIdx = startWith === "payment" && items.length > 1 ? 1 : 0;
-    setViewerImages({ list: items, startIndex: startIdx });
-  }
-
-  function previewFinancePack() {
-    if (!financePack) return;
-    window.open(financePack.url, "_blank");
-  }
-
-  async function shareFinancePack() {
-    if (!financePack) return;
-    const { blob, filename, ref, totalZAR, periodLabel } = financePack;
-    const file = new File([blob], filename, { type: "application/pdf" });
-    const shareData = { title: `Expense Claim ${ref}`, text: `Expense claim ${ref} — ${fmtMoney(totalZAR, "ZAR")} for ${periodLabel}.`, files: [file] };
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share(shareData);
-        markPackSubmitted();
-      } catch (e) {
-        if (e.name !== "AbortError") console.warn("Share failed:", e);
-      }
-    } else {
-      const a = document.createElement("a");
-      a.href = financePack.url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setToast("PDF downloaded — attach it to your email manually");
+      setData(d => ({
+        ...d,
+        expenses: editId
+          ? (d.expenses || []).map(e => e.id === editId ? saved : e)
+          : [saved, ...(d.expenses || []).filter(e => e.id !== saved.id)],
+      }));
+      setToast(editId ? "Expense updated ✓" : "Expense saved ✓");
+      resetForm();
+    } catch (error) {
+      console.error("Expense save failed:", error);
+      setToast("Could not save this expense to the device. Please try again.");
     }
   }
 
-  function emailFinancePack() {
-    if (!financePack) return;
-    const { filename, ref, totalZAR, periodLabel, count, url } = financePack;
-    const a = document.createElement("a");
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    const body = `Hi Vicky,\n\nPlease find attached my expense claim ${ref}.\n\nSummary:\n  • ${count} item${count !== 1 ? "s" : ""}\n  • Period: ${periodLabel}\n  • Total claim: ${fmtMoney(totalZAR, "ZAR")}\n\nThe attached PDF (${filename}) contains the full breakdown, totals by category, and all receipt images.\n\nKind regards`;
-    const subject = encodeURIComponent(`Expense Claim ${ref} — ${fmtMoney(totalZAR, "ZAR")}`);
-    setToast("PDF downloaded — attach it to the email that just opened");
-    setTimeout(() => {
-      window.open(`mailto:${encodeURIComponent(FINANCE_EMAIL)}?subject=${subject}&body=${encodeURIComponent(body)}`, "_blank");
-      markPackSubmitted();
-    }, 500);
-  }
-
-  // ─── Derived state ─────────────────────────────────────────────────────────
-  const duplicateIds = findLikelyDuplicateIds(expenses);
-
-  const filtered = expenses
-    .filter(e => !search || [e.vendor, e.category, e.notes].some(x => x?.toLowerCase().includes(search.toLowerCase())))
-    .sort((a, b) => {
-      if (sortBy === "amount") {
-        const aa = parseFloat(a.amount_zar || a.amount || 0);
-        const ba = parseFloat(b.amount_zar || b.amount || 0);
-        if (ba !== aa) return ba - aa; // largest first
-      } else if (sortBy === "category") {
-        const ca = (a.category || "").localeCompare(b.category || "");
-        if (ca !== 0) return ca;
-      }
-      // default + tiebreaker: newest date first
-      const da = a.expense_date || "";
-      const db = b.expense_date || "";
-      const dt = db.localeCompare(da);
-      if (dt !== 0) return dt;
-      return (b.expense_time || "").localeCompare(a.expense_time || "");
-    });
-
-  // Group by calendar month (date sort) or show a single sorted list otherwise
-  const monthsInOrder = [];
-  const byMonthMap = {};
-  if (sortBy === "date") {
-    filtered.forEach(e => {
-      const m = e.expense_date ? calendarMonth(e.expense_date) : null;
-      const key   = m ? m.key   : "no-date";
-      const label = m ? m.label : "No date";
-      if (!byMonthMap[key]) {
-        byMonthMap[key] = { label, items: [] };
-        monthsInOrder.push(key);
-      }
-      byMonthMap[key].items.push(e);
-    });
-  } else {
-    // Single flat group that preserves the active sort
-    const label = sortBy === "amount" ? "All expenses — by amount" : "All expenses — by category";
-    byMonthMap["all"] = { label, items: filtered };
-    monthsInOrder.push("all");
-  }
-  const orderedMonthKeys = monthsInOrder
-    .filter(k => k !== "no-date")
-    .sort((a, b) => b.localeCompare(a))
-    .concat(monthsInOrder.includes("no-date") ? ["no-date"] : []);
-
-  // Summary for header
-  const thisPeriod = currentCalendarMonth();
-  const totalThisMonth = expenses
-    .filter(e => e.expense_date && e.expense_date >= thisPeriod.start && e.expense_date <= thisPeriod.end)
-    .reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
-
-  const unsubmittedCount = expenses.filter(e => e.status === "unsubmitted").length;
-
-  // ─── Expense form (rendered at top for new, inline for edit) ────────────────
   function renderExpenseForm() {
     return (
       <Card className="p-4 space-y-3">
