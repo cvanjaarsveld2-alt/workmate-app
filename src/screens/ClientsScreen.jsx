@@ -16,7 +16,7 @@ import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
 import { WhatsAppButton } from "../components/WhatsAppButton";
 import { EmailButton } from "../components/EmailButton";
-import { triggerImmediateSync } from "../lib/sync";
+import { triggerImmediateSync, saveAndSync } from "../lib/sync";
 import { SendCompanyInfoSheet } from "../components/SendCompanyInfo";
 import {
   Card, Btn, Field, GroupField, SelectField, SearchBar,
@@ -436,30 +436,35 @@ function CategoryBadge({ catId, size = "sm" }) {
   async function saveClient() {
     if (!form.company.trim()) { setToast("Company name is required"); return; }
     const { categories: _cats, ...formWithoutCats } = form;
-      const formWithDivision = { ...formWithoutCats, division: encodeCats(form.categories), assigned_to_user_id: form.assigned_to_user_id || null, assigned_to: form.assigned_to || "" };
-    if (editId) {
-      const existing = clients.find(c => c.id === editId);
-      const updated  = { ...existing, ...formWithDivision, sync_status: "pending" };
-      setData(d => ({
-        ...d,
-        clients:   (d.clients || []).map(c => c.id === editId ? updated : c),
-        syncQueue: [{ id: genId(), table: "clients", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-      }));
-      await offlineSave("clients", updated);
-      setToast("Client updated");
-    triggerImmediateSync();
-    } else {
-      const item = withTeamId({ id: genId(), user_id: userId, ...formWithDivision, created_at: new Date().toISOString(), sync_status: "pending" }, teamId);
-      setData(d => ({
-        ...d,
-        clients:   [item, ...(d.clients || [])],
-        syncQueue: [{ id: genId(), table: "clients", action: "insert", data: item, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-      }));
-      await offlineSave("clients", item);
-      setToast("Client added");
-    triggerImmediateSync();
+    const formWithDivision = {
+      ...formWithoutCats,
+      division: encodeCats(form.categories),
+      assigned_to_user_id: form.assigned_to_user_id || null,
+      assigned_to: form.assigned_to || "",
+    };
+
+    const now = new Date().toISOString();
+    const existing = editId ? clients.find(c => c.id === editId) : null;
+    if (editId && !existing) { setToast("Client not found"); return; }
+
+    const item = editId
+      ? { ...existing, ...formWithDivision, sync_status: "pending" }
+      : withTeamId({
+          id: genId(),
+          user_id: userId,
+          ...formWithDivision,
+          created_at: now,
+          sync_status: "pending",
+        }, teamId);
+
+    try {
+      await saveAndSync(item, "clients", editId ? "update" : "insert", setData, isOnline);
+      setToast(editId ? "Client updated" : "Client added");
+      resetForm();
+    } catch (error) {
+      console.error("Client save failed:", error);
+      setToast("Could not save the client to this device. Please try again.");
     }
-    resetForm();
   }
 
   async function deleteClient(id, companyName) {
