@@ -77,7 +77,8 @@ test("receipt scanner avoids iOS data-URL fetch failures", () => {
   assert.match(source, /canvas\.toBlob/);
   assert.match(source, /uploadReceiptBlob\(path, compressedBlob\)/);
   assert.match(source, /blobToDataUrl\(compressedBlob\)/);
-  assert.doesNotMatch(source, /fetch\(compressed\)/);\n  assert.match(source, /XMLHttpRequest/);
+  assert.doesNotMatch(source, /fetch\(compressed\)/);
+  assert.match(source, /XMLHttpRequest/);
 });
 
 test("receipt failures preserve the uploaded photo for manual entry", () => {
