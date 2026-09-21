@@ -16,7 +16,7 @@ import {
 import { todayISO, smartDate, genId, compressImage, uploadPhotoToSupabaseWithPath, createFreshMediaUrl } from "../lib/helpers";
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { offlineSave } from "../offline/offlineDb";
-import { triggerImmediateSync } from "../lib/sync";
+import { saveAndSync } from "../lib/sync";
 // vehicleCheckPDF loaded lazily
 import {
   Card, Btn, Field, Toast, PageHeader, useConfirm,
@@ -377,7 +377,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
   function getItemStatus(date, item) { return getDayData(date).items[item]?.status || null; }
   function getItemComment(date, item) { return getDayData(date).items[item]?.comment || ""; }
 
-  function persistDay(date, dayData) {
+  async function persistDay(date, dayData) {
     const row = {
       id: `vehicle_check_${userId}_${date}`,
       user_id: userId,
@@ -390,25 +390,31 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
       sync_status: "pending",
       updated_at: new Date().toISOString(),
     };
-    const queueItem = { id: genId(), table: "vehicle_checks", action: "upsert", data: row, status: "pending", created_at: new Date().toISOString() };
-    offlineSave("vehicle_checks", row).then(() => offlineSave("syncQueue", queueItem)).catch(() => {});
-    setData(d => ({
-      ...d,
-      vehicleChecks: { ...(d.vehicleChecks || {}), [date]: dayData },
-      syncQueue: [queueItem, ...(d.syncQueue || [])],
-    }));
-    triggerImmediateSync();
+
+    try {
+      await saveAndSync(
+        row,
+        "vehicle_checks",
+        "upsert",
+        setData,
+        typeof navigator === "undefined" ? true : navigator.onLine,
+      );
+    } catch (error) {
+      console.error("Vehicle check save failed:", error);
+      setToast("Could not save the vehicle check to this device. Please try again.");
+    }
   }
+
 
   function saveItemStatus(date, item, status, comment = "") {
     const dayData = getDayData(date);
     const existing = dayData.items[item] || {};
-    persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...existing, status, comment: comment || existing.comment || "" } } });
+    void persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...existing, status, comment: comment || existing.comment || "" } } });
   }
 
   function saveItemComment(date, item, comment) {
     const dayData = getDayData(date);
-    persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...(dayData.items[item] || { status: "issue" }), comment } } });
+    void persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...(dayData.items[item] || { status: "issue" }), comment } } });
   }
 
   function getItemPhoto(date, item) { return getDayData(date).items[item]?.photo || null; }
