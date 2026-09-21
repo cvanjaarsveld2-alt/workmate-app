@@ -5,7 +5,7 @@ export const SUPABASE_URL = supabaseUrl || "";
 export const SUPABASE_FUNCTIONS_URL = SUPABASE_URL ? `${SUPABASE_URL.replace(/\/$/, "")}/functions/v1` : "";
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !SUPABASE_ANON_KEY) {
   console.error("⚠️ Missing Supabase environment variables.");
 }
 
