@@ -70,3 +70,19 @@ test("team/customer records stay user/team scoped during sync", () => {
   assert.match(sync, /payload\.user_id=authData\.user\.id/);
   assert.match(sync, /sanitizeRemotePayload/);
 });
+
+
+test("receipt scanner avoids iOS data-URL fetch failures", () => {
+  const source = read("src/components/ReceiptScanner.jsx");
+  assert.match(source, /canvas\.toBlob/);
+  assert.match(source, /storage\.from\("receipts"\)\.upload\(path, compressedBlob/);
+  assert.match(source, /blobToDataUrl\(compressedBlob\)/);
+  assert.doesNotMatch(source, /fetch\(compressed\)/);
+});
+
+test("expense saves use the durable sync path", () => {
+  const source = read("src/screens/ExpensesScreen.jsx");
+  assert.match(source, /import \{ saveAndSync \} from "\.\.\/lib\/sync"/);
+  assert.match(source, /await saveAndSync\(/);
+  assert.doesNotMatch(source, /syncQueue:\s*\[\{id:\s*genId\(\),table:\s*"expenses"/);
+});
