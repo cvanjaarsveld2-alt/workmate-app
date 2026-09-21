@@ -138,13 +138,7 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
         throw new Error("Network error reaching receipt scanner: " + (fetchErr.message || "unknown"));
       }
       clearTimeout(timeoutId);
-        if (fetchErr.name === "AbortError") {
-          throw new Error("AI scan timed out after 60s — the Edge Function may not be deployed correctly. Check Supabase → Edge Functions → scan-receipt → Logs.");
-        }
-        throw new Error("Network error reaching AI: " + (fetchErr.message || "unknown"));
-      }
-      clearTimeout(timeoutId);
-      log(`AI replied (HTTP ${res.status})`);
+      log(`Receipt scanner replied (HTTP ${res.status})`);
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
