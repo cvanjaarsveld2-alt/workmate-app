@@ -8,7 +8,7 @@ import { todayISO, smartDate, genId, uploadPhotoToSupabaseWithPath, createFreshM
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
-import { triggerImmediateSync } from "../lib/sync";
+import { triggerImmediateSync, saveAndSync } from "../lib/sync";
 import { ShareSheet } from "../components/ShareSheet";
 import { scheduleNotificationsViaSW } from "../lib/notifications";
 import { VoiceInput } from "../components/VoiceInput";
@@ -320,134 +320,107 @@ Kind regards`;
     if (!form.note.trim()) { setToast("Please enter a note"); return; }
     if (!isOnline && pendingMedia.length > 0) { setToast("Connect to the internet before saving attachments"); return; }
 
-    // Resolve the selected client into a display label (kept in the `client`
-    // text column so grouping, search, and exports keep working as before).
     const selectedClient = clients.find(c => c.id === form.client_id);
     const clientLabel = selectedClient
       ? selectedClient.company + (selectedClient.branch ? ` — ${selectedClient.branch}` : "")
       : "";
 
-    if (editId) {
-      const existing = notes.find(n => n.id === editId);
-      if (!existing) { setToast("Note not found"); return; }
+    const now = new Date().toISOString();
+    const existing = editId ? notes.find(n => n.id === editId) : null;
+    if (editId && !existing) { setToast("Note not found"); return; }
 
-      let newUploadedMedia = [];
-      if (isOnline && pendingMedia.length > 0) {
-        newUploadedMedia = await Promise.all(pendingMedia.map(async m => {
-          const path = "notes/" + editId + "/" + m.id;
-          const uploaded = await uploadPhotoToSupabaseWithPath(m.file || m.base64, path);
-          return uploaded ? { ...m, url: uploaded.url, storage_path: uploaded.path, base64: undefined, file: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
-        }));
-      } else {
-        newUploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
-      }
-
-      const updated = {
-        ...existing,
-        client_id:  form.client_id || null,
-        client:     clientLabel || (form.client_id ? "" : existing.client) || "",
-        note:       form.note,
-        urgency:    form.urgency,
-        resolve_by: form.resolve_by || null,
-        category:   form.category?.trim() || null,
-        visit_date: form.visit_date || null,
-        media: [...existingMedia, ...newUploadedMedia],
-        linked_contact_ids: linkedContactIds,
-        sync_status: "pending",
-      };
-
-      setData(d => ({
-        ...d,
-        notes: (d.notes || []).map(n => n.id === editId ? updated : n),
-        syncQueue: [{
-          id: genId(),
-          table: "notes",
-          action: "update",
-          data: { ...updated, media: updated.media.map(m => ({ ...m, base64: undefined })) },
-          status: "pending",
-          created_at: new Date().toISOString(),
-        }, ...(d.syncQueue || [])],
-      }));
-      await offlineSave("notes", updated);
-      setToast("Note updated");
-      triggerImmediateSync();
-      resetForm();
-      return;
-    }
-
-    const noteId = genId();
+    const noteId = editId || genId();
     let uploadedMedia = [];
     if (isOnline && pendingMedia.length > 0) {
       uploadedMedia = await Promise.all(pendingMedia.map(async m => {
         const path = "notes/" + noteId + "/" + m.id;
         const uploaded = await uploadPhotoToSupabaseWithPath(m.file || m.base64, path);
-          return uploaded ? { ...m, url: uploaded.url, storage_path: uploaded.path, base64: undefined, file: undefined, uploadStatus: "done" } : { ...m, uploadStatus: "pending" };
+        return uploaded
+          ? { ...m, url: uploaded.url, storage_path: uploaded.path, base64: undefined, file: undefined, uploadStatus: "done" }
+          : { ...m, uploadStatus: "pending" };
       }));
     } else {
       uploadedMedia = pendingMedia.map(m => ({ ...m, uploadStatus: "pending" }));
     }
 
-    const item = withTeamId({
-      id: noteId,
-      user_id: userId,
-      client_id:  form.client_id || null,
-      client:     clientLabel,
-      note:       form.note,
-      urgency:    form.urgency,
-      resolve_by: form.resolve_by || null,
-      category:   form.category?.trim() || null,
-        visit_date: form.visit_date || null,
-      media: uploadedMedia,
-      linked_contact_ids: linkedContactIds,
-      resolved: false,
-      created_at: new Date().toISOString(),
-      sync_status: "pending",
-    }, teamId);
-    setData(d => ({
-      ...d,
-      notes: [item, ...(d.notes || [])],
-      syncQueue: [{ id: genId(), table: "notes", action: "insert", data: { ...item, media: item.media.map(m => ({ ...m, base64: undefined })) }, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-    }));
-    await offlineSave("notes", item);
-    if (form.resolve_by && Notification.permission === "granted") {
-      const fireAt = new Date(form.resolve_by + "T09:00:00");
-      if (fireAt > new Date()) {
-        const urg = form.urgency || "Normal";
-        const emoji = urg === "Critical" ? "🚨" : urg === "Urgent" ? "⚠️" : "📌";
-        scheduleNotificationsViaSW([{ id: "note_" + item.id, title: emoji + " Unresolved Note: " + (clientLabel || "General"), body: form.note.slice(0, 80), fireAt: fireAt.toISOString(), tag: "note_" + item.id }]);
+    const item = editId
+      ? {
+          ...existing,
+          client_id: form.client_id || null,
+          client: clientLabel || (form.client_id ? "" : existing.client) || "",
+          note: form.note,
+          urgency: form.urgency,
+          resolve_by: form.resolve_by || null,
+          category: form.category?.trim() || null,
+          visit_date: form.visit_date || null,
+          media: [...existingMedia, ...uploadedMedia],
+          linked_contact_ids: linkedContactIds,
+          sync_status: "pending",
+        }
+      : withTeamId({
+          id: noteId,
+          user_id: userId,
+          client_id: form.client_id || null,
+          client: clientLabel,
+          note: form.note,
+          urgency: form.urgency,
+          resolve_by: form.resolve_by || null,
+          category: form.category?.trim() || null,
+          visit_date: form.visit_date || null,
+          media: uploadedMedia,
+          linked_contact_ids: linkedContactIds,
+          resolved: false,
+          created_at: now,
+          sync_status: "pending",
+        }, teamId);
+
+    try {
+      await saveAndSync(item, "notes", editId ? "update" : "insert", setData, isOnline);
+      if (form.resolve_by && Notification.permission === "granted") {
+        const fireAt = new Date(form.resolve_by + "T09:00:00");
+        if (fireAt > new Date()) {
+          const urg = form.urgency || "Normal";
+          const emoji = urg === "Critical" ? "🚨" : urg === "Urgent" ? "⚠️" : "📌";
+          scheduleNotificationsViaSW([{
+            id: "note_" + item.id,
+            title: emoji + " Unresolved Note: " + (clientLabel || "General"),
+            body: form.note.slice(0, 80),
+            fireAt: fireAt.toISOString(),
+            tag: "note_" + item.id,
+          }]);
+        }
       }
+      setToast(editId ? "Note updated" : "Note saved");
+      resetForm();
+    } catch (error) {
+      console.error("Note save failed:", error);
+      setToast("Could not save the note to this device. Please try again.");
     }
-    setToast("Note saved");
-    triggerImmediateSync();
-    resetForm();
+  }
+
+  async function updateNote(id, patch) {
+    const n = notes.find(n => n.id === id); if (!n) return;
+    try {
+      await saveAndSync({ ...n, ...patch, sync_status: "pending" }, "notes", "update", setData, isOnline);
+    } catch (error) {
+      console.error("Note update failed:", error);
+      setToast("Could not save the note change. Please try again.");
+    }
   }
 
   async function resolveNote(id) {
     const n = notes.find(n => n.id === id); if (!n) return;
-    const updated = { ...n, resolved: true, resolved_at: new Date().toISOString(), sync_status: "pending" };
-    setData(d => ({ ...d, notes: (d.notes || []).map(x => x.id === id ? updated : x), syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
-    await offlineSave("notes", updated); setToast("Note resolved");
-    triggerImmediateSync();
+    await updateNote(id, { resolved: true, resolved_at: new Date().toISOString() });
+    setToast("Note resolved");
   }
 
   async function unresolveNote(id) {
     const n = notes.find(n => n.id === id); if (!n) return;
-    const updated = { ...n, resolved: false, resolved_at: null, sync_status: "pending" };
-    setData(d => ({
-      ...d,
-      notes: (d.notes || []).map(x => x.id === id ? updated : x),
-      syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-    }));
-    await offlineSave("notes", updated);
-    triggerImmediateSync();
+    await updateNote(id, { resolved: false, resolved_at: null });
   }
 
   async function changeUrgency(id, urgency) {
-    const n = notes.find(n => n.id === id); if (!n) return;
-    const updated = { ...n, urgency, sync_status: "pending" };
-    setData(d => ({ ...d, notes: (d.notes || []).map(x => x.id === id ? updated : x), syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])] }));
-    await offlineSave("notes", updated);
-    triggerImmediateSync();
+    await updateNote(id, { urgency });
   }
 
   async function deleteNote(id) {
@@ -460,14 +433,7 @@ Kind regards`;
 
   async function deleteNoteMedia(noteId, mediaId) {
     const note = notes.find(n => n.id === noteId); if (!note) return;
-    const updated = { ...note, media: (note.media || []).filter(m => m.id !== mediaId), sync_status: "pending" };
-    setData(d => ({
-      ...d,
-      notes: (d.notes || []).map(n => n.id === noteId ? updated : n),
-      syncQueue: [{ id: genId(), table: "notes", action: "update", data: updated, status: "pending", created_at: new Date().toISOString() }, ...(d.syncQueue || [])],
-    }));
-    await offlineSave("notes", updated);
-    triggerImmediateSync();
+    await updateNote(noteId, { media: (note.media || []).filter(m => m.id !== mediaId) });
   }
 
   const unresolvedCount = notes.filter(n => !n.resolved).length;
