@@ -4,11 +4,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useRef, useEffect } from "react";
 import { Camera, Loader2, X, Sparkles } from "lucide-react";
-import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
+import { supabase } from "../supabase";
 import { genId } from "../lib/helpers";
 import { Card } from "../components/ui";
-
-const FUNCTION_URL = `${SUPABASE_FUNCTIONS_URL}/scan-receipt`;
 
 async function compressImage(file, maxDim = 1600, quality = 0.85) {
   const sourceUrl = URL.createObjectURL(file);
@@ -117,46 +115,38 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       const imageBase64 = await blobToDataUrl(compressedBlob);
       log(`Prepared image (${Math.round(imageBase64.length / 1024)} KB)`);
       log(`Sending to secure scanner (${slipType})…`);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
-      let res;
-      try {
-        res = await fetch(FUNCTION_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ""}`,
-          },
-          body: JSON.stringify({ imageBase64, slipType }),
-          signal: controller.signal,
-        });
-      } catch (fetchErr) {
-        clearTimeout(timeoutId);
-        if (fetchErr.name === "AbortError") {
-          throw new Error("Receipt scan timed out after 60s");
-        }
-        throw new Error("Network error reaching receipt scanner: " + (fetchErr.message || "unknown"));
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) {
+        throw new Error("Your session has expired. Please sign in again.");
       }
-      clearTimeout(timeoutId);
-      log(`Receipt scanner replied (HTTP ${res.status})`);
 
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
+      log("Calling secure receipt scanner…");
+      const { data: extracted, error: functionError } = await supabase.functions.invoke("scan-receipt", {
+        body: { imageBase64, slipType },
+      });
+
+      if (functionError) {
+        log("Receipt scanner returned an error");
+        const errBody = functionError.context?.body || {};
         if (errBody.receipt_url) {
           setUploadedPath(errBody.receipt_url);
           uploadedPathRef.current = errBody.receipt_url;
           log("Receipt saved ✓ — AI reading failed");
         }
-        throw new Error(errBody.error || `Receipt scan failed (HTTP ${res.status})`);
+        throw new Error(errBody.error || functionError.message || "Receipt scan failed");
       }
 
-      const extracted = await res.json();
+      if (!extracted) {
+        throw new Error("Receipt scanner returned no data");
+      }
+
+      log("Receipt scanner replied (OK)");
       if (extracted.receipt_url) {
         setUploadedPath(extracted.receipt_url);
         uploadedPathRef.current = extracted.receipt_url;
       }
       log("Got extracted data ✓");
-      onExtracted({ ...extracted });
+
     } catch (e) {
       console.error("Receipt scan error:", e);
       const message = e?.message || "Automatic receipt scanning failed";
