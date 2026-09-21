@@ -78,7 +78,8 @@ test("receipt scanner avoids iOS data-URL fetch failures", () => {
   assert.doesNotMatch(source, /storage\.from\("receipts"\)\.upload/);
   assert.match(source, /blobToDataUrl\(compressedBlob\)/);
   assert.doesNotMatch(source, /fetch\(compressed\)/);
-  assert.doesNotMatch(source, /XMLHttpRequest/);\n  assert.match(source, /Sending to secure scanner/);
+  assert.doesNotMatch(source, /XMLHttpRequest/);
+  assert.match(source, /Sending to secure scanner/);
 });
 
 
