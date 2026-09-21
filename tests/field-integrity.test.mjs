@@ -70,3 +70,59 @@ test("team/customer records stay user/team scoped during sync", () => {
   assert.match(sync, /payload\.user_id=authData\.user\.id/);
   assert.match(sync, /sanitizeRemotePayload/);
 });
+
+
+test("receipt scanner avoids iOS data-URL fetch failures", () => {
+  const source = read("src/components/ReceiptScanner.jsx");
+  assert.match(source, /canvas\.toBlob/);
+  assert.doesNotMatch(source, /storage\.from\("receipts"\)\.upload/);
+  assert.match(source, /blobToDataUrl\(compressedBlob\)/);
+  assert.doesNotMatch(source, /fetch\(compressed\)/);
+  assert.doesNotMatch(source, /XMLHttpRequest/);
+  assert.match(source, /Sending to secure scanner/);
+});
+
+
+test("receipt scanner stores the image server-side before AI", () => {
+  const source = read("supabase/functions/scan-receipt/index.ts");
+  assert.match(source, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(source, /storage\/v1\/object\/receipts/);
+  assert.match(source, /Receipt could not be saved/);
+  assert.match(source, /receipt_url/);
+});
+
+test("receipt failures preserve the uploaded photo for manual entry", () => {
+  const source = read("src/components/ReceiptScanner.jsx");
+  assert.match(source, /uploadedPathRef/);
+  assert.match(source, /Receipt saved safely/);
+  assert.match(source, /Keep receipt & enter details manually/);
+  assert.match(source, /onExtracted\(\{ receipt_url: uploadedPath, scan_failed: true \}\)/);
+});
+
+test("expense saves use the durable sync path", () => {
+  const source = read("src/screens/ExpensesScreen.jsx");
+  assert.match(source, /import \{ saveAndSync \} from "\.\.\/lib\/sync"/);
+  assert.match(source, /await saveAndSync\(/);
+  assert.doesNotMatch(source, /syncQueue:\s*\[\{id:\s*genId\(\),table:\s*"expenses"/);
+});
+
+
+test("saveAndSync writes the local record and durable queue before publishing React state", () => {
+  const source = read("src/lib/sync.js");
+  const start = source.indexOf("export async function saveAndSync");
+  assert.notEqual(start, -1);
+  const body = source.slice(start, source.indexOf("\nfunction collapseQueue", start));
+  assert.match(body, /await offlineSave\(local/);
+  assert.match(body, /await offlineSave\("syncQueue",\s*queueItem\)/);
+  assert.match(body, /applyLocalRecord/);
+  assert.match(body, /result\.duplicate/);
+});
+
+test("critical screens no longer hand-build sync queue entries for their primary saves", () => {
+  const notes = read("src/screens/NotesScreen.jsx");
+  const clients = read("src/screens/ClientsScreen.jsx");
+  const vehicle = read("src/screens/VehicleCheckScreen.jsx");
+  assert.match(notes, /await saveAndSync\(item, "notes"/);
+  assert.match(clients, /await saveAndSync\(item, "clients"/);
+  assert.match(vehicle, /await saveAndSync\(/);
+});
