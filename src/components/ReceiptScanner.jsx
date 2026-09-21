@@ -57,6 +57,27 @@ function blobToDataUrl(blob) {
   });
 }
 
+
+async function describeFunctionError(functionError) {
+  const context = functionError?.context;
+  let body = null;
+  let status = context?.status || null;
+  try {
+    if (context && typeof context.clone === "function") {
+      const response = context.clone();
+      const text = await response.text();
+      try { body = JSON.parse(text); } catch { body = text; }
+      status = response.status || status;
+    }
+  } catch {}
+  return {
+    name: functionError?.name || "UnknownError",
+    message: functionError?.message || "No error message",
+    status,
+    body,
+  };
+}
+
 export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till" }) {
   const [stage, setStage]       = useState("idle"); // idle | uploading | scanning
   const [preview, setPreview]   = useState(null);
@@ -77,6 +98,16 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
     const t = setTimeout(() => cameraRef.current?.click(), 100);
     return () => clearTimeout(t);
   }, []);
+
+  async function copyDebug() {
+    const report = debug.join("\n");
+    try {
+      await navigator.clipboard.writeText(report);
+      setError("Diagnostic copied. Send that diagnostic to me.");
+    } catch {
+      setError(report);
+    }
+  }
 
   function log(msg) {
     const t = new Date().toLocaleTimeString();
@@ -126,14 +157,20 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       });
 
       if (functionError) {
-        log("Receipt scanner returned an error");
-        const errBody = functionError.context?.body || {};
+        const diagnostic = await describeFunctionError(functionError);
+        log(`FUNCTION ERROR: ${diagnostic.name}`);
+        log(`HTTP STATUS: ${diagnostic.status ?? "none"}`);
+        log(`MESSAGE: ${diagnostic.message}`);
+        log(`SERVER BODY: ${typeof diagnostic.body === "string" ? diagnostic.body : JSON.stringify(diagnostic.body)}`);
+        log(`SESSION: authenticated`);
+        log(`BROWSER: ${navigator.userAgent}`);
+        const errBody = diagnostic.body && typeof diagnostic.body === "object" ? diagnostic.body : {};
         if (errBody.receipt_url) {
           setUploadedPath(errBody.receipt_url);
           uploadedPathRef.current = errBody.receipt_url;
           log("Receipt saved ✓ — AI reading failed");
         }
-        throw new Error(errBody.error || functionError.message || "Receipt scan failed");
+        throw new Error(errBody.error || diagnostic.message || "Receipt scan failed");
       }
 
       if (!extracted) {
@@ -212,6 +249,11 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
               <p key={i} className="text-xs font-mono text-slate-600 break-all">{line}</p>
             ))}
           </div>
+          {error && (
+            <button type="button" onClick={copyDebug} className="mt-2 w-full rounded-lg bg-white border border-slate-300 py-2 text-xs font-bold text-slate-700">
+              Copy diagnostic for support
+            </button>
+          )}
         </div>
       )}
 
