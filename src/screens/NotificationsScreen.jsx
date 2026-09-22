@@ -89,11 +89,15 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
     const ok = await confirm("Clear all notifications? This can't be undone.", { confirmLabel: "Clear all" });
     if (!ok) return;
     try {
-      await supabase
+      // Supabase reports errors in the result rather than throwing; without this
+      // check a refused delete looked like success and the list came back on reload.
+      const { error } = await supabase
         .from("team_notifications")
         .delete()
         .eq("to_user_id", userId);
+      if (error) throw error;
       setNotifications([]);
+      onMarkRead?.();
       setToast("Activity cleared");
     } catch (e) {
       setToast("Could not clear — try again");
