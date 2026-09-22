@@ -546,28 +546,28 @@ export function StatCard({ label, value, sub, color, icon: Icon, trend, invertTr
   const rising = trend && trend.dir !== "down";
   const isGood = invertTrend ? !rising : rising;
   return (
-    <Card className="p-4">
+    <Card className="p-4 h-full">
       <div className="flex items-center justify-between mb-2.5">
         {Icon && (
           <div className="rounded-[10px] shrink-0 flex items-center justify-center" style={{ background: chipBg, width: 32, height: 32 }}>
             <Icon size={16} style={{ color: accent }} />
           </div>
         )}
-        {trend && (
-          <span
-            className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-black shrink-0"
-            style={{
-              background: isGood ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
-              color: isGood ? "#16A34A" : "#DC2626",
-            }}>
-            {rising ? "↑" : "↓"} {trend.text}
-          </span>
-        )}
       </div>
       {/* Big confident hero number — colour lives in the icon chip so the row reads clean */}
       <p className="text-[28px] font-black leading-none tracking-tight text-slate-900">{value}</p>
       <p className="mt-2 text-[11px] font-bold text-slate-400 leading-tight">{label}</p>
       {sub && <p className="mt-0.5 text-[11px] text-slate-400 leading-snug">{sub}</p>}
+      {trend && (
+        <span
+          className="mt-2 inline-flex max-w-full items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-black leading-tight"
+          style={{
+            background: isGood ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
+            color: isGood ? "#16A34A" : "#DC2626",
+          }}>
+          {rising ? "↑" : "↓"} {trend.text}
+        </span>
+      )}
     </Card>
   );
 }
@@ -599,7 +599,8 @@ export function PageHeader({ title, subtitle }) {
   return (
     <div className="mb-2 min-w-0 flex-1">
       <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight truncate">{title}</h1>
-      {subtitle && <p className="mt-1 text-sm text-slate-400 leading-snug truncate">{subtitle}</p>}
+      {/* Two lines rather than truncating; slate-500 meets WCAG AA contrast on white. */}
+      {subtitle && <p className="mt-1 text-sm text-slate-500 leading-snug line-clamp-2">{subtitle}</p>}
     </div>
   );
 }

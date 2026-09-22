@@ -913,7 +913,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
             const pct   = teamStats.totalInPipeline > 0 ? (count / teamStats.totalInPipeline) * 100 : 0;
             return (
               <div key={label} className="flex items-center gap-3">
-                <p className="w-20 text-sm font-bold shrink-0" style={{ color }}>{label}</p>
+                <p className="w-24 text-sm font-bold shrink-0 whitespace-nowrap" style={{ color }}>{label}</p>
                 <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
                   <motion.div className="h-full rounded-full" style={{ background: color }}
                     initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />

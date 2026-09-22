@@ -219,7 +219,9 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
     return a;
   }, {});
   const lostC = pCount["Lost"] || 0;
-  const inPipeline = clients.length - lostC;
+  const dormantC = pCount["Dormant"] || 0;
+  // Dormant clients are parked, not in the pipeline (Clients hides them by default too).
+  const inPipeline = clients.length - lostC - dormantC;
 
   const actionItems = [];
   if (criticalNotes.length > 0)
@@ -272,7 +274,9 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                 onClick={() => onNavigate("Followups")}
                 className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors min-h-[60px]">
                 <div className="shrink-0 w-12 text-center">
-                  <p className="text-sm font-black text-slate-900">{f.time || "—"}</p>
+                  {f.time
+                    ? <p className="text-sm font-black text-slate-900">{f.time}</p>
+                    : <p className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Any time</p>}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-900 break-words">{f.title}</p>
@@ -296,7 +300,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
       {actionItems.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100" style={{ background: "#FEF2F2" }}>
+            <div className="px-4 py-3 border-b border-slate-100 bg-red-50">
               <p className="text-xs font-black text-red-700 uppercase tracking-wider">
                 ⚡ Action Required ({actionCount})
               </p>
@@ -523,7 +527,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
               Sales Pipeline
             </button>
             <p className="text-xs text-slate-400 mt-0.5">
-              {inPipeline} in pipeline{lostC > 0 ? ` · ${lostC} lost` : ""}
+              {inPipeline} in pipeline{lostC > 0 ? ` · ${lostC} lost` : ""}{dormantC > 0 ? ` · ${dormantC} dormant` : ""}
             </p>
           </div>
           <Gauge value={quoteConversion} label="Conversion" size={78} />
@@ -549,7 +553,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                 <button
                   onClick={() => setExpandedStage(isExpanded ? null : (count > 0 ? stage : null))}
                   className="w-full flex items-center gap-3 rounded-lg -mx-1 px-1 py-0.5 active:bg-slate-50 transition-colors">
-                  <span className="w-20 text-sm font-bold shrink-0 text-left flex items-center gap-1" style={{ color: c.text }}>
+                  <span className="w-28 text-sm font-bold shrink-0 text-left flex items-center gap-1 whitespace-nowrap" style={{ color: c.text }}>
                     {count > 0 && (
                       <motion.span animate={{ rotate: isExpanded ? 90 : 0 }} transition={{ duration: 0.15 }} className="inline-flex">
                         <ChevronRight size={12} style={{ color: c.text }} />

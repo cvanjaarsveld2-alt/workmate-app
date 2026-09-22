@@ -121,6 +121,12 @@ import { PullToRefresh } from "./components/PullToRefresh";
 // where User A had records but User B had none locally yet, and logout()
 // never touched `data` at all. Kept in one place so the two reset sites and
 // the initial useState can never drift out of sync with each other.
+// Readable names for the top bar (route keys are internal identifiers).
+const SCREEN_TITLES = {
+  Followups: "Follow-ups", VehicleCheck: "Vehicle Check", ColdCall: "Cold Call", JackSelector: "Jack Selector",
+  BackfillZAR: "Backfill ZAR", SharedInbox: "Shared Inbox", Client360: "Client 360", TeamDashboard: "Team Dashboard",
+  Planner: "Weekly Planner",
+};
 const INITIAL_DATA = {
   clients: [],
   followups: [],
@@ -1035,7 +1041,7 @@ export default function PowerWorksApp() {
                   <Wordmark variant="dark" size="sm" />
                 ) : (
                   <div className="flex items-center gap-2 min-w-0">
-                    <p className="text-base font-black text-slate-900 truncate">{screen}</p>
+                    <p className="text-base font-black text-slate-900 truncate">{SCREEN_TITLES[screen] || screen}</p>
                   </div>
                 )}
                 <div className="flex items-center gap-1 shrink-0">

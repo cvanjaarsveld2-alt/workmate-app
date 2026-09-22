@@ -103,7 +103,8 @@ function calendarMonth(isoDate) {
   const startFmt = new Date(start + "T12:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
   const endFmt   = new Date(end   + "T12:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" });
   const rangeLabel = `${startFmt} – ${endFmt}`;
-  return { key, label: rangeLabel, start, end };
+  // Month name reads cleanly on a phone; the full range wrapped onto four lines.
+  return { key, label, rangeLabel, start, end };
 }
 
 // Current calendar month
@@ -277,18 +278,18 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
         onClick={() => setCollapsed(c => !c)}
         className="w-full flex items-center justify-between px-1 mb-2 group"
       >
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-black text-slate-500 uppercase tracking-wider">{label}</p>
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          <p className="text-xs font-black text-slate-500 uppercase tracking-wide whitespace-nowrap">{label}</p>
           {isCurrent && (
             <span className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide"
               style={{ background: "#FEF3C7", color: "#92400E" }}>
               Current
             </span>
           )}
-          <span className="text-xs text-slate-400 font-medium">{items.length} item{items.length !== 1 ? "s" : ""}</span>
+          <span className="text-xs text-slate-500 font-medium whitespace-nowrap">{items.length} item{items.length !== 1 ? "s" : ""}</span>
         </div>
         <div className="flex items-center gap-2">
-          <p className="text-sm font-black" style={{ color: "#8B1A1A" }}>{fmtMoney(periodTotal)}</p>
+          <p className="text-sm font-black whitespace-nowrap" style={{ color: "#8B1A1A" }}>{fmtMoney(periodTotal)}</p>
           <div className="rounded-full p-0.5 bg-slate-100 group-hover:bg-slate-200 transition-colors">
             {collapsed
               ? <ChevronDown size={14} className="text-slate-400" />
