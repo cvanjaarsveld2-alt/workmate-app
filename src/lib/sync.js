@@ -20,7 +20,10 @@ const REMOTE_EXCLUDED_FIELDS={quotes:new Set(["contact_id","from_user_id","to_us
 const DEPENDENCIES={followups:[{field:"quote_id",pending:"sync_pending_quote_id",table:"quotes"},{field:"client_id",pending:"sync_pending_client_id",table:"clients"},{field:"linked_note_id",pending:"sync_pending_note_id",table:"notes"},{field:"team_id",pending:"sync_pending_team_id",table:"teams"}],jobs:[{field:"quote_id",pending:"sync_pending_quote_id",table:"quotes"},{field:"client_id",pending:"sync_pending_client_id",table:"clients"}],invoices:[{field:"quote_id",pending:"sync_pending_quote_id",table:"quotes"},{field:"job_id",pending:"sync_pending_job_id",table:"jobs"},{field:"client_id",pending:"sync_pending_client_id",table:"clients"}],payments:[{field:"invoice_id",pending:"sync_pending_invoice_id",table:"invoices"}]};
 const SYNC_PRIORITY={clients:10,quotes:20,contacts:30,notes:30,equipment:30,expenses:30,leads:30,vehicle_checks:30,activities:30,breakdown_reports:30,repair_reports:30,custom_faults:30,service_reports:30,team_notifications:30,email_quotes:35,followups:40,jobs:50,invoices:60,payments:70};
 function sanitizeRemotePayload(table,data){const out={...(data||{})};for(const field of REMOTE_EXCLUDED_FIELDS[table]||[])delete out[field];return out;}
-function cleanUUIDs(data){const fields=["id","user_id","team_id","client_id","contact_id","linked_note_id","linked_breakdown_id","assigned_to_user_id","from_user_id","to_user_id","quote_id","job_id","invoice_id","sync_pending_quote_id","sync_pending_job_id","sync_pending_client_id","sync_pending_note_id","sync_pending_team_id","sync_pending_invoice_id"];const out={...(data||{})};fields.forEach(f=>{if(out[f]===""||out[f]===undefined)out[f]=null;});return out;}
+// Only normalise link fields the record already carries. Adding every missing one as
+// null sent columns most tables do not have (e.g. jobs.contact_id), and PostgREST
+// rejects the whole upsert with PGRST204, so those tables could never sync.
+function cleanUUIDs(data){const fields=["id","user_id","team_id","client_id","contact_id","linked_note_id","linked_breakdown_id","assigned_to_user_id","from_user_id","to_user_id","quote_id","job_id","invoice_id","sync_pending_quote_id","sync_pending_job_id","sync_pending_client_id","sync_pending_note_id","sync_pending_team_id","sync_pending_invoice_id"];const out={...(data||{})};fields.forEach(f=>{if(f in out&&(out[f]===""||out[f]===undefined))out[f]=null;});return out;}
 function cleanNumerics(data){const out={...(data||{})};["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins","subtotal","vat","total","amount_paid","balance_due","extracted_amount"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;});return out;}
 const ARRAY_CONFLICT_FIELDS={jobs:["photos","parts_used"],breakdown_reports:["items"],repair_reports:["items"]};
 function arraysDiffer(a,b){try{return JSON.stringify(a??[])!==JSON.stringify(b??[]);}catch{return true;}}
@@ -141,7 +144,7 @@ async function upsertWithIdempotentRecovery(table,payload){
     throw error;
   }
 }
-async function stageMissingDependencies(table,payload){const deps=DEPENDENCIES[table]||[];if(!deps.length)return payload;let out={...payload};for(const dep of deps){const id=out[dep.field];if(!id||out[dep.pending])continue;const{data,error}=await supabase.from(dep.table).select("id").eq("id",id).maybeSingle();if(!error&&data)continue;if(dep.pending in out){out[dep.pending]=id;out[dep.field]=null;}}return out;}
+async function stageMissingDependencies(table,payload){const deps=DEPENDENCIES[table]||[];if(!deps.length)return payload;let out={...payload};for(const dep of deps){const id=out[dep.field];if(!id||out[dep.pending])continue;const{data,error}=await supabase.from(dep.table).select("id").eq("id",id).maybeSingle();if(!error&&data)continue;out[dep.pending]=id;out[dep.field]=null;}return out;}
 async function pushOne(table,action,rawData){let payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(rawData)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);if(payload.media)payload={...payload,media:payload.media.map(m=>({...m,base64:undefined}))};payload=stripEmbeddedBase64(payload);if(["insert","upsert","update"].includes(action)){if(table==="vehicle_checks"){const{data:authData,error:authError}=await supabase.auth.getUser();if(authError)throw authError;if(authData?.user?.id)payload.user_id=authData.user.id;else throw new Error("Cannot sync vehicle check without an authenticated user");}else if(TEAM_TABLES.has(table)&&!payload.user_id){const{data:authData}=await supabase.auth.getUser();if(authData?.user?.id)payload.user_id=authData.user.id;}if(action==="update"&&payload.id){const{data:existing,error:existingError}=await supabase.from(table).select("*").eq("id",payload.id).maybeSingle();if(!existingError&&existing){assertNoStaleArrayOverwrite(table,existing,payload);payload={...existing,...payload};}}payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(payload)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);payload=await stageMissingDependencies(table,payload);return await upsertWithIdempotentRecovery(table,{...payload,sync_status:"synced"});}if(action==="delete"){const{error}=await supabase.from(table).delete().eq("id",payload.id);if(error)throw error;return;}throw new Error(`Unknown sync action: ${action}`);}
 // A failure with no Postgrest/Postgres error code is almost always the network itself
 // (offline, DNS hiccup, request timeout) rather than the server rejecting the data.
@@ -161,8 +164,14 @@ async function persistQueue(queue){await offlineReplaceAll("syncQueue",queue);}
 // rejected promise instead — callers that don't already wrap saveAndSync in a
 // try/catch will surface a visible error (or, at minimum, stop short of the
 // misleading "Saved" message) rather than silently lying about what happened.
+// Most stored checks hold `data` as a JSON string (older DailyVehiclePrompt builds
+// stringified it); spreading a string gives {0:"{",1:"\"",...} and no items.
+export function parseVehicleCheckData(data) {
+  if (typeof data !== "string") return data || {};
+  try { const parsed = JSON.parse(data); return parsed && typeof parsed === "object" ? parsed : {}; } catch { return {}; }
+}
 function vehicleCheckDay(row) {
-  return { ...(row?.data || {}), _id: row?.id, _updated_at: row?.updated_at };
+  return { ...parseVehicleCheckData(row?.data), _id: row?.id, _updated_at: row?.updated_at };
 }
 function vehicleChecksMap(rows) {
   return (rows || []).reduce((acc, row) => {

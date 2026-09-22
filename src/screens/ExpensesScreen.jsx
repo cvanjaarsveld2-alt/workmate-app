@@ -841,7 +841,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
         <div className="grid grid-cols-2 gap-2">
           <div>
             <p className="text-xs font-bold text-slate-500 mb-1.5">Till slip</p>
-            {receiptUrl ? (
+            {receiptUrl && receiptUrl !== "no-receipt" ? (
               <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                 <SignedReceiptImg stored={receiptUrl} className="w-full h-32 object-contain" />
                 {/* Overlay: tap anywhere to re-scan */}

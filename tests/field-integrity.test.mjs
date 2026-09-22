@@ -126,3 +126,20 @@ test("critical screens no longer hand-build sync queue entries for their primary
   assert.match(clients, /await saveAndSync\(item, "clients"/);
   assert.match(vehicle, /await saveAndSync\(/);
 });
+
+test("sync never injects link columns a table does not have", () => {
+  const source = read("src/lib/sync.js");
+  // cleanUUIDs must only normalise fields already present (f in out); adding
+  // missing ones sent e.g. notes.contact_id and PostgREST rejected every save.
+  assert.match(source, /if\(f in out&&\(out\[f\]===""\|\|out\[f\]===undefined\)\)out\[f\]=null/);
+});
+
+test("stringified vehicle check data is parsed before use", () => {
+  assert.match(read("src/lib/sync.js"), /export function parseVehicleCheckData/);
+  assert.match(read("src/App.jsx"), /parseVehicleCheckData\(row\.data\)/);
+  assert.doesNotMatch(read("src/components/DailyVehiclePrompt.jsx"), /JSON\.stringify\(dayData\)/);
+});
+
+test("no-receipt placeholder is never rendered as a signed image", () => {
+  assert.match(read("src/screens/ExpensesScreen.jsx"), /receiptUrl && receiptUrl !== "no-receipt" \? \(/);
+});
