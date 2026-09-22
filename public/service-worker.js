@@ -1,6 +1,6 @@
 // ─── PowerMate Service Worker ────────────────────────────────────────────────
 // Offline shell, push notifications and durable reminder scheduling.
-const CACHE_NAME = "powermate-v14";
+const CACHE_NAME = "powermate-v15";
 const PRECACHE = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest"];
 const REMINDER_DB = "powermate_sw";
 const REMINDER_STORE = "reminders";
@@ -20,5 +20,8 @@ self.addEventListener("fetch",e=>{const url=new URL(e.request.url);if(e.request.
 self.addEventListener("sync",e=>{if(e.tag==="powermate-sync")e.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(clients=>{clients.forEach(client=>client.postMessage({type:"POWERMATE_RETRY_SYNC"}));return fireDueReminders().catch(()=>{})}))});
 self.addEventListener("periodicsync",e=>{if(e.tag==="powermate-reminders")e.waitUntil(fireDueReminders().catch(()=>{}))});
 self.addEventListener("push",e=>{let data={title:"PowerMate",body:"You have a notification",url:"/"};try{if(e.data)data={...data,...e.data.json()}}catch{}e.waitUntil(self.registration.showNotification(data.title,{body:data.body,icon:"/icon.svg",badge:"/icon.svg",vibrate:[100,50,100],tag:data.tag||"powermate",renotify:!!data.tag,data:{url:data.url||"/"},actions:[{action:"open",title:"Open PowerMate"}]}))});
-self.addEventListener("notificationclick",e=>{e.notification.close();const url=e.notification.data?.url||"/";e.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(clients=>{for(const client of clients)if(client.url.includes(self.location.origin)&&"focus"in client)return client.focus().then(()=>client.navigate(url));return self.clients.openWindow(url)}))});
+// Only ever open pages inside PowerMate: a push payload's url comes from another
+// user, so an off-site link could be used to send a teammate to a phishing page.
+function safeNotificationUrl(raw){try{const u=new URL(raw||"/",self.location.origin);return u.origin===self.location.origin?u.href:"/"}catch{return "/"}}
+self.addEventListener("notificationclick",e=>{e.notification.close();const url=safeNotificationUrl(e.notification.data?.url);e.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(clients=>{for(const client of clients)if(client.url.includes(self.location.origin)&&"focus"in client)return client.focus().then(()=>client.navigate(url));return self.clients.openWindow(url)}))});
 self.addEventListener("message",e=>{if(e.data?.type==="SKIP_WAITING"){e.waitUntil(Promise.resolve(self.skipWaiting()));return}if(e.data?.type==="SCHEDULE_NOTIFICATIONS")e.waitUntil?.(putReminders(e.data.items||[],e.data.replace===true).then(()=>fireDueReminders()).catch(()=>{}));if(e.data?.type==="CANCEL_NOTIFICATION")e.waitUntil?.(deleteReminder(e.data.id));if(e.data?.type==="FIRE_DUE_REMINDERS")e.waitUntil?.(fireDueReminders().catch(()=>{}))});

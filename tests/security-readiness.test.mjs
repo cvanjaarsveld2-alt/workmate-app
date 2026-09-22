@@ -67,3 +67,7 @@ test("receipt scanner verifies the session instead of trusting JWT claims", () =
 test("production build does not publish source maps", () => {
   assert.match(read("vite.config.js"), /sourcemap:\s*false/);
 });
+
+test("notification clicks only open same-origin pages", () => {
+  assert.match(read("public/service-worker.js"), /safeNotificationUrl\(e\.notification\.data\?\.url\)/);
+});
