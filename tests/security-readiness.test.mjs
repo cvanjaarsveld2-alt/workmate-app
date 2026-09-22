@@ -71,3 +71,10 @@ test("production build does not publish source maps", () => {
 test("notification clicks only open same-origin pages", () => {
   assert.match(read("public/service-worker.js"), /safeNotificationUrl\(e\.notification\.data\?\.url\)/);
 });
+
+test("password reset never reveals whether an account exists", () => {
+  const source = read("src/auth/AuthScreen.jsx");
+  assert.match(source, /resetPasswordForEmail/);
+  assert.match(source, /If that email has a PowerMate account/);
+  assert.match(read("src/App.jsx"), /PASSWORD_RECOVERY/);
+});
