@@ -7,19 +7,41 @@
 // secret "powermate_cron_secret" through public.cron_secret_matches(), which only
 // service_role may execute. No user JWT is involved (verify_jwt = false).
 //
-// Times: follow-ups store local South African wall-clock date/time. SAST is
-// UTC+2 all year (no DST), so they are converted with a fixed offset.
+// Times: follow-ups store the user's local wall-clock date/time. Each target
+// user's IANA timezone (users.timezone, kept current by the app) converts it to
+// UTC, so reminders fire at local time in whichever country they are.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as webPush from "https://esm.sh/web-push@3.6.7";
 
-const SAST_OFFSET = "+02:00";
+const DEFAULT_TZ = "Africa/Johannesburg";
 const WINDOW_MINUTES = 10; // cron runs every 5 min; 10 min tolerates one late run
 
+function tzOffsetMs(tz: string, at: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(at);
+  const get = (t: string) => Number(parts.find(p => p.type === t)?.value);
+  return Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second")) - at.getTime();
+}
+
+// Local wall-clock time in `tz` -> UTC instant (second pass settles DST changes).
+function localToUtc(date: string, hhmm: string, tz: string): Date {
+  const [y, m, d] = date.split("-").map(Number);
+  const [h, mi] = hhmm.split(":").map(Number);
+  const guess = Date.UTC(y, m - 1, d, h, mi);
+  let ts = guess - tzOffsetMs(tz, new Date(guess));
+  ts = guess - tzOffsetMs(tz, new Date(ts));
+  return new Date(ts);
+}
+
+function shiftDate(date: string, days: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
 // Codes the app offers (src/lib/constants.js) plus legacy codes found in data.
-function reminderFireAt(date: string, time: string | null, reminder: string): Date | null {
+function reminderFireAt(date: string, time: string | null, reminder: string, tz: string): Date | null {
   const hhmm = /^\d{2}:\d{2}/.test(time || "") ? (time as string).slice(0, 5) : "09:00";
-  const due = new Date(`${date}T${hhmm}:00${SAST_OFFSET}`);
+  const due = localToUtc(date, hhmm, tz);
   const minus = (mins: number) => new Date(due.getTime() - mins * 60_000);
   switch (reminder) {
     case "on_time": return due;
@@ -27,17 +49,16 @@ function reminderFireAt(date: string, time: string | null, reminder: string): Da
     case "30_before": case "30_min": return minus(30);
     case "1h_before": case "1_hour": return minus(60);
     case "2_hours": return minus(120);
-    case "1d_before": case "1_day": {
-      const d = new Date(`${date}T09:00:00${SAST_OFFSET}`);
-      return new Date(d.getTime() - 86_400_000);
-    }
-    case "2_days": {
-      const d = new Date(`${date}T09:00:00${SAST_OFFSET}`);
-      return new Date(d.getTime() - 2 * 86_400_000);
-    }
-    case "morning": return new Date(`${date}T07:00:00${SAST_OFFSET}`);
+    case "1d_before": case "1_day": return localToUtc(shiftDate(date, -1), "09:00", tz);
+    case "2_days": return localToUtc(shiftDate(date, -2), "09:00", tz);
+    case "morning": return localToUtc(date, "07:00", tz);
     default: return null; // "none" or unknown
   }
+}
+
+function validTz(tz: string | null | undefined): string {
+  try { if (tz) { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return tz; } } catch { /* fall through */ }
+  return DEFAULT_TZ;
 }
 
 function json(body: unknown, status = 200) {
@@ -64,10 +85,10 @@ Deno.serve(async (req: Request) => {
 
   try {
     const now = new Date();
-    // Dates in SAST: yesterday..+3 days covers every reminder type's lead time.
-    const sastToday = new Date(now.getTime() + 2 * 3_600_000).toISOString().slice(0, 10);
-    const from = new Date(Date.parse(sastToday) - 86_400_000).toISOString().slice(0, 10);
-    const to = new Date(Date.parse(sastToday) + 3 * 86_400_000).toISOString().slice(0, 10);
+    // Two days either side of today (UTC) covers every timezone and reminder lead time.
+    const today = now.toISOString().slice(0, 10);
+    const from = shiftDate(today, -2);
+    const to = shiftDate(today, 3);
 
     const { data: followups, error } = await supabase
       .from("followups")
@@ -79,10 +100,19 @@ Deno.serve(async (req: Request) => {
       .neq("reminder", "none");
     if (error) throw error;
 
+    const targets = [...new Set((followups || []).map(f => f.assigned_to_user_id || f.user_id).filter(Boolean))];
+    const tzByUser = new Map<string, string>();
+    if (targets.length) {
+      const { data: users } = await supabase.from("users").select("id, timezone").in("id", targets);
+      for (const u of users || []) tzByUser.set(u.id, validTz(u.timezone));
+    }
+
     let sent = 0, due = 0;
     const notifiedIds: string[] = [];
     for (const fu of followups || []) {
-      const fireAt = reminderFireAt(fu.date, fu.time, fu.reminder);
+      const target = fu.assigned_to_user_id || fu.user_id;
+      if (!target) continue;
+      const fireAt = reminderFireAt(fu.date, fu.time, fu.reminder, tzByUser.get(target) || DEFAULT_TZ);
       if (!fireAt) continue;
       const lateBy = (now.getTime() - fireAt.getTime()) / 60_000;
       if (lateBy < 0 || lateBy > WINDOW_MINUTES) continue;
@@ -90,7 +120,6 @@ Deno.serve(async (req: Request) => {
       if (fu.notified_at && new Date(fu.notified_at).getTime() >= fireAt.getTime()) continue;
       due++;
 
-      const target = fu.assigned_to_user_id || fu.user_id;
       const { data: subs } = await supabase.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", target);
       notifiedIds.push(fu.id);
       if (!subs?.length) continue;
@@ -99,7 +128,7 @@ Deno.serve(async (req: Request) => {
         title: `⏰ Reminder: ${fu.title}`,
         body: `${fu.time ? `Due at ${fu.time.slice(0, 5)}` : "Due today"}${fu.client ? ` — ${fu.client}` : ""}`,
         url: "/?screen=Followups",
-        tag: `followup-${fu.id}`,
+        tag: `fu_${fu.id}`, // same tag as on-device reminders, so a phone never shows both
       });
       const stale: string[] = [];
       for (const sub of subs) {

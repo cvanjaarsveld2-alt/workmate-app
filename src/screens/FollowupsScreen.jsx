@@ -19,6 +19,7 @@ import {
   Card, Btn, Field, SearchBar, FilterPills, CollapsibleFilters,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
+import { useIsMine } from "../lib/teamView";
 
 function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShare, showShare }) {
   const [expanded, setExpanded] = useState(false);
@@ -87,6 +88,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShar
 }
 
 export function FollowupsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
+  const isMine = useIsMine(userId);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter]     = useState("By Client");
   const [editId, setEditId]     = useState(null);
@@ -97,8 +99,8 @@ export function FollowupsScreen({ data, setData, userId, userEmail, teamId, team
   const [form, setForm] = useState({ title: "", client_id: "", date: todayISO(), time: "09:00", reminder: "morning", notes: "", linked_note_id: "", assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
-  const followups = (data.followups || []).filter(f => f.user_id === userId || f.assigned_to_user_id === userId);
-  const clients   = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+  const followups = (data.followups || []).filter(isMine);
+  const clients   = (data.clients || []).filter(isMine);
   const today     = todayISO();
   const nextWeek  = new Date(); nextWeek.setDate(nextWeek.getDate() + 7);
   const nextWeekStr = nextWeek.toISOString().slice(0, 10);

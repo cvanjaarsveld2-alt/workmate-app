@@ -12,6 +12,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { withTeamId } from "../lib/teamId";
 import { triggerImmediateSync } from "../lib/sync";
 import { deleteRecord } from "../lib/deleteHelpers";
+import { useIsMine } from "../lib/teamView";
 
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = [
@@ -109,6 +110,7 @@ function friendlyHeading(date, today) {
 }
 
 export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
+  const isMine = useIsMine(userId);
   const today = todayISO();
   const now = localDate(today);
   const touchStart = useRef(null);
@@ -122,7 +124,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
   const [contactPickerOpen, setContactPickerOpen] = useState(false);
 
   const cells = useMemo(() => monthCells(view.year, view.month), [view]);
-  const followups = (data.followups || []).filter(item => item.user_id === userId || item.assigned_to_user_id === userId);
+  const followups = (data.followups || []).filter(isMine);
   const clients = (data.clients || []).filter(client => !client.user_id || client.user_id === userId || client.assigned_to_user_id === userId);
   const calendarItems = useMemo(() => {
     const items = followups.map(item => ({ ...item, _source: "followup", _kind: itemType(item) }));

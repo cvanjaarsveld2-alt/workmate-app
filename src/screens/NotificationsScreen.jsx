@@ -67,6 +67,7 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
       followup: "Followups",
       client:   "Clients",
       contact:  "Contacts",
+      team_view_request: "Team",
     };
     const screen = screenMap[notif.record_type];
     if (screen && onNavigate) onNavigate(screen);

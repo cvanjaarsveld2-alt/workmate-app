@@ -23,6 +23,7 @@ import {
 } from "../components/ui";
 import { MemberSelector } from "../components/MemberSelector";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
+import { useIsMine } from "../lib/teamView";
 
 // ─── Lead stages ─────────────────────────────────────────────────────────────
 const LEAD_STAGES = ["New", "Assigned", "In Progress", "Quoted", "Won", "Lost"];
@@ -285,6 +286,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
+  const isMine = useIsMine(userId);
   const [showForm, setShowForm]       = useState(false);
   const [editLead, setEditLead]       = useState(null);
   const [detailLead, setDetailLead]   = useState(null);
@@ -298,8 +300,8 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
 
   const leads    = data.leads    || [];
   // Same rule as every other screen: records you created or that are assigned to you.
-  const clients  = (data.clients  || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
-  const contacts = (data.contacts || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+  const clients  = (data.clients  || []).filter(isMine);
+  const contacts = (data.contacts || []).filter(isMine);
 
   useEffect(() => {
     if (!quickAddTrigger) return;

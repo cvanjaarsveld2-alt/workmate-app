@@ -1,0 +1,2 @@
+-- Exported from production supabase_migrations.schema_migrations (20260916025127).
+REVOKE EXECUTE ON FUNCTION public.enforce_signup_domain() FROM anon; REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon; REVOKE EXECUTE ON FUNCTION public.recalculate_invoice_payment_totals(uuid) FROM anon; REVOKE EXECUTE ON FUNCTION public.restore_sync_dependencies() FROM anon; REVOKE EXECUTE ON FUNCTION public.stage_missing_sync_dependencies() FROM anon; REVOKE EXECUTE ON FUNCTION public.sync_invoice_after_payment() FROM anon;

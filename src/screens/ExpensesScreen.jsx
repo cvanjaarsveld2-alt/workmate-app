@@ -37,6 +37,7 @@ import {
   Card, Btn, Field, SelectField, SearchBar,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
+import { useIsMine } from "../lib/teamView";
 
 // ─── Expense categories with GL codes + SA VAT treatment ──────────────────────
 // GL codes are SENSIBLE SA DEFAULTS — your financial manager should edit these
@@ -397,6 +398,7 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigger }) {
+  const isMine = useIsMine(userId);
   const exportProgress = useExportProgress();
   const [showForm, setShowForm]       = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -988,7 +990,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             const cl = (data.clients || []).find(c => c.id === v);
             setForm(f => ({ ...f, client_id: v || null, client_name: cl ? `${cl.company}${cl.branch ? " — " + cl.branch : ""}` : "" }));
           }}
-          clients={(data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId)} placeholder="Link to a client…" />
+          clients={(data.clients || []).filter(isMine)} placeholder="Link to a client…" />
 
         <Field label="Notes (optional)" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What was this for?" multiline />
         <div className="flex gap-2">

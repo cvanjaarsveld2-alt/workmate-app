@@ -14,6 +14,7 @@ import { Card, Btn, Field, Toast, Empty, PageHeader, ClientSelector } from "../c
 import { todayISO, genId, smartDate } from "../lib/helpers";
 import { withTeamId } from "../lib/teamId";
 import { offlineSave } from "../offline/offlineDb";
+import { useIsMine } from "../lib/teamView";
 
 const SUPABASE_URL = "https://hrqzqyfvbfzrfnuxovvr.supabase.co";
 
@@ -24,6 +25,7 @@ function formatDuration(seconds) {
 }
 
 export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavigate }) {
+  const isMine = useIsMine(userId);
   const [phase, setPhase]             = useState("setup");   // setup | recording | processing | review | saved
   const [meetingTitle, setMeetingTitle] = useState("");
   const [clientId, setClientId]       = useState(null);
@@ -40,7 +42,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
   const timerRef         = useRef(null);
   const startTimeRef     = useRef(null);
 
-  const clients = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+  const clients = (data.clients || []).filter(isMine);
   const selectedClient = clients.find(c => c.id === clientId);
 
   useEffect(() => () => {

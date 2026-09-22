@@ -18,6 +18,7 @@ import {
   RefreshCw, LogOut, Shield, AlertTriangle, X,
   ChevronRight, ChevronDown, ChevronUp, ArrowLeft,
   Send, Inbox, TrendingUp, Calendar, UserPlus,
+  Eye, EyeOff, ShieldCheck,
 } from "lucide-react";
 import { supabase } from "../supabase";
 import { Card, Btn, Field, Toast, PageHeader, useConfirm } from "../components/ui";
@@ -26,6 +27,7 @@ import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { triggerImmediateSync } from "../lib/sync";
+import { readTeamViewPref, writeTeamViewPref } from "../lib/teamView";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function money(n) {
@@ -502,6 +504,11 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
   const [saving, setSaving]           = useState(false);
   const [viewingMember, setViewingMember] = useState(null);
   const [showManage, setShowManage]   = useState(false);
+  // Master-account controls: who may see the whole team's records, and requests for it.
+  const [access, setAccess]           = useState(null);
+  const [viewAccess, setViewAccess]   = useState({});
+  const [viewRequests, setViewRequests] = useState([]);
+  const [teamViewOn, setTeamViewOn]   = useState(readTeamViewPref);
   const { confirm, dialog }           = useConfirm();
 
   useEffect(() => { loadTeam(); }, [userId, appUserRole]);
@@ -541,6 +548,20 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
       }
 
       setMyRole(effectiveRole);
+
+      const [{ data: acc }, { data: accessRows }] = await Promise.all([
+        supabase.rpc("get_my_team_access"),
+        supabase.from("team_members").select("user_id, can_view_team").eq("team_id", membership.team_id),
+      ]);
+      setAccess(acc && typeof acc === "object" ? acc : null);
+      setViewAccess(Object.fromEntries((accessRows || []).map(r => [r.user_id, !!r.can_view_team])));
+      if (acc?.is_owner) {
+        const { data: reqs } = await supabase.from("team_notifications")
+          .select("id, from_user_id, message, created_at")
+          .eq("to_user_id", userId).eq("record_type", "team_view_request").eq("read", false)
+          .order("created_at", { ascending: false });
+        setViewRequests(reqs || []);
+      } else setViewRequests([]);
 
       const { data: teamData } = await supabase
         .from("teams").select("id, name, invite_code").eq("id", membership.team_id).maybeSingle();
@@ -649,19 +670,50 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
     else { setMembers(m => m.filter(x => x.user_id !== member.user_id)); setToast("Member removed"); }
   }
 
+  // Only the master account changes roles or access (enforced by set_member_access).
+  async function setMemberAccess(member, { role = null, canViewTeam = null }) {
+    const { error } = await supabase.rpc("set_member_access", { p_user_id: member.user_id, p_role: role, p_can_view_team: canViewTeam });
+    if (error) { setToast(error.message || "Could not update access"); return false; }
+    if (role) setMembers(m => m.map(x => x.user_id === member.user_id ? { ...x, role } : x));
+    if (canViewTeam !== null) setViewAccess(v => ({ ...v, [member.user_id]: canViewTeam }));
+    setViewRequests(r => r.filter(x => x.from_user_id !== member.user_id));
+    return true;
+  }
+
+  async function toggleTeamView(member) {
+    const next = !viewAccess[member.user_id];
+    if (await setMemberAccess(member, { canViewTeam: next }))
+      setToast(`${member.email} ${next ? "can now see" : "no longer sees"} the whole team's records`);
+  }
+
+  async function answerRequest(req, approve) {
+    const member = members.find(m => m.user_id === req.from_user_id) || { user_id: req.from_user_id, email: "Teammate" };
+    if (await setMemberAccess(member, { canViewTeam: approve }))
+      setToast(approve ? `Access granted to ${member.email}` : "Request declined");
+  }
+
+  async function requestTeamView() {
+    const { error } = await supabase.rpc("request_team_view");
+    if (error) { setToast(error.message || "Could not send request"); return; }
+    setAccess(a => ({ ...(a || {}), request_pending: true }));
+    setToast("Request sent to the master account");
+  }
+
+  function switchTeamView(on) {
+    setTeamViewOn(on);
+    writeTeamViewPref(on);
+  }
+
   async function toggleRole(member) {
-    if (myRole !== "admin" || member.user_id === userId) { setToast("Cannot change your own role"); return; }
+    if (!access?.is_owner) { setToast("Only the master account can change roles"); return; }
+    if (member.user_id === userId) { setToast("The master account always stays admin"); return; }
     const newRole = member.role === "admin" ? "member" : "admin";
     const ok = await confirm(
       `${newRole === "admin" ? "Promote" : "Demote"} ${member.email} to ${newRole}?`,
       { confirmLabel: newRole === "admin" ? "Promote" : "Demote", confirmVariant: newRole === "admin" ? "success" : "danger" }
     );
     if (!ok) return;
-    const { error } = await supabase.from("team_members")
-      .update({ role: newRole }).eq("user_id", member.user_id).eq("team_id", team.id);
-    if (error) { setToast("Could not update role"); return; }
-    setMembers(m => m.map(x => x.user_id === member.user_id ? { ...x, role: newRole } : x));
-    setToast(`${member.email} is now ${newRole}`);
+    if (await setMemberAccess(member, { role: newRole })) setToast(`${member.email} is now ${newRole}`);
   }
 
   function copyCode() {
@@ -1004,6 +1056,49 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
         </div>
       )}
 
+      {/* ── Whole-team view: master approves; others request ── */}
+      {access?.is_owner && viewRequests.length > 0 && (
+        <Card className="p-4 space-y-3">
+          <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Access requests</p>
+          {viewRequests.map(req => {
+            const who = members.find(m => m.user_id === req.from_user_id);
+            return (
+              <div key={req.id} className="flex items-center gap-2">
+                <p className="flex-1 text-sm text-slate-700">{who?.email || "A teammate"} wants to see the whole team's records.</p>
+                <Btn size="sm" variant="secondary" onClick={() => answerRequest(req, false)}>Decline</Btn>
+                <Btn size="sm" onClick={() => answerRequest(req, true)}>Approve</Btn>
+              </div>
+            );
+          })}
+        </Card>
+      )}
+      {access && (
+        <Card className="p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} style={{ color: BRAND.primary }} />
+            <p className="text-sm font-black text-slate-800">{access.is_owner ? "Master account" : "Whole-team view"}</p>
+          </div>
+          {access.is_owner ? (
+            <p className="text-xs text-slate-500">Only you can make people admin (crown) or let them see the whole team's records (eye).</p>
+          ) : access.can_view_team ? (
+            <p className="text-xs text-slate-500">The master account has given you access to the whole team's records.</p>
+          ) : access.request_pending ? (
+            <p className="text-xs text-slate-500">Your request is waiting for the master account.</p>
+          ) : (
+            <div className="flex items-center gap-2">
+              <p className="flex-1 text-xs text-slate-500">You see records you created or that are assigned to you.</p>
+              <Btn size="sm" onClick={requestTeamView}>Request access</Btn>
+            </div>
+          )}
+          {access.can_view_team && (
+            <label className="flex items-center justify-between gap-3 pt-1">
+              <span className="text-sm text-slate-700">Show teammates' records on my screens</span>
+              <input type="checkbox" className="h-5 w-5 accent-red-800" checked={teamViewOn} onChange={e => switchTeamView(e.target.checked)} />
+            </label>
+          )}
+        </Card>
+      )}
+
       {/* ── Members list (everyone sees) ── */}
       <Card className="overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-50 flex items-center justify-between">
@@ -1036,13 +1131,20 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                     <p className="text-xs text-slate-400 truncate mt-0.5">{m.email}</p>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    {myRole === "admin" && !isMe && (
+                    {access?.is_owner && !isMe && (
+                      <button onClick={e => { e.stopPropagation(); toggleTeamView(m); }}
+                        title={viewAccess[m.user_id] ? "Can see whole team" : "Sees only their own records"}
+                        className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center">
+                        {viewAccess[m.user_id] ? <Eye size={14} className="text-emerald-600" /> : <EyeOff size={14} className="text-slate-300" />}
+                      </button>
+                    )}
+                    {access?.is_owner && !isMe && (
                       <button onClick={e => { e.stopPropagation(); toggleRole(m); }}
                         className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center">
                         <Crown size={14} style={{ color: m.role === "admin" ? "#A16207" : "#CBD5E1" }} />
                       </button>
                     )}
-                    {(isMe || (myRole === "admin" && !isMe)) && (
+                    {((isMe && !access?.is_owner) || (access?.is_owner && !isMe)) && (
                       <button onClick={e => { e.stopPropagation(); removeMember(m); }}
                         className="p-2 rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 min-w-[36px] min-h-[36px] flex items-center justify-center">
                         {isMe ? <LogOut size={14} /> : <UserMinus size={14} />}
@@ -1143,7 +1245,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
         <div className="flex items-start gap-3">
           <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-800 leading-relaxed">
-            All team members can view and edit shared data. Expenses are always private — no one else can see yours.
+            Your screens show your own and assigned records; the master account can grant whole-team view. Expenses are always private — no one else can see yours.
           </p>
         </div>
       </Card>

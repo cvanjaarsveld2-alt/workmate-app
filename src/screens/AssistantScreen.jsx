@@ -22,6 +22,7 @@ import { offlineSave } from "../offline/offlineDb";
 import { triggerImmediateSync } from "../lib/sync";
 import { promoteEmailQuoteToQuote } from "../lib/emailQuoteAutomation";
 import { Card, Btn, Field, Toast, Empty, PageHeader, useConfirm } from "../components/ui";
+import { useIsMine } from "../lib/teamView";
 
 const CONFIDENCE_STYLE = {
   high:   { bg: "#DCFCE7", text: "#15803D", label: "High confidence" },
@@ -110,12 +111,13 @@ function ReviewCard({ candidate, clients, onConfirm, onDismiss }) {
 }
 
 export function AssistantScreen({ data, setData, userId, teamId }) {
+  const isMine = useIsMine(userId);
   const [toast, setToast] = useState("");
   const [showDismissed, setShowDismissed] = useState(false);
   const { confirm, dialog } = useConfirm();
 
-  const emailQuotes = (data.email_quotes || []).filter(e => e.user_id === userId);
-  const clients = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+  const emailQuotes = (data.email_quotes || []).filter(isMine);
+  const clients = (data.clients || []).filter(isMine);
   const followups = data.followups || [];
 
   const needsReview = useMemo(

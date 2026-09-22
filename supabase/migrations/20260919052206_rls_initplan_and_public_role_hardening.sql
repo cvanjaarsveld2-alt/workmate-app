@@ -1,4 +1,4 @@
--- RLS performance and role hardening applied to production on 2026-09-19.
+-- Exported from production supabase_migrations.schema_migrations (20260919052206).
 drop policy if exists "activities_ins" on public.activities;
 create policy "activities_ins" on public.activities for insert to authenticated with check (((user_id = (select auth.uid())) AND ((team_id IS NULL) OR (team_id IN (SELECT team_members.team_id FROM public.team_members WHERE team_members.user_id = (select auth.uid()))))));
 drop policy if exists "breakdown_reports_ins" on public.breakdown_reports;

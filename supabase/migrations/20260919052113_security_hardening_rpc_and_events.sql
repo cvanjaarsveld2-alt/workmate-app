@@ -1,4 +1,6 @@
--- Security hardening applied to production on 2026-09-19.
+-- Exported from production supabase_migrations.schema_migrations (20260919052113).
+
+-- PowerMate security hardening: telemetry ownership and RPC surface.
 drop policy if exists "Anyone insert events" on public.events;
 create policy "events_insert_own"
   on public.events for insert
@@ -23,6 +25,7 @@ revoke execute on function public.handle_new_user() from public, authenticated;
 revoke execute on function public.restore_sync_dependencies() from public, authenticated;
 revoke execute on function public.stage_missing_sync_dependencies() from public, authenticated;
 revoke execute on function public.sync_invoice_after_payment() from public, authenticated;
+
 revoke execute on function public.recalculate_invoice_payment_totals(uuid) from authenticated;
 
 grant execute on function public.accept_shared_record(uuid,uuid) to authenticated;

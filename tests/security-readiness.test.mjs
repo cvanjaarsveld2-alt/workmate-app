@@ -78,3 +78,17 @@ test("password reset never reveals whether an account exists", () => {
   assert.match(source, /If that email has a PowerMate account/);
   assert.match(read("src/App.jsx"), /PASSWORD_RECOVERY/);
 });
+
+test("roles and whole-team view are changed only through the master-account RPC", () => {
+  const team = read("src/screens/TeamScreen.jsx");
+  assert.match(team, /rpc\("set_member_access"/);
+  assert.doesNotMatch(team, /\.update\(\{ role: newRole \}\)/);
+  assert.match(team, /access\?\.is_owner && !isMe/);
+});
+
+test("device reminders only use the person's own records and follow the signed-in user", () => {
+  const app = read("src/App.jsx");
+  assert.match(app, /isOwnRecord\(r,uid\)/);
+  assert.match(app, /unsubscribeFromPush\(uid\)/);
+  assert.match(app, /set_my_timezone/);
+});

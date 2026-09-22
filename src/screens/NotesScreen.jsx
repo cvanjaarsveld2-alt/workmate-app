@@ -18,9 +18,11 @@ import { ContactPicker, LinkedContactsDisplay } from "../components/ContactPicke
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { NoteToFollowupBtn } from "../components/NoteToFollowup";
+import { useIsMine } from "../lib/teamView";
 // NotesExport loaded lazily to keep initial bundle small
 
 export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], isOnline, quickAddTrigger, searchSeed }) {
+  const isMine = useIsMine(userId);
   const [showForm, setShowForm]         = useState(false);
   const [editId, setEditId]             = useState(null);
   const [search, setSearch]             = useState("");
@@ -45,7 +47,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const [exportProgress, setExportProgress] = useState(0);
   const [notesPack, setNotesPack] = useState(null); // { blob, url, filename } — PDF ready to preview/share
   const { confirm, dialog } = useConfirm();
-  const notes    = (data.notes    || []).filter(n => n.user_id === userId || n.assigned_to_user_id === userId);
+  const notes    = (data.notes    || []).filter(isMine);
   const contacts = data.contacts || [];
   const clients  = data.clients  || [];
   const today    = todayISO();

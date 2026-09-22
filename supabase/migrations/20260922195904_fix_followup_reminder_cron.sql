@@ -1,3 +1,4 @@
+-- Exported from production supabase_migrations.schema_migrations (20260922195904).
 -- Shared secret pg_cron presents to send-reminders (never leaves the database).
 do $$
 begin

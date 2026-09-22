@@ -22,6 +22,7 @@ import {
   Card, Btn, Field, GroupField, SelectField, SearchBar,
   FilterPills, CollapsibleFilters, Toast, Empty, StagePill, PageHeader, useConfirm,
 } from "../components/ui";
+import { useIsMine } from "../lib/teamView";
 
 const STAGE_PRIORITY = { Active: 0, Quoted: 1, Contacted: 2, "New Lead": 3, Won: 4, Lost: 5 };
 
@@ -332,6 +333,7 @@ function ClientFollowupRow({ followup: f, setData }) {
 
 // ─── Main ClientsScreen ───────────────────────────────────────────────────────
 export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed, onNavigate, isOnline }) {
+  const isMine = useIsMine(userId);
   const [showForm, setShowForm]         = useState(false);
   const [search, setSearch]             = useState("");
   const [editId, setEditId]             = useState(null);
@@ -408,7 +410,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
   const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], category: "", assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
-  const clients   = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+  const clients   = (data.clients || []).filter(isMine);
   const dormantCount = filterStage === "Dormant" ? 0 : clients.filter(c => c.stage === "Dormant").length;
   const companyCount = new Set(clients.map(c => c.company?.trim()).filter(Boolean)).size;
   const followups = data.followups || [];
