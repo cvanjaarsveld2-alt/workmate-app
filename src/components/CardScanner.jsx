@@ -12,24 +12,31 @@ const EDGE_FUNCTION_URL = `${SUPABASE_FUNCTIONS_URL}/scan-business-card`;
 async function compressImage(file, maxWidth = 1600, quality = 0.85) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = e => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement("canvas");
         const ratio = img.width / img.height;
         let w = img.width;
         let h = img.height;
-        if (w > maxWidth) { w = maxWidth; h = maxWidth / ratio; }
+        if (w > maxWidth) {
+          w = maxWidth;
+          h = maxWidth / ratio;
+        }
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, w, h);
-        canvas.toBlob((blob) => {
-          if (!blob) return reject(new Error("Compression failed"));
-          const fr = new FileReader();
-          fr.onloadend = () => resolve({ blob, dataUrl: fr.result });
-          fr.readAsDataURL(blob);
-        }, "image/jpeg", quality);
+        canvas.toBlob(
+          blob => {
+            if (!blob) return reject(new Error("Compression failed"));
+            const fr = new FileReader();
+            fr.onloadend = () => resolve({ blob, dataUrl: fr.result });
+            fr.readAsDataURL(blob);
+          },
+          "image/jpeg",
+          quality,
+        );
       };
       img.onerror = reject;
       img.src = e.target.result;
@@ -57,11 +64,13 @@ async function uploadCardImage(blob, userId) {
 }
 
 async function extractCardData(imageBase64) {
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   if (!session) throw new Error("Not authenticated");
   const response = await fetch(EDGE_FUNCTION_URL, {
     method: "POST",
-    headers: { "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ imageBase64 }),
   });
   const result = await response.json();
@@ -114,28 +123,116 @@ export function CardScanner({ userId, onExtracted, onCancel }) {
   const triggerGallery = () => galleryInputRef.current?.click();
 
   return (
-    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden">
-      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileSelected(e.target.files?.[0])} />
-      <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => handleFileSelected(e.target.files?.[0])} />
-      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between" style={{ background: "#F7F3F3" }}>
+    <motion.div
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      className="bg-white rounded-2xl shadow-lg border border-slate-100 overflow-hidden"
+    >
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={e => handleFileSelected(e.target.files?.[0])}
+      />
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={e => handleFileSelected(e.target.files?.[0])}
+      />
+      <div
+        className="px-4 py-3 border-b border-slate-100 flex items-center justify-between"
+        style={{ background: "#F7F3F3" }}
+      >
         <p className="text-base font-black text-slate-900">Scan Business Card</p>
-        <button onClick={onCancel} className="p-1.5 rounded-lg text-slate-400 hover:bg-white"><X size={18} /></button>
+        <button onClick={onCancel} className="p-1.5 rounded-lg text-slate-400 hover:bg-white">
+          <X size={18} />
+        </button>
       </div>
       <div className="p-4">
         <AnimatePresence mode="wait">
-          {step === "choose" && <motion.div key="choose" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-6 flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center"><Camera size={30} style={{ color: "#8B1A1A" }} /></div>
-            <div className="text-center"><p className="text-sm font-bold text-slate-700">Opening camera…</p><p className="text-xs text-slate-400 mt-1">Point at a business card and take the photo</p></div>
-            <button onClick={triggerCamera} className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]" style={{ background: "#8B1A1A" }}><Camera size={16} /> Open Camera</button>
-            <button onClick={triggerGallery} className="text-xs font-bold text-slate-400 py-2 px-4 min-h-[44px]">Use a photo from my gallery instead</button>
-          </motion.div>}
-          {step === "processing" && <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-8 flex flex-col items-center text-center">
-            <Loader2 size={42} className="text-red-600 animate-spin mb-4" /><p className="text-base font-bold text-slate-900">{progress || "Processing…"}</p><p className="text-xs text-slate-500 mt-1">Takes a few seconds</p>
-          </motion.div>}
-          {step === "error" && <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-red-50 border border-red-200"><AlertCircle size={20} className="text-red-600 shrink-0 mt-0.5" /><div className="flex-1"><p className="text-sm font-bold text-red-800">Couldn't scan the card</p><p className="text-xs text-red-600 mt-0.5">{error}</p></div></div>
-            <div className="flex gap-2"><button onClick={() => { setStep("choose"); setError(""); }} className="flex-1 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]" style={{ background: "#8B1A1A" }}>Try Again</button><button onClick={onCancel} className="rounded-xl px-4 py-3 text-sm font-bold text-slate-600 bg-slate-100 min-h-[48px]">Cancel</button></div>
-          </motion.div>}
+          {step === "choose" && (
+            <motion.div
+              key="choose"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="py-6 flex flex-col items-center gap-4"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center">
+                <Camera size={30} style={{ color: "#8B1A1A" }} />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-700">Opening camera…</p>
+                <p className="text-xs text-slate-400 mt-1">Point at a business card and take the photo</p>
+              </div>
+              <button
+                onClick={triggerCamera}
+                className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
+                style={{ background: "#8B1A1A" }}
+              >
+                <Camera size={16} /> Open Camera
+              </button>
+              <button
+                onClick={triggerGallery}
+                className="text-xs font-bold text-slate-400 py-2 px-4 min-h-[44px]"
+              >
+                Use a photo from my gallery instead
+              </button>
+            </motion.div>
+          )}
+          {step === "processing" && (
+            <motion.div
+              key="processing"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="py-8 flex flex-col items-center text-center"
+            >
+              <Loader2 size={42} className="text-red-600 animate-spin mb-4" />
+              <p className="text-base font-bold text-slate-900">{progress || "Processing…"}</p>
+              <p className="text-xs text-slate-500 mt-1">Takes a few seconds</p>
+            </motion.div>
+          )}
+          {step === "error" && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-3"
+            >
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-red-50 border border-red-200">
+                <AlertCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-red-800">Couldn't scan the card</p>
+                  <p className="text-xs text-red-600 mt-0.5">{error}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setStep("choose");
+                    setError("");
+                  }}
+                  className="flex-1 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
+                  style={{ background: "#8B1A1A" }}
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={onCancel}
+                  className="rounded-xl px-4 py-3 text-sm font-bold text-slate-600 bg-slate-100 min-h-[48px]"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     </motion.div>

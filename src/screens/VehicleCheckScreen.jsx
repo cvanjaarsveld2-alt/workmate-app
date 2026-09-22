@@ -4,7 +4,7 @@
 // - History: grouped by month (collapsible) then by week
 // - Multi-select days/weeks, build combined PDF, share to department
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useExportProgress } from "../components/ExportProgress";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -373,7 +373,15 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
   }
 
   // ── Day data helpers ────────────────────────────────────────────────────────
-  function getDayData(date) { return checks[date] || { items: {}, generalComment: "" }; }
+  // Latest answers written for each day but not yet reflected in `checks`. Rapid
+  // taps build on this so one tap cannot overwrite another before state catches up.
+  const unsavedDays = useRef({});
+  function getDayData(date) {
+    const pending = unsavedDays.current[date];
+    const saved = checks[date];
+    if (pending && !(saved?._updated_at && saved._updated_at >= pending.updatedAt)) return pending.dayData;
+    return saved || { items: {}, generalComment: "" };
+  }
   function getItemStatus(date, item) { return getDayData(date).items[item]?.status || null; }
   function getItemComment(date, item) { return getDayData(date).items[item]?.comment || ""; }
 
@@ -390,6 +398,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
       sync_status: "pending",
       updated_at: new Date().toISOString(),
     };
+    unsavedDays.current[date] = { dayData, updatedAt: row.updated_at };
 
     try {
       await saveAndSync(

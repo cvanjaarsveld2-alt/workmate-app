@@ -294,7 +294,7 @@ function LockoutTimer({ userId, onExpired }) {
       if (r <= 0) { clearInterval(id); onExpired(); }
     }, 1000);
     return () => clearInterval(id);
-  }, []); // eslint-disable-line
+  }, []);  
 
   const mins = Math.ceil(remaining / 60000);
   return (
@@ -323,7 +323,7 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
       const timer = setTimeout(() => triggerBiometric(), 500);
       return () => clearTimeout(timer);
     }
-  }, []); // eslint-disable-line
+  }, []);  
 
   useEffect(() => {
     if (error && error !== prevError.current) {

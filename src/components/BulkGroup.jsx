@@ -176,7 +176,7 @@ export function useCollapsibleGroups(allNames = null, defaultCollapsed = false) 
     if (!defaultCollapsed || !allNames) return;
     if (touched) return;
     setCollapsed(new Set(allNames));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [defaultCollapsed, allNames ? allNames.join("|") : "", touched]);
 
   const isCollapsed = React.useCallback((name) => collapsed.has(name), [collapsed]);

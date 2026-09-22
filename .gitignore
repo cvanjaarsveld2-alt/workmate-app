@@ -31,3 +31,4 @@ logs/
 .cache/
 .parcel-cache/
 .eslintcache
+tests/sim/out/

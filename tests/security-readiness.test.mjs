@@ -87,7 +87,7 @@ test("roles and whole-team view are changed only through the master-account RPC"
 });
 
 test("device reminders only use the person's own records and follow the signed-in user", () => {
-  const app = read("src/App.jsx");
+  const app = read("src/App.jsx").replace(/\s+/g, "");
   assert.match(app, /isOwnRecord\(r,uid\)/);
   assert.match(app, /unsubscribeFromPush\(uid\)/);
   assert.match(app, /set_my_timezone/);
