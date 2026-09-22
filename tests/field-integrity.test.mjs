@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const read = p => fs.readFileSync(p, "utf8");
+// Whitespace-insensitive view so formatting changes do not break behaviour checks.
+const compact = p => read(p).replace(/\s+/g, "");
 
 test("offline writes fail loudly instead of masquerading as success", () => {
   const source = read("src/offline/offlineDb.js");
@@ -65,8 +67,8 @@ test("job invoice and payment uniqueness/idempotency protections stay wired into
 });
 
 test("team/customer records stay user/team scoped during sync", () => {
-  const sync = read("src/lib/sync.js");
-  assert.match(sync, /const TEAM_TABLES=new Set/);
+  const sync = compact("src/lib/sync.js");
+  assert.match(sync, /constTEAM_TABLES=newSet/);
   assert.match(sync, /payload\.user_id=authData\.user\.id/);
   assert.match(sync, /sanitizeRemotePayload/);
 });
@@ -128,10 +130,10 @@ test("critical screens no longer hand-build sync queue entries for their primary
 });
 
 test("sync never injects link columns a table does not have", () => {
-  const source = read("src/lib/sync.js");
+  const source = compact("src/lib/sync.js");
   // cleanUUIDs must only normalise fields already present (f in out); adding
   // missing ones sent e.g. notes.contact_id and PostgREST rejected every save.
-  assert.match(source, /if\(f in out&&\(out\[f\]===""\|\|out\[f\]===undefined\)\)out\[f\]=null/);
+  assert.match(source, /if\(finout&&\(out\[f\]===""\|\|out\[f\]===undefined\)\)out\[f\]=null/);
 });
 
 test("stringified vehicle check data is parsed before use", () => {

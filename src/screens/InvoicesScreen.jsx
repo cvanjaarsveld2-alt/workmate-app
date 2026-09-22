@@ -1,14 +1,220 @@
-import React,{useEffect,useMemo,useState}from"react";import{offlineGetAll,offlineSave}from"../offline/offlineDb";import{saveAndSync}from"../lib/sync";import{supabase}from"../supabase";import{Card,Btn,PageHeader}from"../components/ui";import{CreditCard,RefreshCw,Search,CheckCircle2,WifiOff}from"lucide-react";import{useOnlineStatus}from"../hooks/useOnlineStatus";
-const money=v=>`R ${Number(v||0).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`;const labels={draft:"Draft",sent:"Sent",part_paid:"Partially paid",partially_paid:"Partially paid",paid:"Paid",overdue:"Overdue",cancelled:"Cancelled"};const METHODS=["eft","cash","card","instant_eft","other"];
+import React, { useEffect, useMemo, useState } from "react";
+import { offlineGetAll, offlineSave } from "../offline/offlineDb";
+import { saveAndSync } from "../lib/sync";
+import { supabase } from "../supabase";
+import { Card, Btn, PageHeader } from "../components/ui";
+import { CreditCard, RefreshCw, Search, CheckCircle2, WifiOff } from "lucide-react";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
+const money = v =>
+  `R ${Number(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const labels = {
+  draft: "Draft",
+  sent: "Sent",
+  part_paid: "Partially paid",
+  partially_paid: "Partially paid",
+  paid: "Paid",
+  overdue: "Overdue",
+  cancelled: "Cancelled",
+};
+const METHODS = ["eft", "cash", "card", "instant_eft", "other"];
 // Generated ONCE per payment intent (here, before the offline/online branch) and
 // carried as part of the record itself — every retry of the same queued item (offline
 // save, sync-queue retry, browser restart, a second device racing the same payment)
 // resends this exact key, so the DB's payments_idempotency_key_uidx constraint can
 // tell "this exact intent already succeeded" apart from "this is a genuinely new
 // payment". crypto.randomUUID isn't available on every older WebView, hence the fallback.
-function genIdempotencyKey(){try{if(typeof crypto!=="undefined"&&crypto.randomUUID)return crypto.randomUUID();}catch{}return`idem_${Date.now()}_${Math.random().toString(36).slice(2,10)}_${Math.random().toString(36).slice(2,10)}`;}
-export function InvoicesScreen({userId,teamId,setData}){const[invoices,setInvoices]=useState([]),[payments,setPayments]=useState([]),[loading,setLoading]=useState(true),[saving,setSaving]=useState(null),[error,setError]=useState(""),[query,setQuery]=useState("");const online=useOnlineStatus();
-async function load(){if(!userId)return;setLoading(true);setError("");const[li,lp]=await Promise.all([offlineGetAll("invoices").catch(()=>[]),offlineGetAll("payments").catch(()=>[])]);setInvoices((li||[]).filter(x=>x.user_id===userId||x.team_id===teamId));setPayments((lp||[]).filter(x=>x.user_id===userId||x.team_id===teamId));if(online){const[ir,pr]=await Promise.all([supabase.from("invoices").select("*").order("issue_date",{ascending:false}),supabase.from("payments").select("*").order("payment_date",{ascending:false})]);if(!ir.error){setInvoices(ir.data||[]);await Promise.all((ir.data||[]).map(x=>offlineSave("invoices",x).catch(()=>{})))}else if(!li.length)setError(ir.error.message);if(!pr.error){setPayments(pr.data||[]);await Promise.all((pr.data||[]).map(x=>offlineSave("payments",x).catch(()=>{})))}}setLoading(false)}useEffect(()=>{load()},[userId,teamId,online]);
-const visible=useMemo(()=>{const t=query.trim().toLowerCase();return t?invoices.filter(x=>[x.invoice_number,x.notes,x.status].some(v=>String(v||"").toLowerCase().includes(t))):invoices},[invoices,query]);
-async function pay(inv){const balance=Math.max(0,Number(inv.balance_due||0)),raw=window.prompt(`Payment for ${inv.invoice_number||"invoice"}. Amount (R):`,String(balance));if(raw===null)return;const amount=Number(String(raw).replace(/,/g,""));if(!Number.isFinite(amount)||amount<=0||amount>balance+.01){setError("Enter a valid amount within the outstanding balance.");return}const reference=window.prompt("Payment reference (optional):","");if(reference===null)return;const method=(window.prompt("Payment method (eft / cash / card / instant_eft / other):","eft")||"eft").trim().toLowerCase();if(!METHODS.includes(method)){setError("Invalid payment method. Use eft, cash, card, instant_eft or other.");return}setSaving(inv.id);setError("");const p={id:`pay_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,idempotency_key:genIdempotencyKey(),user_id:userId,team_id:inv.team_id||teamId||null,invoice_id:inv.id,amount,payment_date:new Date().toISOString().slice(0,10),method,reference:reference.trim()||null,created_at:new Date().toISOString(),sync_status:"pending"};const paid=(payments.filter(x=>x.invoice_id===inv.id).reduce((s,x)=>s+Number(x.amount||0),0)+amount),total=Number(inv.total||0),updated={...inv,amount_paid:Math.min(total,paid),balance_due:Math.max(0,total-paid),status:paid>=total?"paid":"part_paid",sync_status:"pending"};await offlineSave("payments",p);await offlineSave("invoices",updated);setPayments(x=>[p,...x]);setInvoices(x=>x.map(i=>i.id===inv.id?updated:i));const saved=await saveAndSync(p,"payments","insert",setData||(()=>{}),online);if(saved?.sync_status==="synced"){const{data}=await supabase.from("invoices").select("*").eq("id",inv.id).maybeSingle();if(data){setInvoices(x=>x.map(i=>i.id===inv.id?data:i));await offlineSave("invoices",data)}}setSaving(null);setError(online?"Payment recorded.":"Payment saved offline and queued for sync.")}
-const outstanding=invoices.reduce((s,x)=>s+Number(x.balance_due||0),0),received=invoices.reduce((s,x)=>s+Number(x.amount_paid||0),0);return <div className="space-y-4"><PageHeader title="Invoices" subtitle="Billing, balances & payments"/>{!online&&<div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 flex gap-2"><WifiOff size={16}/>Offline mode — invoices and payments save locally and sync later.</div>}{error&&<div className="rounded-xl bg-slate-50 border p-3 text-sm text-slate-700">{error}</div>}<div className="grid grid-cols-2 gap-3"><Card className="p-4"><p className="text-xs font-bold text-slate-400">Outstanding</p><p className="text-lg font-black">{money(outstanding)}</p></Card><Card className="p-4"><p className="text-xs font-bold text-slate-400">Payments received</p><p className="text-lg font-black">{money(received)}</p></Card></div><div className="flex gap-2"><div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search invoices" className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm"/></div><Btn size="sm" variant="secondary" onClick={load}><RefreshCw size={14}/>Refresh</Btn></div>{loading?<Card className="p-6 text-center text-slate-400">Loading invoices…</Card>:visible.length===0?<Card className="p-6 text-center"><p className="font-bold">No invoices found</p><p className="text-sm text-slate-400">Invoices generated from completed jobs appear here.</p></Card>:visible.map(inv=>{const paidFlag=Number(inv.balance_due||0)<=0||inv.status==="paid";return <Card key={inv.id} className="p-4 space-y-3"><div className="flex items-start gap-3"><div className="flex-1"><p className="font-black truncate">{inv.invoice_number||"Invoice"}</p><p className="text-sm text-slate-500">{labels[inv.status]||String(inv.status||"Unknown").replaceAll("_"," ")}</p></div><p className="font-black">{money(inv.total)}</p></div><div className="flex justify-between text-xs text-slate-500"><span>Paid: {money(inv.amount_paid)}</span><span>Balance: {money(inv.balance_due)}</span></div>{paidFlag?<span className="inline-flex items-center gap-1 text-xs font-bold text-green-700"><CheckCircle2 size={13}/>Paid</span>:<Btn size="sm" onClick={()=>pay(inv)} disabled={saving===inv.id}><CreditCard size={13}/>{saving===inv.id?"Saving…":"Record payment"}</Btn>}</Card>})}</div>}
+function genIdempotencyKey() {
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch {}
+  return `idem_${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+export function InvoicesScreen({ userId, teamId, setData }) {
+  const [invoices, setInvoices] = useState([]),
+    [payments, setPayments] = useState([]),
+    [loading, setLoading] = useState(true),
+    [saving, setSaving] = useState(null),
+    [error, setError] = useState(""),
+    [query, setQuery] = useState("");
+  const online = useOnlineStatus();
+  async function load() {
+    if (!userId) return;
+    setLoading(true);
+    setError("");
+    const [li, lp] = await Promise.all([
+      offlineGetAll("invoices").catch(() => []),
+      offlineGetAll("payments").catch(() => []),
+    ]);
+    setInvoices((li || []).filter(x => x.user_id === userId || x.team_id === teamId));
+    setPayments((lp || []).filter(x => x.user_id === userId || x.team_id === teamId));
+    if (online) {
+      const [ir, pr] = await Promise.all([
+        supabase.from("invoices").select("*").order("issue_date", { ascending: false }),
+        supabase.from("payments").select("*").order("payment_date", { ascending: false }),
+      ]);
+      if (!ir.error) {
+        setInvoices(ir.data || []);
+        await Promise.all((ir.data || []).map(x => offlineSave("invoices", x).catch(() => {})));
+      } else if (!li.length) setError(ir.error.message);
+      if (!pr.error) {
+        setPayments(pr.data || []);
+        await Promise.all((pr.data || []).map(x => offlineSave("payments", x).catch(() => {})));
+      }
+    }
+    setLoading(false);
+  }
+  useEffect(() => {
+    load();
+  }, [userId, teamId, online]);
+  const visible = useMemo(() => {
+    const t = query.trim().toLowerCase();
+    return t
+      ? invoices.filter(x =>
+          [x.invoice_number, x.notes, x.status].some(v =>
+            String(v || "")
+              .toLowerCase()
+              .includes(t),
+          ),
+        )
+      : invoices;
+  }, [invoices, query]);
+  async function pay(inv) {
+    const balance = Math.max(0, Number(inv.balance_due || 0)),
+      raw = window.prompt(`Payment for ${inv.invoice_number || "invoice"}. Amount (R):`, String(balance));
+    if (raw === null) return;
+    const amount = Number(String(raw).replace(/,/g, ""));
+    if (!Number.isFinite(amount) || amount <= 0 || amount > balance + 0.01) {
+      setError("Enter a valid amount within the outstanding balance.");
+      return;
+    }
+    const reference = window.prompt("Payment reference (optional):", "");
+    if (reference === null) return;
+    const method = (
+      window.prompt("Payment method (eft / cash / card / instant_eft / other):", "eft") || "eft"
+    )
+      .trim()
+      .toLowerCase();
+    if (!METHODS.includes(method)) {
+      setError("Invalid payment method. Use eft, cash, card, instant_eft or other.");
+      return;
+    }
+    setSaving(inv.id);
+    setError("");
+    const p = {
+      id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      idempotency_key: genIdempotencyKey(),
+      user_id: userId,
+      team_id: inv.team_id || teamId || null,
+      invoice_id: inv.id,
+      amount,
+      payment_date: new Date().toISOString().slice(0, 10),
+      method,
+      reference: reference.trim() || null,
+      created_at: new Date().toISOString(),
+      sync_status: "pending",
+    };
+    const paid =
+        payments.filter(x => x.invoice_id === inv.id).reduce((s, x) => s + Number(x.amount || 0), 0) + amount,
+      total = Number(inv.total || 0),
+      updated = {
+        ...inv,
+        amount_paid: Math.min(total, paid),
+        balance_due: Math.max(0, total - paid),
+        status: paid >= total ? "paid" : "part_paid",
+        sync_status: "pending",
+      };
+    await offlineSave("payments", p);
+    await offlineSave("invoices", updated);
+    setPayments(x => [p, ...x]);
+    setInvoices(x => x.map(i => (i.id === inv.id ? updated : i)));
+    const saved = await saveAndSync(p, "payments", "insert", setData || (() => {}), online);
+    if (saved?.sync_status === "synced") {
+      const { data } = await supabase.from("invoices").select("*").eq("id", inv.id).maybeSingle();
+      if (data) {
+        setInvoices(x => x.map(i => (i.id === inv.id ? data : i)));
+        await offlineSave("invoices", data);
+      }
+    }
+    setSaving(null);
+    setError(online ? "Payment recorded." : "Payment saved offline and queued for sync.");
+  }
+  const outstanding = invoices.reduce((s, x) => s + Number(x.balance_due || 0), 0),
+    received = invoices.reduce((s, x) => s + Number(x.amount_paid || 0), 0);
+  return (
+    <div className="space-y-4">
+      <PageHeader title="Invoices" subtitle="Billing, balances & payments" />
+      {!online && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 flex gap-2">
+          <WifiOff size={16} />
+          Offline mode — invoices and payments save locally and sync later.
+        </div>
+      )}
+      {error && <div className="rounded-xl bg-slate-50 border p-3 text-sm text-slate-700">{error}</div>}
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="p-4">
+          <p className="text-xs font-bold text-slate-400">Outstanding</p>
+          <p className="text-lg font-black">{money(outstanding)}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs font-bold text-slate-400">Payments received</p>
+          <p className="text-lg font-black">{money(received)}</p>
+        </Card>
+      </div>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search invoices"
+            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2.5 text-sm"
+          />
+        </div>
+        <Btn size="sm" variant="secondary" onClick={load}>
+          <RefreshCw size={14} />
+          Refresh
+        </Btn>
+      </div>
+      {loading ? (
+        <Card className="p-6 text-center text-slate-400">Loading invoices…</Card>
+      ) : visible.length === 0 ? (
+        <Card className="p-6 text-center">
+          <p className="font-bold">No invoices found</p>
+          <p className="text-sm text-slate-400">Invoices generated from completed jobs appear here.</p>
+        </Card>
+      ) : (
+        visible.map(inv => {
+          const paidFlag = Number(inv.balance_due || 0) <= 0 || inv.status === "paid";
+          return (
+            <Card key={inv.id} className="p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <p className="font-black truncate">{inv.invoice_number || "Invoice"}</p>
+                  <p className="text-sm text-slate-500">
+                    {labels[inv.status] || String(inv.status || "Unknown").replaceAll("_", " ")}
+                  </p>
+                </div>
+                <p className="font-black">{money(inv.total)}</p>
+              </div>
+              <div className="flex justify-between text-xs text-slate-500">
+                <span>Paid: {money(inv.amount_paid)}</span>
+                <span>Balance: {money(inv.balance_due)}</span>
+              </div>
+              {paidFlag ? (
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700">
+                  <CheckCircle2 size={13} />
+                  Paid
+                </span>
+              ) : (
+                <Btn size="sm" onClick={() => pay(inv)} disabled={saving === inv.id}>
+                  <CreditCard size={13} />
+                  {saving === inv.id ? "Saving…" : "Record payment"}
+                </Btn>
+              )}
+            </Card>
+          );
+        })
+      )}
+    </div>
+  );
+}
