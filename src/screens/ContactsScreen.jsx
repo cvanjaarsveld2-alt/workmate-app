@@ -26,6 +26,7 @@ import {
   Card, Btn, Field, GroupField, SearchBar, FilterPills, CollapsibleFilters,
   Toast, Empty, PageHeader, useConfirm,
 } from "../components/ui";
+import { useIsMine } from "../lib/teamView";
 
 const STATUS_COLORS = {
   lead:      { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
@@ -66,6 +67,7 @@ function ExpandableText({ text, limit = 100, className = "" }) {
 }
 
 export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
+  const isMine = useIsMine(userId);
   const [showForm, setShowForm]       = useState(false);
   const [catOpen, setCatOpen]         = useState(false); // category section collapsed by default
   const [showScanner, setShowScanner] = useState(false);
@@ -143,8 +145,8 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
     met_at: "", met_date: todayISO(), notes: "", status: "lead", category: "",
   });
   const { confirm, dialog } = useConfirm();
-  const contacts = (data.contacts || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
-  const clients  = (data.clients  || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+  const contacts = (data.contacts || []).filter(isMine);
+  const clients  = (data.clients  || []).filter(isMine);
   const [sendInfo, setSendInfo] = useState(null); // { name, email, phone }
 
   useEffect(() => {

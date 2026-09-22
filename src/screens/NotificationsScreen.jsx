@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Check, Users, TrendingUp, Calendar, UserPlus, Inbox } from "lucide-react";
 import { supabase } from "../supabase";
 import { markNotificationsRead } from "../lib/teamNotifications";
-import { Card, PageHeader, Empty, Toast, Btn } from "../components/ui";
+import { Card, PageHeader, Empty, Toast, Btn, useConfirm } from "../components/ui";
 import { BRAND } from "../lib/constants";
 import { smartDate } from "../lib/helpers";
 
@@ -20,6 +20,7 @@ const TYPE_ICON = {
 };
 
 export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
+  const { confirm, dialog } = useConfirm();
       const [pendingShares, setPendingShares] = useState(0);
 
       useEffect(() => {
@@ -66,6 +67,7 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
       followup: "Followups",
       client:   "Clients",
       contact:  "Contacts",
+      team_view_request: "Team",
     };
     const screen = screenMap[notif.record_type];
     if (screen && onNavigate) onNavigate(screen);
@@ -84,6 +86,8 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
   }
 
   async function clearAll() {
+    const ok = await confirm("Clear all notifications? This can't be undone.", { confirmLabel: "Clear all" });
+    if (!ok) return;
     try {
       await supabase
         .from("team_notifications")
@@ -98,6 +102,7 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
       <PageHeader title="Notifications" subtitle="Records shared with you by your team" />

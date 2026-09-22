@@ -1,0 +1,23 @@
+-- Exported from production supabase_migrations.schema_migrations (20260916143335).
+REVOKE EXECUTE ON FUNCTION public.accept_shared_record(uuid, uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.create_team_for_user(text, uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.current_team_id() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_team_member_emails(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.join_team_by_code(text, uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.migrate_user_data_to_team(uuid, uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.notify_assignment(uuid, uuid, uuid, text, uuid, text, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.reassign_record(text, uuid, uuid, text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.recalculate_invoice_payment_totals(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.restore_sync_dependencies() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.same_team(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.stage_missing_sync_dependencies() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.accept_shared_record(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.create_team_for_user(text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.current_team_id() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_team_member_emails(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.join_team_by_code(text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.migrate_user_data_to_team(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.notify_assignment(uuid, uuid, uuid, text, uuid, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.reassign_record(text, uuid, uuid, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.recalculate_invoice_payment_totals(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.same_team(uuid) TO authenticated;

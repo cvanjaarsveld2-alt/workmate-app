@@ -23,6 +23,7 @@ import {
 } from "../components/ui";
 import { MemberSelector } from "../components/MemberSelector";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
+import { useIsMine } from "../lib/teamView";
 
 // ─── Lead stages ─────────────────────────────────────────────────────────────
 const LEAD_STAGES = ["New", "Assigned", "In Progress", "Quoted", "Won", "Lost"];
@@ -285,6 +286,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
 export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed }) {
+  const isMine = useIsMine(userId);
   const [showForm, setShowForm]       = useState(false);
   const [editLead, setEditLead]       = useState(null);
   const [detailLead, setDetailLead]   = useState(null);
@@ -297,8 +299,9 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const { confirm, dialog }           = useConfirm();
 
   const leads    = data.leads    || [];
-  const clients  = (data.clients  || []).filter(c => c.user_id === userId);
-  const contacts = (data.contacts || []).filter(c => c.user_id === userId);
+  // Same rule as every other screen: records you created or that are assigned to you.
+  const clients  = (data.clients  || []).filter(isMine);
+  const contacts = (data.contacts || []).filter(isMine);
 
   useEffect(() => {
     if (!quickAddTrigger) return;
@@ -600,6 +603,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <LeadForm
+              key={editLead?.id || "new"}
               initial={editLead
                 ? { ...editLead, categories: parseCats(editLead.categories) }
                 : blankForm(userId, userEmail)}

@@ -11,6 +11,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// ~6 MB of image data once decoded.
+const MAX_IMAGE_BASE64_CHARS = 8_000_000;
+
 const CATEGORIES = [
   "Fuel", "Accommodation", "Meals & Entertainment", "Tools & Equipment",
   "Parts & Materials", "Travel", "Office", "Other",
@@ -22,45 +25,35 @@ serve(async (req) => {
   }
 
   try {
-    const { imageBase64, slipType = "till" } = await req.json();
-    if (!imageBase64) {
-      return new Response(JSON.stringify({ error: "No image provided" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // The browser only sends the compressed image to this authenticated Edge Function.
-    // Storage is deliberately handled server-side so iOS/WebKit never has to upload
-    // the receipt directly to Supabase Storage.
-    const authHeader = req.headers.get("Authorization") || "";
-    // IMPORTANT: match the actual whitespace after "Bearer".
-    // The previous deployed build contained /^Bearer\\s+/ which matched a literal
-    // backslash+s instead of whitespace, so the JWT was never stripped correctly.
-    const jwt = authHeader.replace(/^Bearer\s+/i, "");
-    const userId = (() => {
-      try {
-        const payload = jwt.split(".")[1];
-        if (!payload) return "";
-        const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-        const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
-        return JSON.parse(atob(padded)).sub || "";
-      } catch {
-        return "";
-      }
-    })();
-
-    if (!userId) {
-      return new Response(JSON.stringify({ error: "Authenticated user could not be identified" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const json = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), {
+      status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ error: "Supabase server configuration is incomplete" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return json({ error: "Supabase server configuration is incomplete" }, 500);
+    }
+
+    // Verify the caller's session with Supabase Auth. Decoding the JWT payload
+    // alone trusts an unsigned claim, so a forged token could write into another
+    // user's receipt folder whenever gateway JWT verification is disabled.
+    const jwt = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+    if (!jwt) return json({ error: "Unauthorized" }, 401);
+    const authRes = await fetch(`${SUPABASE_URL.replace(/\/$/, "")}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${jwt}`, apikey: SUPABASE_SERVICE_ROLE_KEY },
+    });
+    const userId = authRes.ok ? String((await authRes.json())?.id || "") : "";
+    if (!userId) return json({ error: "Authenticated user could not be identified" }, 401);
+
+    const { imageBase64, slipType: rawSlipType = "till" } = await req.json();
+    const slipType = rawSlipType === "payment" ? "payment" : "till";
+    if (typeof imageBase64 !== "string" || !imageBase64) return json({ error: "No image provided" }, 400);
+    // Receipts are compressed client-side; cap the payload so the endpoint can't be
+    // used to push arbitrarily large files into Storage or OpenAI.
+    if (imageBase64.length > MAX_IMAGE_BASE64_CHARS) return json({ error: "Image is too large" }, 413);
+    if (imageBase64.startsWith("data:") && !/^data:image\/(jpeg|jpg|png|webp);base64,/i.test(imageBase64)) {
+      return json({ error: "Unsupported image type" }, 415);
     }
 
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
@@ -96,7 +89,7 @@ serve(async (req) => {
     if (!storageRes.ok) {
       const storageText = await storageRes.text();
       console.error("Receipt storage error:", storageRes.status, storageText);
-      return new Response(JSON.stringify({ error: "Receipt could not be saved", detail: storageText }), {
+      return new Response(JSON.stringify({ error: "Receipt could not be saved" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -155,7 +148,7 @@ Return numbers as plain numbers.`;
     if (!openaiRes.ok) {
       const errText = await openaiRes.text();
       console.error("OpenAI error:", errText);
-      return new Response(JSON.stringify({ error: "AI scan failed", detail: errText, receipt_url: receiptPath, scan_failed: true }), {
+      return new Response(JSON.stringify({ error: "AI scan failed", receipt_url: receiptPath, scan_failed: true }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -205,7 +198,7 @@ Return numbers as plain numbers.`;
 
   } catch (e) {
     console.error("Function error:", e);
-    return new Response(JSON.stringify({ error: e.message || "Unknown error" }), {
+    return new Response(JSON.stringify({ error: "Receipt scan failed" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

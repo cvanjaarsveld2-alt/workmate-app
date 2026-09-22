@@ -8,10 +8,13 @@ export async function requestNotificationPermission() {
   return (await Notification.requestPermission()) === "granted";
 }
 
-export async function scheduleNotificationsViaSW(items) {
+// Adds reminders by default. replace:true wipes every stored reminder first
+// (including calendar reminders), so only pass it for a full rebuild.
+// With a source, replace:true only rebuilds that source's reminders.
+export async function scheduleNotificationsViaSW(items, { replace = false, source = null } = {}) {
   try {
     const reg = await navigator.serviceWorker?.ready;
-    reg?.active?.postMessage({ type: "SCHEDULE_NOTIFICATIONS", items, replace: true });
+    reg?.active?.postMessage({ type: "SCHEDULE_NOTIFICATIONS", items, replace, source });
     if (reg?.periodicSync && !reg.periodicSync.getTags) return;
     if (reg?.periodicSync) {
       const tags = await reg.periodicSync.getTags();
@@ -69,7 +72,7 @@ export function buildNotificationItems(followups = [], equipment = [], notes = [
     let fireAt = base;
     switch (f.reminder) {
       case "15_before": fireAt = new Date(base.getTime() - 15 * 60000); break;
-      case "30_before": fireAt = new Date(base.getTime() - 30 * 60000); break;
+      case "30_before": case "30_min": fireAt = new Date(base.getTime() - 30 * 60000); break;
       case "1h_before": fireAt = new Date(base.getTime() - 60 * 60000); break;
       case "1d_before": {
         const d = new Date(f.date + "T09:00:00");

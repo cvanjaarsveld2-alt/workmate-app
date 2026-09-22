@@ -6,8 +6,11 @@ const cors = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Caps each field so one request can't send an arbitrarily large prompt to OpenAI.
+const MAX_FIELD_CHARS = 4000;
+
 function clean(v: unknown) {
-  return String(v ?? "").trim();
+  return String(v ?? "").trim().slice(0, MAX_FIELD_CHARS);
 }
 
 function jsonResponse(payload: unknown, status = 200) {
@@ -176,6 +179,6 @@ Rules:
     });
   } catch (e) {
     console.error("polish-sales-email: unexpected error", e);
-    return jsonResponse({ error: e?.message || "Sales AI failed" }, 500);
+    return jsonResponse({ error: "Sales AI failed" }, 500);
   }
 });

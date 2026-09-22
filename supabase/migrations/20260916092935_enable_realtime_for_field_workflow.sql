@@ -1,0 +1,2 @@
+-- Exported from production supabase_migrations.schema_migrations (20260916092935).
+do $$ declare t text; begin foreach t in array array['jobs','invoices','payments','service_reports'] loop if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename=t) then execute format('alter publication supabase_realtime add table public.%I',t); end if; end loop; end $$;

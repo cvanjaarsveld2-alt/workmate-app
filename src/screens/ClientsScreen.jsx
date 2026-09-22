@@ -22,8 +22,45 @@ import {
   Card, Btn, Field, GroupField, SelectField, SearchBar,
   FilterPills, CollapsibleFilters, Toast, Empty, StagePill, PageHeader, useConfirm,
 } from "../components/ui";
+import { useIsMine } from "../lib/teamView";
 
 const STAGE_PRIORITY = { Active: 0, Quoted: 1, Contacted: 2, "New Lead": 3, Won: 4, Lost: 5 };
+
+// ─── Lead categories ──────────────────────────────────────────────────────────
+// Stored as a comma-separated string in the existing `division` column.
+const LEAD_CATEGORIES = [
+  { id: "opencast",  label: "Opencast",                 color: "#B45309", bg: "#FEF3C7" },
+  { id: "underground", label: "Underground",            color: "#1E293B", bg: "#E2E8F0" },
+  { id: "jacks",     label: "Jacks",                    color: "#1E40AF", bg: "#DBEAFE" },
+  { id: "tyres",     label: "Tyre Handlers",            color: "#166534", bg: "#DCFCE7" },
+  { id: "starters",  label: "Starters",                 color: "#92400E", bg: "#FEF3C7" },
+  { id: "ausco",     label: "Ausco Brakes",             color: "#7C2D12", bg: "#FFE4D9" },
+  { id: "manifolds", label: "Axiom — Manifolds",        color: "#5B21B6", bg: "#EDE9FE" },
+  { id: "motors",    label: "Axiom — Motors",           color: "#0E7490", bg: "#CFFAFE" },
+  { id: "pumps",     label: "Axiom — Pumps",            color: "#065F46", bg: "#D1FAE5" },
+  { id: "coolers",   label: "Axiom — Coolers",          color: "#9F1239", bg: "#FFE4E6" },
+  { id: "other",     label: "Other",                    color: "#64748B", bg: "#F1F5F9" },
+];
+
+function parseCats(str) {
+  if (!str) return [];
+  return str.split(",").map(s => s.trim()).filter(Boolean);
+}
+
+function encodeCats(arr) {
+  return arr.join(",");
+}
+
+function CategoryBadge({ catId, size = "sm" }) {
+  const cat = LEAD_CATEGORIES.find(c => c.id === catId);
+  if (!cat) return null;
+  return (
+    <span className={`inline-flex items-center rounded-full font-bold ${size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"}`}
+      style={{ background: cat.bg, color: cat.color }}>
+      {cat.label}
+    </span>
+  );
+}
 
 // ─── Expandable text (used for long client notes) ─────────────────────────────
 function ExpandableText({ text, limit = 100, className = "" }) {
@@ -296,43 +333,9 @@ function ClientFollowupRow({ followup: f, setData }) {
 
 // ─── Main ClientsScreen ───────────────────────────────────────────────────────
 export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], quickAddTrigger, searchSeed, onNavigate, isOnline }) {
+  const isMine = useIsMine(userId);
   const [showForm, setShowForm]         = useState(false);
   const [search, setSearch]             = useState("");
-// ─── Lead categories ──────────────────────────────────────────────────────────
-// Stored as a comma-separated string in the existing `division` column.
-const LEAD_CATEGORIES = [
-  { id: "opencast",  label: "Opencast",                 color: "#B45309", bg: "#FEF3C7" },
-  { id: "underground", label: "Underground",            color: "#1E293B", bg: "#E2E8F0" },
-  { id: "jacks",     label: "Jacks",                    color: "#1E40AF", bg: "#DBEAFE" },
-  { id: "tyres",     label: "Tyre Handlers",            color: "#166534", bg: "#DCFCE7" },
-  { id: "starters",  label: "Starters",                 color: "#92400E", bg: "#FEF3C7" },
-  { id: "ausco",     label: "Ausco Brakes",             color: "#7C2D12", bg: "#FFE4D9" },
-  { id: "manifolds", label: "Axiom — Manifolds",        color: "#5B21B6", bg: "#EDE9FE" },
-  { id: "motors",    label: "Axiom — Motors",           color: "#0E7490", bg: "#CFFAFE" },
-  { id: "pumps",     label: "Axiom — Pumps",            color: "#065F46", bg: "#D1FAE5" },
-  { id: "coolers",   label: "Axiom — Coolers",          color: "#9F1239", bg: "#FFE4E6" },
-  { id: "other",     label: "Other",                    color: "#64748B", bg: "#F1F5F9" },
-];
-
-function parseCats(str) {
-  if (!str) return [];
-  return str.split(",").map(s => s.trim()).filter(Boolean);
-}
-
-function encodeCats(arr) {
-  return arr.join(",");
-}
-
-function CategoryBadge({ catId, size = "sm" }) {
-  const cat = LEAD_CATEGORIES.find(c => c.id === catId);
-  if (!cat) return null;
-  return (
-    <span className={`inline-flex items-center rounded-full font-bold ${size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"}`}
-      style={{ background: cat.bg, color: cat.color }}>
-      {cat.label}
-    </span>
-  );
-}
   const [editId, setEditId]             = useState(null);
   const [toast, setToast]               = useState("");
   const [sendInfo, setSendInfo]         = useState(null);
@@ -407,7 +410,8 @@ function CategoryBadge({ catId, size = "sm" }) {
   const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], category: "", assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
-  const clients   = (data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+  const clients   = (data.clients || []).filter(isMine);
+  const dormantCount = filterStage === "Dormant" ? 0 : clients.filter(c => c.stage === "Dormant").length;
   const companyCount = new Set(clients.map(c => c.company?.trim()).filter(Boolean)).size;
   const followups = data.followups || [];
   const notes     = data.notes     || [];
@@ -654,7 +658,7 @@ function CategoryBadge({ catId, size = "sm" }) {
       </AnimatePresence>
 
       <div className="flex items-center justify-between">
-        <PageHeader title="Clients & Leads" subtitle={`${companyCount} compan${companyCount === 1 ? "y" : "ies"} · ${clients.length} client records · add new clients here`} />
+        <PageHeader title="Clients & Leads" subtitle={`${companyCount} compan${companyCount === 1 ? "y" : "ies"} · ${clients.length} client records${dormantCount ? ` · ${dormantCount} dormant hidden` : ""}`} />
         <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
           {(showForm || editId) ? <X size={15} /> : <Plus size={15} />}{(showForm || editId) ? "Cancel" : "Add Lead"}
         </Btn>

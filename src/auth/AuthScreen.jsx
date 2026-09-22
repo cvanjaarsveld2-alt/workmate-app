@@ -93,6 +93,27 @@ export function AuthScreen() {
     setLoading(false);
   }
 
+  // Invited users (created by an admin) start without a password they know, so
+  // the reset email doubles as "set my password". The message is the same
+  // whether or not the address exists, so it can't be used to probe accounts.
+  async function sendReset() {
+    const emailLower = email.trim().toLowerCase();
+    if (!emailLower) {
+      setMsg({ text: "Enter your email address first.", type: "error" });
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(emailLower, {
+      redirectTo: window.location.origin,
+    });
+    setLoading(false);
+    if (error && /rate|too many/i.test(error.message || "")) {
+      setMsg({ text: "Too many requests. Please wait a few minutes and try again.", type: "error" });
+      return;
+    }
+    setMsg({ text: "If that email has a PowerMate account, a link to set your password is on its way. Open it on this device.", type: "success" });
+  }
+
   function switchMode(newMode) {
     setMode(newMode);
     clearMsg();
@@ -159,9 +180,15 @@ export function AuthScreen() {
             <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-center">
               <p className="text-sm font-bold text-slate-700 mb-1">Accounts are invite-only</p>
               <p className="text-xs text-slate-500 leading-relaxed">
-                New accounts are created by your administrator. Please contact your PowerMate admin to be added to the team, then sign in here.
+                New accounts are created by your administrator. Already invited? Enter your email above and set your password.
               </p>
             </div>
+          )}
+
+          {mode === "signup" && (
+            <Btn className="w-full" size="lg" onClick={sendReset} disabled={loading}>
+              {loading ? "Please wait…" : "Email me a link to set my password"}
+            </Btn>
           )}
 
           {mode === "signin" && (
@@ -169,10 +196,71 @@ export function AuthScreen() {
               {loading ? "Please wait…" : "Sign In"}
             </Btn>
           )}
+
+          {mode === "signin" && (
+            <button type="button" onClick={sendReset} disabled={loading}
+              className="w-full text-center text-sm font-bold text-slate-500 min-h-[44px]">
+              Forgot password?
+            </button>
+          )}
         </Card>
 
         <p className="mt-6 text-center text-xs text-slate-400">© 2026 Power Works (Pty) Ltd</p>
       </motion.div>
+    </div>
+  );
+}
+
+// Shown after the user opens a password-reset / invite link. Supabase has already
+// signed them in from the link; this makes them choose a password before entering.
+export function SetPasswordScreen({ onDone }) {
+  const [password, setPassword]   = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [showPw, setShowPw]       = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [msg, setMsg]             = useState("");
+
+  async function save() {
+    if (password.length < 8) { setMsg("Password must be at least 8 characters."); return; }
+    if (password !== confirmPw) { setMsg("Passwords do not match."); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+    if (error) {
+      setMsg(/weak|pwned|leaked/i.test(error.message || "")
+        ? "That password is too weak or has appeared in a data breach. Please choose another."
+        : error.message || "Could not save your password. Please try again.");
+      return;
+    }
+    onDone();
+  }
+
+  const inputCls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 pr-12 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]";
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center px-4" style={{ background: BRAND.light }}>
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex flex-col items-center">
+          <img src={BRAND.logo} alt="PW" className="mb-4 h-16 object-contain" onError={e => e.target.style.display = "none"} />
+          <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>Set your password</h1>
+          <p className="mt-1 text-sm text-slate-400">Choose a password for signing in to PowerMate</p>
+        </div>
+        <Card className="p-6 space-y-4">
+          <div className="relative">
+            <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+              placeholder="New password (min 8 characters)" autoComplete="new-password" className={inputCls} />
+            <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? "Hide password" : "Show password"}
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 p-1 min-w-[44px] min-h-[44px] flex items-center justify-center">
+              {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          <input type={showPw ? "text" : "password"} value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && save()} placeholder="Confirm new password" autoComplete="new-password" className={inputCls} />
+          {msg && <div className="rounded-xl p-3.5 text-sm font-medium bg-red-50 text-red-700">{msg}</div>}
+          <Btn className="w-full" size="lg" onClick={save} disabled={loading}>
+            {loading ? "Saving…" : "Save password"}
+          </Btn>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -32,10 +32,12 @@ import { convertToZAR } from "../lib/exchangeRate";
 // expenseFinancePDF loaded lazily
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
+import { neutralizeFormula } from "../lib/csv";
 import {
   Card, Btn, Field, SelectField, SearchBar,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
+import { useIsMine } from "../lib/teamView";
 
 // ─── Expense categories with GL codes + SA VAT treatment ──────────────────────
 // GL codes are SENSIBLE SA DEFAULTS — your financial manager should edit these
@@ -54,6 +56,7 @@ const CATEGORY_META = {
   "Office":               { gl: "5400", vatClaim: true,  note: "Office consumables/admin — claimable." },
   "Other":                { gl: "5900", vatClaim: true,  note: "Uncategorised — confirm GL code with finance." },
 };
+const defaultGl = category => (CATEGORY_META[category] || {}).gl || "";
 
 const CATEGORIES = Object.keys(CATEGORY_META);
 
@@ -395,6 +398,7 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigger }) {
+  const isMine = useIsMine(userId);
   const exportProgress = useExportProgress();
   const [showForm, setShowForm]       = useState(false);
   const [showScanner, setShowScanner] = useState(false);
@@ -413,7 +417,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   const [detailExpense, setDetailExpense] = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
   const [form, setForm] = useState({
-    vendor: "", vat_number: "", amount: "", vat_amount: "", currency: "ZAR",
+    vendor: "", vat_number: "", gl_code: defaultGl("Other"), gr_code: "", gl_manually_edited: false, amount: "", vat_amount: "", currency: "ZAR",
     expense_date: todayISO(), expense_time: "", category: "Other",
     payment_method: "Card", notes: "", client_id: null, client_name: "",
   });
@@ -445,7 +449,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
 
   function resetForm() {
     setForm({
-      vendor: "", amount: "", vat_amount: "", currency: "ZAR",
+      vendor: "", vat_number: "", gl_code: defaultGl("Other"), gr_code: "", gl_manually_edited: false, amount: "", vat_amount: "", currency: "ZAR",
       expense_date: todayISO(), expense_time: "", category: "Other",
       payment_method: "Card", notes: "", client_id: null, client_name: "",
     });
@@ -483,6 +487,9 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       expense_date:   extracted.expense_date || todayISO(),
       expense_time:   extracted.expense_time || "",
       category:       extracted.category || "Other",
+      gl_code:        defaultGl(extracted.category || "Other"),
+      gr_code:        "",
+      gl_manually_edited: false,
       payment_method: extracted.payment_method || "Card",
       notes:          "",
     });
@@ -506,6 +513,10 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       expense_date:   ex.expense_date || todayISO(),
       expense_time:   ex.expense_time || "",
       category:       ex.category || "Other",
+      gl_code:        ex.gl_code || defaultGl(ex.category || "Other"),
+      gr_code:        ex.gr_code || "",
+      // A saved code may be a finance override, so category changes must not replace it.
+      gl_manually_edited: !!ex.gl_code,
       payment_method: ex.payment_method || "Card",
       notes:          ex.notes || "",
       client_id:      ex.client_id || null,
@@ -547,7 +558,8 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       user_id:          userId,
       vendor:           form.vendor,
       vat_number:       form.vat_number || "",
-      gl_code:          (CATEGORY_META[form.category] || {}).gl || "",
+      gl_code:          (form.gl_code || "").trim() || defaultGl(form.category),
+      gr_code:          (form.gr_code || "").trim() || null,
       amount:           parseFloat(form.amount) || 0,
       vat_amount:       parseFloat(form.vat_amount) || null,
       currency:         form.currency || "ZAR",
@@ -621,9 +633,9 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   function exportCSV() {
     const selected = expenses.filter(e => selectedIds.has(e.id));
     if (selected.length === 0) { setToast("Select expenses to export"); return; }
-    const cols = ["Date","Vendor","Supplier VAT No","Category","GL Code","VAT Claimable",
+    const cols = ["Date","Vendor","Supplier VAT No","Category","GL Code","GR Code","VAT Claimable",
       "Currency","Gross Amount","VAT Amount","Net Amount","ZAR Gross","Payment Method","Has Receipt","VAT No Missing (R5k+)","Notes"];
-    const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const esc = v => `"${neutralizeFormula(v).replace(/"/g, '""')}"`;
     const rows = selected.map(e => {
       const meta = CATEGORY_META[e.category] || {};
       const gross = parseFloat(e.amount || 0);
@@ -631,7 +643,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       const net = gross - vat;
       return [
         e.expense_date || "", e.vendor || "", e.vat_number || "", e.category || "",
-        e.gl_code || meta.gl || "", meta.vatClaim === false ? "No (SARS)" : "Yes",
+        e.gl_code || meta.gl || "", e.gr_code || "", meta.vatClaim === false ? "No (SARS)" : "Yes",
         e.currency || "ZAR", gross.toFixed(2), vat.toFixed(2), net.toFixed(2),
         parseFloat(e.amount_zar || gross).toFixed(2), e.payment_method || "",
         (e.receipt_url || e.no_receipt === false) ? "Yes" : "No",
@@ -840,7 +852,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
         <div className="grid grid-cols-2 gap-2">
           <div>
             <p className="text-xs font-bold text-slate-500 mb-1.5">Till slip</p>
-            {receiptUrl ? (
+            {receiptUrl && receiptUrl !== "no-receipt" ? (
               <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
                 <SignedReceiptImg stored={receiptUrl} className="w-full h-32 object-contain" />
                 {/* Overlay: tap anywhere to re-scan */}
@@ -954,7 +966,11 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
           <Field label="Date" type="date" value={form.expense_date} onChange={v => setForm(f => ({ ...f, expense_date: v }))} />
           <Field label="Time (optional)" type="time" value={form.expense_time} onChange={v => setForm(f => ({ ...f, expense_time: v }))} />
         </div>
-        <SelectField label="Category" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} options={CATEGORIES} />
+        <SelectField label="Category" value={form.category} onChange={v => setForm(f => ({ ...f, category: v, gl_code: f.gl_manually_edited ? f.gl_code : defaultGl(v) }))} options={CATEGORIES} />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="GL code" value={form.gl_code} onChange={v => setForm(f => ({ ...f, gl_code: v, gl_manually_edited: true }))} placeholder="Sage ledger code" maxLength={40} />
+          <Field label="GR code (optional)" value={form.gr_code} onChange={v => setForm(f => ({ ...f, gr_code: v }))} placeholder="Sage reference" maxLength={40} />
+        </div>
         <div>
           <label className="mb-1.5 block text-sm font-bold text-slate-500">Payment Method</label>
           <div className="grid grid-cols-3 gap-2">
@@ -974,7 +990,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             const cl = (data.clients || []).find(c => c.id === v);
             setForm(f => ({ ...f, client_id: v || null, client_name: cl ? `${cl.company}${cl.branch ? " — " + cl.branch : ""}` : "" }));
           }}
-          clients={(data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId)} placeholder="Link to a client…" />
+          clients={(data.clients || []).filter(isMine)} placeholder="Link to a client…" />
 
         <Field label="Notes (optional)" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What was this for?" multiline />
         <div className="flex gap-2">
@@ -1070,6 +1086,8 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
 
             <div className="grid grid-cols-2 gap-3">
               <DetailRow label="Payment" value={detailExpense.payment_method} />
+              <DetailRow label="GL code" value={detailExpense.gl_code || defaultGl(detailExpense.category)} mono />
+              {detailExpense.gr_code && <DetailRow label="GR code" value={detailExpense.gr_code} mono />}
               <DetailRow label="Status" value={(STATUS_COLORS[detailExpense.status] || STATUS_COLORS.unsubmitted).label} />
               {detailExpense.expense_time && <DetailRow label="Time" value={detailExpense.expense_time} mono />}
               {detailExpense.vat_amount > 0 && <DetailRow label="VAT included" value={fmtMoney(detailExpense.vat_amount, detailExpense.currency)} />}

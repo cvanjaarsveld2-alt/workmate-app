@@ -101,7 +101,7 @@ export function DailyVehiclePrompt({ userId, teamId, data, setData, onNavigate }
       registration: settings.registration || "",
       driver: settings.driver || "",
       team_id: teamId || null,
-      data: JSON.stringify(dayData),
+      data: dayData,
       sync_status: "pending",
       updated_at: new Date().toISOString(),
     };

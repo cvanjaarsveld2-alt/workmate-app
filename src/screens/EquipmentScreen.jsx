@@ -12,6 +12,7 @@ import { Card, Btn, Field, SearchBar, FilterPills, CollapsibleFilters, Toast, Em
 import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
+import { useIsMine } from "../lib/teamView";
 
 // ─── Show-more text (full info on tap, no silent clipping) ──────────────────
 function ExpandableText({ text, limit = 110, className = "" }) {
@@ -35,6 +36,7 @@ function ExpandableText({ text, limit = 110, className = "" }) {
 }
 
 export function EquipmentScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], isOnline, quickAddTrigger, searchSeed }) {
+  const isMine = useIsMine(userId);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch]     = useState("");
   const [detailEq, setDetailEq] = useState(null);
@@ -46,7 +48,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
   const [form, setForm] = useState({ name: "", type: "", make: "", model: "", serial: "", location: "", client: "", client_id: null, service_due: "", notes: "" });
   const [pendingMedia, setPendingMedia] = useState([]);
   const { confirm, dialog } = useConfirm();
-  const equipment = (data.equipment || []).filter(e => e.user_id === userId || e.assigned_to_user_id === userId);
+  const equipment = (data.equipment || []).filter(isMine);
 
   useEffect(() => {
     if (!quickAddTrigger) return;
@@ -185,7 +187,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
                     const cl = (data.clients || []).find(c => c.id === v);
                     setForm(f => ({ ...f, client_id: v || null, client: cl ? cl.company : "" }));
                   }}
-                  clients={(data.clients || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId)} placeholder="Select client…" />
+                  clients={(data.clients || []).filter(isMine)} placeholder="Select client…" />
         <Field label="Next Service Due" type="date" value={form.service_due} onChange={v => setForm(f => ({ ...f, service_due: v }))} />
         <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Additional notes…" multiline />
         <div>

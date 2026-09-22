@@ -42,3 +42,53 @@ test("service worker does not cache Supabase/API responses", () => {
   const sw = read("public/service-worker.js");
   assert.match(sw, /url\.hostname\.includes\("supabase"\)/);
 });
+
+test("CSV exports neutralize spreadsheet formulas but keep numbers numeric", async () => {
+  const { neutralizeFormula } = await import("../src/lib/csv.js");
+  assert.equal(neutralizeFormula("=HYPERLINK(\"http://x\")"), "'=HYPERLINK(\"http://x\")");
+  assert.equal(neutralizeFormula("@SUM(A1)"), "'@SUM(A1)");
+  assert.equal(neutralizeFormula("+27 82 000"), "'+27 82 000");
+  assert.equal(neutralizeFormula("-12.50"), "-12.50");
+  assert.equal(neutralizeFormula("Engen Garage"), "Engen Garage");
+  assert.equal(neutralizeFormula(null), "");
+  for (const file of ["src/components/BackupExport.jsx", "src/ReportExport.jsx", "src/screens/ExpensesScreen.jsx"]) {
+    assert.match(read(file), /neutralizeFormula\(/, file);
+  }
+});
+
+test("receipt scanner verifies the session instead of trusting JWT claims", () => {
+  const source = read("supabase/functions/scan-receipt/index.ts");
+  assert.match(source, /auth\/v1\/user/);
+  assert.doesNotMatch(source, /JSON\.parse\(atob/);
+  assert.doesNotMatch(source, /detail: (storageText|errText)/);
+  assert.match(source, /MAX_IMAGE_BASE64_CHARS/);
+});
+
+test("production build does not publish source maps", () => {
+  assert.match(read("vite.config.js"), /sourcemap:\s*false/);
+});
+
+test("notification clicks only open same-origin pages", () => {
+  assert.match(read("public/service-worker.js"), /safeNotificationUrl\(e\.notification\.data\?\.url\)/);
+});
+
+test("password reset never reveals whether an account exists", () => {
+  const source = read("src/auth/AuthScreen.jsx");
+  assert.match(source, /resetPasswordForEmail/);
+  assert.match(source, /If that email has a PowerMate account/);
+  assert.match(read("src/App.jsx"), /PASSWORD_RECOVERY/);
+});
+
+test("roles and whole-team view are changed only through the master-account RPC", () => {
+  const team = read("src/screens/TeamScreen.jsx");
+  assert.match(team, /rpc\("set_member_access"/);
+  assert.doesNotMatch(team, /\.update\(\{ role: newRole \}\)/);
+  assert.match(team, /access\?\.is_owner && !isMe/);
+});
+
+test("device reminders only use the person's own records and follow the signed-in user", () => {
+  const app = read("src/App.jsx");
+  assert.match(app, /isOwnRecord\(r,uid\)/);
+  assert.match(app, /unsubscribeFromPush\(uid\)/);
+  assert.match(app, /set_my_timezone/);
+});
