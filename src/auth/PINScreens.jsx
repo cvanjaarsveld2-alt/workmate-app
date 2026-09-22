@@ -41,7 +41,7 @@ async function _hashPIN(pin, salt) {
 async function savePINHash(pin, userId) {
   const salt = _randomSalt();
   const hash = await _hashPIN(pin, salt);
-  localStorage.setItem(scopedPinKey(PIN_KEY, userId), `v2${salt}${hash}`);
+  localStorage.setItem(scopedPinKey(PIN_KEY, userId), `v2$${salt}$${hash}`);
 }
 async function verifyPIN(pin, userId) {
   const key = scopedPinKey(PIN_KEY, userId);

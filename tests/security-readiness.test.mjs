@@ -42,3 +42,28 @@ test("service worker does not cache Supabase/API responses", () => {
   const sw = read("public/service-worker.js");
   assert.match(sw, /url\.hostname\.includes\("supabase"\)/);
 });
+
+test("CSV exports neutralize spreadsheet formulas but keep numbers numeric", async () => {
+  const { neutralizeFormula } = await import("../src/lib/csv.js");
+  assert.equal(neutralizeFormula("=HYPERLINK(\"http://x\")"), "'=HYPERLINK(\"http://x\")");
+  assert.equal(neutralizeFormula("@SUM(A1)"), "'@SUM(A1)");
+  assert.equal(neutralizeFormula("+27 82 000"), "'+27 82 000");
+  assert.equal(neutralizeFormula("-12.50"), "-12.50");
+  assert.equal(neutralizeFormula("Engen Garage"), "Engen Garage");
+  assert.equal(neutralizeFormula(null), "");
+  for (const file of ["src/components/BackupExport.jsx", "src/ReportExport.jsx", "src/screens/ExpensesScreen.jsx"]) {
+    assert.match(read(file), /neutralizeFormula\(/, file);
+  }
+});
+
+test("receipt scanner verifies the session instead of trusting JWT claims", () => {
+  const source = read("supabase/functions/scan-receipt/index.ts");
+  assert.match(source, /auth\/v1\/user/);
+  assert.doesNotMatch(source, /JSON\.parse\(atob/);
+  assert.doesNotMatch(source, /detail: (storageText|errText)/);
+  assert.match(source, /MAX_IMAGE_BASE64_CHARS/);
+});
+
+test("production build does not publish source maps", () => {
+  assert.match(read("vite.config.js"), /sourcemap:\s*false/);
+});

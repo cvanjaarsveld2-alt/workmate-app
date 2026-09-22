@@ -32,6 +32,7 @@ import { convertToZAR } from "../lib/exchangeRate";
 // expenseFinancePDF loaded lazily
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
+import { neutralizeFormula } from "../lib/csv";
 import {
   Card, Btn, Field, SelectField, SearchBar,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
@@ -623,7 +624,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
     if (selected.length === 0) { setToast("Select expenses to export"); return; }
     const cols = ["Date","Vendor","Supplier VAT No","Category","GL Code","VAT Claimable",
       "Currency","Gross Amount","VAT Amount","Net Amount","ZAR Gross","Payment Method","Has Receipt","VAT No Missing (R5k+)","Notes"];
-    const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const esc = v => `"${neutralizeFormula(v).replace(/"/g, '""')}"`;
     const rows = selected.map(e => {
       const meta = CATEGORY_META[e.category] || {};
       const gross = parseFloat(e.amount || 0);

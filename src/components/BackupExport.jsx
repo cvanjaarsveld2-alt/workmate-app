@@ -7,6 +7,7 @@ import { Download, Database, CheckCircle2, AlertTriangle, Share2 } from "lucide-
 import JSZip from "jszip";
 import { Card, Btn } from "./ui";
 import { supabase } from "../supabase";
+import { neutralizeFormula } from "../lib/csv";
 
 const LAST_BACKUP_KEY = "powermate_last_backup";
 const BACKUP_REMINDER_DAYS = 7;
@@ -20,7 +21,7 @@ function csvEscape(val) {
   let str = String(val);
   // Convert objects/arrays to JSON strings
   if (typeof val === "object") str = JSON.stringify(val);
-  str = str.replace(/"/g, '""');
+  str = neutralizeFormula(str).replace(/"/g, '""');
   return /[,"\n\r]/.test(str) ? `"${str}"` : str;
 }
 

@@ -8,6 +8,7 @@
 
 import React, { useState } from "react";
 import { FileText, Download, Calendar } from "lucide-react";
+import { neutralizeFormula } from "./lib/csv";
 
 const BRAND = { primary: "#8B1A1A", light: "#F7F3F3" };
 
@@ -22,7 +23,7 @@ function smartDate(ds) {
 // ─── CSV Helpers ─────────────────────────────────────────────────────────────
 function csvEscape(val) {
   if (val === null || val === undefined) return "";
-  const str = String(val).replace(/"/g, '""');
+  const str = neutralizeFormula(val).replace(/"/g, '""');
   return str.includes(",") || str.includes('"') || str.includes("\n") ? `"${str}"` : str;
 }
 

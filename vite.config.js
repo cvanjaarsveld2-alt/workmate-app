@@ -12,7 +12,8 @@ export default defineConfig({
     // Dynamic imports still create separate lazy chunks automatically.
     rollupOptions: {},
     minify: false,
-    sourcemap: true,
+    // Source maps stay out of the public deploy; they exposed the full source tree.
+    sourcemap: false,
     chunkSizeWarningLimit: 600,
   },
 });

@@ -8,10 +8,12 @@ export async function requestNotificationPermission() {
   return (await Notification.requestPermission()) === "granted";
 }
 
-export async function scheduleNotificationsViaSW(items) {
+// Adds reminders by default. replace:true wipes every stored reminder first
+// (including calendar reminders), so only pass it for a full rebuild.
+export async function scheduleNotificationsViaSW(items, { replace = false } = {}) {
   try {
     const reg = await navigator.serviceWorker?.ready;
-    reg?.active?.postMessage({ type: "SCHEDULE_NOTIFICATIONS", items, replace: true });
+    reg?.active?.postMessage({ type: "SCHEDULE_NOTIFICATIONS", items, replace });
     if (reg?.periodicSync && !reg.periodicSync.getTags) return;
     if (reg?.periodicSync) {
       const tags = await reg.periodicSync.getTags();
