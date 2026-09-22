@@ -420,11 +420,12 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
   function getItemPhoto(date, item) { return getDayData(date).items[item]?.photo || null; }
 
   // Save a photo against a specific flagged item (uploads then patches URL)
-  async function saveItemPhoto(date, item, base64) {
+  async function saveItemPhoto(date, item, base64, comment) {
     const dayData = getDayData(date);
-    const existing = dayData.items[item] || { status: "issue", comment: "" };
+    const prior = dayData.items[item] || { status: "issue", comment: "" };
+    const existing = comment === undefined ? prior : { ...prior, comment };
     // Store base64 preview immediately
-    persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...existing, photo: base64 } } });
+    persistDay(date, { ...dayData, items: { ...dayData.items, [item]: { ...existing, status: "issue", photo: base64 } } });
     try {
       const safeItem = item.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       const path = `vehicle-checks/${userId}/${date}/item-${safeItem}-${genId()}.jpg`;
@@ -434,7 +435,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
       if (url) {
         const latest = getDayData(date);
         const latestItem = latest.items[item] || existing;
-        persistDay(date, { ...latest, items: { ...latest.items, [item]: { ...latestItem, photo: url, storage_path } } });
+        persistDay(date, { ...latest, items: { ...latest.items, [item]: { ...latestItem, status: "issue", comment: existing.comment, photo: url, storage_path } } });
       }
     } catch (e) {
       console.warn("Item photo upload failed (kept local):", e);
@@ -493,7 +494,8 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
   async function resetDay(date) {
     const ok = await confirm(`Clear all checks for ${smartDate(date)}?`, { confirmLabel: "Clear" });
     if (!ok) return;
-    persistDay(date, { items: {}, generalComment: "" });
+    // Keep day-level fields (e.g. vehicle photos) when clearing the item answers.
+    persistDay(date, { ...getDayData(date), items: {}, generalComment: "" });
     setToast("Day cleared");
   }
 
@@ -507,9 +509,11 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
 
   function handleIssueSave(comment, photo) {
     if (!issueSheet) return;
-    saveItemComment(issueSheet.date, issueSheet.item, comment);
-    saveItemStatus(issueSheet.date, issueSheet.item, "issue", comment);
-    if (photo) saveItemPhoto(issueSheet.date, issueSheet.item, photo);
+    // saveItemStatus stores the comment too; a separate saveItemComment raced it from
+    // the same snapshot and could revert the item to its previous status.
+    // With a photo, one write carries status, comment and photo together.
+    if (photo) saveItemPhoto(issueSheet.date, issueSheet.item, photo, comment);
+    else saveItemStatus(issueSheet.date, issueSheet.item, "issue", comment);
     setIssueSheet(null);
     setToast("Issue saved");
   }

@@ -610,7 +610,7 @@ export function TeamDashboardScreen({
                     {d.contact  && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Contact</p><p className="text-sm text-slate-800">{d.contact}</p></div>}
                     {d.phone    && <div className="flex gap-2 items-center"><p className="text-xs font-bold text-slate-400 w-16">Phone</p>
                       <a href={`tel:${d.phone}`} className="text-sm text-blue-600 font-medium">{d.phone}</a>
-                      <a href={`https://wa.me/${d.phone.replace(/^0/,"27").replace(/[^0-9]/,"")}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://wa.me/${d.phone.replace(/^0/,"27").replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer"
                         className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">WhatsApp</a>
                     </div>}
                     {d.email    && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Email</p><a href={`mailto:${d.email}`} className="text-sm text-blue-600">{d.email}</a></div>}
@@ -632,7 +632,7 @@ export function TeamDashboardScreen({
                     {d.company  && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Company</p><p className="text-sm text-slate-800">{d.company}</p></div>}
                     {d.phone    && <div className="flex gap-2 items-center"><p className="text-xs font-bold text-slate-400 w-16">Phone</p>
                       <a href={`tel:${d.phone}`} className="text-sm text-blue-600 font-medium">{d.phone}</a>
-                      <a href={`https://wa.me/${d.phone.replace(/^0/,"27").replace(/[^0-9]/,"")}`} target="_blank" rel="noopener noreferrer"
+                      <a href={`https://wa.me/${d.phone.replace(/^0/,"27").replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer"
                         className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">WhatsApp</a>
                     </div>}
                     {d.email    && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Email</p><a href={`mailto:${d.email}`} className="text-sm text-blue-600">{d.email}</a></div>}

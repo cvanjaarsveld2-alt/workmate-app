@@ -169,7 +169,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
     // Also create follow-up action items
     if (minutes.actionItems?.length && saveTarget === "both") {
       minutes.actionItems.forEach(item => {
-        if (!item.deadline && !item.action) return;
+        if (!item.action) return;
         const fu = withTeamId({
           id: genId(), user_id: userId,
           title: item.action,

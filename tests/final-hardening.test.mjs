@@ -4,7 +4,7 @@ import fs from "node:fs";
 
 test("service worker cache version is current hardening generation", () => {
   const sw = fs.readFileSync("public/service-worker.js", "utf8");
-  assert.match(sw, /const CACHE_NAME = "powermate-v15";/);
+  assert.match(sw, /const CACHE_NAME = "powermate-v16";/);
 });
 
 test("daily vehicle prompt carries team ownership", () => {

@@ -376,7 +376,7 @@ Kind regards`;
 
     try {
       await saveAndSync(item, "notes", editId ? "update" : "insert", setData, isOnline);
-      if (form.resolve_by && Notification.permission === "granted") {
+      if (form.resolve_by && typeof Notification !== "undefined" && Notification.permission === "granted") {
         const fireAt = new Date(form.resolve_by + "T09:00:00");
         if (fireAt > new Date()) {
           const urg = form.urgency || "Normal";

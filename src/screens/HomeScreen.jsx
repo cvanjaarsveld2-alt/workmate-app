@@ -13,7 +13,6 @@ import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
 
 // Neglect threshold — user configurable in Settings (default 21 days)
 const NEGLECT_KEY = "pm_neglect_days";
-const NEGLECT_DAYS = parseInt(localStorage.getItem(NEGLECT_KEY) || "21", 10);
 
 function daysSince(dateStr) {
   if (!dateStr) return 9999;
@@ -76,6 +75,7 @@ function money(n) {
 }
 
 export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, onNavigate }) {
+  const NEGLECT_DAYS = parseInt(localStorage.getItem(NEGLECT_KEY) || "21", 10); // read per render so Settings apply immediately
   const today     = todayISO();
   const [neglectSheet, setNeglectSheet] = React.useState(null);
   const [expandedStage, setExpandedStage] = React.useState(null); // which pipeline stage is expanded

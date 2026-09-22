@@ -297,8 +297,9 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
   const { confirm, dialog }           = useConfirm();
 
   const leads    = data.leads    || [];
-  const clients  = (data.clients  || []).filter(c => c.user_id === userId);
-  const contacts = (data.contacts || []).filter(c => c.user_id === userId);
+  // Same rule as every other screen: records you created or that are assigned to you.
+  const clients  = (data.clients  || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
+  const contacts = (data.contacts || []).filter(c => c.user_id === userId || c.assigned_to_user_id === userId);
 
   useEffect(() => {
     if (!quickAddTrigger) return;
@@ -600,6 +601,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
             <LeadForm
+              key={editLead?.id || "new"}
               initial={editLead
                 ? { ...editLead, categories: parseCats(editLead.categories) }
                 : blankForm(userId, userEmail)}

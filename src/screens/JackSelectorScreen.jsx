@@ -193,6 +193,14 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
   const [selJacks, setSelJacks] = useState(Array.isArray(m.jackOverrides) ? [...m.jackOverrides] : []);
   const [jackStand, setJackStand] = useState(m.jackStand || "");
   const [note, setNote] = useState(m.note || "");
+  // Cancel must discard unsaved edits, or reopening the editor shows them again.
+  function cancelEdit() {
+    setClosedHeight(m.closedHeight ?? "");
+    setSelJacks(Array.isArray(m.jackOverrides) ? [...m.jackOverrides] : []);
+    setJackStand(m.jackStand || "");
+    setNote(m.note || "");
+    setEditing(false);
+  }
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
 
@@ -391,7 +399,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
               <Field label="Note for the team (optional)" value={note} onChange={setNote} multiline placeholder="Anything the next person jacking this machine should know" />
 
               <div className="flex gap-2">
-                <Btn variant="ghost" size="sm" onClick={() => setEditing(false)} className="flex-1">Cancel</Btn>
+                <Btn variant="ghost" size="sm" onClick={cancelEdit} className="flex-1">Cancel</Btn>
                 {m._confirmation && (
                   <Btn variant="outline" size="sm" onClick={handleRevert} disabled={saving} className="flex-1">Revert</Btn>
                 )}

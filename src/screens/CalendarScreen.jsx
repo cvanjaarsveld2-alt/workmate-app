@@ -70,6 +70,7 @@ function readCalendarNotes(item) {
     if (line === "Calendar meeting" || line === "Calendar follow-up") return;
     if (line.startsWith("Related to: ")) related_to = line.slice(12);
     else if (line.startsWith("Location: ")) location = line.slice(10);
+    else if (line.startsWith("Contact: ")) return; // rebuilt from contact_id on save
     else notes.push(line);
   });
   return { related_to, location, notes: notes.join("\n").trim() };

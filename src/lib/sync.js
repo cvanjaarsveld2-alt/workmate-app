@@ -10,6 +10,7 @@ const TEAM_TABLES=new Set(["clients","followups","quotes","contacts","notes","eq
 const LOCAL_STORE={breakdown_reports:"breakdowns",repair_reports:"repairs",custom_faults:"customFaults",service_reports:"serviceReports",team_notifications:"teamNotifications"};
 const localStoreName=table=>LOCAL_STORE[table]||table;
 const MAX_SYNC_ATTEMPTS=8,PAGE_SIZE=1000,RECONCILE_MS=30000;
+const REVIVABLE_CODES=new Set(["PGRST204","PWR_ARRAY_CONFLICT","SCHEMA_ERROR"]);
 // _syncInProgress is a simple mutex so two overlapping sync passes never race each other.
 // _syncRerunRequested remembers that *something* asked for another pass while one was
 // already running — without it, a save that lands mid-sync would silently be dropped
@@ -145,7 +146,7 @@ async function upsertWithIdempotentRecovery(table,payload){
   }
 }
 async function stageMissingDependencies(table,payload){const deps=DEPENDENCIES[table]||[];if(!deps.length)return payload;let out={...payload};for(const dep of deps){const id=out[dep.field];if(!id||out[dep.pending])continue;const{data,error}=await supabase.from(dep.table).select("id").eq("id",id).maybeSingle();if(!error&&data)continue;out[dep.pending]=id;out[dep.field]=null;}return out;}
-async function pushOne(table,action,rawData){let payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(rawData)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);if(payload.media)payload={...payload,media:payload.media.map(m=>({...m,base64:undefined}))};payload=stripEmbeddedBase64(payload);if(["insert","upsert","update"].includes(action)){if(table==="vehicle_checks"){const{data:authData,error:authError}=await supabase.auth.getUser();if(authError)throw authError;if(authData?.user?.id)payload.user_id=authData.user.id;else throw new Error("Cannot sync vehicle check without an authenticated user");}else if(TEAM_TABLES.has(table)&&!payload.user_id){const{data:authData}=await supabase.auth.getUser();if(authData?.user?.id)payload.user_id=authData.user.id;}if(action==="update"&&payload.id){const{data:existing,error:existingError}=await supabase.from(table).select("*").eq("id",payload.id).maybeSingle();if(!existingError&&existing){assertNoStaleArrayOverwrite(table,existing,payload);payload={...existing,...payload};}}payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(payload)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);payload=await stageMissingDependencies(table,payload);return await upsertWithIdempotentRecovery(table,{...payload,sync_status:"synced"});}if(action==="delete"){const{error}=await supabase.from(table).delete().eq("id",payload.id);if(error)throw error;return;}throw new Error(`Unknown sync action: ${action}`);}
+async function pushOne(table,action,rawData){let payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(rawData)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);if(payload.media)payload={...payload,media:payload.media.map(m=>({...m,base64:undefined}))};payload=stripEmbeddedBase64(payload);if(["insert","upsert","update"].includes(action)){if(table==="vehicle_checks"){const{data:authData,error:authError}=await supabase.auth.getUser();if(authError)throw authError;if(authData?.user?.id)payload.user_id=authData.user.id;else throw new Error("Cannot sync vehicle check without an authenticated user");}else if(TEAM_TABLES.has(table)&&!payload.user_id){const{data:authData}=await supabase.auth.getUser();if(authData?.user?.id)payload.user_id=authData.user.id;}if(action==="update"&&payload.id){const{data:existing,error:existingError}=await supabase.from(table).select("*").eq("id",payload.id).maybeSingle();if(existingError)throw existingError;if(existing){assertNoStaleArrayOverwrite(table,existing,payload);payload={...existing,...payload};}}payload=sanitizeRemotePayload(table,cleanNumerics(cleanUUIDs(payload)));if(table==="vehicle_checks")payload=normalizeVehicleCheckPayload(payload);payload=await stageMissingDependencies(table,payload);return await upsertWithIdempotentRecovery(table,{...payload,sync_status:"synced"});}if(action==="delete"){const{error}=await supabase.from(table).delete().eq("id",payload.id);if(error)throw error;return;}throw new Error(`Unknown sync action: ${action}`);}
 // A failure with no Postgrest/Postgres error code is almost always the network itself
 // (offline, DNS hiccup, request timeout) rather than the server rejecting the data.
 // Those should never count against a record's limited retry budget — a technician
@@ -324,6 +325,10 @@ export async function pushSyncQueue(syncQueue,setData){
     for(const item of durable||[])if(item?.id)merged.set(item.id,item);
     for(const item of syncQueue||[])if(item?.id)merged.set(item.id,item);
     syncQueue=[...merged.values()];
+    // Records that failed before the PGRST204 / false-conflict fixes were never bad
+    // data: give each one exactly one fresh attempt so they reach the server.
+    const revived=syncQueue.map(item=>item.status==="failed"&&!item.revived_v2&&REVIVABLE_CODES.has(item.last_error?.code||item.last_error?.syncErrorCode)?{...item,status:"pending",attempts:0,next_attempt_at:null,revived_v2:true}:item);
+    if(revived.some((item,i)=>item!==syncQueue[i])){syncQueue=revived;await persistQueue(syncQueue);}
   }catch(e){console.warn("[Sync] durable queue read failed; using in-memory queue",e);}
   
   // Never spend retry attempts while offline — every attempt below is a real network
@@ -367,7 +372,12 @@ export async function pushSyncQueue(syncQueue,setData){
     if(failed.length){logEvent("sync_failed",{count:failed.length});window.dispatchEvent(new CustomEvent("powermate:sync_failed",{detail:{count:failed.length,message:`${failed.length} item${failed.length===1?"":"s"} failed to sync`,items:failed.map(f=>({table:f.table,entityId:f.entityId,syncErrorCode:f.error?.syncErrorCode||null}))}}));}
     if(succeeded.length)logEvent("sync_succeeded",{count:succeeded.length});
     const succeededIds=new Set(succeeded.map(r=>r.queueId)),failedIds=new Set(failed.map(r=>r.queueId));
-    const nextQueue=(queueSnapshot||[]).filter(item=>!succeededIds.has(item.id)&&!discarded.has(item.id)).map(item=>{
+    // A failed winner must keep the merged data of the edits collapsed into it;
+    // the snapshot copy only holds the last edit, and the others were discarded.
+    const winnerById=new Map(winners.map(w=>[w.id,w]));
+    const nextQueue=(queueSnapshot||[]).filter(item=>!succeededIds.has(item.id)&&!discarded.has(item.id)).map(original=>{
+      const winner=winnerById.get(original.id);
+      const item=winner&&!succeededIds.has(original.id)?{...original,action:winner.action,data:winner.data}:original;
       if(!failedIds.has(item.id))return item;
       const outcome=failed.find(r=>r.queueId===item.id);
       const classification=outcome?.classification||classifySyncError({code:outcome?.error?.code,message:outcome?.error?.message});
@@ -418,7 +428,7 @@ export async function pushSyncQueue(syncQueue,setData){
   }
 }
 async function pullAll(makeQuery){const rows=[];for(let page=0;;page+=1){const{data,error}=await makeQuery().range(page*PAGE_SIZE,page*PAGE_SIZE+PAGE_SIZE-1);if(error)return{data:null,error};const batch=data||[];rows.push(...batch);if(batch.length<PAGE_SIZE)return{data:rows,error:null};}}
-async function pullTable(table,uid){let query=supabase.from(table).select("*");if(table==="team_notifications")query=query.eq("to_user_id",uid);else if(!TEAM_TABLES.has(table))query=query.eq("user_id",uid);return pullAll(()=>query.order("created_at",{ascending:false}));}
+async function pullTable(table,uid){const makeQuery=()=>{let query=supabase.from(table).select("*");if(table==="team_notifications")query=query.eq("to_user_id",uid);else if(!TEAM_TABLES.has(table))query=query.eq("user_id",uid);return query.order("created_at",{ascending:false});};return pullAll(makeQuery);}
 function dirtyQueueForTable(table){return(_globalQueueRef?.current||[]).filter(q=>(q.status==="pending"||q.status==="failed")&&q.table===table);}
 export async function pullFromSupabase(uid,setData){
   if(!uid)return false;

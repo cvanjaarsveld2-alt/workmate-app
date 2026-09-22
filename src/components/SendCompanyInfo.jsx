@@ -13,6 +13,18 @@ const WHATSAPP_ICON = () => (
   </svg>
 );
 
+// company-docs is a private bucket and file_url holds the storage path, so the
+// recipient needs a signed link. Legacy rows may already hold a full URL.
+const SHARE_LINK_SECONDS = 60 * 60 * 24 * 7;
+async function shareableUrl(doc) {
+  const stored = doc.file_url || "";
+  if (/^https?:\/\//.test(stored) && !stored.includes("/company-docs/")) return stored;
+  const path = stored.includes("/company-docs/") ? stored.split("/company-docs/")[1].split("?")[0] : stored;
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from("company-docs").createSignedUrl(path, SHARE_LINK_SECONDS);
+  return error ? null : data?.signedUrl || null;
+}
+
 function formatBytes(bytes) {
   if (!bytes) return "";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
@@ -31,7 +43,9 @@ export function SendCompanyInfoSheet({ recipientName, recipientEmail, recipientP
         .select("*")
         .order("category", { ascending: true })
         .order("name", { ascending: true });
-      const list = data || [];
+      // Sign links up front so tapping Email/WhatsApp opens immediately (iOS blocks
+      // window.open after an await).
+      const list = await Promise.all((data || []).map(async d => ({ ...d, shareUrl: await shareableUrl(d).catch(() => null) })));
       setDocs(list);
       // Pre-select the first Company Profile if one exists
       const profile = list.find(d => d.category === "Company Profile");
@@ -50,13 +64,13 @@ export function SendCompanyInfoSheet({ recipientName, recipientEmail, recipientP
   }
 
   function getSelectedDocs() {
-    return docs.filter(d => selected.has(d.id));
+    return docs.filter(d => selected.has(d.id) && d.shareUrl);
   }
 
   function buildEmailBody(selectedDocs) {
     const firstName = (recipientName || "").split(" ")[0] || "there";
     const docLines = selectedDocs.map(d =>
-      `• ${d.name}\n  ${d.file_url}`
+      `• ${d.name}\n  ${d.shareUrl}`
     ).join("\n\n");
 
     return `Hi ${firstName},
@@ -76,7 +90,7 @@ Power Works (Pty) Ltd`.trim();
 
   function buildWhatsAppBody(selectedDocs) {
     const firstName = (recipientName || "").split(" ")[0] || "there";
-    const docLines = selectedDocs.map(d => `• *${d.name}*: ${d.file_url}`).join("\n");
+    const docLines = selectedDocs.map(d => `• *${d.name}*: ${d.shareUrl}`).join("\n");
 
     return `Hi ${firstName}, thank you for connecting with *Power Works (Pty) Ltd*!\n\nPlease find our documents below:\n\n${docLines}\n\nFeel free to reach out if you have any questions. 👍`;
   }

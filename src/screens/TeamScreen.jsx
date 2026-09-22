@@ -890,8 +890,8 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
 
               const myClients  = allClients.filter(c => c.user_id === m.user_id);
               const myContacts = allContacts.filter(c => c.user_id === m.user_id);
-              const myLeads    = allLeads.filter(l => l.user_id === m.user_id);
-              const myOpenFU   = allFU.filter(f => f.user_id === m.user_id && !f.completed);
+              const myLeads    = allLeads.filter(l => l.user_id === m.user_id || l.assigned_to_user_id === m.user_id);
+              const myOpenFU   = allFU.filter(f => (f.user_id === m.user_id || f.assigned_to_user_id === m.user_id) && !f.completed);
               const myOverdue  = myOpenFU.filter(f => f.date < todayISO());
               const activeLeads = myLeads.filter(l => !["Won","Lost"].includes(l.stage || "New")).length;
 

@@ -1,12 +1,14 @@
 // ─── PowerMate Service Worker ────────────────────────────────────────────────
 // Offline shell, push notifications and durable reminder scheduling.
-const CACHE_NAME = "powermate-v15";
+const CACHE_NAME = "powermate-v16";
 const PRECACHE = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest"];
 const REMINDER_DB = "powermate_sw";
 const REMINDER_STORE = "reminders";
 
 function openReminderDB() { return new Promise((resolve,reject)=>{const req=indexedDB.open(REMINDER_DB,1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(REMINDER_STORE))db.createObjectStore(REMINDER_STORE,{keyPath:"id"})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)}); }
-async function putReminders(items,replace=false){const db=await openReminderDB();return new Promise((resolve,reject)=>{const tx=db.transaction(REMINDER_STORE,"readwrite"),store=tx.objectStore(REMINDER_STORE);if(replace)store.clear();for(const item of items){if(!item?.id||!item?.fireAt)continue;const t=new Date(item.fireAt).getTime();if(Number.isFinite(t))store.put({...item,fireAt:new Date(t).toISOString()})}tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}
+// replace+source rebuilds only that source's reminders (e.g. the follow-up digest),
+// so calendar and note reminders scheduled elsewhere survive the refresh.
+async function putReminders(items,replace=false,source=null){const db=await openReminderDB();return new Promise((resolve,reject)=>{const tx=db.transaction(REMINDER_STORE,"readwrite"),store=tx.objectStore(REMINDER_STORE);const write=()=>{for(const item of items){if(!item?.id||!item?.fireAt)continue;const t=new Date(item.fireAt).getTime();if(Number.isFinite(t))store.put({...item,...(source?{source}:{}),fireAt:new Date(t).toISOString()})}};if(replace&&source){const req=store.getAll();req.onsuccess=()=>{for(const r of req.result||[])if(r.source===source)store.delete(r.id);write()}}else{if(replace)store.clear();write()}tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}
 async function deleteReminder(id){const db=await openReminderDB();return new Promise(resolve=>{const tx=db.transaction(REMINDER_STORE,"readwrite");tx.objectStore(REMINDER_STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>resolve()})}
 async function dueReminders(){const db=await openReminderDB();return new Promise((resolve,reject)=>{const tx=db.transaction(REMINDER_STORE,"readonly"),req=tx.objectStore(REMINDER_STORE).getAll();req.onsuccess=()=>resolve((req.result||[]).filter(r=>new Date(r.fireAt).getTime()<=Date.now()));req.onerror=()=>reject(req.error)})}
 async function fireDueReminders(){const due=await dueReminders();for(const item of due){await self.registration.showNotification(item.title||"PowerMate Reminder",{body:item.body||"",icon:"/icon.svg",badge:"/icon.svg",vibrate:[100,50,100],tag:item.tag||item.id,data:{url:item.url||"/"}});await deleteReminder(item.id)}}
@@ -24,4 +26,4 @@ self.addEventListener("push",e=>{let data={title:"PowerMate",body:"You have a no
 // user, so an off-site link could be used to send a teammate to a phishing page.
 function safeNotificationUrl(raw){try{const u=new URL(raw||"/",self.location.origin);return u.origin===self.location.origin?u.href:"/"}catch{return "/"}}
 self.addEventListener("notificationclick",e=>{e.notification.close();const url=safeNotificationUrl(e.notification.data?.url);e.waitUntil(self.clients.matchAll({type:"window",includeUncontrolled:true}).then(clients=>{for(const client of clients)if(client.url.includes(self.location.origin)&&"focus"in client)return client.focus().then(()=>client.navigate(url));return self.clients.openWindow(url)}))});
-self.addEventListener("message",e=>{if(e.data?.type==="SKIP_WAITING"){e.waitUntil(Promise.resolve(self.skipWaiting()));return}if(e.data?.type==="SCHEDULE_NOTIFICATIONS")e.waitUntil?.(putReminders(e.data.items||[],e.data.replace===true).then(()=>fireDueReminders()).catch(()=>{}));if(e.data?.type==="CANCEL_NOTIFICATION")e.waitUntil?.(deleteReminder(e.data.id));if(e.data?.type==="FIRE_DUE_REMINDERS")e.waitUntil?.(fireDueReminders().catch(()=>{}))});
+self.addEventListener("message",e=>{if(e.data?.type==="SKIP_WAITING"){e.waitUntil(Promise.resolve(self.skipWaiting()));return}if(e.data?.type==="SCHEDULE_NOTIFICATIONS")e.waitUntil?.(putReminders(e.data.items||[],e.data.replace===true,e.data.source||null).then(()=>fireDueReminders()).catch(()=>{}));if(e.data?.type==="CANCEL_NOTIFICATION")e.waitUntil?.(deleteReminder(e.data.id));if(e.data?.type==="FIRE_DUE_REMINDERS")e.waitUntil?.(fireDueReminders().catch(()=>{}))});
