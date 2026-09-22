@@ -17,6 +17,8 @@ export function classifySyncError(error){
   if(isNetworkFailure(error))return{code:"NETWORK_ERROR",retryable:true,consumesAttempt:false};
   const pgCode=error?.code;
   if(pgCode==="PGRST204")return{code:"SCHEMA_ERROR",retryable:true,consumesAttempt:true};
+  // Keep the conflict code distinct so App.jsx can show the "changed on another device" message.
+  if(pgCode==="PWR_ARRAY_CONFLICT")return{code:"PWR_ARRAY_CONFLICT",retryable:false,consumesAttempt:true};
   if(pgCode==="23505")return{code:"UNIQUE_CONSTRAINT",retryable:false,consumesAttempt:true};
   if(pgCode==="23503")return{code:"FOREIGN_KEY_ERROR",retryable:true,consumesAttempt:true};
   if(pgCode&&RETRYABLE_CODES.has(pgCode))return{code:pgCode==="PGRST301"?"AUTH_EXPIRED":"TIMEOUT",retryable:true,consumesAttempt:true};

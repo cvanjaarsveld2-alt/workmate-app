@@ -25,3 +25,6 @@ test("transient errors remain retryable",()=>{
 test("unknown server errors default to retryable",()=>{
   assert.deepEqual(classifySyncError({code:"500",message:"server exploded"}),{code:"SERVER_ERROR",retryable:true,consumesAttempt:true});
 });
+test("array conflicts keep their own code so the UI can explain them",()=>{
+  assert.deepEqual(classifySyncError({code:"PWR_ARRAY_CONFLICT",message:"changed on another device"}),{code:"PWR_ARRAY_CONFLICT",retryable:false,consumesAttempt:true});
+});

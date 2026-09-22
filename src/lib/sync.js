@@ -24,7 +24,15 @@ function cleanUUIDs(data){const fields=["id","user_id","team_id","client_id","co
 function cleanNumerics(data){const out={...(data||{})};["estimated_value","value","amount","amount_zar","quote_value","vat_amount","exchange_rate","duration_mins","subtotal","vat","total","amount_paid","balance_due","extracted_amount"].forEach(f=>{if(!(f in out))return;const v=out[f];if(v===""||v===undefined)out[f]=null;else if(v!==null&&typeof v==="string"&&Number.isNaN(Number.parseFloat(v)))out[f]=null;});return out;}
 const ARRAY_CONFLICT_FIELDS={jobs:["photos","parts_used"],breakdown_reports:["items"],repair_reports:["items"]};
 function arraysDiffer(a,b){try{return JSON.stringify(a??[])!==JSON.stringify(b??[]);}catch{return true;}}
+// A differing array is only a conflict when the server row changed AFTER the version
+// this edit was based on. Comparing against the current server value alone flagged
+// every legitimate edit (e.g. adding parts_used when completing a job) as a conflict.
+function serverChangedSinceBase(existing,incoming){
+  const serverTs=Date.parse(existing?.updated_at||""),baseTs=Date.parse(incoming?.updated_at||"");
+  return Number.isFinite(serverTs)&&Number.isFinite(baseTs)&&serverTs>baseTs;
+}
 function assertNoStaleArrayOverwrite(table,existing,incoming){
+  if(!serverChangedSinceBase(existing,incoming))return;
   const fields=ARRAY_CONFLICT_FIELDS[table]||[];
   for(const field of fields){
     if(!Array.isArray(existing?.[field])||!Array.isArray(incoming?.[field]))continue;
@@ -153,16 +161,27 @@ async function persistQueue(queue){await offlineReplaceAll("syncQueue",queue);}
 // rejected promise instead — callers that don't already wrap saveAndSync in a
 // try/catch will surface a visible error (or, at minimum, stop short of the
 // misleading "Saved" message) rather than silently lying about what happened.
+function vehicleCheckDay(row) {
+  return { ...(row?.data || {}), _id: row?.id, _updated_at: row?.updated_at };
+}
+function vehicleChecksMap(rows) {
+  return (rows || []).reduce((acc, row) => {
+    if (row?.check_date) acc[row.check_date] = vehicleCheckDay(row);
+    return acc;
+  }, {});
+}
 function applyLocalRecord(current, local, item) {
   // Keep React state in lockstep with the durable local write. This makes
   // saveAndSync safe for new records as well as updates; callers no longer
   // need to hand-build syncQueue entries or remember to insert into state.
-  if (local === "vehicleChecks") {
+  // vehicle_checks rows are stored in IndexedDB under "vehicle_checks" but React
+  // state keeps them as a date-keyed map under "vehicleChecks" (see App.jsx).
+  if (local === "vehicle_checks") {
     const date = item?.check_date;
     if (!date) return current;
     return {
       ...current,
-      vehicleChecks: { ...(current.vehicleChecks || {}), [date]: item.data ?? item },
+      vehicleChecks: { ...(current.vehicleChecks || {}), [date]: vehicleCheckDay(item) },
     };
   }
   const rows = Array.isArray(current[local]) ? current[local] : [];
@@ -213,21 +232,32 @@ export async function saveAndSync(item, table, action, setData, isOnline) {
   const canonical = result.duplicate && result.canonical ? result.canonical : { ...item, sync_status: "synced" };
   const synced = { ...canonical, sync_status: "synced" };
 
+  // Only retire THIS save's queue entry. Another save of the same record may have
+  // been queued while this push was in flight (e.g. two quick vehicle-check taps);
+  // removing it, or overwriting the local row with this older payload, loses that edit.
+  // Older entries for the same record are superseded by this push and go too.
+  const sameRecord = q => q.table === table && q.data?.id === item.id;
+  const isNewer = q => sameRecord(q) && q.id !== queueItem.id && String(q.created_at || "") > now;
+  const settled = q => q.id === queueItem.id || (sameRecord(q) && !isNewer(q));
+  const durableQueue = await offlineGetAll("syncQueue");
+  const newerQueued = durableQueue.some(isNewer);
+  await offlineReplaceAll("syncQueue", durableQueue.filter(q => !settled(q)));
+  if (newerQueued) {
+    setData(current => ({ ...current, syncQueue: (current.syncQueue || []).filter(q => !settled(q)) }));
+    return { ...item, sync_status: "pending" };
+  }
+
   if (result.duplicate && canonical.id && canonical.id !== item.id) {
     await offlineDelete(local, item.id);
   }
   await offlineSave(local, synced);
-  await offlineReplaceAll(
-    "syncQueue",
-    (await offlineGetAll("syncQueue")).filter(q => !(q.table === table && q.data?.id === item.id)),
-  );
 
   setData(current => ({
     ...applyLocalRecord(current, local, synced),
-    ...(result.duplicate && canonical.id !== item.id && local !== "vehicleChecks" && {
+    ...(result.duplicate && canonical.id !== item.id && local !== "vehicle_checks" && {
       [local]: (current[local] || []).filter(row => row.id !== item.id),
     }),
-    syncQueue: (current.syncQueue || []).filter(q => !(q.table === table && q.data?.id === item.id)),
+    syncQueue: (current.syncQueue || []).filter(q => !settled(q)),
   }));
 
   return synced;
@@ -402,6 +432,7 @@ export async function pullFromSupabase(uid,setData){
         if(q&&q.action!=="delete"&&!serverRows.some(r=>r.id===row.id))serverRows.push(row);
       }
       next[local]=serverRows;
+      if(table==="vehicle_checks")next.vehicleChecks=vehicleChecksMap(serverRows);
       await offlineReplaceAll(local,serverRows);
     }
     setData(current=>({...current,...next}));
