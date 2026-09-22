@@ -176,6 +176,15 @@ function cleanUUIDs(data) {
   });
   return out;
 }
+// Postgres rejects "" for date and timestamp columns (22007), so a form that
+// leaves e.g. leads.follow_up_date blank made the whole record fail to sync.
+// Covers every date/timestamp column in the schema (checked against production).
+const DATE_FIELD = /(^date$|_date$|_at$|^service_due$|^resolve_by$|^last_seen$|^timestamp$)/;
+function cleanDates(data) {
+  const out = { ...(data || {}) };
+  for (const key of Object.keys(out)) if (out[key] === "" && DATE_FIELD.test(key)) out[key] = null;
+  return out;
+}
 function cleanNumerics(data) {
   const out = { ...(data || {}) };
   [
@@ -380,7 +389,7 @@ async function stageMissingDependencies(table, payload) {
   return out;
 }
 async function pushOne(table, action, rawData) {
-  let payload = sanitizeRemotePayload(table, cleanNumerics(cleanUUIDs(rawData)));
+  let payload = sanitizeRemotePayload(table, cleanDates(cleanNumerics(cleanUUIDs(rawData))));
   if (table === "vehicle_checks") payload = normalizeVehicleCheckPayload(payload);
   if (payload.media) payload = { ...payload, media: payload.media.map(m => ({ ...m, base64: undefined })) };
   payload = stripEmbeddedBase64(payload);
@@ -406,7 +415,7 @@ async function pushOne(table, action, rawData) {
         payload = { ...existing, ...payload };
       }
     }
-    payload = sanitizeRemotePayload(table, cleanNumerics(cleanUUIDs(payload)));
+    payload = sanitizeRemotePayload(table, cleanDates(cleanNumerics(cleanUUIDs(payload))));
     if (table === "vehicle_checks") payload = normalizeVehicleCheckPayload(payload);
     payload = await stageMissingDependencies(table, payload);
     return await upsertWithIdempotentRecovery(table, { ...payload, sync_status: "synced" });
@@ -1252,7 +1261,11 @@ export function setupRealtimeSync(uid, setData) {
   start().catch(() => {});
   const timer = setInterval(() => {
     if (document.visibilityState !== "hidden" && navigator.onLine) {
-      pullFromSupabase(uid, setData).catch(() => {});
+      // Upload anything still queued (including changes from a previous session)
+      // before pulling, so a restart never leaves local edits stuck on the device.
+      pushSyncQueue(_globalQueueRef?.current || [], setData)
+        .catch(() => {})
+        .finally(() => pullFromSupabase(uid, setData).catch(() => {}));
       retryPendingMedia(uid, setData).catch(() => {});
     }
   }, RECONCILE_MS);

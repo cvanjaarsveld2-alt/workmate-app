@@ -145,3 +145,17 @@ test("stringified vehicle check data is parsed before use", () => {
 test("no-receipt placeholder is never rendered as a signed image", () => {
   assert.match(read("src/screens/ExpensesScreen.jsx"), /receiptUrl && receiptUrl !== "no-receipt" \? \(/);
 });
+
+test("blank dates are sent as null, never as an empty string", () => {
+  const sync = compact("src/lib/sync.js");
+  assert.match(sync, /constDATE_FIELD=/);
+  assert.match(sync, /cleanDates\(cleanNumerics\(cleanUUIDs\(rawData\)\)\)/);
+});
+
+test("queued changes are persisted and pushed without waiting for a new save", () => {
+  const app = compact("src/App.jsx");
+  assert.match(app, /offlineSave\("syncQueue",durable\)/);
+  assert.match(app, /triggerImmediateSync\(\)/);
+  const sync = compact("src/lib/sync.js");
+  assert.match(sync, /pushSyncQueue\(_globalQueueRef\?\.current\|\|\[\],setData\)/);
+});

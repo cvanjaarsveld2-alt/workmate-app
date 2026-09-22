@@ -16,6 +16,18 @@ npm run build
 
 The production build is Vite-based and outputs to `dist`.
 
+## Checks
+```bash
+npm run lint       # ESLint: undefined names/components, hook rules
+npm test           # node:test unit and source checks
+npm run test:sim   # builds the app and drives every screen + save/sync/offline
+                   # flows in Chromium against an in-memory Supabase emulator
+npm run check      # lint + tests + field/security checks + production build
+```
+The simulation uses synthetic data only and never contacts Supabase; writes are
+validated against the production schema in `tests/sim/schema.json` (refresh it
+when columns change).
+
 ## Deploy to Vercel
 1. Import the repository into Vercel.
 2. Framework preset: **Vite**.

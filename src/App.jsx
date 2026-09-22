@@ -247,17 +247,25 @@ export default function PowerWorksApp() {
   const [teamRefreshKey, setTeamRefreshKey] = useState(0);
   const syncQueueRef = useRef(data.syncQueue);
   const persistedQueueIds = useRef(new Set());
+  const queueSyncTimer = useRef(null);
   useEffect(() => {
     syncQueueRef.current = data.syncQueue;
     // Many screens add queue entries straight into React state. Write each new one
     // to IndexedDB immediately so an offline edit survives the app being closed.
     const uid = session?.user?.id;
     if (!uid || getCurrentOfflineUser() !== uid) return;
+    const writes = [];
     for (const item of data.syncQueue || []) {
       if (!item?.id || persistedQueueIds.current.has(item.id)) continue;
       persistedQueueIds.current.add(item.id);
       const durable = { attempts: 0, next_attempt_at: null, status: "pending", created_at: new Date().toISOString(), ...item };
-      offlineSave("syncQueue", durable).catch(() => persistedQueueIds.current.delete(item.id));
+      writes.push(offlineSave("syncQueue", durable).catch(() => persistedQueueIds.current.delete(item.id)));
+    }
+    // Not every screen starts a sync after queueing; do it here once the new
+    // entries are on the device (debounced so a burst of edits is one pass).
+    if (writes.length && navigator.onLine) {
+      clearTimeout(queueSyncTimer.current);
+      queueSyncTimer.current = setTimeout(() => Promise.all(writes).then(() => triggerImmediateSync()), 400);
     }
   }, [data.syncQueue, session?.user?.id]);
   useEffect(() => {
@@ -582,7 +590,10 @@ export default function PowerWorksApp() {
     if (!session?.user?.id) return;
     const uid = session.user.id;
     if (navigator.onLine) {
-      pullFromSupabase(uid, setData).catch(() => {});
+      // Push first: changes queued before the app was last closed go up on startup.
+      pushSyncQueue(syncQueueRef.current || [], setData)
+        .catch(() => {})
+        .finally(() => pullFromSupabase(uid, setData).catch(() => {}));
       retryPendingMedia(uid, setData).catch(() => {});
     }
     const unsubscribe = setupRealtimeSync(uid, setData);
