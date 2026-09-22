@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Home, Calendar, Settings, Search, Menu, Plus, Bell } from "lucide-react";
 import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
-import { offlineGetAll, setOfflineUser } from "./offline/offlineDb";
+import { offlineGetAll, offlineSave, offlineReplaceAll, setOfflineUser, getCurrentOfflineUser } from "./offline/offlineDb";
 import { todayISO, logEvent, genId } from "./lib/helpers";
 import {
   localStorageKey,
@@ -240,9 +240,20 @@ export default function PowerWorksApp() {
   const [screenContext, setScreenContext] = useState({});
   const [teamRefreshKey, setTeamRefreshKey] = useState(0);
   const syncQueueRef = useRef(data.syncQueue);
+  const persistedQueueIds = useRef(new Set());
   useEffect(() => {
     syncQueueRef.current = data.syncQueue;
-  }, [data.syncQueue]);
+    // Many screens add queue entries straight into React state. Write each new one
+    // to IndexedDB immediately so an offline edit survives the app being closed.
+    const uid = session?.user?.id;
+    if (!uid || getCurrentOfflineUser() !== uid) return;
+    for (const item of data.syncQueue || []) {
+      if (!item?.id || persistedQueueIds.current.has(item.id)) continue;
+      persistedQueueIds.current.add(item.id);
+      const durable = { attempts: 0, next_attempt_at: null, status: "pending", created_at: new Date().toISOString(), ...item };
+      offlineSave("syncQueue", durable).catch(() => persistedQueueIds.current.delete(item.id));
+    }
+  }, [data.syncQueue, session?.user?.id]);
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
     const onMessage = event => {
@@ -423,7 +434,14 @@ export default function PowerWorksApp() {
   }, [isOnline, session?.user?.id]);
   useEffect(() => {
     function onClearFailed() {
-      setData(d => ({ ...d, syncQueue: (d.syncQueue || []).filter(i => i.status !== "failed") }));
+      setData(d => {
+        const kept = (d.syncQueue || []).filter(i => i.status !== "failed");
+        // Clear the stored copy too, or the next sync merges the failed items back.
+        offlineGetAll("syncQueue")
+          .then(rows => offlineReplaceAll("syncQueue", (rows || []).filter(i => i.status !== "failed")))
+          .catch(() => {});
+        return { ...d, syncQueue: kept };
+      });
     }
     window.addEventListener("powermate-clear-failed-queue", onClearFailed);
     return () => window.removeEventListener("powermate-clear-failed-queue", onClearFailed);
@@ -910,7 +928,10 @@ export default function PowerWorksApp() {
         userId={session.user.id}
         teamId={teamId}
         onSyncNow={handleSyncNow}
-        onClearQueue={q => setData(d => ({ ...d, syncQueue: q }))}
+        onClearQueue={q => {
+          setData(d => ({ ...d, syncQueue: q }));
+          offlineReplaceAll("syncQueue", q || []).catch(() => {});
+        }}
         syncing={syncing}
         isOnline={isOnline}
         notifPermission={notifPermission}

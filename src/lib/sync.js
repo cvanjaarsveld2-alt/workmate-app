@@ -748,7 +748,12 @@ export async function pushSyncQueue(syncQueue, setData) {
   // call, and burning through MAX_SYNC_ATTEMPTS just because there was no signal would
   // permanently "fail" perfectly good records. Anything that asks us to sync while
   // offline is simply deferred, untouched, to the next call once connectivity returns.
-  if (!navigator.onLine) return;
+  if (!navigator.onLine) {
+    // Offline: make sure every queued change (including ones screens only put in
+    // React state) is on the device before we step aside.
+    try { await persistQueue(syncQueue); } catch (e) { console.warn("[Sync] offline queue persist failed", e); }
+    return;
+  }
   if (_syncInProgress) {
     _syncRerunRequested = true;
     return;

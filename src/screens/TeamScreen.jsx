@@ -1113,9 +1113,13 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
             const name = m.email?.split("@")[0] || "Member";
             return (
               <div key={m.user_id}>
-                <button
+                {/* A div, not a button: the row holds its own buttons (access, role, remove). */}
+                <div
+                  role={myRole === "admin" && !isMe ? "button" : undefined}
+                  tabIndex={myRole === "admin" && !isMe ? 0 : undefined}
                   className="w-full flex items-center gap-3 px-4 py-4 text-left min-h-[64px]"
                   onClick={() => myRole === "admin" && !isMe ? setViewingMember(m) : null}
+                  onKeyDown={e => { if ((e.key === "Enter" || e.key === " ") && myRole === "admin" && !isMe) { e.preventDefault(); setViewingMember(m); } }}
                   style={{ cursor: myRole === "admin" && !isMe ? "pointer" : "default" }}>
                   <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-white text-xs font-black"
                     style={{ background: m.role === "admin" ? "#A16207" : BRAND.primary }}>
@@ -1152,7 +1156,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                     )}
                     {myRole === "admin" && !isMe && <ChevronRight size={14} className="text-slate-300" />}
                   </div>
-                </button>
+                </div>
               </div>
             );
           })}
