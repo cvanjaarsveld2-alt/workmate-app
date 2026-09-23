@@ -825,7 +825,14 @@ export async function pushSyncQueue(syncQueue, setData) {
       offlineSave(key, result.canonical).catch(() => {});
     }
     if (failed.length) {
-      logEvent("sync_failed", { count: failed.length });
+      logEvent("sync_failed", {
+        count: failed.length,
+        items: failed.slice(0, 10).map(f => ({
+          table: f.table,
+          code: f.error?.syncErrorCode || f.error?.code || null,
+          message: String(f.error?.message || "").slice(0, 300),
+        })),
+      });
       window.dispatchEvent(
         new CustomEvent("powermate:sync_failed", {
           detail: {

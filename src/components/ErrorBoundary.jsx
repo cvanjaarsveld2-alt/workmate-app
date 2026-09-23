@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React from "react";
 import { AlertTriangle, RotateCw, Home } from "lucide-react";
+import { reportError } from "../lib/helpers";
 
 // Crash log lives in localStorage so the Diagnostics screen can read it back.
 const CRASH_LOG_KEY = "powermate_crash_log";
@@ -68,6 +69,10 @@ export class ErrorBoundary extends React.Component {
       message: error?.message || String(error),
       stack: (error?.stack || "").split("\n").slice(0, 6).join("\n"),
       componentStack: (info?.componentStack || "").split("\n").slice(0, 6).join("\n"),
+    });
+    reportError("screen_crashed", error, {
+      screen: this.props.label || "unknown",
+      componentStack: (info?.componentStack || "").slice(0, 1000),
     });
     console.error("[ErrorBoundary]", this.props.label, error, info);
   }

@@ -4,6 +4,10 @@ import "./index.css";
 import "./darkMode.css";
 import { initTheme } from "./lib/theme";
 import PowerMateApp from "./App.jsx";
+import { installGlobalErrorReporting } from "./lib/helpers";
+
+// Uncaught errors and promise rejections go to the events table (buffered offline).
+installGlobalErrorReporting();
 
 // Vite emits a preloadError when a long-lived tab asks for a lazy chunk from
 // an older deployment. Reload once so the browser receives the current HTML

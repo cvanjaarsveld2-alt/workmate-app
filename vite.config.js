@@ -3,6 +3,10 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // Tags error reports with the deployed commit (Vercel sets this at build time).
+    "import.meta.env.VITE_BUILD_SHA": JSON.stringify((process.env.VERCEL_GIT_COMMIT_SHA || "dev").slice(0, 7)),
+  },
   build: {
     // The old TDZ crash ("Cannot access 'n' before initialization") came from
     // manual vendor chunking splitting an import cycle. With automatic chunking,
