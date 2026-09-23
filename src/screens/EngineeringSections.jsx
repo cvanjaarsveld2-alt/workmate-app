@@ -265,7 +265,7 @@ export function EngineeringSections({ engineering = {}, onChange }) {
             <div className="flex gap-2">
               {["pending", "in_progress", "done"].map(st => (
                 <button key={st} onClick={() => patchAction(a.id, { status: st })}
-                  className="flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+                  className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
                   style={a.status === st
                     ? { background: st === "done" ? "#16A34A" : st === "in_progress" ? "#D97706" : "#DC2626", color: "#fff" }
                     : { background: "#fff", color: "#64748B", border: "1px solid #E2E8F0" }}>

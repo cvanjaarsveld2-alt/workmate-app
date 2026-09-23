@@ -159,7 +159,7 @@ export function VoiceInput({
       {(transcript || mode === "listening") && (
         <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 min-h-[60px]">
           <p className="text-sm text-slate-700 leading-relaxed">
-            {transcript || <span className="text-slate-300 italic">Listening...</span>}
+            {transcript || <span className="text-slate-400 italic">Listening...</span>}
           </p>
         </div>
       )}

@@ -345,7 +345,7 @@ function MemberDashboard({ member, data, setData, members, currentUserId, userEm
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-black text-red-700">{overdueFU.length} overdue follow-up{overdueFU.length !== 1 ? "s" : ""}</p>
-              <p className="text-xs text-red-500 mt-0.5">Need attention</p>
+              <p className="text-xs text-red-600 mt-0.5">Need attention</p>
             </div>
             <button onClick={() => setDrillSection("followups")}
               className="text-xs font-bold text-red-600 px-3 py-2 rounded-xl min-h-[40px]"
@@ -477,7 +477,7 @@ function SharedWithMe({ userId, data, setData, onRefresh }) {
                 </div>
               </div>
               <div className="px-4 pb-3 border-t border-slate-50">
-                <p className="text-[10px] text-slate-400 text-center">
+                <p className="text-[11px] text-slate-400 text-center">
                   "Add to my dashboard" copies this {cfg.label.toLowerCase()} to your personal screens only.
                 </p>
               </div>
@@ -907,13 +907,13 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
             { label: "Contacted", color: "#1E40AF" },
             { label: "Quoted",    color: "#5B21B6" },
             { label: "Active",    color: "#0E7490" },
-            { label: "Won",       color: "#16A34A" },
+            { label: "Won",       color: "#15803D" },
           ].map(({ label, color }) => {
             const count = teamStats.pipeline[label] || 0;
             const pct   = teamStats.totalInPipeline > 0 ? (count / teamStats.totalInPipeline) * 100 : 0;
             return (
               <div key={label} className="flex items-center gap-3">
-                <p className="w-24 text-sm font-bold shrink-0 whitespace-nowrap" style={{ color }}>{label}</p>
+                <p className="pm-tint w-24 text-sm font-bold shrink-0 whitespace-nowrap" style={{ "--tint": color }}>{label}</p>
                 <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
                   <motion.div className="h-full rounded-full" style={{ background: color }}
                     initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.5 }} />
@@ -982,7 +982,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                         onClick={() => setViewingMember({ ...m, _openSection: stat.section })}
                         className="flex flex-col items-center py-3 px-2 w-full active:bg-slate-50 transition-colors">
                         <p className="text-lg font-black leading-none" style={{ color: stat.color }}>{stat.value}</p>
-                        <p className="text-[10px] font-bold text-slate-400 mt-0.5 text-center leading-tight">{stat.label}</p>
+                        <p className="text-[11px] font-bold text-slate-400 mt-0.5 text-center leading-tight">{stat.label}</p>
                       </button>
                     ))}
                   </div>
@@ -990,7 +990,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                   {/* Recent clients preview */}
                   {myClients.length > 0 && (
                     <div className="border-t border-slate-50">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider px-4 pt-2.5 pb-1">
+                      <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider px-4 pt-2.5 pb-1">
                         Recent clients
                       </p>
                       <div className="divide-y divide-slate-50">
@@ -1001,9 +1001,9 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                             <div key={c.id} className="flex items-center gap-2 px-4 py-2.5">
                               <div className="flex-1 min-w-0">
                                 <p className="text-xs font-bold text-slate-800 truncate">{c.company}</p>
-                                {c.branch && <p className="text-[10px] text-slate-400 truncate">{c.branch}</p>}
+                                {c.branch && <p className="text-[11px] text-slate-400 truncate">{c.branch}</p>}
                               </div>
-                              <span className="text-[10px] font-bold rounded-full px-2 py-0.5 shrink-0"
+                              <span className="text-[11px] font-bold rounded-full px-2 py-0.5 shrink-0"
                                 style={{ background: "#FEF3C7", color: "#92400E" }}>
                                 {c.stage || "New Lead"}
                               </span>
@@ -1012,7 +1012,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                         {myClients.length > 3 && (
                           <button
                             onClick={() => setViewingMember({ ...m, _openSection: "clients" })}
-                            className="w-full text-center py-2.5 text-[10px] font-bold min-h-[40px]"
+                            className="w-full text-center py-2.5 text-[11px] font-bold min-h-[40px]"
                             style={{ color: BRAND.primary }}>
                             +{myClients.length - 3} more — tap to see all
                           </button>
@@ -1026,10 +1026,10 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                       onClick={() => setViewingMember({ ...m, _openSection: "followups" })}
                       className="w-full flex items-center gap-2 px-4 py-3 border-t border-slate-50 text-left"
                       style={{ background: "#FEF2F2" }}>
-                      <p className="text-xs font-bold text-red-600 flex-1">
+                      <p className="text-xs font-bold text-red-700 flex-1">
                         ⚠ {myOverdue.length} overdue follow-up{myOverdue.length !== 1 ? "s" : ""}
                       </p>
-                      <ChevronRight size={12} className="text-red-400 shrink-0" />
+                      <ChevronRight size={12} className="text-red-600 shrink-0" />
                     </button>
                   )}
                 </Card>
@@ -1193,7 +1193,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                 <button onClick={copyCode}
                   className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 transition-colors"
                   style={{ background: copied ? "#DCFCE7" : "#F7F3F3" }}>
-                  {copied ? <Check size={20} className="text-green-600" /> : <Copy size={20} style={{ color: BRAND.primary }} />}
+                  {copied ? <Check size={20} className="text-green-700" /> : <Copy size={20} style={{ color: BRAND.primary }} />}
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2">
@@ -1229,12 +1229,12 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                     <div className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
                       style={{ background: item.shared ? "#DCFCE7" : "#F1F5F9" }}>
                       {item.shared
-                        ? <Check size={10} className="text-green-600" />
+                        ? <Check size={10} className="text-green-700" />
                         : <X size={8} className="text-slate-400" />}
                     </div>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-slate-700 leading-tight">{item.label}</p>
-                      {item.note && <p className="text-[10px] text-slate-400">{item.note}</p>}
+                      {item.note && <p className="text-[11px] text-slate-400">{item.note}</p>}
                     </div>
                   </div>
                 ))}

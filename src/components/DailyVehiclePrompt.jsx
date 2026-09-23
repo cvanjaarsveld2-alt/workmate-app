@@ -201,9 +201,9 @@ export function DailyVehiclePrompt({ userId, teamId, data, setData, onNavigate }
                     <button
                       onClick={handleReportIssue}
                       className="flex-1 flex flex-col items-center gap-2 py-4 rounded-2xl border-2 border-amber-200 bg-amber-50 min-h-[80px] active:scale-95 transition-transform">
-                      <AlertTriangle size={22} className="text-amber-600" />
+                      <AlertTriangle size={22} className="text-amber-700" />
                       <span className="text-sm font-black text-amber-700">Report Issue</span>
-                      <span className="text-[10px] text-amber-500">Full checklist</span>
+                      <span className="text-[11px] text-amber-700">Full checklist</span>
                     </button>
 
                     <button
@@ -212,11 +212,11 @@ export function DailyVehiclePrompt({ userId, teamId, data, setData, onNavigate }
                       style={{ background: BRAND.primary }}>
                       <CheckCircle2 size={22} className="text-white" />
                       <span className="text-sm font-black">All Good</span>
-                      <span className="text-[10px] text-white/70">Mark all items ✓</span>
+                      <span className="text-[11px] text-white/70">Mark all items ✓</span>
                     </button>
                   </div>
 
-                  <p className="text-xs text-slate-300 text-center mt-4">
+                  <p className="text-xs text-slate-400 text-center mt-4">
                     Tap × to skip — you'll be reminded again when you reopen the app
                   </p>
                 </>

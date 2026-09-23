@@ -111,7 +111,7 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
             <div className="flex-1 overflow-y-auto py-2">
               {SECTIONS.map(section => (
                 <div key={section.title} className="mb-0.5">
-                  <p className="px-5 pt-4 pb-1 text-[10px] font-black text-slate-400 tracking-widest">
+                  <p className="px-5 pt-4 pb-1 text-[11px] font-black text-slate-400 tracking-widest">
                     {section.title}
                   </p>
                   {section.items.map(item => {
@@ -137,7 +137,7 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
                           {item.label}
                         </span>
                         {badge > 0 && (
-                          <span className="min-w-5 h-5 px-1 rounded-full bg-red-100 text-red-600 text-[10px] font-black flex items-center justify-center">
+                          <span className="min-w-5 h-5 px-1 rounded-full bg-red-100 text-red-600 text-[11px] font-black flex items-center justify-center">
                             {badge > 99 ? "99+" : badge}
                           </span>
                         )}

@@ -90,7 +90,7 @@ export function InteractionLog({ client, setData, userId, teamId }) {
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: m.negative ? "#DC2626" : "#16A34A" }} />
                   <span className="text-sm font-bold text-slate-800">{it.label || m.label}</span>
-                  <span className="ml-auto text-[11px] text-slate-400">{(it.date || "").slice(0, 10)}</span>
+                  <span className="ml-auto text-xs text-slate-400">{(it.date || "").slice(0, 10)}</span>
                 </div>
                 {it.note && <p className="text-xs text-slate-500 mt-1 pl-4">{it.note}</p>}
               </div>
@@ -120,7 +120,7 @@ export function InteractionLog({ client, setData, userId, teamId }) {
                 </button>
               </div>
 
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Outcome</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Outcome</p>
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {INTERACTION_OUTCOMES.map(o => {
                   const active = chosen?.key === o.key;
@@ -136,7 +136,7 @@ export function InteractionLog({ client, setData, userId, teamId }) {
                 })}
               </div>
 
-              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Note (optional)</p>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5">Note (optional)</p>
               <textarea
                 value={note} onChange={e => setNote(e.target.value)}
                 rows={3} placeholder="e.g. Spoke to Johan — already using a competitor, revisit next year"

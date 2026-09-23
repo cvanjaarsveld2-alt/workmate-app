@@ -260,11 +260,11 @@ export function SalesFollowupComposer({ contact, onClose }) {
               <p className="text-xs font-black uppercase tracking-wider text-slate-500">Gap-Selling check</p>
               <div className="grid grid-cols-1 gap-1.5 mt-2">
                 {checks.map(c=><div key={c.id} className="flex items-center gap-2 text-xs">
-                  <span className={c.pass ? "text-green-600" : "text-amber-600"}>{c.pass ? "✓" : "•"}</span>
+                  <span className={c.pass ? "text-green-700" : "text-amber-700"}>{c.pass ? "✓" : "•"}</span>
                   <span className={c.pass ? "text-slate-600" : "text-amber-700"}>{c.label}{!c.pass ? " — add this if you know it" : ""}</span>
                 </div>)}
               </div>
-              <p className="text-[11px] font-bold text-slate-400 mt-2">{passed}/{checks.length} checks supported</p>
+              <p className="text-xs font-bold text-slate-400 mt-2">{passed}/{checks.length} checks supported</p>
             </div>
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Subject</label>
@@ -282,9 +282,9 @@ export function SalesFollowupComposer({ contact, onClose }) {
               <Sparkles size={15} className="inline mr-1" />
               {aiPolishing ? "Professionalising…" : "Professionalise with AI"}
             </button>
-            {aiMessage && <p className="text-[11px] text-center text-slate-400">{aiMessage}</p>}
+            {aiMessage && <p className="text-xs text-center text-slate-400">{aiMessage}</p>}
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={copy} className="rounded-xl border-2 py-3 text-sm font-bold" style={{borderColor:copied?"#16A34A":"#E2E8F0",color:copied?"#16A34A":"#475569"}}>{copied ? "Copied ✓" : "Copy"}</button>
+              <button onClick={copy} className="rounded-xl border-2 py-3 text-sm font-bold" style={{borderColor:copied?"#16A34A":"#E2E8F0",color:copied?"#15803D":"#475569"}}>{copied ? "Copied ✓" : "Copy"}</button>
               <button onClick={openEmail} disabled={!contact.email} className="rounded-xl py-3 text-sm font-bold text-white disabled:opacity-40" style={{background:"#0078D4"}}><Mail size={14} className="inline mr-1"/> Open Email</button>
             </div>
             <div className="grid grid-cols-2 gap-2">

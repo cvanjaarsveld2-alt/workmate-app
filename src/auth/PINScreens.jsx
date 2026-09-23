@@ -201,7 +201,7 @@ function NumKey({ digit, sub, onPress, disabled }) {
       className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm select-none w-[72px] h-[66px] sm:w-[80px] sm:h-[72px]">
       <span className="text-2xl font-bold text-slate-900 leading-none">{digit}</span>
       {sub
-        ? <span className="text-[9px] font-bold text-slate-400 tracking-[0.18em] mt-1">{sub}</span>
+        ? <span className="text-[10px] font-bold text-slate-400 tracking-[0.18em] mt-1">{sub}</span>
         : <span className="h-[13px]" />}
     </motion.button>
   );
@@ -428,7 +428,7 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
               </motion.p>
             ) : (
               <motion.p key="hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="text-sm text-slate-300 text-center">
+                className="text-sm text-slate-400 text-center">
                 {PIN_LENGTH} digits
               </motion.p>
             )}
@@ -546,7 +546,7 @@ export function PINSetupScreen({ userId, onComplete }) {
                 className="text-sm font-bold text-red-600 text-center">{error}</motion.p>
             ) : (
               <motion.p key="hint" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="text-sm text-slate-300 text-center">{PIN_LENGTH} digits</motion.p>
+                className="text-sm text-slate-400 text-center">{PIN_LENGTH} digits</motion.p>
             )}
           </AnimatePresence>
         </div>

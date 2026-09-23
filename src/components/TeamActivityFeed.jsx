@@ -96,7 +96,7 @@ export function TeamActivityFeed({ teamId, userId, limit = 20 }) {
                   <p className="text-xs text-slate-700 break-words leading-relaxed">
                     {actionText}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(item.created_at)}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{timeAgo(item.created_at)}</p>
                 </div>
                 {isAccepted && <span className="text-green-500 text-xs shrink-0">✅</span>}
                 {isDeclined && <span className="text-red-500 text-xs shrink-0">❌</span>}

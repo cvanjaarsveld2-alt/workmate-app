@@ -251,12 +251,12 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
                   {DAYS[i]}
                 </span>
                 <span className="text-xs text-slate-400">{d.slice(8)}/{d.slice(5, 7)}</span>
-                {isToday && <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded-full text-white" style={{ background: BRAND.primary }}>Today</span>}
+                {isToday && <span className="text-[11px] font-black uppercase px-1.5 py-0.5 rounded-full text-white" style={{ background: BRAND.primary }}>Today</span>}
               </div>
               <span className="text-xs font-bold text-slate-400">{items.length ? `${items.length}` : "—"}</span>
             </div>
             {items.length === 0
-              ? <p className="text-xs text-slate-300 py-1">Nothing scheduled</p>
+              ? <p className="text-xs text-slate-400 py-1">Nothing scheduled</p>
               : <div className="space-y-1.5">
                   {items.map(it => <PlanItem key={it.id} item={it} onMove={() => setMoving(it)} onDone={() => completeFollowup(it)} onOpen={onNavigate} onDraft={() => setDrafting({ item: it, client: clientForItem(it) })} />)}
                 </div>}
@@ -294,7 +294,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
                         <Mail size={15} style={{ color: BRAND.primary }} />
                       </button>
                       <button onClick={() => markContacted(it.raw)}
-                        className="shrink-0 px-2.5 h-8 rounded-full text-[11px] font-bold active:bg-slate-200 flex items-center gap-1"
+                        className="shrink-0 px-2.5 h-8 rounded-full text-xs font-bold active:bg-slate-200 flex items-center gap-1"
                         style={{ color: "#16A34A" }} aria-label="Mark contacted">
                         <CheckIcon size={13} /> Done
                       </button>
@@ -303,7 +303,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
                 </div>
                 {/* Snooze setting */}
                 <div className="mt-3 pt-2.5 border-t border-slate-100">
-                  <p className="text-[11px] font-bold text-slate-400 mb-1.5">Hide after contacting for:</p>
+                  <p className="text-xs font-bold text-slate-400 mb-1.5">Hide after contacting for:</p>
                   <div className="flex gap-1.5">
                     {[7, 10, 14, 21].map(d => (
                       <button key={d} onClick={() => changeSnooze(d)}

@@ -111,7 +111,7 @@ function statusStyle(s) {
   if (s === "ok")    return { bg: "#DCFCE7", color: "#166534", border: "#BBF7D0" };
   if (s === "issue") return { bg: "#FEE2E2", color: "#991B1B", border: "#FECACA" };
   if (s === "na")    return { bg: "#F1F5F9", color: "#64748B", border: "#E2E8F0" };
-  return { bg: "#F8FAFC", color: "#94A3B8", border: "#E2E8F0" };
+  return { bg: "#F8FAFC", color: "#647083", border: "#E2E8F0" };
 }
 
 // ─── Issue sheet ──────────────────────────────────────────────────────────────
@@ -169,7 +169,7 @@ function IssueSheet({ item, date, currentComment, currentPhoto, onSave, onClose 
               <MediaPicker onAdd={handlePhoto} />
             )}
             {compressing && <p className="text-xs text-slate-400 mt-1">Processing photo…</p>}
-            <p className="text-[11px] text-slate-400 mt-1">Attach a photo of this specific fault.</p>
+            <p className="text-xs text-slate-400 mt-1">Attach a photo of this specific fault.</p>
           </div>
         </div>
         <div className="px-5 pb-8 pt-2 flex gap-3">
@@ -238,7 +238,7 @@ function SettingsPanel({ settings, userId, onSave, onClose }) {
             ) : (
               <MediaPicker onAdd={handleVehiclePhoto} />
             )}
-            <p className="text-[11px] text-slate-400 mt-1.5">Shown at the top of the checklist. A permanent profile photo of the vehicle.</p>
+            <p className="text-xs text-slate-400 mt-1.5">Shown at the top of the checklist. A permanent profile photo of the vehicle.</p>
           </div>
 
           <Field label="Vehicle (Make & Model)" value={form.vehicle} onChange={v => setForm(f => ({ ...f, vehicle: v }))} placeholder="e.g. Toyota Hilux" />
@@ -274,7 +274,7 @@ function WeekRow({ week, checksMap, selected, onSelect, onDayClick, selectMode }
           {!hasAny && <p className="text-xs text-slate-400 mt-0.5">No checks recorded</p>}
         </div>
         {hasAny && (
-          <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
+          <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold"
             style={hasIssue
               ? { background: "#FEE2E2", color: "#991B1B" }
               : { background: "#DCFCE7", color: "#166534" }}>
@@ -299,8 +299,8 @@ function WeekRow({ week, checksMap, selected, onSelect, onDayClick, selectMode }
                 background: hasItems ? (dayIssue ? "#FEF2F2" : "#F0FDF4") : "#F8FAFC",
                 borderColor: hasItems ? (dayIssue ? "#FECACA" : "#BBF7D0") : "#E2E8F0",
               }}>
-              <span className="text-[10px] font-bold text-slate-400 leading-none">{DAY_LABELS[i]}</span>
-              <span className="text-xs font-black leading-none" style={{ color: hasItems ? (dayIssue ? "#991B1B" : "#166534") : "#94A3B8" }}>
+              <span className="text-[11px] font-bold text-slate-400 leading-none">{DAY_LABELS[i]}</span>
+              <span className="text-xs font-black leading-none" style={{ color: hasItems ? (dayIssue ? "#991B1B" : "#166534") : "#647083" }}>
                 {new Date(date + "T12:00:00").getDate()}
               </span>
               {hasItems && (
@@ -804,7 +804,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                       borderColor: isActive ? "#8B1A1A" : hasIssue ? "#FECACA" : isOk ? "#BBF7D0" : "#E2E8F0",
                       opacity: isFuture ? 0.35 : 1,
                     }}>
-                    <span className="text-[10px] font-bold leading-none" style={{ color: isActive ? "rgba(255,255,255,0.7)" : "#94A3B8" }}>{DAY_LABELS[i]}</span>
+                    <span className="text-[11px] font-bold leading-none" style={{ color: isActive ? "rgba(255,255,255,0.85)" : "#647083" }}>{DAY_LABELS[i]}</span>
                     <span className="text-sm font-black leading-none mt-0.5" style={{ color: isActive ? "white" : "#1E293B" }}>
                       {new Date(date + "T12:00:00").getDate()}
                     </span>
@@ -870,7 +870,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                   </div>
                 )}
                 <MediaPicker onAdd={addVehiclePhoto} />
-                <p className="text-[11px] text-slate-400 mt-2">Take a photo or choose one from your gallery — attach a physical photo of the vehicle for this day's record.</p>
+                <p className="text-xs text-slate-400 mt-2">Take a photo or choose one from your gallery — attach a physical photo of the vehicle for this day's record.</p>
               </div>
             );
           })()}
@@ -887,7 +887,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-black text-slate-500 uppercase tracking-wider">{section}</p>
                     {sectionIssues > 0 && (
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-black text-red-700" style={{ background: "#FEE2E2" }}>
+                      <span className="rounded-full px-2 py-0.5 text-[11px] font-black text-red-700" style={{ background: "#FEE2E2" }}>
                         {sectionIssues} issue{sectionIssues !== 1 ? "s" : ""}
                       </span>
                     )}
@@ -920,7 +920,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                                   {!status            && <div className="w-5 h-5 rounded-full border-2 border-slate-200 bg-white" />}
                                 </div>
                                 <p className="flex-1 text-sm font-bold text-slate-800">{item}</p>
-                                <span className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black border"
+                                <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-black border"
                                   style={{ background: ss.bg, color: ss.color, borderColor: ss.border }}>
                                   {status === "ok" ? "OK" : status === "issue" ? "Issue" : status === "na" ? "N/A" : "—"}
                                 </span>
@@ -935,12 +935,12 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                                       <div className="flex-1 rounded-xl bg-red-50 border border-red-100 px-3 py-2">
                                         <p className="text-xs font-black text-red-700 mb-0.5">Issue note</p>
                                         <p className="text-xs text-red-600 leading-snug">{comment}</p>
-                                        <p className="text-[10px] text-red-400 mt-1.5 font-medium">Tap to edit</p>
+                                        <p className="text-[11px] text-red-600 mt-1.5 font-medium">Tap to edit</p>
                                       </div>
                                     ) : (
                                       <div className="flex-1 rounded-xl border-2 border-dashed border-red-200 px-3 py-2.5 flex items-center gap-2">
-                                        <FileText size={13} className="text-red-400 shrink-0" />
-                                        <p className="text-xs font-bold text-red-500">Add issue description</p>
+                                        <FileText size={13} className="text-red-600 shrink-0" />
+                                        <p className="text-xs font-bold text-red-600">Add issue description</p>
                                       </div>
                                     )}
                                   </button>
@@ -1014,7 +1014,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-black text-slate-500 uppercase tracking-wider">{month.label}</p>
                     {monthIssues > 0 && (
-                      <span className="rounded-full px-2 py-0.5 text-[10px] font-black text-red-700" style={{ background: "#FEE2E2" }}>
+                      <span className="rounded-full px-2 py-0.5 text-[11px] font-black text-red-700" style={{ background: "#FEE2E2" }}>
                         {monthIssues} issue week{monthIssues !== 1 ? "s" : ""}
                       </span>
                     )}

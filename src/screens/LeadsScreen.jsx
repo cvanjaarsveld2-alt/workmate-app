@@ -72,7 +72,7 @@ function CatBadge({ catId }) {
   const cat = LEAD_CATEGORIES.find(c => c.id === catId);
   if (!cat) return null;
   return (
-    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold"
+    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold"
       style={{ background: cat.bg, color: cat.color }}>
       {cat.label}
     </span>
@@ -198,7 +198,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
                 className="rounded-full px-3 py-1.5 text-xs font-bold border-2 transition-all min-h-[36px]"
                 style={sel
                   ? { background: cat.bg, color: cat.color, borderColor: cat.color }
-                  : { background: "white", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  : { background: "white", color: "#647083", borderColor: "#E2E8F0" }}>
                 {cat.label}
               </button>
             );
@@ -218,7 +218,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
                 className="rounded-full px-3 py-1.5 text-xs font-bold border-2 transition-all min-h-[36px]"
                 style={sel
                   ? { background: s.bg, color: s.color, borderColor: s.dot }
-                  : { background: "white", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  : { background: "white", color: "#647083", borderColor: "#E2E8F0" }}>
                 {stage}
               </button>
             );
@@ -636,8 +636,8 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
                   style={{ color: filterStage === stage ? s.color : "#1E293B" }}>
                   {count}
                 </span>
-                <span className="text-[10px] font-bold leading-tight mt-0.5"
-                  style={{ color: filterStage === stage ? s.color : "#94A3B8" }}>
+                <span className="text-[11px] font-bold leading-tight mt-0.5"
+                  style={{ color: filterStage === stage ? s.color : "#647083" }}>
                   {stage}
                 </span>
               </button>
@@ -706,7 +706,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
                           <div className="flex flex-wrap gap-1 mt-1.5">
                             {cats.slice(0, 3).map(id => <CatBadge key={id} catId={id} />)}
                             {cats.length > 3 && (
-                              <span className="text-[10px] font-bold text-slate-400">+{cats.length - 3}</span>
+                              <span className="text-[11px] font-bold text-slate-400">+{cats.length - 3}</span>
                             )}
                           </div>
                         )}
@@ -725,7 +725,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
                             </span>
                           )}
                           {lead.estimated_value > 0 && (
-                            <span className="text-xs font-bold text-green-600">{money(lead.estimated_value)}</span>
+                            <span className="text-xs font-bold text-green-700">{money(lead.estimated_value)}</span>
                           )}
                         </div>
                       </div>

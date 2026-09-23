@@ -207,7 +207,7 @@ export function EmailComposer({ contact, onClose, onGapSelling }) {
             <div className="grid grid-cols-2 gap-2">
               <button onClick={copy}
                 className="rounded-xl py-3 text-sm font-bold border-2"
-                style={{ borderColor: copied ? "#16A34A" : "#E2E8F0", color: copied ? "#16A34A" : "#475569" }}>
+                style={{ borderColor: copied ? "#16A34A" : "#E2E8F0", color: copied ? "#15803D" : "#475569" }}>
                 {copied ? "Copied ✓" : "Copy"}
               </button>
               <button onClick={openOutlook}

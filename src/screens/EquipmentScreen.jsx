@@ -324,8 +324,8 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
 
       {(overdueCount > 0 || dueSoonCount > 0) && (
         <div className="grid grid-cols-2 gap-3">
-          {overdueCount > 0 && <div className="rounded-2xl bg-red-50 border border-red-200 p-3 text-center"><p className="text-2xl font-black text-red-700">{overdueCount}</p><p className="text-sm font-bold text-red-500">Overdue Service</p></div>}
-          {dueSoonCount > 0 && <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-center"><p className="text-2xl font-black text-amber-700">{dueSoonCount}</p><p className="text-sm font-bold text-amber-500">Due in 14 Days</p></div>}
+          {overdueCount > 0 && <div className="rounded-2xl bg-red-50 border border-red-200 p-3 text-center"><p className="text-2xl font-black text-red-700">{overdueCount}</p><p className="text-sm font-bold text-red-700">Overdue Service</p></div>}
+          {dueSoonCount > 0 && <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-center"><p className="text-2xl font-black text-amber-700">{dueSoonCount}</p><p className="text-sm font-bold text-amber-700">Due in 14 Days</p></div>}
         </div>
       )}
 

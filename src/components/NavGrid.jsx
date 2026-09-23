@@ -92,7 +92,7 @@ export function NavGrid({ open, onClose, onOpen, currentScreen, onNavigate, badg
                           {tile.label}
                         </span>
                         {badge > 0 && (
-                          <span className="absolute top-2 right-3 rounded-full px-1.5 py-0.5 text-[10px] font-black text-white min-w-[18px] text-center" style={{ background: BRAND.primary }}>
+                          <span className="absolute top-2 right-3 rounded-full px-1.5 py-0.5 text-[11px] font-black text-white min-w-[18px] text-center" style={{ background: BRAND.primary }}>
                             {badge > 99 ? "99+" : badge}
                           </span>
                         )}

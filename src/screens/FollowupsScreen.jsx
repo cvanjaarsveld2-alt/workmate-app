@@ -49,7 +49,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShar
       <div className="flex items-start gap-3">
         <button
           onClick={onToggle}
-          className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all mt-0.5 ${f.completed ? "bg-green-100 text-green-600" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}
+          className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all mt-0.5 ${f.completed ? "bg-green-100 text-green-700" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}
         >
           <Check size={16} />
         </button>
@@ -83,7 +83,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShar
             <p className="text-xs text-slate-400 mt-1 break-words whitespace-pre-wrap">{f.notes}</p>
           )}
           {reminder && reminder.value !== "none" && !f.completed && (
-            <p className="text-xs text-blue-400 mt-0.5">🔔 {reminder.label}</p>
+            <p className="text-xs text-blue-600 mt-0.5">🔔 {reminder.label}</p>
           )}
           {f.clientPhone && !f.completed && (
             <div className="mt-2">
@@ -110,7 +110,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShar
         </div>
         <div className="flex flex-col gap-2 shrink-0">
           {isOverdue && (
-            <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-600 whitespace-nowrap">
+            <span className="rounded-full bg-red-100 px-2 py-1 text-xs font-bold text-red-700 whitespace-nowrap">
               Overdue
             </span>
           )}
@@ -759,7 +759,7 @@ export function FollowupsScreen({
               className="flex-1 rounded-2xl bg-red-50 border border-red-200 p-3 text-center"
             >
               <p className="text-2xl font-black text-red-700">{overdueCount}</p>
-              <p className="text-xs font-bold text-red-500">Overdue</p>
+              <p className="text-xs font-bold text-red-700">Overdue</p>
             </button>
           )}
           {todayCount > 0 && (
@@ -768,7 +768,7 @@ export function FollowupsScreen({
               className="flex-1 rounded-2xl bg-blue-50 border border-blue-200 p-3 text-center"
             >
               <p className="text-2xl font-black text-blue-700">{todayCount}</p>
-              <p className="text-xs font-bold text-blue-500">Due Today</p>
+              <p className="text-xs font-bold text-blue-700">Due Today</p>
             </button>
           )}
         </div>
@@ -822,15 +822,15 @@ export function FollowupsScreen({
                   className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"
                 >
                   <div className="px-4 py-3 border-b border-slate-100" style={{ background: "#F7F3F3" }}>
-                    <div className="flex items-center justify-between">
-                      <p className="text-base font-black text-slate-900">{clientName}</p>
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="min-w-0 truncate text-base font-black text-slate-900">{clientName}</p>
+                      <div className="flex shrink-0 items-center gap-2">
                         {overdueFUs.length > 0 && (
-                          <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">
+                          <span className="whitespace-nowrap rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">
                             ⚠️ {overdueFUs.length} overdue
                           </span>
                         )}
-                        <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600">
+                        <span className="whitespace-nowrap rounded-full bg-slate-200 px-2.5 py-1 text-xs font-bold text-slate-600">
                           {pendingFUs.length} pending
                         </span>
                       </div>

@@ -335,7 +335,7 @@ export function JobsScreen({ userId, teamId, setData }) {
                       {i + 1}. {x}
                     </p>
                   ))}
-                  <p className="text-[11px]">⚠ {assistant.advice.safety}</p>
+                  <p className="text-xs">⚠ {assistant.advice.safety}</p>
                 </div>
               )}
             </Card>

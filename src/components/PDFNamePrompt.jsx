@@ -60,7 +60,7 @@ export function PDFNamePrompt({ open, defaultName = "PowerMate-Export", ext = "p
                   className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-4 pr-16 text-sm font-bold text-slate-900 outline-none focus:border-red-300 focus:bg-white transition-colors"
                   placeholder="Enter filename…"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-300">.pdf</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">.pdf</span>
               </div>
 
               <p className="text-xs text-slate-400">This is the filename when saved or shared.</p>

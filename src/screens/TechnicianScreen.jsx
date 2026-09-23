@@ -334,7 +334,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
                     {r.status === "completed" ? (
-                      <CheckCircle2 className="text-green-600" size={19} />
+                      <CheckCircle2 className="text-green-700" size={19} />
                     ) : (
                       <Wrench size={19} />
                     )}

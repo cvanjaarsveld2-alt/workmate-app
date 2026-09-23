@@ -204,7 +204,8 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
     if (!previous || previous === 0) return null;
     const pct = Math.round(((current - previous) / previous) * 100);
     if (pct === 0) return null;
-    return { dir: pct >= 0 ? "up" : "down", text: `${Math.abs(pct)}% vs last month` };
+    const lastMonth = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toLocaleDateString("en-ZA", { month: "short" });
+    return { dir: pct >= 0 ? "up" : "down", text: `${Math.abs(pct)}% vs ${lastMonth}` };
   }
   // Use ZAR equivalent so mixed-currency periods sum sensibly.
   const expMonthTotal     = expThisMonth.reduce((s, e) => s + parseFloat(e.amount_zar || e.amount || 0), 0);
@@ -276,7 +277,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                 <div className="shrink-0 w-12 text-center">
                   {f.time
                     ? <p className="text-sm font-black text-slate-900">{f.time}</p>
-                    : <p className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Any time</p>}
+                    : <p className="text-xs font-bold text-slate-500 whitespace-nowrap">Any time</p>}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-900 break-words">{f.title}</p>
@@ -353,7 +354,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                 {neglected.length} client{neglected.length !== 1 ? "s" : ""} need attention
               </p>
             </div>
-            <span className="text-[10px] text-slate-400">{NEGLECT_DAYS}+ days</span>
+            <span className="text-[11px] text-slate-400">{NEGLECT_DAYS}+ days</span>
           </div>
           <div className="space-y-2">
             {neglected.map(cl => (
@@ -362,18 +363,18 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                   onClick={() => setNeglectSheet(cl)}
                   className="flex-1 flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl bg-red-50 active:bg-red-100 transition-colors text-left">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 rounded-[10px] bg-white/70 flex items-center justify-center shrink-0 text-[11px] font-black text-slate-500">
+                    <div className="w-9 h-9 rounded-[10px] bg-white/70 flex items-center justify-center shrink-0 text-xs font-black text-slate-500">
                       {(cl.company || "?").replace(/[^a-zA-Z ]/g, "").split(" ").filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "?"}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-bold text-slate-900 truncate">{cl.company}</p>
                       {cl.branch && <p className="text-xs text-slate-400 truncate">{cl.branch}</p>}
                       {cl.contactType === "stage" && (
-                        <p className="text-[10px] text-amber-600 mt-0.5">Stage updated only</p>
+                        <p className="text-[11px] text-amber-700 mt-0.5">Stage updated only</p>
                       )}
                     </div>
                   </div>
-                  <span className="shrink-0 text-[11px] font-black text-red-600 bg-red-100 px-2.5 py-1 rounded-full">
+                  <span className="shrink-0 text-xs font-black text-red-700 bg-red-100 px-2.5 py-1 rounded-full">
                     {cl.daysSince >= 9999 ? "Never" : `${cl.daysSince}d`}
                   </span>
                 </button>
@@ -412,7 +413,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                         {neglectSheet.daysSince >= 9999 ? "Never contacted" : `${neglectSheet.daysSince} days without contact`}
                       </span>
                       {neglectSheet.contactType === "stage" && (
-                        <span className="text-xs text-amber-600">Stage only</span>
+                        <span className="text-xs text-amber-700">Stage only</span>
                       )}
                     </div>
                   </div>
@@ -509,7 +510,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
             />
           </div>
           {targetProgress >= 100 && (
-            <p className="text-xs font-bold text-green-600 mt-1.5">🎉 Target reached!</p>
+            <p className="text-xs font-bold text-green-700 mt-1.5">🎉 Target reached!</p>
           )}
           {targetProgress > 0 && targetProgress < 100 && (
             <p className="text-xs text-slate-400 mt-1.5">
@@ -590,7 +591,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                             <span className="flex-1 min-w-0 truncate text-sm font-bold text-slate-700">
                               {cl.company || "Unnamed"}{cl.branch ? ` — ${cl.branch}` : ""}
                             </span>
-                            <span className="text-[11px] font-bold text-slate-400 shrink-0">Move</span>
+                            <span className="text-xs font-bold text-slate-400 shrink-0">Move</span>
                             <ChevronRight size={13} className="text-slate-300 shrink-0" />
                           </button>
                         ))}
@@ -651,7 +652,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                         : { borderColor: "#E2E8F0", background: "#fff" }}>
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: sc.dot }} />
                       <span className="flex-1 text-[15px] font-bold" style={{ color: sc.text || "#334155" }}>{stage}</span>
-                      {current && <span className="text-[11px] font-black uppercase" style={{ color: sc.text }}>Current</span>}
+                      {current && <span className="text-xs font-black uppercase" style={{ color: sc.text }}>Current</span>}
                     </button>
                   );
                 })}

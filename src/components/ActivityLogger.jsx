@@ -133,7 +133,7 @@ export function ActivityLogger({ open, onClose, client, userId, teamId, data, se
               {step === "followup" && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 rounded-xl bg-green-50 p-3">
-                    <CheckCircle2 size={18} className="text-green-600 shrink-0"/>
+                    <CheckCircle2 size={18} className="text-green-700 shrink-0"/>
                     <p className="text-sm font-bold text-green-700">Interaction logged</p>
                   </div>
                   <p className="text-sm font-black text-slate-700">Schedule a follow-up?</p>
@@ -155,7 +155,7 @@ export function ActivityLogger({ open, onClose, client, userId, teamId, data, se
 
               {step === "done" && (
                 <div className="flex flex-col items-center py-8 gap-4">
-                  <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center"><CheckCircle2 size={32} className="text-green-600"/></div>
+                  <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center"><CheckCircle2 size={32} className="text-green-700"/></div>
                   <p className="text-lg font-black text-slate-900">All done</p>
                   <button onClick={handleClose} className="px-6 py-3 rounded-2xl text-sm font-bold text-white min-h-[48px]" style={{background:BRAND.primary}}>Close</button>
                 </div>

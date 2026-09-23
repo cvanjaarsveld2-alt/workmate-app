@@ -275,10 +275,10 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
               { key: "board", label: "Board", icon: LayoutGrid },
             ].map(m => (
               <button key={m.key} onClick={() => { haptic.light(); setListMode(m.key); }}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-bold transition-all min-h-[40px]"
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-bold transition-all min-h-[40px] ${listMode === m.key ? "" : "text-slate-500"}`}
                 style={listMode === m.key
                   ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
-                  : { background: "transparent", color: "#94A3B8" }}>
+                  : { background: "transparent" }}>
                 <m.icon size={15} /> {m.label}
               </button>
             ))}
@@ -296,7 +296,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
                     <p className="text-sm font-bold text-slate-900 truncate">{bd.title || "Untitled breakdown"}</p>
                     {bd.equipment && <p className="text-xs text-slate-400 truncate">{bd.equipment}</p>}
                   </div>
-                  <span className="flex items-center gap-1 text-[11px] font-black text-red-600 shrink-0"><Link2 size={13} /> Repair</span>
+                  <span className="flex items-center gap-1 text-xs font-black text-red-600 shrink-0"><Link2 size={13} /> Repair</span>
                 </button>
               ))}
             </div>
@@ -326,15 +326,15 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           {isRepair
-                            ? <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: "#16A34A18", color: "#16A34A" }}>Repaired</span>
-                            : <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${st.color}18`, color: st.color }}>{st.label}</span>}
-                          {!isRepair && <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${sev.color}18`, color: sev.color }}>{sev.label}</span>}
-                          {r.linked_breakdown_id && <span className="flex items-center gap-0.5 text-[10px] font-black text-slate-400"><Link2 size={10} /> linked</span>}
+                            ? <span className="pm-tint text-[11px] font-black px-2 py-0.5 rounded-full" style={{ background: "#16A34A18", "--tint": "#15803D" }}>Repaired</span>
+                            : <span className="pm-tint text-[11px] font-black px-2 py-0.5 rounded-full" style={{ background: `${st.color}18`, "--tint": st.color }}>{st.label}</span>}
+                          {!isRepair && <span className="text-[11px] font-black px-2 py-0.5 rounded-full pm-tint" style={{ background: `${sev.color}18`, "--tint": sev.color }}>{sev.label}</span>}
+                          {r.linked_breakdown_id && <span className="flex items-center gap-0.5 text-[11px] font-black text-slate-400"><Link2 size={10} /> linked</span>}
                         </div>
                         <p className="text-sm font-black text-slate-900 truncate">{r.title || "Untitled report"}</p>
                         {r.equipment && <p className="text-xs text-slate-500 truncate mt-0.5">{r.equipment}</p>}
                         {r.client_name && <p className="text-xs text-slate-400 truncate">{r.client_name}</p>}
-                        <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-400 font-bold">
+                        <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 font-bold">
                           <span className="flex items-center gap-1"><Camera size={12} /> {allPhotos}</span>
                           {!isRepair && <span className="flex items-center gap-1"><AlertTriangle size={12} /> {faultCount} fault{faultCount !== 1 ? "s" : ""}</span>}
                           <span>{smartDate(r.report_date)}</span>
@@ -571,7 +571,7 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
                   ].map(ph => (
                     <button key={ph.value}
                       onClick={() => { haptic.tick(); patchItem(it.id, { phase: ph.value }); }}
-                      className="flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+                      className="flex-1 py-1.5 rounded-lg text-xs font-bold transition-all"
                       style={(it.phase || "general") === ph.value
                         ? { background: BRAND_PRIMARY, color: "#fff" }
                         : { background: "#F1F5F9", color: "#64748B" }}>
@@ -599,7 +599,7 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
                   {(it.faults || []).length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {it.faults.map(f => (
-                        <span key={f} className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full" style={{ background: "#FEF2F2", color: "#B91C1C" }}>
+                        <span key={f} className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full" style={{ background: "#FEF2F2", color: "#B91C1C" }}>
                           {f}<button onClick={() => toggleFault(it.id, f)}><X size={9} /></button>
                         </span>
                       ))}
@@ -616,7 +616,7 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
               {isRepair && (
                 <>
                   {it._fromFault && (
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">
                       <AlertTriangle size={11} /> Fault from breakdown — log the repair below
                     </div>
                   )}
@@ -763,7 +763,7 @@ function BreakdownBoard({ reports, onOpen, onChangeStatus }) {
               <div className="space-y-2">
                 {items.length === 0 && (
                   <div className="rounded-xl border-2 border-dashed border-slate-100 py-8 text-center">
-                    <p className="text-xs text-slate-300 font-bold">Empty</p>
+                    <p className="text-xs text-slate-400 font-bold">Empty</p>
                   </div>
                 )}
                 {items.map(r => {
@@ -776,13 +776,13 @@ function BreakdownBoard({ reports, onOpen, onChangeStatus }) {
                     <div key={r.id} className="rounded-xl border-2 border-slate-100 bg-white overflow-hidden">
                       <button onClick={() => onOpen(r)} className="w-full text-left p-3 active:bg-slate-50 transition-colors">
                         <div className="flex items-center gap-1.5 mb-1.5">
-                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={{ background: `${sev.color}18`, color: sev.color }}>{sev.label}</span>
-                          {r.linked_breakdown_id && <span className="flex items-center gap-0.5 text-[9px] font-black text-slate-400"><Link2 size={9} /> linked</span>}
+                          <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full pm-tint" style={{ background: `${sev.color}18`, "--tint": sev.color }}>{sev.label}</span>
+                          {r.linked_breakdown_id && <span className="flex items-center gap-0.5 text-[10px] font-black text-slate-400"><Link2 size={9} /> linked</span>}
                         </div>
                         <p className="text-sm font-black text-slate-900 leading-snug line-clamp-2">{r.title || "Untitled report"}</p>
                         {r.equipment && <p className="text-xs text-slate-500 truncate mt-0.5">{r.equipment}</p>}
-                        {r.client_name && <p className="text-[11px] text-slate-400 truncate">{r.client_name}</p>}
-                        <div className="flex items-center gap-2.5 mt-2 text-[10px] text-slate-400 font-bold">
+                        {r.client_name && <p className="text-xs text-slate-400 truncate">{r.client_name}</p>}
+                        <div className="flex items-center gap-2.5 mt-2 text-[11px] text-slate-400 font-bold">
                           <span className="flex items-center gap-1"><Camera size={11} /> {allPhotos}</span>
                           <span className="flex items-center gap-1"><AlertTriangle size={11} /> {faultCount}</span>
                           <span>{smartDate(r.report_date)}</span>
@@ -793,7 +793,7 @@ function BreakdownBoard({ reports, onOpen, onChangeStatus }) {
                         <button
                           onClick={() => left && onChangeStatus(r.id, left)}
                           disabled={!left}
-                          className="flex-1 flex items-center justify-center gap-1 py-2 text-[11px] font-bold transition-colors"
+                          className="flex-1 flex items-center justify-center gap-1 py-2 text-xs font-bold transition-colors"
                           style={left ? { color: "#64748B" } : { color: "#E2E8F0", cursor: "default" }}>
                           <ChevronRight size={12} className="rotate-180" />
                           {left ? statusMeta(left).label : ""}
@@ -802,7 +802,7 @@ function BreakdownBoard({ reports, onOpen, onChangeStatus }) {
                         <button
                           onClick={() => right && onChangeStatus(r.id, right)}
                           disabled={!right}
-                          className="flex-1 flex items-center justify-center gap-1 py-2 text-[11px] font-bold transition-colors"
+                          className="flex-1 flex items-center justify-center gap-1 py-2 text-xs font-bold transition-colors"
                           style={right ? { color: "#64748B" } : { color: "#E2E8F0", cursor: "default" }}>
                           {right ? statusMeta(right).label : ""}
                           <ChevronRight size={12} />
@@ -840,7 +840,7 @@ function AddPhotoTile({ onAdd }) {
       <button type="button" onClick={() => inputRef.current?.click()}
         className="shrink-0 w-20 h-20 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1 active:bg-red-50 active:border-red-300 transition-colors">
         <Camera size={18} style={{ color: BRAND_PRIMARY }} />
-        <span className="text-[10px] font-bold text-slate-400">Add</span>
+        <span className="text-[11px] font-bold text-slate-400">Add</span>
       </button>
     </>
   );
@@ -926,7 +926,7 @@ function FaultPickerSheet({ item, customFaults = [], onAddCustomFault, onRemoveC
           {/* Your saved faults (custom library) */}
           {filteredCustom.length > 0 && (
             <div className="mb-4">
-              <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2">Your saved faults</p>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Your saved faults</p>
               <div className="space-y-1.5">
                 {filteredCustom.map(cf => {
                   const on = selected.includes(cf.label);
@@ -953,7 +953,7 @@ function FaultPickerSheet({ item, customFaults = [], onAddCustomFault, onRemoveC
           {/* Built-in fault groups */}
           {groups.map(g => (
             <div key={g.group} className="mb-4">
-              <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2">{g.group}</p>
+              <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">{g.group}</p>
               <div className="space-y-1.5">
                 {g.faults.map(f => {
                   const on = selected.includes(f);

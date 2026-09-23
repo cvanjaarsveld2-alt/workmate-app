@@ -119,7 +119,7 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
                     <p className="text-sm font-bold text-slate-700 leading-tight">
                       {opt.camIcon ? "📷 " : ""}{opt.label}
                     </p>
-                    {opt.sub && <p className="text-[10px] text-slate-400 mt-0.5 leading-tight">{opt.sub}</p>}
+                    {opt.sub && <p className="text-[11px] text-slate-400 mt-0.5 leading-tight">{opt.sub}</p>}
                   </div>
                 </button>
               ))}

@@ -48,3 +48,7 @@ input, select, textarea {
 * {
   overflow-wrap: break-word;
 }
+
+/* Text in an inline accent colour: style={{ "--tint": color }} + className "pm-tint".
+   darkMode.css lightens it on dark surfaces. */
+.pm-tint { color: var(--tint); }

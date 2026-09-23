@@ -251,7 +251,7 @@ export function RenameGroupSheet({ open, currentName, existingGroups = [], onClo
                 className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-none focus:border-red-300 focus:bg-white transition-colors"
                 placeholder="New group name…" />
 
-              {clash && <p className="text-xs font-bold text-red-500 -mt-2">A group with that name already exists.</p>}
+              {clash && <p className="text-xs font-bold text-red-600 -mt-2">A group with that name already exists.</p>}
 
               <button onClick={confirm} disabled={!trimmed || clash || trimmed === currentName}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white font-black text-sm disabled:opacity-40 min-h-[52px]"

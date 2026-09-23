@@ -147,7 +147,7 @@ export function BackfillZARScreen({ data, setData, userId, onBack }) {
                       </p>
                     </div>
                     {status === "done" && (
-                      <span className="shrink-0 inline-flex items-center gap-1 text-xs font-bold text-green-600">
+                      <span className="shrink-0 inline-flex items-center gap-1 text-xs font-bold text-green-700">
                         <CheckCircle2 size={14} /> Fixed
                       </span>
                     )}

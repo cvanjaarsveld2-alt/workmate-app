@@ -55,7 +55,7 @@ function CategoryBadge({ catId, size = "sm" }) {
   const cat = LEAD_CATEGORIES.find(c => c.id === catId);
   if (!cat) return null;
   return (
-    <span className={`inline-flex items-center rounded-full font-bold ${size === "xs" ? "px-1.5 py-0.5 text-[9px]" : "px-2 py-0.5 text-[10px]"}`}
+    <span className={`inline-flex items-center rounded-full font-bold ${size === "xs" ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-[11px]"}`}
       style={{ background: cat.bg, color: cat.color }}>
       {cat.label}
     </span>
@@ -186,7 +186,7 @@ function InlineNoteForm({ client, userId, teamId, setData, onDone }) {
           {Object.keys(NOTE_URGENCY).map(u => (
             <button key={u} type="button" onClick={() => setForm(f => ({ ...f, urgency: u }))}
               className="flex-1 rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px]"
-              style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+              style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#647083", borderColor: "#E2E8F0" }}>
               {u}
             </button>
           ))}
@@ -234,7 +234,7 @@ function ClientNoteRow({ note: n, setData }) {
       style={!n.resolved ? { borderLeft: "3px solid " + urg.dot } : {}}>
       <div className="flex items-start gap-2.5">
         <button onClick={toggleResolved}
-          className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all mt-0.5 ${n.resolved ? "bg-green-100 text-green-600" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
+          className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all mt-0.5 ${n.resolved ? "bg-green-100 text-green-700" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
           <Check size={15} />
         </button>
         <div className="flex-1 min-w-0">
@@ -304,7 +304,7 @@ function ClientFollowupRow({ followup: f, setData }) {
     <div className={`rounded-xl p-2.5 ${isOverdue ? "bg-red-50" : f.completed ? "bg-slate-50" : "bg-white border border-slate-100"}`}>
       <div className="flex items-start gap-2.5">
         <button onClick={toggleDone}
-          className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all mt-0.5 ${f.completed ? "bg-green-100 text-green-600" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
+          className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all mt-0.5 ${f.completed ? "bg-green-100 text-green-700" : isOverdue ? "bg-red-100 text-red-500" : "bg-slate-100 text-slate-400"}`}>
           <Check size={15} />
         </button>
         <div className="flex-1 min-w-0">
@@ -559,7 +559,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
                   className="rounded-full px-3 py-1.5 text-xs font-bold border-2 transition-all min-h-[36px]"
                   style={selected
                     ? { background: cat.bg, color: cat.color, borderColor: cat.color }
-                    : { background: "white", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                    : { background: "white", color: "#647083", borderColor: "#E2E8F0" }}>
                   {cat.label}
                 </button>
               );

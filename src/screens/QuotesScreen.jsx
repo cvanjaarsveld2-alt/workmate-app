@@ -442,7 +442,7 @@ export function QuotesScreen({
                         setToast("Couldn't generate PDF — try again");
                       }
                     }}
-                    className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-green-600 flex items-center justify-center"
+                    className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-green-700 flex items-center justify-center"
                     title="Generate PDF"
                   >
                     <Download size={15} />

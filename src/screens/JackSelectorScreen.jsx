@@ -123,7 +123,7 @@ export function JackSelectorScreen({ userId, teamId }) {
                           {MACHINE_TYPES[type]}
                         </span>
                         <span className="flex items-center gap-2">
-                          <span className="text-[11px] font-bold text-slate-300">{machines.length}</span>
+                          <span className="text-xs font-bold text-slate-400">{machines.length}</span>
                           <ChevronDown
                             size={14}
                             className="text-slate-300 transition-transform"
@@ -246,7 +246,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
   const Line = ({ n, name, sub }) => (
     <div className="rounded-2xl border px-4 py-3 mb-2" style={{ borderColor: "rgba(139,26,26,0.2)" }}>
       <div className="flex items-center gap-2">
-        <span className="w-6 h-6 rounded-full grid place-items-center text-[11px] font-black text-white shrink-0" style={{ background: n === 1 ? BRAND.primary : "#94A3B8" }}>{n}</span>
+        <span className="w-6 h-6 rounded-full grid place-items-center text-xs font-black text-white shrink-0" style={{ background: n === 1 ? BRAND.primary : "#647083" }}>{n}</span>
         <span className="text-base font-black text-slate-900">{name}</span>
       </div>
       {sub && <p className="text-xs text-slate-500 mt-1 pl-8">{sub}</p>}
@@ -274,11 +274,11 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
 
         {/* Published clearances where available; otherwise a clear on-site prompt.
             This is machine clearance, NOT the jacking closed-height. */}
-        <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5 mt-3">Clearance</p>
+        <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5 mt-3">Clearance</p>
         <div className="rounded-2xl bg-slate-50 px-4 py-3 mb-1">
           <div className="flex items-center justify-between py-1">
             <span className="text-xs font-bold text-slate-500">Ground clearance</span>
-            <span className="text-sm font-black" style={{ color: m.groundClearance ? "#0F172A" : "#94A3B8" }}>
+            <span className="text-sm font-black" style={{ color: m.groundClearance ? "#0F172A" : "#647083" }}>
               {m.groundClearance ? `${m.groundClearance} mm` : "Measure on site"}
             </span>
           </div>
@@ -288,10 +288,10 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
               <span className="text-sm font-black text-slate-800">{m.rearAxleClearance} mm</span>
             </div>
           )}
-          <p className="text-[10px] text-slate-400 mt-1.5">Published machine clearance — confirm the actual jacking-point gap on site before lifting.</p>
+          <p className="text-[11px] text-slate-400 mt-1.5">Published machine clearance — confirm the actual jacking-point gap on site before lifting.</p>
         </div>
 
-        <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5">Jack</p>
+        <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5">Jack</p>
         {rec.jackLoad != null && (
           <p className="text-xs text-slate-500 mb-1.5">
             Est. load on jack: <span className="font-bold text-slate-700">~{rec.jackLoad}t</span> (≈50% of {m.emptyWeight}t empty — confirm on site)
@@ -312,7 +312,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
         )}
 
         {/* Stands */}
-        <p className="text-[11px] font-black uppercase tracking-wider text-slate-400 mb-1.5 mt-3">Jacking stand</p>
+        <p className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5 mt-3">Jacking stand</p>
         <Line n={1} name={rec.stand.name} sub={`Closed ${rec.stand.closedHeight}mm · extends ${rec.stand.extendedHeight}mm · ${rec.stand.capacity}t SWL (3:1)`} />
         {rec.standAlt && <Line n={2} name={rec.standAlt.name} sub={`Closed ${rec.standAlt.closedHeight}mm · extends ${rec.standAlt.extendedHeight}mm · ${rec.standAlt.capacity}t SWL (3:1)`} />}
 
@@ -323,7 +323,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
           </div>
         ) : t && t.maxLoss ? (
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 mt-3 flex gap-2.5">
-            <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <AlertTriangle size={16} className="text-amber-700 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800">
               <span className="font-bold">Flat tyre — max clearance loss ≈ {t.maxLoss}mm</span> ({m.tyre}, full deflation). Front & rear differ. Always measure the actual gap on site before choosing the jack.
             </p>
@@ -339,7 +339,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
               <div className="min-w-0">
                 {m._confirmation ? (
                   <p className="text-xs text-slate-500">
-                    <span className="font-bold" style={{ color: "#16A34A" }}>✓ Confirmed on site</span>
+                    <span className="font-bold" style={{ color: "#15803D" }}>✓ Confirmed on site</span>
                     {m._confirmation.updated_at && ` · ${new Date(m._confirmation.updated_at).toLocaleDateString()}`}
                   </p>
                 ) : (
@@ -357,7 +357,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Confirm jack fit</p>
+              <p className="text-xs font-black uppercase tracking-wider text-slate-400">Confirm jack fit</p>
 
               <Field
                 label="Measured closed height (mm)"
@@ -380,19 +380,19 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
                         className="w-full flex items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left transition-colors"
                         style={{ borderColor: checked ? BRAND.primary : "#F1F5F9", background: checked ? BRAND.light : "#F8FAFC" }}>
                         <span
-                          className="w-6 h-6 rounded-full grid place-items-center text-[11px] font-black shrink-0"
+                          className="w-6 h-6 rounded-full grid place-items-center text-xs font-black shrink-0"
                           style={{ background: checked ? BRAND.primary : "#E2E8F0", color: checked ? "#fff" : "#94A3B8" }}>
                           {checked ? order + 1 : ""}
                         </span>
                         <span className="flex-1 min-w-0">
                           <span className="block text-sm font-bold text-slate-800">{j.name}</span>
-                          <span className="block text-[11px] text-slate-400">{j.capacity ? j.capacity + "t · " : ""}Closed {j.closedHeight}mm</span>
+                          <span className="block text-xs text-slate-400">{j.capacity ? j.capacity + "t · " : ""}Closed {j.closedHeight}mm</span>
                         </span>
                       </button>
                     );
                   })}
                 </div>
-                <p className="mt-1.5 text-[11px] text-slate-400">Leave nothing selected to let the automatic estimate keep using the closed height above.</p>
+                <p className="mt-1.5 text-xs text-slate-400">Leave nothing selected to let the automatic estimate keep using the closed height above.</p>
               </div>
 
               <Field label="Jacking stand note (optional)" value={jackStand} onChange={setJackStand} placeholder="e.g. 100t / 800mm" />

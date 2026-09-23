@@ -58,7 +58,7 @@ function BarChart({ data, color = BRAND.primary, height = 80, valueFormat = v =>
     <div className="flex items-end gap-1.5" style={{ height }}>
       {data.map((d, i) => (
         <div key={d.key} className="flex-1 flex flex-col items-center gap-1 min-w-0">
-          <p className="text-[9px] font-bold text-slate-500 leading-none">
+          <p className="text-[10px] font-bold text-slate-500 leading-none">
             {d.value > 0 ? valueFormat(d.value) : ""}
           </p>
           <motion.div
@@ -68,7 +68,7 @@ function BarChart({ data, color = BRAND.primary, height = 80, valueFormat = v =>
             className="w-full rounded-t-lg"
             style={{ background: d.highlight ? color : color + "55", minWidth: 6 }}
           />
-          <p className="text-[9px] text-slate-400 leading-none truncate w-full text-center">{d.label}</p>
+          <p className="text-[10px] text-slate-400 leading-none truncate w-full text-center">{d.label}</p>
         </div>
       ))}
     </div>
@@ -118,7 +118,7 @@ function Tile({ label, value, sub, color, icon: Icon, trend }) {
             : trend < 0
               ? <TrendingDown size={12} className="text-red-500" />
               : <span className="w-3" />}
-          <p className="text-xs font-bold" style={{ color: trend > 0 ? "#16A34A" : trend < 0 ? "#DC2626" : "#94A3B8" }}>
+          <p className={`text-xs font-bold ${trend > 0 ? "text-green-700" : trend < 0 ? "text-red-700" : "text-slate-500"}`}>
             {trend > 0 ? `+${trend}` : trend} vs prev quarter
           </p>
         </div>
@@ -233,6 +233,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
     stage: s,
     count: clients.filter(c => (c.stage || "New Lead") === s).length,
     color: STAGE_COLORS[s]?.dot || BRAND.primary,
+    text: STAGE_COLORS[s]?.text || BRAND.primary,
   }));
   const totalInPipeline = pipelineCount.reduce((s, p) => s + p.count, 0);
 
@@ -306,8 +307,8 @@ export function AnalyticsScreen({ data, onNavigate }) {
           <div className="relative shrink-0" style={{ width: 80, height: 80 }}>
             <RatioRing value={wonClients} max={Math.max(closedClients, 1)} color="#16A34A" size={80} strokeWidth={10} />
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <p className="text-lg font-black leading-none" style={{ color: "#16A34A" }}>{winRate}%</p>
-              <p className="text-[9px] text-slate-400 font-bold leading-none mt-0.5">win rate</p>
+              <p className="pm-tint text-lg font-black leading-none" style={{ "--tint": "#15803D" }}>{winRate}%</p>
+              <p className="text-[10px] text-slate-400 font-bold leading-none mt-0.5">win rate</p>
             </div>
           </div>
           <div className="flex-1 space-y-2">
@@ -360,7 +361,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
             <p className="text-sm font-black text-slate-800">New Leads per Quarter</p>
             <div className="text-right">
               <p className="text-lg font-black" style={{ color: BRAND.primary }}>{currentQLeads}</p>
-              <p className="text-[10px] text-slate-400">this quarter</p>
+              <p className="text-[11px] text-slate-400">this quarter</p>
             </div>
           </div>
           <BarChart data={leadsByQuarter} color={BRAND.primary} height={100} />
@@ -381,8 +382,8 @@ export function AnalyticsScreen({ data, onNavigate }) {
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-black text-slate-800">Win Rate by Quarter (%)</p>
             <div className="text-right">
-              <p className="text-lg font-black" style={{ color: "#16A34A" }}>{winRate}%</p>
-              <p className="text-[10px] text-slate-400">overall</p>
+              <p className="pm-tint text-lg font-black" style={{ "--tint": "#15803D" }}>{winRate}%</p>
+              <p className="text-[11px] text-slate-400">overall</p>
             </div>
           </div>
           <BarChart data={winRateByQ} color="#16A34A" height={100} valueFormat={v => `${v}%`} />
@@ -413,7 +414,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
             </div>
             <div className="text-right shrink-0">
               <p className="text-2xl font-black" style={{ color: "#5B21B6" }}>{avgFUPerWin}</p>
-              <p className="text-[10px] text-slate-400">avg follow-ups</p>
+              <p className="text-[11px] text-slate-400">avg follow-ups</p>
             </div>
           </div>
           {/* Follow-up completion ring */}
@@ -469,7 +470,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap">
                         <p className="text-sm font-black text-slate-900 leading-tight truncate">{c.name}</p>
-                        <p className="text-xs font-bold shrink-0" style={{ color: "#16A34A" }}>{money(c.revenue)}</p>
+                        <p className="pm-tint text-xs font-bold shrink-0" style={{ "--tint": "#15803D" }}>{money(c.revenue)}</p>
                       </div>
                       <div className="flex items-center gap-3 mt-1.5">
                         <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
@@ -480,7 +481,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
                             transition={{ duration: 0.5, delay: i * 0.05 }}
                           />
                         </div>
-                        <p className="text-[10px] text-slate-400 shrink-0">
+                        <p className="text-[11px] text-slate-400 shrink-0">
                           {c.deals} deal{c.deals !== 1 ? "s" : ""}
                           {c.followups ? ` · ${c.followups} follow-ups` : ""}
                         </p>
@@ -500,11 +501,11 @@ export function AnalyticsScreen({ data, onNavigate }) {
         <Card className="p-4">
           <div className="space-y-3">
             {pipelineCount.concat([
-              { stage: "Won",  count: wonClients,  color: "#16A34A" },
-              { stage: "Lost", count: lostClients,  color: "#94A3B8" },
-            ]).map(({ stage, count, color }) => (
+              { stage: "Won",  count: wonClients,  color: "#16A34A", text: "#15803D" },
+              { stage: "Lost", count: lostClients,  color: "#94A3B8", text: "#647083" },
+            ]).map(({ stage, count, color, text }) => (
               <div key={stage} className="flex items-center gap-3">
-                <p className="w-20 text-sm font-bold shrink-0" style={{ color }}>{stage}</p>
+                <p className="pm-tint w-20 text-sm font-bold shrink-0" style={{ "--tint": text }}>{stage}</p>
                 <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
                   <motion.div className="h-full rounded-full"
                     style={{ background: color }}

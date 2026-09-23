@@ -178,8 +178,8 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 onClick={() => handleNotifTap(notif)}
-                className="w-full flex items-start gap-3 px-4 py-4 text-left hover:bg-slate-50 transition-colors min-h-[72px]"
-                style={{ background: notif.read ? "white" : "#FEFAF5" }}>
+                className={`w-full flex items-start gap-3 px-4 py-4 text-left hover:bg-slate-50 transition-colors min-h-[72px] ${notif.read ? "bg-white" : ""}`}
+                style={notif.read ? undefined : { background: "#FEFAF5" }}>
 
                 {/* Icon */}
                 <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 mt-0.5"
