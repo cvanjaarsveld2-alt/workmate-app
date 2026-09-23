@@ -547,7 +547,7 @@ export function StatCard({ label, value, sub, color, icon: Icon, trend, invertTr
     <Card className="p-4 h-full">
       <div className="flex items-center justify-between mb-2.5">
         {Icon && (
-          <div className="rounded-[10px] shrink-0 flex items-center justify-center" style={{ background: chipBg, width: 32, height: 32 }}>
+          <div className="rounded-md shrink-0 flex items-center justify-center" style={{ background: chipBg, width: 32, height: 32, boxShadow: `inset 0 0 0 1px ${accent}26` }}>
             <Icon size={16} style={{ color: accent }} />
           </div>
         )}

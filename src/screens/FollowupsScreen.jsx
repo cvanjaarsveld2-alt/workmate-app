@@ -45,7 +45,9 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShar
   }
 
   return (
-    <Card className={`p-3.5 ${isOverdue ? "border-l-4 border-l-red-400" : ""}`}>
+    <Card className={`p-3.5 ${isOverdue ? "relative overflow-hidden pl-5" : ""}`}>
+      {/* Overdue: hazard stripe down the edge. */}
+      {isOverdue && <div className="pm-hazard absolute left-0 top-0 bottom-0 w-1.5" aria-hidden="true" />}
       <div className="flex items-start gap-3">
         <button
           onClick={onToggle}

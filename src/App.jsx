@@ -121,12 +121,6 @@ import { PullToRefresh } from "./components/PullToRefresh";
 // where User A had records but User B had none locally yet, and logout()
 // never touched `data` at all. Kept in one place so the two reset sites and
 // the initial useState can never drift out of sync with each other.
-// Readable names for the top bar (route keys are internal identifiers).
-const SCREEN_TITLES = {
-  Followups: "Follow-ups", VehicleCheck: "Vehicle Check", ColdCall: "Cold Call", JackSelector: "Jack Selector",
-  BackfillZAR: "Backfill ZAR", SharedInbox: "Shared Inbox", Client360: "Client 360", TeamDashboard: "Team Dashboard",
-  Planner: "Weekly Planner",
-};
 const INITIAL_DATA = {
   clients: [],
   followups: [],
@@ -1050,13 +1044,11 @@ export default function PowerWorksApp() {
                 >
                   <Menu size={22} />
                 </button>
-                {screen === "Home" ? (
+                {/* Wordmark on every screen: each page already carries its own title,
+                    so repeating it here just doubled it. */}
+                <button onClick={() => navigate("Home")} aria-label="Home" className="min-w-0">
                   <Wordmark variant="graphite" size="sm" />
-                ) : (
-                  <div className="flex items-center gap-2 min-w-0">
-                    <p className="font-display text-lg font-bold uppercase tracking-wider text-white truncate">{SCREEN_TITLES[screen] || screen}</p>
-                  </div>
-                )}
+                </button>
                 <div className="flex items-center gap-1 shrink-0">
                   {teamId && (
                     <button

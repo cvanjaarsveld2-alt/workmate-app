@@ -321,6 +321,10 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
               const faultCount = (r.items || []).reduce((s, i) => s + (i.faults?.length || 0), 0);
               return (
                 <Card key={r.id} className="p-0 overflow-hidden">
+                  {/* Open high/critical breakdowns carry the hazard stripe. */}
+                  {!isRepair && r.status !== "resolved" && ["high", "critical"].includes(r.severity) && (
+                    <div className="pm-hazard h-1.5" aria-hidden="true" />
+                  )}
                   <button onClick={() => openReport(r)} className="w-full text-left p-4 active:bg-slate-50 transition-colors">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">

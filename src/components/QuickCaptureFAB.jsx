@@ -141,7 +141,7 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
           }
         }}
         aria-label={open ? "Close quick capture" : isCameraFirst ? "Open camera" : "Quick capture"}
-        className="fixed z-40 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+        className="fixed z-40 rounded-2xl flex items-center justify-center active:scale-95 transition-transform"
         style={{
           background: BRAND.primary,
           color: "white",
@@ -149,7 +149,9 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
           height: 64,
           bottom: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
           right: 16,
-          boxShadow: "0 6px 16px rgba(139,26,26,0.45), 0 2px 4px rgba(0,0,0,0.15)",
+          // Machined red plate with a graphite edge, matching the header.
+          border: "3px solid #15171A",
+          boxShadow: "0 8px 18px rgba(21,23,26,0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
         }}>
         {isCameraFirst && !open
           ? <Camera size={26} strokeWidth={2} />
