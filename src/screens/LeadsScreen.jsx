@@ -198,7 +198,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
                 className="rounded-full px-3 py-1.5 text-xs font-bold border-2 transition-all min-h-[36px]"
                 style={sel
                   ? { background: cat.bg, color: cat.color, borderColor: cat.color }
-                  : { background: "white", color: "#647083", borderColor: "#E2E8F0" }}>
+                  : { background: "white", color: "#5E6A7C", borderColor: "#E2E8F0" }}>
                 {cat.label}
               </button>
             );
@@ -218,7 +218,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
                 className="rounded-full px-3 py-1.5 text-xs font-bold border-2 transition-all min-h-[36px]"
                 style={sel
                   ? { background: s.bg, color: s.color, borderColor: s.dot }
-                  : { background: "white", color: "#647083", borderColor: "#E2E8F0" }}>
+                  : { background: "white", color: "#5E6A7C", borderColor: "#E2E8F0" }}>
                 {stage}
               </button>
             );
@@ -637,7 +637,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
                   {count}
                 </span>
                 <span className="text-[11px] font-bold leading-tight mt-0.5"
-                  style={{ color: filterStage === stage ? s.color : "#647083" }}>
+                  style={{ color: filterStage === stage ? s.color : "#5E6A7C" }}>
                   {stage}
                 </span>
               </button>

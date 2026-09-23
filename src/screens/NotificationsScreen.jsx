@@ -117,7 +117,7 @@ export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {
         <Card className="p-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-              style={{ background: pendingShares > 0 ? "#DCFCE7" : "#F7F3F3" }}>
+              style={{ background: pendingShares > 0 ? "#DCFCE7" : "#EFECE6" }}>
               <Inbox size={22} style={{ color: pendingShares > 0 ? "#16A34A" : BRAND.primary }} />
             </div>
             <div className="flex-1 min-w-0">

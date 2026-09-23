@@ -111,7 +111,7 @@ function statusStyle(s) {
   if (s === "ok")    return { bg: "#DCFCE7", color: "#166534", border: "#BBF7D0" };
   if (s === "issue") return { bg: "#FEE2E2", color: "#991B1B", border: "#FECACA" };
   if (s === "na")    return { bg: "#F1F5F9", color: "#64748B", border: "#E2E8F0" };
-  return { bg: "#F8FAFC", color: "#647083", border: "#E2E8F0" };
+  return { bg: "#F8FAFC", color: "#5E6A7C", border: "#E2E8F0" };
 }
 
 // ─── Issue sheet ──────────────────────────────────────────────────────────────
@@ -300,7 +300,7 @@ function WeekRow({ week, checksMap, selected, onSelect, onDayClick, selectMode }
                 borderColor: hasItems ? (dayIssue ? "#FECACA" : "#BBF7D0") : "#E2E8F0",
               }}>
               <span className="text-[11px] font-bold text-slate-400 leading-none">{DAY_LABELS[i]}</span>
-              <span className="text-xs font-black leading-none" style={{ color: hasItems ? (dayIssue ? "#991B1B" : "#166534") : "#647083" }}>
+              <span className="text-xs font-black leading-none" style={{ color: hasItems ? (dayIssue ? "#991B1B" : "#166534") : "#5E6A7C" }}>
                 {new Date(date + "T12:00:00").getDate()}
               </span>
               {hasItems && (
@@ -676,7 +676,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                 </div>
                 <p className="text-xs text-slate-400 mt-1.5 text-center">{pdfPack.filename}</p>
               </div>
-              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#EFECE6" }}>
                 <button onClick={sharePdfPack}
                   className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
                   style={{ background: "#8B1A1A" }}>
@@ -781,7 +781,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                 {!isCurrentWeek && (
                   <button onClick={goToToday}
                     className="text-xs font-bold px-2.5 py-1.5 rounded-xl min-h-[36px]"
-                    style={{ background: "#F7F3F3", color: "#8B1A1A" }}>
+                    style={{ background: "#EFECE6", color: "#8B1A1A" }}>
                     Today
                   </button>
                 )}
@@ -804,7 +804,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                       borderColor: isActive ? "#8B1A1A" : hasIssue ? "#FECACA" : isOk ? "#BBF7D0" : "#E2E8F0",
                       opacity: isFuture ? 0.35 : 1,
                     }}>
-                    <span className="text-[11px] font-bold leading-none" style={{ color: isActive ? "rgba(255,255,255,0.85)" : "#647083" }}>{DAY_LABELS[i]}</span>
+                    <span className="text-[11px] font-bold leading-none" style={{ color: isActive ? "rgba(255,255,255,0.85)" : "#5E6A7C" }}>{DAY_LABELS[i]}</span>
                     <span className="text-sm font-black leading-none mt-0.5" style={{ color: isActive ? "white" : "#1E293B" }}>
                       {new Date(date + "T12:00:00").getDate()}
                     </span>

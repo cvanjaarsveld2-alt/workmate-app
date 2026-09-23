@@ -870,7 +870,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 <button type="button"
                   onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
                   className="w-full h-24 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#EFECE6" }}>
                     <Camera size={18} style={{ color: "#8B1A1A" }} />
                   </div>
                   <span className="text-xs font-bold text-slate-500">Scan till slip</span>
@@ -912,7 +912,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               <button type="button"
                 onClick={() => { setScannerMode("payment"); setShowScanner(true); }}
                 className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#EFECE6" }}>
                   <Camera size={18} style={{ color: "#8B1A1A" }} />
                 </div>
                 <span className="text-xs font-bold text-slate-500">Add payment slip</span>
@@ -979,8 +979,8 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               <button key={m} type="button" onClick={() => setForm(f => ({ ...f, payment_method: m }))}
                 className="rounded-xl py-2.5 text-sm font-bold border-2 transition-all min-h-[44px]"
                 style={form.payment_method === m
-                  ? { background: "#F7F3F3", color: "#8B1A1A", borderColor: "#8B1A1A" }
-                  : { background: "#F8FAFC", color: "#647083", borderColor: "#E2E8F0" }}>
+                  ? { background: "#EFECE6", color: "#8B1A1A", borderColor: "#8B1A1A" }
+                  : { background: "#F8FAFC", color: "#5E6A7C", borderColor: "#E2E8F0" }}>
                 {m}
               </button>
             ))}
@@ -1169,7 +1169,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 </div>
                 <p className="text-xs text-slate-400 mt-1.5 text-center">Pinch / scroll to review · {financePack.filename}</p>
               </div>
-              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#EFECE6" }}>
                 <button onClick={shareFinancePack}
                   className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
                   style={{ background: "#8B1A1A" }}>

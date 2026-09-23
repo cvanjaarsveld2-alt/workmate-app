@@ -18,12 +18,12 @@ import { haptic } from "../../lib/haptics";
 export function Card({ children, className = "", onClick }) {
   return (
     <div
-      className={`bg-white rounded-2xl border border-slate-100/80 ${
+      className={`bg-white rounded-2xl border border-stone-200 ${
         onClick
           ? "cursor-pointer transition-all duration-150 active:scale-[0.98] active:bg-slate-50"
           : ""
       } ${className}`}
-      style={{ boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 4px 16px -8px rgba(15,23,42,0.10)" }}
+      style={{ boxShadow: "0 1px 0 rgba(28,24,18,0.05), 0 6px 14px -10px rgba(28,24,18,0.22)" }}
       onClick={onClick ? (e) => { haptic.light(); onClick(e); } : undefined}>
       {children}
     </div>
@@ -139,7 +139,7 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
           {!disabled && onAdd && (
             <button type="button" onClick={onAdd}
               className="flex items-center gap-1.5 text-xs font-bold rounded-xl px-3 py-2 min-h-[40px]"
-              style={{ color: "#8B1A1A", background: "#F7F3F3" }}>
+              style={{ color: "#8B1A1A", background: "#EFECE6" }}>
               <Camera size={13} /> Add photo
             </button>
           )}
@@ -169,7 +169,7 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
             <button type="button" onClick={onAdd}
               className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-2 active:border-red-300 active:bg-red-50 transition-colors"
               style={{ aspectRatio: "4/3" }}>
-              <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+              <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "#EFECE6" }}>
                 <Camera size={20} style={{ color: "#8B1A1A" }} />
               </div>
               <span className="text-xs font-bold text-slate-400">Add photo</span>
@@ -180,7 +180,7 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
         !disabled && onAdd && (
           <button type="button" onClick={onAdd}
             className="w-full h-28 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center gap-3 active:border-red-300 active:bg-red-50 transition-colors">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "#EFECE6" }}>
               <Camera size={20} style={{ color: "#8B1A1A" }} />
             </div>
             <div className="text-left">
@@ -553,8 +553,8 @@ export function StatCard({ label, value, sub, color, icon: Icon, trend, invertTr
         )}
       </div>
       {/* Big confident hero number — colour lives in the icon chip so the row reads clean */}
-      <p className="text-[28px] font-black leading-none tracking-tight text-slate-900">{value}</p>
-      <p className="mt-2 text-xs font-bold text-slate-400 leading-tight">{label}</p>
+      <p className="font-display text-[34px] font-bold leading-none text-slate-900">{value}</p>
+      <p className="mt-2 font-display text-[13px] font-bold uppercase tracking-wider text-slate-500 leading-tight">{label}</p>
       {sub && <p className="mt-0.5 text-xs text-slate-400 leading-snug">{sub}</p>}
       {trend && (
         <span
@@ -592,9 +592,9 @@ export function NavTab({ icon: Icon, label, active, onClick, badge }) {
 export function PageHeader({ title, subtitle }) {
   return (
     <div className="mb-2 min-w-0 flex-1">
-      <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight truncate">{title}</h1>
+      <h1 className="font-display text-[28px] font-extrabold uppercase tracking-wide text-slate-900 leading-none truncate">{title}</h1>
       {/* Two lines rather than truncating; slate-500 meets WCAG AA contrast on white. */}
-      {subtitle && <p className="mt-1 text-sm text-slate-500 leading-snug line-clamp-2">{subtitle}</p>}
+      {subtitle && <p className="mt-1.5 text-sm font-medium text-slate-500 leading-snug line-clamp-2">{subtitle}</p>}
     </div>
   );
 }
@@ -603,7 +603,7 @@ export function PageHeader({ title, subtitle }) {
 export function SectionHeader({ title, action, onAction }) {
   return (
     <div className="flex items-center justify-between mb-2 mt-1">
-      <p className="text-xs font-black text-slate-400 uppercase tracking-wider">{title}</p>
+      <p className="pm-eyebrow text-[13px] text-slate-500">{title}</p>
       {action && onAction && (
         <button onClick={onAction} className="text-xs font-bold py-2 px-3 rounded-xl min-h-[40px]"
           style={{ color: BRAND.primary, background: BRAND.light }}>

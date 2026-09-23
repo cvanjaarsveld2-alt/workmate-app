@@ -406,7 +406,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
                 className="rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px] capitalize"
                 style={form.status === s
                   ? { background: STATUS_COLORS[s].bg, color: STATUS_COLORS[s].text, borderColor: STATUS_COLORS[s].dot }
-                  : { background: "#F8FAFC", color: "#647083", borderColor: "#E2E8F0" }}>
+                  : { background: "#F8FAFC", color: "#5E6A7C", borderColor: "#E2E8F0" }}>
                 {s}
               </button>
             ))}
@@ -697,7 +697,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
           const isCol = groups.isCollapsed(company);
           return (
           <Card key={company} className="overflow-hidden">
-            <div className="flex items-center border-b border-slate-100" style={{ background: "#F7F3F3" }}>
+            <div className="flex items-center border-b border-slate-100" style={{ background: "#EFECE6" }}>
               <button onClick={() => groups.toggle(company)}
                 className="flex-1 px-4 py-2.5 active:bg-slate-100 transition-colors">
                 <div className="flex items-center justify-between">

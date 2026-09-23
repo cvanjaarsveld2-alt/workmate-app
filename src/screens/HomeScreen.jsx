@@ -246,15 +246,15 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
 
       {/* ── Header ── */}
       <div>
-        <p className="text-sm text-slate-400">{niceDate()}</p>
-        <p className="text-xl font-black text-slate-900">Dashboard</p>
+        <p className="font-display text-[13px] font-bold uppercase tracking-wider text-slate-500">{niceDate()}</p>
+        <h1 className="font-display text-[30px] font-extrabold uppercase tracking-wide text-slate-900 leading-none mt-1">Dashboard</h1>
       </div>
 
       {/* ── Today's Schedule ── */}
       <Card className="overflow-hidden">
         <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100">
-          <p className="text-xs font-black text-slate-500 uppercase tracking-wider">
-            📅 Today's Schedule {todayFU.length > 0 && `(${todayFU.length})`}
+          <p className="pm-eyebrow text-[13px] text-slate-600">
+            Today's Schedule {todayFU.length > 0 && `(${todayFU.length})`}
           </p>
           {todayFU.length > 0 && (
             <button onClick={() => onNavigate("Followups")} className="text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center gap-1">
@@ -301,9 +301,11 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
       {actionItems.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="overflow-hidden">
+            {/* Hazard stripe: the one place on the dashboard that needs action. */}
+            <div className="pm-hazard h-1.5" aria-hidden="true" />
             <div className="px-4 py-3 border-b border-slate-100 bg-red-50">
-              <p className="text-xs font-black text-red-700 uppercase tracking-wider">
-                ⚡ Action Required ({actionCount})
+              <p className="font-display text-[13px] font-bold text-red-700 uppercase tracking-wider">
+                Action Required ({actionCount})
               </p>
             </div>
             <div className="divide-y divide-slate-50">

@@ -9,7 +9,7 @@ export const COLORS = {
   // Brand
   primary:      "#8B1A1A",
   primaryDark:  "#6B1414",
-  primaryLight: "#F7F3F3",
+  primaryLight: "#EFECE6",
   primaryTint:  "#FBEAEA",   // subtle background wash
 
   // Semantic — used for status, feedback, actions

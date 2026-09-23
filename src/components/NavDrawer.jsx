@@ -126,7 +126,7 @@ export function NavDrawer({ open, onClose, currentScreen, onNavigate, badges = {
                       >
                         <div
                           className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-                          style={{ background: active ? "#F7F3F3" : "#F8FAFC" }}
+                          style={{ background: active ? "#EFECE6" : "#F8FAFC" }}
                         >
                           <item.icon size={16} style={{ color: active ? BRAND.primary : "#94A3B8" }} />
                         </div>

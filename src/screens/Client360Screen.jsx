@@ -207,7 +207,7 @@ function EmptyTab({ icon: Icon, label, actionLabel, onAction }) {
         <button
           onClick={onAction}
           className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl min-h-[36px]"
-          style={{ color: BRAND.primary, background: "#F7F3F3" }}
+          style={{ color: BRAND.primary, background: "#EFECE6" }}
         >
           <Plus size={12} /> {actionLabel}
         </button>
@@ -807,7 +807,7 @@ export function Client360Screen({
           label="Log"
           onClick={() => setActiveTab("calls")}
           color="#8B1A1A"
-          bg="#F7F3F3"
+          bg="#EFECE6"
         />
         {client.phone && (
           <>

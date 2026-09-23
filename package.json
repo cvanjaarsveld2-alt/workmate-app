@@ -16,6 +16,8 @@
     "test:sim": "node tests/sim/run.cjs"
   },
   "dependencies": {
+    "@fontsource/barlow": "^5.3.0",
+    "@fontsource/barlow-condensed": "^5.3.0",
     "@supabase/supabase-js": "^2.43.4",
     "@vitejs/plugin-react": "^5.0.0",
     "exceljs": "^4.4.0",

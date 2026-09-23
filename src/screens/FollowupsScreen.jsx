@@ -821,7 +821,7 @@ export function FollowupsScreen({
                   key={clientName}
                   className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"
                 >
-                  <div className="px-4 py-3 border-b border-slate-100" style={{ background: "#F7F3F3" }}>
+                  <div className="px-4 py-3 border-b border-slate-100" style={{ background: "#EFECE6" }}>
                     <div className="flex items-center justify-between gap-2">
                       <p className="min-w-0 truncate text-base font-black text-slate-900">{clientName}</p>
                       <div className="flex shrink-0 items-center gap-2">

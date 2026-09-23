@@ -502,7 +502,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
           <div className="space-y-3">
             {pipelineCount.concat([
               { stage: "Won",  count: wonClients,  color: "#16A34A", text: "#15803D" },
-              { stage: "Lost", count: lostClients,  color: "#94A3B8", text: "#647083" },
+              { stage: "Lost", count: lostClients,  color: "#94A3B8", text: "#5E6A7C" },
             ]).map(({ stage, count, color, text }) => (
               <div key={stage} className="flex items-center gap-3">
                 <p className="pm-tint w-20 text-sm font-bold shrink-0" style={{ "--tint": text }}>{stage}</p>

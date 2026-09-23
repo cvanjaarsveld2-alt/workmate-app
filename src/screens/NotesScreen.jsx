@@ -541,7 +541,7 @@ Kind regards`;
             {Object.keys(NOTE_URGENCY).map(u => (
               <button key={u} type="button" onClick={() => setForm(f => ({ ...f, urgency: u }))}
                 className="flex-1 rounded-xl py-3 text-sm font-bold border-2 transition-all min-h-[48px]"
-                style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#647083", borderColor: "#E2E8F0" }}>
+                style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#5E6A7C", borderColor: "#E2E8F0" }}>
                 {u}
               </button>
             ))}
@@ -644,7 +644,7 @@ Kind regards`;
                 <p className="text-xs text-slate-400 mt-1.5 text-center">Scroll to review · {notesPack.filename}</p>
               </div>
 
-              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#EFECE6" }}>
                 <button onClick={shareNotesPack}
                   className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
                   style={{ background: "#8B1A1A" }}>
@@ -688,7 +688,7 @@ Kind regards`;
               {Object.keys(NOTE_URGENCY).map(u2 => (
                 <button key={u2} onClick={() => { changeUrgency(detailNote.id, u2); setDetailNote(n => ({ ...n, urgency: u2 })); }}
                   className="flex-1 rounded-lg px-2 py-2 text-xs font-bold border transition-all min-h-[48px]"
-                  style={(detailNote.urgency || "Normal") === u2 ? { background: NOTE_URGENCY[u2].bg, color: NOTE_URGENCY[u2].text, borderColor: NOTE_URGENCY[u2].dot } : { background: "#F8FAFC", color: "#647083", borderColor: "#E2E8F0" }}>
+                  style={(detailNote.urgency || "Normal") === u2 ? { background: NOTE_URGENCY[u2].bg, color: NOTE_URGENCY[u2].text, borderColor: NOTE_URGENCY[u2].dot } : { background: "#F8FAFC", color: "#5E6A7C", borderColor: "#E2E8F0" }}>
                   {u2.charAt(0)}
                 </button>
               ))}
@@ -830,7 +830,7 @@ Kind regards`;
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowExportMenu(false)} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed left-4 right-4 top-1/2 -translate-y-1/2 z-50 max-w-sm mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100" style={{ background: "#F7F3F3" }}>
+              <div className="px-5 py-4 border-b border-slate-100" style={{ background: "#EFECE6" }}>
                 <p className="text-base font-black text-slate-900">Export {selectedIds.size} Note{selectedIds.size !== 1 ? "s" : ""}</p>
                 <p className="text-xs text-slate-500 mt-0.5">Choose your format</p>
               </div>

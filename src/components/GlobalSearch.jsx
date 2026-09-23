@@ -252,7 +252,7 @@ export function GlobalSearch({ open, onClose, data, onNavigate }) {
 
             {/* Footer hint */}
             {query && totalCount > 0 && (
-              <div className="px-4 py-2 border-t border-slate-100 text-center" style={{ background: "#F7F3F3" }}>
+              <div className="px-4 py-2 border-t border-slate-100 text-center" style={{ background: "#EFECE6" }}>
                 <p className="text-xs text-slate-400">
                   Tap a result to jump to that section
                 </p>

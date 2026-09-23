@@ -6,9 +6,9 @@
    greys (not blue-tinted), and a frosted translucent top bar.
 
    iOS system reference values used here:
-     systemBackground            #000000  (base)
-     secondarySystemBackground   #1C1C1E  (cards / grouped content)
-     tertiarySystemBackground    #2C2C2E  (nested rows, inputs)
+     systemBackground            #0E0F11  (base)
+     secondarySystemBackground   #17191C  (cards / grouped content)
+     tertiarySystemBackground    #202327  (nested rows, inputs)
      systemGray4/5/6 for borders and fills
      label / secondaryLabel / tertiaryLabel for text
 
@@ -22,8 +22,8 @@
 
 /* Page background as a variable so inline-styled wrappers can pick it up.
    Light mode keeps the warm off-white; dark mode goes true black. */
-:root { --pm-page-bg: #F7F3F3; }
-.dark { --pm-page-bg: #000000; }
+:root { --pm-page-bg: #F2EFE9; }  /* warm stone */
+.dark { --pm-page-bg: #0E0F11; }
 
 /* Wordmark "POWER" text + tag: dark on light backgrounds, light in dark mode.
    (The white "light" variant used on the red drawer is unaffected.) */
@@ -33,16 +33,16 @@
 /* ── Base canvas — true black like iOS ────────────────────────────────────── */
 .dark body,
 .dark #root {
-  background: #000000 !important;
+  background: #0E0F11 !important;
 }
 
 /* ── Surfaces — the iOS elevation ladder ──────────────────────────────────── */
 /* white cards → secondarySystemBackground (elevated grey on black) */
-.dark .bg-white            { background-color: #1C1C1E !important; }
+.dark .bg-white            { background-color: #17191C !important; }
 /* faint fills → tertiary / grouped */
-.dark .bg-slate-50         { background-color: #2C2C2E !important; }
-.dark .bg-slate-100        { background-color: #3A3A3C !important; }
-.dark .bg-slate-200        { background-color: #48484A !important; }
+.dark .bg-slate-50         { background-color: #202327 !important; }
+.dark .bg-slate-100        { background-color: #2A2E33 !important; }
+.dark .bg-slate-200        { background-color: #353A40 !important; }
 .dark .bg-slate-200\/70    { background-color: rgba(118,118,128,0.24) !important; }  /* segmented-control track */
 .dark .bg-slate-50\/50,
 .dark .bg-slate-50\/60     { background-color: rgba(255,255,255,0.04) !important; }
@@ -59,7 +59,7 @@
 .dark .text-slate-600      { color: rgba(235,235,245,0.80) !important; }  /* secondaryLabel */
 /* 500/400 carry descriptions and captions; iOS's 0.60/0.48 alphas fall under
    4.5:1 on the grey card surfaces, so they are lifted slightly to stay AA
-   on everything up to bg-slate-100 (#3A3A3C). */
+   on everything up to bg-slate-100 (#2A2E33). */
 .dark .text-slate-500      { color: rgba(235,235,245,0.68) !important; }  /* tertiaryLabel */
 .dark .text-slate-400      { color: rgba(235,235,245,0.60) !important; }
 .dark .text-slate-300      { color: rgba(235,235,245,0.34) !important; }  /* quaternaryLabel */
@@ -69,8 +69,9 @@
 /* ── Borders / separators — iOS uses a subtle translucent hairline ────────── */
 .dark .border-slate-100    { border-color: rgba(84,84,88,0.34) !important; }   /* opaqueSeparator-ish */
 .dark .border-slate-200    { border-color: rgba(84,84,88,0.48) !important; }
+.dark .border-stone-200    { border-color: rgba(84,84,88,0.48) !important; }
 .dark .border-slate-300    { border-color: rgba(84,84,88,0.60) !important; }
-.dark .border-white        { border-color: #1C1C1E !important; }
+.dark .border-white        { border-color: #17191C !important; }
 
 /* ── Dividers ─────────────────────────────────────────────────────────────── */
 .dark .divide-slate-50 > * + *   { border-color: rgba(84,84,88,0.34) !important; }
@@ -83,7 +84,7 @@
 .dark input,
 .dark select,
 .dark textarea {
-  background-color: #2C2C2E !important;
+  background-color: #202327 !important;
   color: #F2F2F7 !important;
   border-color: rgba(84,84,88,0.48) !important;
 }
@@ -98,7 +99,7 @@
 .dark header.fixed,
 .dark .bg-white\/90,
 .dark .bg-white\/95 {
-  background-color: rgba(28,28,30,0.72) !important;
+  background-color: rgba(21,23,26,0.94) !important;
   -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
   backdrop-filter: saturate(180%) blur(20px) !important;
 }
@@ -116,23 +117,23 @@
    variable definitions above are excluded (they're not elements). */
 /* React writes inline colours through the CSSOM, so the style attribute holds
    the serialised rgb() form, never the hex — match that. */
-.dark [style*="#F7F3F3"],
-.dark [style*="background: rgb(247, 243, 243)"],
+.dark [style*="#EFECE6"],
+.dark [style*="background: rgb(239, 236, 230)"],
 .dark [style*="background: rgb(248, 250, 252)"],
 .dark [style*="background: rgb(254, 250, 245)"] {
-  background-color: #2C2C2E !important;
+  background-color: #202327 !important;
 }
 .dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"]):is([style*="color"], [style*="border"]) {
-  background-color: #2C2C2E !important;
+  background-color: #202327 !important;
 }
 /* Text colours set alongside those light fills were picked for a light
    background; lift them with the fill. */
-.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(247, 243, 243)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(15, 23, 42)"] { color: #FFFFFF !important; }
-.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(247, 243, 243)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(30, 41, 59)"] { color: #F2F2F7 !important; }
-.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(247, 243, 243)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(71, 85, 105)"] { color: rgba(235,235,245,0.80) !important; }
-.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(247, 243, 243)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(100, 116, 139)"] { color: rgba(235,235,245,0.68) !important; }
-.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(247, 243, 243)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(100, 112, 131)"] { color: rgba(235,235,245,0.60) !important; }
-.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(247, 243, 243)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(139, 26, 26)"] { color: #F87171 !important; }
+.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(239, 236, 230)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(15, 23, 42)"] { color: #FFFFFF !important; }
+.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(239, 236, 230)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(30, 41, 59)"] { color: #F2F2F7 !important; }
+.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(239, 236, 230)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(71, 85, 105)"] { color: rgba(235,235,245,0.80) !important; }
+.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(239, 236, 230)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(100, 116, 139)"] { color: rgba(235,235,245,0.68) !important; }
+.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(239, 236, 230)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(94, 106, 124)"] { color: rgba(235,235,245,0.60) !important; }
+.dark :is([style*="background: white;"], [style*="background: rgb(255, 255, 255)"], [style*="background: rgb(239, 236, 230)"], [style*="background: rgb(248, 250, 252)"], [style*="background: rgb(254, 250, 245)"])[style*="color: rgb(139, 26, 26)"] { color: #F87171 !important; }
 
 /* Tinted status panels (errors, warnings, success, info). Light mode uses pale
    50-shade fills with 700/800 text; in dark mode that left bright pastel boxes.
@@ -184,7 +185,7 @@
 .dark [style="color: rgb(71, 85, 105);"] { color: rgba(235,235,245,0.80) !important; }  /* slate-600 */
 .dark [style="color: rgb(100, 116, 139);"] { color: rgba(235,235,245,0.68) !important; }  /* #64748B */
 .dark [style="color: rgb(83, 96, 114);"] { color: rgba(235,235,245,0.68) !important; }  /* slate-500 */
-.dark [style="color: rgb(100, 112, 131);"] { color: rgba(235,235,245,0.60) !important; }  /* slate-400 */
+.dark [style="color: rgb(94, 106, 124);"] { color: rgba(235,235,245,0.60) !important; }  /* slate-400 */
 .dark [style="color: rgb(139, 26, 26);"] { color: #F87171 !important; }  /* brand red */
 .dark [style="color: rgb(220, 38, 38);"] { color: #F87171 !important; }  /* red-600 */
 .dark [style="color: rgb(185, 28, 28);"] { color: #FCA5A5 !important; }  /* red-700 */
@@ -209,7 +210,7 @@
 .dark :is([style*="background: rgb(254, 226, 226)"], [style*="background-color: rgb(254, 226, 226)"], [style*="background: rgb(254, 242, 242)"], [style*="background-color: rgb(254, 242, 242)"], [style*="background: rgb(255, 245, 245)"], [style*="background-color: rgb(255, 245, 245)"], [style*="background: rgb(255, 241, 242)"], [style*="background-color: rgb(255, 241, 242)"], [style*="background: rgb(255, 228, 230)"], [style*="background-color: rgb(255, 228, 230)"], [style*="background: rgb(255, 247, 247)"], [style*="background-color: rgb(255, 247, 247)"]) { background-color: rgba(239, 68, 68, 0.16) !important; color: #FCA5A5 !important; }  /* red */
 .dark :is([style*="background: rgb(207, 250, 254)"], [style*="background-color: rgb(207, 250, 254)"]) { background-color: rgba(6, 182, 212, 0.18) !important; color: #67E8F9 !important; }  /* cyan */
 .dark :is([style*="background: rgb(252, 231, 243)"], [style*="background-color: rgb(252, 231, 243)"]) { background-color: rgba(236, 72, 153, 0.18) !important; color: #F9A8D4 !important; }  /* pink */
-.dark :is([style*="background: rgb(241, 245, 249)"], [style*="background-color: rgb(241, 245, 249)"], [style*="background: rgb(226, 232, 240)"], [style*="background-color: rgb(226, 232, 240)"], [style*="background: rgb(245, 239, 239)"], [style*="background-color: rgb(245, 239, 239)"]) { background-color: #3A3A3C !important; color: rgba(235,235,245,0.80) !important; }  /* slate */
+.dark :is([style*="background: rgb(241, 245, 249)"], [style*="background-color: rgb(241, 245, 249)"], [style*="background: rgb(226, 232, 240)"], [style*="background-color: rgb(226, 232, 240)"], [style*="background: rgb(245, 239, 239)"], [style*="background-color: rgb(245, 239, 239)"]) { background-color: #2A2E33 !important; color: rgba(235,235,245,0.80) !important; }  /* slate */
 /* Inline slate-100/200 borders read as bright outlines on black. */
 .dark :is([style*="border-color: rgb(226, 232, 240)"], [style*="border-color: rgb(241, 245, 249)"]) { border-color: rgba(84, 84, 88, 0.65) !important; }
 .dark :is([style*="solid rgb(226, 232, 240)"], [style*="solid rgb(241, 245, 249)"]) { border-color: rgba(84, 84, 88, 0.65) !important; }

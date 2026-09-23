@@ -11,14 +11,15 @@ import React from "react";
 import { BRAND } from "../lib/constants";
 
 export function Wordmark({ variant = "dark", size = "md", className = "" }) {
-  const onDark = variant === "light";
+  // "graphite": the dark app header — white POWER, brightened brand red WORKS.
+  const onDark = variant === "light" || variant === "graphite";
   // "light" variant is always white (used on the red drawer). The "dark" variant
   // is dark text on light backgrounds — but must flip to light in dark mode, so
   // it uses a CSS variable (--pm-wordmark, defined in darkMode.css) rather than
   // a hardcoded near-black that would vanish on a dark background.
   const powerColor = onDark ? "#FFFFFF" : "var(--pm-wordmark, #111111)";
   // Brand red; darkMode.css brightens it on black, where #8B1A1A is ~1.8:1.
-  const worksColor = onDark ? BRAND.primary : `var(--pm-wordmark-works, ${BRAND.primary})`;
+  const worksColor = variant === "graphite" ? "#EF6461" : onDark ? BRAND.primary : `var(--pm-wordmark-works, ${BRAND.primary})`;
   const tagColor = onDark ? "rgba(255,255,255,0.75)" : "var(--pm-wordmark-tag, #6B7280)";
 
   const sizes = {

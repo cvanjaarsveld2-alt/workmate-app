@@ -80,7 +80,7 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
             }}>
 
             {/* Header */}
-            <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2" style={{ background: "#F7F3F3" }}>
+            <div className="px-4 py-2.5 border-b border-slate-100 flex items-center gap-2" style={{ background: "#EFECE6" }}>
               <Scan size={13} style={{ color: BRAND.primary }} />
               <p className="text-xs font-black text-slate-600 uppercase tracking-wider">Quick Add</p>
             </div>

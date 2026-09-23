@@ -177,7 +177,7 @@ export function AssistantScreen({ data, setData, userId, teamId }) {
         subtitle={needsReview.length > 0 ? `${needsReview.length} email quote${needsReview.length !== 1 ? "s" : ""} to review` : "All caught up"}
       />
 
-      <Card className="p-3.5 flex items-start gap-3" style={{ background: "#F7F3F3" }}>
+      <Card className="p-3.5 flex items-start gap-3" style={{ background: "#EFECE6" }}>
         <Mail size={18} className="shrink-0 mt-0.5" style={{ color: BRAND.primary }} />
         <p className="text-xs text-slate-500 leading-relaxed">
           Quotes sent by plain email get read from a dedicated Gmail inbox once a day and show up below with the client and amount already pulled out. Nothing is sent automatically — you confirm each one before it becomes a real quote.

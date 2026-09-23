@@ -167,7 +167,7 @@ export function DailyVehiclePrompt({ userId, teamId, data, setData, onNavigate }
                   <div className="flex items-start justify-between mb-5">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
-                        style={{ background: "#F7F3F3" }}>
+                        style={{ background: "#EFECE6" }}>
                         <Car size={22} style={{ color: BRAND.primary }} />
                       </div>
                       <div>

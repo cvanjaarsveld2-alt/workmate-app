@@ -1037,30 +1037,31 @@ export default function PowerWorksApp() {
             className="min-h-screen pb-32"
             style={{ background: "var(--pm-page-bg)", paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
           >
+            {/* Graphite steel bar in both themes, with a brand-red rule underneath. */}
             <header
-              className="fixed top-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100"
-              style={{ paddingTop: "env(safe-area-inset-top)" }}
+              className="pm-graphite fixed top-0 left-0 right-0 z-40 border-b-2"
+              style={{ paddingTop: "env(safe-area-inset-top)", borderBottomColor: BRAND.primary }}
             >
               <div className="mx-auto max-w-2xl px-3 h-14 flex items-center justify-between gap-2">
                 <button
                   onClick={() => setDrawerOpen(true)}
-                  className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  className="p-2 rounded-xl text-white/85 hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center"
                   aria-label="Menu"
                 >
                   <Menu size={22} />
                 </button>
                 {screen === "Home" ? (
-                  <Wordmark variant="dark" size="sm" />
+                  <Wordmark variant="graphite" size="sm" />
                 ) : (
                   <div className="flex items-center gap-2 min-w-0">
-                    <p className="text-base font-black text-slate-900 truncate">{SCREEN_TITLES[screen] || screen}</p>
+                    <p className="font-display text-lg font-bold uppercase tracking-wider text-white truncate">{SCREEN_TITLES[screen] || screen}</p>
                   </div>
                 )}
                 <div className="flex items-center gap-1 shrink-0">
                   {teamId && (
                     <button
                       onClick={() => navigate("Notifications")}
-                      className="relative p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      className="relative p-2 rounded-xl text-white/85 hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center"
                       aria-label="Notifications"
                     >
                       <Bell size={20} />
@@ -1076,7 +1077,7 @@ export default function PowerWorksApp() {
                   )}
                   <button
                     onClick={() => setSearchOpen(true)}
-                    className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    className="p-2 rounded-xl text-white/85 hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center"
                     aria-label="Search"
                   >
                     <Search size={20} />

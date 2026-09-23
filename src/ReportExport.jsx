@@ -10,7 +10,7 @@ import React, { useState } from "react";
 import { FileText, Download, Calendar } from "lucide-react";
 import { neutralizeFormula } from "./lib/csv";
 
-const BRAND = { primary: "#8B1A1A", light: "#F7F3F3" };
+const BRAND = { primary: "#8B1A1A", light: "#EFECE6" };
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function formatCurrency(v) { return "R " + parseFloat(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 }); }

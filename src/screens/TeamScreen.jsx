@@ -428,7 +428,7 @@ function SharedWithMe({ userId, data, setData, onRefresh }) {
   if (items.length === 0) {
     return (
       <Card className="p-6 text-center">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#F7F3F3" }}>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: "#EFECE6" }}>
           <Inbox size={22} style={{ color: BRAND.primary }} />
         </div>
         <p className="text-sm font-bold text-slate-700">Nothing shared with you</p>
@@ -798,7 +798,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
         <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
         <PageHeader title="Team" subtitle="Set up team sharing for Power Works" />
         <Card className="p-5 text-center space-y-3">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "#F7F3F3" }}>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "#EFECE6" }}>
             <Users size={28} style={{ color: BRAND.primary }} />
           </div>
           <p className="text-base font-black text-slate-800">No team set up yet</p>
@@ -1167,7 +1167,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
       <button onClick={() => setShowManage(s => !s)}
         className="w-full flex items-center justify-between px-1">
         <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Team Settings</p>
-        <div className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 min-h-[36px]" style={{ background: "#F7F3F3" }}>
+        <div className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 min-h-[36px]" style={{ background: "#EFECE6" }}>
           <p className="text-xs font-bold" style={{ color: BRAND.primary }}>
             {showManage ? "Hide" : "Invite code & settings"}
           </p>
@@ -1192,7 +1192,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                 </div>
                 <button onClick={copyCode}
                   className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0 transition-colors"
-                  style={{ background: copied ? "#DCFCE7" : "#F7F3F3" }}>
+                  style={{ background: copied ? "#DCFCE7" : "#EFECE6" }}>
                   {copied ? <Check size={20} className="text-green-700" /> : <Copy size={20} style={{ color: BRAND.primary }} />}
                 </button>
               </div>

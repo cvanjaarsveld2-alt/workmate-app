@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Delete, Fingerprint, ScanFace } from "lucide-react";
 // FIX #8 — Use the shared constants so MAX_ATTEMPTS, storage keys, and
 // lockout config are consistent everywhere in the app.
+import { Wordmark } from "../components/Wordmark";
 import {
   PIN_KEY,
   PIN_UNLOCKED_KEY,
@@ -21,7 +22,7 @@ const PIN_LENGTH    = 6;
 const BIOMETRIC_KEY = "pm_biometric_credential"; // stores credential ID as base64
 
 const RED   = "#8B1A1A";
-const LIGHT = "#F7F3F3";
+const LIGHT = "#EFECE6";
 
 // ─── PIN helpers ─────────────────────────────────────────────────────────────
 // FIX (Build 8, Phase 3) — every helper below now takes the signed-in user's
@@ -261,7 +262,7 @@ function BiometricButton({ userId, onSuccess, onError, isRegistering }) {
     }
   }
 
-  const bgColor    = state === "scanning" ? "#F0FDF4" : state === "error" ? "#FEF2F2" : "#F7F3F3";
+  const bgColor    = state === "scanning" ? "#F0FDF4" : state === "error" ? "#FEF2F2" : "#EFECE6";
   const iconColor  = state === "scanning" ? "#16A34A" : state === "error" ? "#DC2626" : RED;
   const textColor  = iconColor;
 
@@ -400,15 +401,11 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-between overflow-auto" style={{ background: LIGHT }}>
+    <div className="pm-graphite fixed inset-0 flex flex-col items-center justify-between overflow-auto">
       <div className="flex flex-col items-center pt-16 pb-4 px-6">
-        <img src="/logo.png" alt="Power Works" className="h-14 object-contain mb-6"
-          onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }} />
-        <div className="hidden items-center justify-center rounded-2xl px-5 py-3 mb-6" style={{ background: RED }}>
-          <span className="text-white text-lg font-black tracking-wide">POWER<span style={{ color: "#FCA5A5" }}>MATE</span></span>
-        </div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight text-center">Welcome back</h1>
-        <p className="mt-1.5 text-sm text-slate-400 text-center leading-snug">
+        <div className="mb-6"><Wordmark variant="graphite" size="md" /></div>
+        <h1 className="font-display text-3xl font-extrabold uppercase tracking-wider text-white text-center">Welcome back</h1>
+        <p className="mt-1.5 text-sm text-white/70 text-center leading-snug">
           {biometricRegistered ? "Use biometric or enter your PIN" : "Enter your PIN to open PowerMate"}
         </p>
       </div>
@@ -455,7 +452,7 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
         {biometricAvailable && !biometricRegistered && !lockedOut && (
           <div className="mt-2 flex flex-col items-center gap-2">
             <BiometricButton userId={userId} onSuccess={handleBiometricSuccess} onError={msg => setError(msg || "Biometric failed")} isRegistering={true} />
-            <p className="text-xs text-slate-400 text-center max-w-[220px] leading-snug">
+            <p className="text-xs text-white/70 text-center max-w-[220px] leading-snug">
               Tap above to enable Face ID or fingerprint for faster unlock
             </p>
           </div>
@@ -464,7 +461,7 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
         {onForgot && (
           <button onClick={onForgot}
             className="mt-1 text-sm font-bold py-2 px-5 rounded-xl min-h-[44px]"
-            style={{ color: RED }}>
+            style={{ color: "#EF6461" }}>
             Forgot PIN? Sign in again
           </button>
         )}
@@ -526,15 +523,11 @@ export function PINSetupScreen({ userId, onComplete }) {
     : "Enter the same PIN again to confirm";
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-between overflow-auto" style={{ background: LIGHT }}>
+    <div className="pm-graphite fixed inset-0 flex flex-col items-center justify-between overflow-auto">
       <div className="flex flex-col items-center pt-16 pb-4 px-6">
-        <img src="/logo.png" alt="Power Works" className="h-14 object-contain mb-6"
-          onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }} />
-        <div className="hidden items-center justify-center rounded-2xl px-5 py-3 mb-6" style={{ background: RED }}>
-          <span className="text-white text-lg font-black tracking-wide">POWER<span style={{ color: "#FCA5A5" }}>MATE</span></span>
-        </div>
-        <h1 className="text-2xl font-black text-slate-900 tracking-tight text-center">{title}</h1>
-        <p className="mt-1.5 text-sm text-slate-400 text-center leading-snug">{subtitle}</p>
+        <div className="mb-6"><Wordmark variant="graphite" size="md" /></div>
+        <h1 className="font-display text-3xl font-extrabold uppercase tracking-wider text-white text-center">{title}</h1>
+        <p className="mt-1.5 text-sm text-white/70 text-center leading-snug">{subtitle}</p>
       </div>
 
       <div className="w-full px-6">
