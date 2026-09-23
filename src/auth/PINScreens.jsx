@@ -35,41 +35,63 @@ function _randomSalt() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
 }
-async function _hashPIN(pin, salt) {
+// Legacy (v2 and older) format: one SHA-256 round. Only used to verify PINs
+// saved by earlier builds, which are then rewritten as v3.
+async function _hashPINLegacy(pin, salt) {
   return _digestHex(pin + salt);
+}
+// v3: PBKDF2-SHA256 with a per-install salt. A 6-digit PIN has only a million
+// possibilities, so a single fast hash could be brute-forced in well under a
+// second by anyone who copies localStorage off the device. The work factor
+// makes each guess cost ~0.1–0.5 s on a phone. Iterations are stored with the
+// hash so they can be raised later; older hashes upgrade on the next unlock.
+const PIN_PBKDF2_ITERATIONS = 600000;
+async function _hashPINv3(pin, salt, iterations) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(salt), iterations },
+    key,
+    256,
+  );
+  return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+function _safeEqual(a, b) {
+  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 async function savePINHash(pin, userId) {
   const salt = _randomSalt();
-  const hash = await _hashPIN(pin, salt);
-  localStorage.setItem(scopedPinKey(PIN_KEY, userId), `v2$${salt}$${hash}`);
+  const hash = await _hashPINv3(pin, salt, PIN_PBKDF2_ITERATIONS);
+  localStorage.setItem(scopedPinKey(PIN_KEY, userId), `v3$${PIN_PBKDF2_ITERATIONS}$${salt}$${hash}`);
 }
 async function verifyPIN(pin, userId) {
   const key = scopedPinKey(PIN_KEY, userId);
   const stored = localStorage.getItem(key);
   if (!stored) return false;
+  if (stored.startsWith("v3$")) {
+    const [, iterStr, salt, hash] = stored.split("$");
+    const iterations = parseInt(iterStr, 10);
+    if (!salt || !hash || !(iterations > 0)) return false;
+    const ok = _safeEqual(await _hashPINv3(pin, salt, iterations), hash);
+    if (ok && iterations < PIN_PBKDF2_ITERATIONS) await savePINHash(pin, userId);
+    return ok;
+  }
+  // Everything below is a pre-v3 format: verify it once, then upgrade to v3.
+  let ok = false;
   if (stored.startsWith("v2$")) {
     const [, salt, hash] = stored.split("$");
-    if (!salt || !hash) return false;
-    return (await _hashPIN(pin, salt)) === hash;
+    ok = !!salt && !!hash && _safeEqual(await _hashPINLegacy(pin, salt), hash);
+  } else if (/^v2[0-9a-f]{96}$/i.test(stored)) {
+    // Short-lived malformed v2 format (v2 + salt + hash, without separators).
+    ok = _safeEqual(await _hashPINLegacy(pin, stored.slice(2, 34)), stored.slice(34));
+  } else {
+    // Build 8 hash with the old static salt.
+    ok = _safeEqual(await _digestHex(pin + "powermate_salt_v1"), stored);
   }
-  // Repair the short-lived malformed v2 format from the previous build
-  // (v2 + salt + hash, without separators). Existing PINs remain valid;
-  // a successful verification is immediately rewritten to canonical v2$ form.
-  if (/^v2[0-9a-f]{96}$/i.test(stored)) {
-    const salt = stored.slice(2, 34);
-    const hash = stored.slice(34);
-    if ((await _hashPIN(pin, salt)) === hash) {
-      await savePINHash(pin, userId);
-      return true;
-    }
-    return false;
-  }
-  // Legacy Build 8 hash migration: verify once against the old static salt,
-  // then immediately replace it with a per-install random salt.
-  const legacyHash = await _digestHex(pin + "powermate_salt_v1");
-  if (legacyHash !== stored) return false;
-  await savePINHash(pin, userId);
-  return true;
+  if (ok) await savePINHash(pin, userId);
+  return ok;
 }
 export function getPINHash(userId)          { return localStorage.getItem(scopedPinKey(PIN_KEY, userId)); }
 export function getPINAttempts(userId)      { return parseInt(localStorage.getItem(scopedPinKey(PIN_ATTEMPTS_KEY, userId)) || "0", 10); }
