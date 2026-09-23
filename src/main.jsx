@@ -4,10 +4,17 @@ import "./index.css";
 import "./darkMode.css";
 import { initTheme } from "./lib/theme";
 import PowerMateApp from "./App.jsx";
-import { installGlobalErrorReporting } from "./lib/helpers";
+import { installGlobalErrorReporting, logEvent } from "./lib/helpers";
+import { requestPersistentStorage } from "./offline/offlineDb";
 
 // Uncaught errors and promise rejections go to the events table (buffered offline).
 installGlobalErrorReporting();
+
+// Keep the offline queue safe from browser storage eviction; report devices
+// where the browser refuses, since their unsynced changes are at risk.
+requestPersistentStorage().then(status => {
+  if (status.supported && !status.persisted) setTimeout(() => logEvent("storage_not_persistent", status), 10000);
+});
 
 // Vite emits a preloadError when a long-lived tab asks for a lazy chunk from
 // an older deployment. Reload once so the browser receives the current HTML

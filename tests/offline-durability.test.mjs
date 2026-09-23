@@ -36,3 +36,8 @@ test("Followups uses a stable module import", () => {
   assert.match(app, /import \{ FollowupsScreen \} from "\.\/screens\/FollowupsScreen"/);
   assert.doesNotMatch(app, /lazy\(\(\) => import\("\.\/screens\/FollowupsScreen"\)/);
 });
+
+test("startup asks the browser not to evict the offline IndexedDB store", () => {
+  assert.match(read("src/main.jsx"), /requestPersistentStorage\(\)/);
+  assert.match(read("src/offline/offlineDb.js"), /navigator\.storage\.persist\(\)/);
+});
