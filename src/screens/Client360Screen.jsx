@@ -115,16 +115,16 @@ function TimelineItem({ event, onTap }) {
       </div>
       <div className="flex-1 min-w-0 pb-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: s.color }}>
+          <span className="text-[11px] font-black uppercase tracking-wider" style={{ color: s.color }}>
             {s.label}
           </span>
-          <span className="text-[10px] text-slate-400 ml-auto shrink-0">{timeAgo(event.date)}</span>
+          <span className="text-[11px] text-slate-400 ml-auto shrink-0">{timeAgo(event.date)}</span>
         </div>
         <p className="text-sm font-bold text-slate-900 mt-0.5 break-words">{event.title}</p>
         {event.subtitle && <p className="text-xs text-slate-500 mt-0.5">{event.subtitle}</p>}
         {event.badge && (
           <span
-            className="inline-block mt-1 text-[10px] font-bold rounded-full px-2 py-0.5"
+            className="inline-block mt-1 text-[11px] font-bold rounded-full px-2 py-0.5"
             style={{ background: event.badge.bg, color: event.badge.color }}
           >
             {event.badge.text}
@@ -143,7 +143,7 @@ function ActionBtn({ icon: Icon, label, onClick, color, bg }) {
       style={{ background: bg }}
     >
       <Icon size={18} style={{ color }} />
-      <span className="text-[10px] font-black" style={{ color }}>
+      <span className="text-[11px] font-black" style={{ color }}>
         {label}
       </span>
     </button>
@@ -207,7 +207,7 @@ function EmptyTab({ icon: Icon, label, actionLabel, onAction }) {
         <button
           onClick={onAction}
           className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl min-h-[36px]"
-          style={{ color: BRAND.primary, background: "#F7F3F3" }}
+          style={{ color: BRAND.primary, background: "#EFECE6" }}
         >
           <Plus size={12} /> {actionLabel}
         </button>
@@ -488,7 +488,7 @@ export function Client360Screen({
                         className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${f.completed ? "bg-green-100" : "bg-slate-100"}`}
                       >
                         {f.completed ? (
-                          <CheckCircle2 size={14} className="text-green-600" />
+                          <CheckCircle2 size={14} className="text-green-700" />
                         ) : (
                           <Calendar size={14} className="text-slate-400" />
                         )}
@@ -505,7 +505,7 @@ export function Client360Screen({
                         </p>
                       </div>
                       {!f.completed && f.date < today && (
-                        <span className="text-[10px] font-bold rounded-full px-2 py-0.5 bg-red-100 text-red-700 shrink-0">
+                        <span className="text-[11px] font-bold rounded-full px-2 py-0.5 bg-red-100 text-red-700 shrink-0">
                           Overdue
                         </span>
                       )}
@@ -568,7 +568,7 @@ export function Client360Screen({
                                   </div>
                                 ))}
                               {n.media.filter(m => m.url).length > 4 && (
-                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0">
+                                <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-[11px] font-bold text-slate-400 shrink-0">
                                   +{n.media.filter(m => m.url).length - 4}
                                 </div>
                               )}
@@ -662,7 +662,7 @@ export function Client360Screen({
                   )}
                   <div className="flex items-center gap-2 mt-1.5">
                     <span
-                      className="text-[10px] font-bold rounded-full px-2 py-0.5"
+                      className="text-[11px] font-bold rounded-full px-2 py-0.5"
                       style={{ background: "#EDE9FE", color: "#5B21B6" }}
                     >
                       {l.stage || "New"}
@@ -807,7 +807,7 @@ export function Client360Screen({
           label="Log"
           onClick={() => setActiveTab("calls")}
           color="#8B1A1A"
-          bg="#F7F3F3"
+          bg="#EFECE6"
         />
         {client.phone && (
           <>
@@ -850,10 +850,10 @@ export function Client360Screen({
       {/* ── Health warning ── */}
       {healthIssues.length > 0 && (
         <div className="flex items-start gap-2.5 rounded-xl bg-amber-50 border border-amber-200 p-3">
-          <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+          <AlertTriangle size={14} className="text-amber-700 shrink-0 mt-0.5" />
           <div>
             <p className="text-xs font-bold text-amber-700">Needs attention</p>
-            <p className="text-xs text-amber-600 mt-0.5">{healthIssues.join(" · ")}</p>
+            <p className="text-xs text-amber-700 mt-0.5">{healthIssues.join(" · ")}</p>
           </div>
         </div>
       )}
@@ -865,13 +865,13 @@ export function Client360Screen({
             <p className="text-lg font-black" style={{ color: BRAND.primary }}>
               {contacts.length}
             </p>
-            <p className="text-[10px] font-bold text-slate-400">Contacts</p>
+            <p className="text-[11px] font-bold text-slate-400">Contacts</p>
           </div>
           <div className="flex-1 bg-white rounded-xl p-2.5 border border-slate-100 min-w-0">
             <p className="text-lg font-black" style={{ color: overdueFU.length > 0 ? "#DC2626" : "#1E40AF" }}>
               {openFU.length}
             </p>
-            <p className="text-[10px] font-bold text-slate-400">
+            <p className="text-[11px] font-bold text-slate-400">
               {overdueFU.length > 0 ? `${overdueFU.length} overdue` : "Open F/U"}
             </p>
           </div>
@@ -879,13 +879,13 @@ export function Client360Screen({
             <p className="text-lg font-black" style={{ color: "#166534" }}>
               {formatCurrency(wonRev)}
             </p>
-            <p className="text-[10px] font-bold text-slate-400">Won</p>
+            <p className="text-[11px] font-bold text-slate-400">Won</p>
           </div>
           <div className="flex-1 bg-white rounded-xl p-2.5 border border-slate-100 min-w-0">
             <p className="text-lg font-black" style={{ color: "#5B21B6" }}>
               {formatCurrency(pendingRev)}
             </p>
-            <p className="text-[10px] font-bold text-slate-400">Pending</p>
+            <p className="text-[11px] font-bold text-slate-400">Pending</p>
           </div>
         </div>
         {/* Expandable extra stats */}
@@ -911,17 +911,17 @@ export function Client360Screen({
                   <p className="text-lg font-black" style={{ color: "#5B21B6" }}>
                     {formatCurrency(totalQuoted)}
                   </p>
-                  <p className="text-[10px] font-bold text-slate-400">Total quoted</p>
+                  <p className="text-[11px] font-bold text-slate-400">Total quoted</p>
                 </div>
                 <div className="flex-1 bg-white rounded-xl p-2.5 border border-slate-100 min-w-0">
                   <p className="text-lg font-black" style={{ color: "#9A3412" }}>
                     {formatCurrency(totalExpenses)}
                   </p>
-                  <p className="text-[10px] font-bold text-slate-400">Expenses</p>
+                  <p className="text-[11px] font-bold text-slate-400">Expenses</p>
                 </div>
                 <div className="flex-1 bg-white rounded-xl p-2.5 border border-slate-100 min-w-0">
                   <p className="text-lg font-black text-slate-700">{equipment.length}</p>
-                  <p className="text-[10px] font-bold text-slate-400">Equipment</p>
+                  <p className="text-[11px] font-bold text-slate-400">Equipment</p>
                 </div>
               </div>
               {lastContact && (
@@ -958,7 +958,7 @@ export function Client360Screen({
               {t.label}
               {count > 0 && (
                 <span
-                  className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${active ? "bg-white/30" : "bg-slate-100"}`}
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${active ? "bg-white/30" : "bg-slate-100"}`}
                 >
                   {count}
                 </span>

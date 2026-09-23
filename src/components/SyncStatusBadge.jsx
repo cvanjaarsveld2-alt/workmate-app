@@ -28,7 +28,7 @@ export default function SyncStatusBadge({ isOnline, pendingCount, syncing }) {
   if (!isOnline) {
     content = (
       <span key="offline" className="flex items-center gap-1.5">
-        <CloudOff size={11} className="text-amber-600" />
+        <CloudOff size={11} className="text-amber-700" />
         <span>Offline · saving locally</span>
       </span>
     );
@@ -42,7 +42,7 @@ export default function SyncStatusBadge({ isOnline, pendingCount, syncing }) {
   } else if (justReconnected) {
     content = (
       <span key="reconnected" className="flex items-center gap-1.5">
-        <Check size={11} className="text-green-600" />
+        <Check size={11} className="text-green-700" />
         <span>Back online</span>
       </span>
     );
@@ -59,7 +59,7 @@ export default function SyncStatusBadge({ isOnline, pendingCount, syncing }) {
           className="fixed left-1/2 -translate-x-1/2 z-30 pointer-events-none"
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 90px)" }}>
           <div
-            className="rounded-full bg-white/95 backdrop-blur px-3 py-1 text-[11px] font-bold text-slate-500"
+            className="rounded-full bg-white/95 backdrop-blur px-3 py-1 text-xs font-bold text-slate-500"
             style={{
               border: "1px solid #E2E8F0",
               boxShadow: "0 1px 4px rgba(15, 23, 42, 0.08)",

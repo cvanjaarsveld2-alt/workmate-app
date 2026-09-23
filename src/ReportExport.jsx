@@ -10,7 +10,7 @@ import React, { useState } from "react";
 import { FileText, Download, Calendar } from "lucide-react";
 import { neutralizeFormula } from "./lib/csv";
 
-const BRAND = { primary: "#8B1A1A", light: "#F7F3F3" };
+const BRAND = { primary: "#8B1A1A", light: "#EFECE6" };
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function formatCurrency(v) { return "R " + parseFloat(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2 }); }
@@ -277,9 +277,9 @@ export default function ReportExport({ data }) {
           className="w-full flex items-center justify-between rounded-xl border-2 border-red-100 p-3.5 text-left hover:border-red-300 transition-colors disabled:opacity-40 min-h-[56px]">
           <div>
             <p className="text-sm font-bold text-red-700">Overdue & Urgent</p>
-            <p className="text-xs text-red-400">Items needing immediate attention</p>
+            <p className="text-xs text-red-600">Items needing immediate attention</p>
           </div>
-          <Download size={16} className="text-red-400 shrink-0" />
+          <Download size={16} className="text-red-600 shrink-0" />
         </button>
       </div>
 
@@ -287,7 +287,7 @@ export default function ReportExport({ data }) {
         <p className="text-xs text-slate-400 text-center">Generating report…</p>
       )}
       {lastExport && !exporting && (
-        <p className="text-xs text-green-600 text-center font-medium">✓ Exported at {lastExport} — check your Downloads folder</p>
+        <p className="text-xs text-green-700 text-center font-medium">✓ Exported at {lastExport} — check your Downloads folder</p>
       )}
     </div>
   );

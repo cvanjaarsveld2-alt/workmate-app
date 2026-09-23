@@ -97,7 +97,7 @@ export function TeamRecordDetailScreen({ data, teamMembers = [], recordType, rec
               key={key}
               className={`${key === "notes" || key === "description" || key === "outcome_notes" ? "sm:col-span-2" : ""} rounded-xl bg-slate-50 p-3`}
             >
-              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p>
+              <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">{label}</p>
               <p className="text-sm font-semibold text-slate-800 whitespace-pre-wrap break-words mt-1">
                 {displayValue(key, record[key])}
               </p>

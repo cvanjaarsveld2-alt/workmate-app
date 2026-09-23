@@ -484,7 +484,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
           <div className="w-1 self-stretch rounded-full shrink-0" style={{ background: eventColor(item) }} />
           <div className="w-12 shrink-0 pt-0.5">
             <p className="text-xs font-black text-slate-700">{item.time || "All-day"}</p>
-            {!compact && <p className="text-[10px] text-slate-400 mt-0.5">{itemType(item)}</p>}
+            {!compact && <p className="text-[11px] text-slate-400 mt-0.5">{itemType(item)}</p>}
           </div>
           <div className="flex-1 min-w-0">
             <p
@@ -521,7 +521,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
               onClick={() => toggleComplete(item)}
               className="flex-1 min-h-[44px] text-xs font-bold text-slate-500 flex items-center justify-center gap-1.5 active:bg-slate-50"
             >
-              {item.completed ? <CheckCircle2 size={14} className="text-green-600" /> : <Check size={14} />}{" "}
+              {item.completed ? <CheckCircle2 size={14} className="text-green-700" /> : <Check size={14} />}{" "}
               {item.completed ? "Completed" : "Complete"}
             </button>
             <button
@@ -612,7 +612,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
               {DAY_NAMES.map((day, index) => (
                 <div
                   key={day}
-                  className={`text-center text-[10px] font-black uppercase py-2 ${index > 4 ? "text-red-400" : "text-slate-400"}`}
+                  className={`text-center text-[11px] font-black uppercase py-2 ${index > 4 ? "text-red-600" : "text-slate-400"}`}
                 >
                   {day}
                 </div>
@@ -656,7 +656,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                       {items.slice(0, 2).map(item => (
                         <div
                           key={item.id}
-                          className="text-[9px] font-bold truncate text-left px-1 py-0.5 rounded"
+                          className="text-[10px] font-bold truncate text-left px-1 py-0.5 rounded"
                           style={{ color: eventColor(item), background: `${eventColor(item)}14` }}
                         >
                           {item.time ? `${item.time} ` : ""}
@@ -664,7 +664,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                         </div>
                       ))}
                       {items.length > 2 && (
-                        <p className="text-[9px] text-slate-400 text-left px-1">+{items.length - 2} more</p>
+                        <p className="text-[10px] text-slate-400 text-left px-1">+{items.length - 2} more</p>
                       )}
                     </div>
                   </button>

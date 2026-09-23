@@ -11,7 +11,7 @@ import {
 import { BRAND } from "../lib/constants";
 
 const TILES = [
-  { key: "Home",      label: "Dashboard",  icon: Home,      bg: "#F7F3F3", color: "#8B1A1A" },
+  { key: "Home",      label: "Dashboard",  icon: Home,      bg: "#EFECE6", color: "#8B1A1A" },
   { key: "Clients",   label: "Clients",    icon: Users,     bg: "#EDE9FE", color: "#5B21B6", badgeKey: "clients" },
   { key: "Contacts",  label: "Contacts",   icon: UserPlus,  bg: "#FFE4D9", color: "#7C2D12", badgeKey: "leads" },
   { key: "Followups", label: "Follow-ups", icon: Calendar,  bg: "#CFFAFE", color: "#0E7490", badgeKey: "overdueFU" },
@@ -92,7 +92,7 @@ export function NavGrid({ open, onClose, onOpen, currentScreen, onNavigate, badg
                           {tile.label}
                         </span>
                         {badge > 0 && (
-                          <span className="absolute top-2 right-3 rounded-full px-1.5 py-0.5 text-[10px] font-black text-white min-w-[18px] text-center" style={{ background: BRAND.primary }}>
+                          <span className="absolute top-2 right-3 rounded-full px-1.5 py-0.5 text-[11px] font-black text-white min-w-[18px] text-center" style={{ background: BRAND.primary }}>
                             {badge > 99 ? "99+" : badge}
                           </span>
                         )}

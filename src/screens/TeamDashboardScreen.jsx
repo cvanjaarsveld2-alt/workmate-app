@@ -43,7 +43,7 @@ function MiniStat({ label, value, sub, color }) {
     <div className="flex-1 min-w-0 bg-white rounded-2xl p-3.5 border border-slate-100">
       <p className="text-2xl font-black" style={{ color }}>{value}</p>
       <p className="text-xs font-bold text-slate-500 mt-0.5">{label}</p>
-      {sub && <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -77,12 +77,12 @@ function ClientRow({ client, color, onOpen, onShare, onTap }) {
       </button>
       <div className="flex gap-2 pb-2 pl-8">
         {onOpen && (
-          <button onClick={onOpen} className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">
+          <button onClick={onOpen} className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-lg hover:bg-blue-50 transition-colors">
             Full profile →
           </button>
         )}
         {onShare && (
-          <button onClick={onShare} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
+          <button onClick={onShare} className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
             <Send size={11} /> Assign
           </button>
         )}
@@ -100,13 +100,13 @@ function ContactRow({ contact, color, onShare, onTap }) {
           <p className="text-sm font-bold text-slate-900 truncate">{contact.name}</p>
           <p className="text-xs text-slate-400 truncate">{[contact.company, contact.title].filter(Boolean).join(" · ")}</p>
         </div>
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: "#EDE9FE", color: "#5B21B6" }}>
+        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: "#EDE9FE", color: "#5B21B6" }}>
           {contact.status || "Lead"}
         </span>
       </button>
       {onShare && (
         <div className="pb-2 pl-8">
-          <button onClick={onShare} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
+          <button onClick={onShare} className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
             <Send size={11} /> Assign
           </button>
         </div>
@@ -128,7 +128,7 @@ function LeadRow({ lead, color, onShare, onTap }) {
       </button>
       {onShare && (
         <div className="pb-2 pl-8">
-          <button onClick={onShare} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
+          <button onClick={onShare} className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors">
             <Send size={11} /> Assign
           </button>
         </div>
@@ -147,19 +147,19 @@ function FollowupRow({ fu, today, color, onShare, onTap }) {
           <p className="text-sm font-bold text-slate-900 truncate">{fu.title}</p>
           <p className="text-xs text-slate-400 truncate">{fu.client}{fu.branch ? ` — ${fu.branch}` : ""}</p>
           {fu.notes && <p className="text-xs text-slate-400 truncate mt-0.5 italic">{fu.notes}</p>}
-          <p className="text-[10px] text-slate-400 mt-0.5">{fu.time ? `${fu.time} · ` : ""}{fu.date}</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">{fu.time ? `${fu.time} · ` : ""}{fu.date}</p>
         </div>
         {fu.completed ? (
           <CheckCircle2 size={14} className="text-green-500 shrink-0" />
         ) : (
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${overdue ? "text-red-700 bg-red-50" : "text-slate-600 bg-slate-100"}`}>
+          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${overdue ? "text-red-700 bg-red-50" : "text-slate-600 bg-slate-100"}`}>
             {overdue ? "Overdue" : smartDate(fu.date)}
           </span>
         )}
       </button>
       {onShare && (
         <div className="pb-2 pl-8">
-          <button onClick={onShare} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 hover:text-red-700 transition-colors px-2 py-1 rounded-lg hover:bg-red-50">
+          <button onClick={onShare} className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 hover:text-red-700 transition-colors px-2 py-1 rounded-lg hover:bg-red-50">
             <Send size={11} /> Assign to teammate
           </button>
         </div>
@@ -463,7 +463,7 @@ export function TeamDashboardScreen({
               style={active ? { background: s.bg, color: s.color, borderColor: s.bg } : {}}>
               <s.icon size={12} />
               {s.label}
-              {s.count > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${active ? "bg-white/50" : "bg-slate-100"}`}>{s.count}</span>}
+              {s.count > 0 && <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${active ? "bg-white/50" : "bg-slate-100"}`}>{s.count}</span>}
             </button>
           );
         })}
@@ -503,7 +503,7 @@ export function TeamDashboardScreen({
                     {isCollapsed
                       ? <ChevronRight size={16} className="text-slate-400 shrink-0" />
                       : <ChevronDown size={16} className="text-slate-400 shrink-0" />}
-                    <span className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[10px] font-black text-white"
+                    <span className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[11px] font-black text-white"
                       style={{ background: group.color }}>
                       {name.slice(0, 1).toUpperCase()}
                     </span>
@@ -604,14 +604,14 @@ export function TeamDashboardScreen({
                 {detailItem.type === "client" && (() => { const d = detailItem.data; return (<>
                   <div className="flex items-center gap-2 flex-wrap">
                     <StagePill stage={d.stage || "New Lead"} />
-                    {d.sync_status === "pending" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Not synced</span>}
+                    {d.sync_status === "pending" && <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Not synced</span>}
                   </div>
                   <div className="rounded-xl bg-slate-50 p-4 space-y-2">
                     {d.contact  && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Contact</p><p className="text-sm text-slate-800">{d.contact}</p></div>}
                     {d.phone    && <div className="flex gap-2 items-center"><p className="text-xs font-bold text-slate-400 w-16">Phone</p>
                       <a href={`tel:${d.phone}`} className="text-sm text-blue-600 font-medium">{d.phone}</a>
                       <a href={`https://wa.me/${d.phone.replace(/^0/,"27").replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer"
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">WhatsApp</a>
+                        className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">WhatsApp</a>
                     </div>}
                     {d.email    && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Email</p><a href={`mailto:${d.email}`} className="text-sm text-blue-600">{d.email}</a></div>}
                     {d.location && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Location</p><p className="text-sm text-slate-800">{d.location}</p></div>}
@@ -633,7 +633,7 @@ export function TeamDashboardScreen({
                     {d.phone    && <div className="flex gap-2 items-center"><p className="text-xs font-bold text-slate-400 w-16">Phone</p>
                       <a href={`tel:${d.phone}`} className="text-sm text-blue-600 font-medium">{d.phone}</a>
                       <a href={`https://wa.me/${d.phone.replace(/^0/,"27").replace(/[^0-9]/g,"")}`} target="_blank" rel="noopener noreferrer"
-                        className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">WhatsApp</a>
+                        className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700">WhatsApp</a>
                     </div>}
                     {d.email    && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Email</p><a href={`mailto:${d.email}`} className="text-sm text-blue-600">{d.email}</a></div>}
                     {d.met_at   && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Met at</p><p className="text-sm text-slate-800">{d.met_at}</p></div>}

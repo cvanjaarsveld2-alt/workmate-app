@@ -71,7 +71,7 @@ const CATEGORY_COLORS = {
   "Travel":               { bg: "#CFFAFE", text: "#0E7490" },
   "Tolls":                { bg: "#E0F2FE", text: "#075985" },
   "Office":               { bg: "#F1F5F9", text: "#475569" },
-  "Other":                { bg: "#F1F5F9", text: "#64748B" },
+  "Other":                { bg: "#F1F5F9", text: "#536072" },
 };
 
 // Status used internally — no longer shown as pills on cards
@@ -281,7 +281,7 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <p className="text-xs font-black text-slate-500 uppercase tracking-wide whitespace-nowrap">{label}</p>
           {isCurrent && (
-            <span className="rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide"
+            <span className="rounded-full px-2 py-0.5 text-[11px] font-black uppercase tracking-wide"
               style={{ background: "#FEF3C7", color: "#92400E" }}>
               Current
             </span>
@@ -860,7 +860,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 <button type="button"
                   onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
                   className="absolute inset-0 flex items-end justify-center pb-2 bg-black/0 hover:bg-black/20 active:bg-black/30 transition-colors">
-                  <span className="rounded-full bg-black/50 text-white text-[10px] font-bold px-2 py-1 flex items-center gap-1">
+                  <span className="rounded-full bg-black/50 text-white text-[11px] font-bold px-2 py-1 flex items-center gap-1">
                     <Camera size={10} /> Replace
                   </span>
                 </button>
@@ -870,7 +870,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 <button type="button"
                   onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
                   className="w-full h-24 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#EFECE6" }}>
                     <Camera size={18} style={{ color: "#8B1A1A" }} />
                   </div>
                   <span className="text-xs font-bold text-slate-500">Scan till slip</span>
@@ -881,7 +881,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                   className={`w-full py-2 rounded-xl border-2 text-xs font-bold transition-all ${
                     receiptUrl === "no-receipt"
                       ? "border-amber-400 bg-amber-50 text-amber-700"
-                      : "border-slate-100 bg-slate-50 text-slate-400 hover:border-amber-300 hover:text-amber-600"
+                      : "border-slate-100 bg-slate-50 text-slate-400 hover:border-amber-300 hover:text-amber-700"
                   }`}>
                   {receiptUrl === "no-receipt" ? "⚠️ No receipt" : "No receipt"}
                 </button>
@@ -912,7 +912,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               <button type="button"
                 onClick={() => { setScannerMode("payment"); setShowScanner(true); }}
                 className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#EFECE6" }}>
                   <Camera size={18} style={{ color: "#8B1A1A" }} />
                 </div>
                 <span className="text-xs font-bold text-slate-500">Add payment slip</span>
@@ -979,8 +979,8 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               <button key={m} type="button" onClick={() => setForm(f => ({ ...f, payment_method: m }))}
                 className="rounded-xl py-2.5 text-sm font-bold border-2 transition-all min-h-[44px]"
                 style={form.payment_method === m
-                  ? { background: "#F7F3F3", color: "#8B1A1A", borderColor: "#8B1A1A" }
-                  : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  ? { background: "#EFECE6", color: "#8B1A1A", borderColor: "#8B1A1A" }
+                  : { background: "#F8FAFC", color: "#5E6A7C", borderColor: "#E2E8F0" }}>
                 {m}
               </button>
             ))}
@@ -1079,7 +1079,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               <div className="rounded-xl bg-green-50 border border-green-100 p-3">
                 <p className="text-xs font-bold text-green-700 uppercase tracking-wider">ZAR equivalent</p>
                 <p className="text-xl font-black text-green-800 mt-0.5">{fmtMoney(detailExpense.amount_zar, "ZAR")}</p>
-                <p className="text-xs text-green-600 mt-0.5">
+                <p className="text-xs text-green-700 mt-0.5">
                   Rate {Number(detailExpense.exchange_rate || 0).toFixed(4)} on {detailExpense.rate_date || "n/a"} ({detailExpense.rate_source || "n/a"})
                 </p>
               </div>
@@ -1169,7 +1169,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 </div>
                 <p className="text-xs text-slate-400 mt-1.5 text-center">Pinch / scroll to review · {financePack.filename}</p>
               </div>
-              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#EFECE6" }}>
                 <button onClick={shareFinancePack}
                   className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
                   style={{ background: "#8B1A1A" }}>
@@ -1318,10 +1318,10 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             { k: "category", label: "Category" },
           ].map(o => (
             <button key={o.k} onClick={() => setSortBy(o.k)}
-              className="flex-1 py-1.5 rounded-md text-xs font-bold transition-all"
+              className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${sortBy === o.k ? "" : "text-slate-500"}`}
               style={sortBy === o.k
                 ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
-                : { background: "transparent", color: "#94A3B8" }}>
+                : { background: "transparent" }}>
               {o.label}
             </button>
           ))}

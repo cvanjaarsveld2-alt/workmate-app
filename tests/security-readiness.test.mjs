@@ -92,3 +92,9 @@ test("device reminders only use the person's own records and follow the signed-i
   assert.match(app, /unsubscribeFromPush\(uid\)/);
   assert.match(app, /set_my_timezone/);
 });
+
+test("clearing notifications checks the delete result instead of assuming success", () => {
+  const src = read("src/screens/NotificationsScreen.jsx").replace(/\s+/g, "");
+  assert.match(src, /const\{error\}=awaitsupabase\.from\("team_notifications"\)\.delete\(\)/);
+  assert.match(src, /if\(error\)throwerror;/);
+});

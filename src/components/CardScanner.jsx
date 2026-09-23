@@ -146,7 +146,7 @@ export function CardScanner({ userId, onExtracted, onCancel }) {
       />
       <div
         className="px-4 py-3 border-b border-slate-100 flex items-center justify-between"
-        style={{ background: "#F7F3F3" }}
+        style={{ background: "#EFECE6" }}
       >
         <p className="text-base font-black text-slate-900">Scan Business Card</p>
         <button onClick={onCancel} className="p-1.5 rounded-lg text-slate-400 hover:bg-white">

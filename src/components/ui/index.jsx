@@ -18,12 +18,12 @@ import { haptic } from "../../lib/haptics";
 export function Card({ children, className = "", onClick }) {
   return (
     <div
-      className={`bg-white rounded-2xl border border-slate-100/80 ${
+      className={`bg-white rounded-2xl border border-stone-200 ${
         onClick
           ? "cursor-pointer transition-all duration-150 active:scale-[0.98] active:bg-slate-50"
           : ""
       } ${className}`}
-      style={{ boxShadow: "0 1px 2px rgba(15,23,42,0.04), 0 4px 16px -8px rgba(15,23,42,0.10)" }}
+      style={{ boxShadow: "0 1px 0 rgba(28,24,18,0.05), 0 6px 14px -10px rgba(28,24,18,0.22)" }}
       onClick={onClick ? (e) => { haptic.light(); onClick(e); } : undefined}>
       {children}
     </div>
@@ -139,7 +139,7 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
           {!disabled && onAdd && (
             <button type="button" onClick={onAdd}
               className="flex items-center gap-1.5 text-xs font-bold rounded-xl px-3 py-2 min-h-[40px]"
-              style={{ color: "#8B1A1A", background: "#F7F3F3" }}>
+              style={{ color: "#8B1A1A", background: "#EFECE6" }}>
               <Camera size={13} /> Add photo
             </button>
           )}
@@ -154,7 +154,7 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
               </button>
               {p.caption && (
                 <div className="absolute bottom-0 left-0 right-0 px-2 py-1.5 bg-black/50">
-                  <p className="text-[10px] text-white font-medium leading-tight truncate">{p.caption}</p>
+                  <p className="text-[11px] text-white font-medium leading-tight truncate">{p.caption}</p>
                 </div>
               )}
               {onRemove && (
@@ -169,7 +169,7 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
             <button type="button" onClick={onAdd}
               className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-2 active:border-red-300 active:bg-red-50 transition-colors"
               style={{ aspectRatio: "4/3" }}>
-              <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+              <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: "#EFECE6" }}>
                 <Camera size={20} style={{ color: "#8B1A1A" }} />
               </div>
               <span className="text-xs font-bold text-slate-400">Add photo</span>
@@ -180,7 +180,7 @@ export function PhotoField({ photos = [], onAdd, onView, onRemove, label = "Phot
         !disabled && onAdd && (
           <button type="button" onClick={onAdd}
             className="w-full h-28 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center gap-3 active:border-red-300 active:bg-red-50 transition-colors">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: "#EFECE6" }}>
               <Camera size={20} style={{ color: "#8B1A1A" }} />
             </div>
             <div className="text-left">
@@ -316,14 +316,12 @@ export function CollapsibleFilters({ groups = [], defaultOpen = false }) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-white"
-        style={hasActive
-          ? { borderColor: "rgba(139,26,26,0.35)", color: BRAND.primary }
-          : { borderColor: "#E2E8F0", color: "#475569" }}>
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-white ${hasActive ? "pm-tint" : "border-slate-200 text-slate-600"}`}
+        style={hasActive ? { borderColor: "rgba(139,26,26,0.35)", "--tint": BRAND.primary } : undefined}>
         <SlidersHorizontal size={13} />
         Filters
         {hasActive && (
-          <span className="rounded-full min-w-[16px] h-[16px] px-1 grid place-items-center text-[9px] font-black text-white"
+          <span className="rounded-full min-w-[16px] h-[16px] px-1 grid place-items-center text-[10px] font-black text-white"
             style={{ background: BRAND.primary }}>
             {activeCount}
           </span>
@@ -359,12 +357,12 @@ export function CollapsibleFilters({ groups = [], defaultOpen = false }) {
                     {/* Section caption */}
                     <div className="flex items-center gap-1.5 px-3 py-1.5">
                       <Tag size={11} className="text-red-700 shrink-0" />
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex-1">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex-1">
                         {g.label}
                       </p>
                       {g.value && g.value !== "All" && (
                         <button onClick={() => g.onChange("All")}
-                          className="text-[10px] font-bold" style={{ color: BRAND.primary }}>
+                          className="text-[11px] font-bold" style={{ color: BRAND.primary }}>
                           Clear
                         </button>
                       )}
@@ -443,7 +441,7 @@ export function GroupField({ label = "Group", value = "", onChange, existing = [
           className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
           style={{ fontSize: 16 }} />
         {isNew && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-wide"
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-black uppercase tracking-wide"
             style={{ color: BRAND.primary }}>
             New
           </span>
@@ -529,7 +527,7 @@ export function Gauge({ value = 0, size = 88, label, color }) {
       </svg>
       <div className="absolute inset-x-0 flex flex-col items-center" style={{ top: size / 2 - 14 }}>
         <span className="text-lg font-black leading-none text-slate-900">{pct}%</span>
-        {label && <span className="text-[9px] font-bold text-slate-400 mt-0.5 uppercase tracking-wide">{label}</span>}
+        {label && <span className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-wide">{label}</span>}
       </div>
     </div>
   );
@@ -540,7 +538,7 @@ export function StatCard({ label, value, sub, color, icon: Icon, trend, invertTr
   const accent = color || BRAND.primary;
   // Soft tint of the accent for the icon chip background
   const chipBg = `${accent}14`;
-  // Optional trend pill: { dir: "up"|"down", text: "22% vs last month" }.
+  // Optional trend pill: { dir: "up"|"down", text: "22% vs Aug" }.
   // invertTrend flips the good/bad colouring — use it for metrics where "up" is
   // bad (e.g. expenses), so a rising number reads red, not green.
   const rising = trend && trend.dir !== "down";
@@ -549,22 +547,18 @@ export function StatCard({ label, value, sub, color, icon: Icon, trend, invertTr
     <Card className="p-4 h-full">
       <div className="flex items-center justify-between mb-2.5">
         {Icon && (
-          <div className="rounded-[10px] shrink-0 flex items-center justify-center" style={{ background: chipBg, width: 32, height: 32 }}>
+          <div className="rounded-md shrink-0 flex items-center justify-center" style={{ background: chipBg, width: 32, height: 32, boxShadow: `inset 0 0 0 1px ${accent}26` }}>
             <Icon size={16} style={{ color: accent }} />
           </div>
         )}
       </div>
       {/* Big confident hero number — colour lives in the icon chip so the row reads clean */}
-      <p className="text-[28px] font-black leading-none tracking-tight text-slate-900">{value}</p>
-      <p className="mt-2 text-[11px] font-bold text-slate-400 leading-tight">{label}</p>
-      {sub && <p className="mt-0.5 text-[11px] text-slate-400 leading-snug">{sub}</p>}
+      <p className="font-display text-[34px] font-bold leading-none text-slate-900">{value}</p>
+      <p className="mt-2 font-display text-[13px] font-bold uppercase tracking-wider text-slate-500 leading-tight">{label}</p>
+      {sub && <p className="mt-0.5 text-xs text-slate-400 leading-snug">{sub}</p>}
       {trend && (
         <span
-          className="mt-2 inline-flex max-w-full items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-black leading-tight"
-          style={{
-            background: isGood ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
-            color: isGood ? "#16A34A" : "#DC2626",
-          }}>
+          className={`mt-2 inline-flex max-w-full items-center gap-0.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-black leading-tight ${isGood ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
           {rising ? "↑" : "↓"} {trend.text}
         </span>
       )}
@@ -579,14 +573,14 @@ export function NavTab({ icon: Icon, label, active, onClick, badge }) {
   return (
     <button
       onClick={onClick ? (e) => { haptic.light(); onClick(e); } : undefined}
-      className="relative flex flex-col items-center justify-center gap-1 flex-1 transition-all"
-      style={{ minHeight: 72, color: active ? BRAND.primary : "#94A3B8" }}>
+      className={`relative flex flex-col items-center justify-center gap-1 flex-1 transition-all ${active ? "" : "text-slate-500"}`}
+      style={{ minHeight: 72, color: active ? BRAND.primary : undefined }}>
       <div className={`rounded-2xl px-3 py-1.5 transition-all ${active ? "bg-red-50" : ""}`}>
         <Icon size={22} />
       </div>
-      <span className="text-[11px] font-bold leading-none">{label}</span>
+      <span className="text-xs font-bold leading-none">{label}</span>
       {!!badge && (
-        <span className="absolute right-1 top-2 rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] text-white font-black min-w-[18px] text-center leading-none">
+        <span className="absolute right-1 top-2 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] text-white font-black min-w-[18px] text-center leading-none">
           {badge}
         </span>
       )}
@@ -598,9 +592,9 @@ export function NavTab({ icon: Icon, label, active, onClick, badge }) {
 export function PageHeader({ title, subtitle }) {
   return (
     <div className="mb-2 min-w-0 flex-1">
-      <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-tight truncate">{title}</h1>
+      <h1 className="font-display text-[28px] font-extrabold uppercase tracking-wide text-slate-900 leading-none truncate">{title}</h1>
       {/* Two lines rather than truncating; slate-500 meets WCAG AA contrast on white. */}
-      {subtitle && <p className="mt-1 text-sm text-slate-500 leading-snug line-clamp-2">{subtitle}</p>}
+      {subtitle && <p className="mt-1.5 text-sm font-medium text-slate-500 leading-snug line-clamp-2">{subtitle}</p>}
     </div>
   );
 }
@@ -609,7 +603,7 @@ export function PageHeader({ title, subtitle }) {
 export function SectionHeader({ title, action, onAction }) {
   return (
     <div className="flex items-center justify-between mb-2 mt-1">
-      <p className="text-xs font-black text-slate-400 uppercase tracking-wider">{title}</p>
+      <p className="pm-eyebrow text-[13px] text-slate-500">{title}</p>
       {action && onAction && (
         <button onClick={onAction} className="text-xs font-bold py-2 px-3 rounded-xl min-h-[40px]"
           style={{ color: BRAND.primary, background: BRAND.light }}>

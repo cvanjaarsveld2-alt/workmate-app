@@ -61,7 +61,7 @@ export function DetailSheet({ open, onClose, title, subtitle, primaryActions, ch
 
             {/* Primary actions (Call / WhatsApp / Open slip etc) — lead with these */}
             {primaryActions && (
-              <div className="px-4 py-3 border-b border-slate-100" style={{ background: "#F7F3F3" }}>
+              <div className="px-4 py-3 border-b border-slate-100" style={{ background: "#EFECE6" }}>
                 {primaryActions}
               </div>
             )}

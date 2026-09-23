@@ -223,7 +223,7 @@ export function CompanyDocuments({ userId, teamId }) {
                   className="w-full rounded-xl border-2 border-dashed border-slate-200 bg-white p-4 text-center cursor-pointer hover:border-red-300 hover:bg-red-50 transition-colors min-h-[72px] flex flex-col items-center justify-center gap-1">
                   {selectedFile ? (
                     <>
-                      <FileText size={20} className="text-green-600" />
+                      <FileText size={20} className="text-green-700" />
                       <p className="text-sm font-bold text-slate-700">{selectedFile.name}</p>
                       <p className="text-xs text-slate-400">{formatBytes(selectedFile.size)}</p>
                     </>

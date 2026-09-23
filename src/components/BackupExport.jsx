@@ -318,8 +318,8 @@ export function BackupExport({ data }) {
       }`}>
         <div className="flex items-start gap-2">
           {isStale
-            ? <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-            : <CheckCircle2 size={16} className="text-green-600 shrink-0 mt-0.5" />}
+            ? <AlertTriangle size={16} className="text-amber-700 shrink-0 mt-0.5" />
+            : <CheckCircle2 size={16} className="text-green-700 shrink-0 mt-0.5" />}
           <div className="flex-1 min-w-0">
             <p className={`text-sm font-bold ${isStale ? "text-amber-700" : "text-green-700"}`}>
               {lastBackup
@@ -330,7 +330,7 @@ export function BackupExport({ data }) {
                     : `Last backup: ${daysSinceBackup} days ago`
                 : "No backup yet"}
             </p>
-            <p className={`text-xs ${isStale ? "text-amber-600" : "text-green-600"} mt-0.5`}>
+            <p className={`text-xs ${isStale ? "text-amber-700" : "text-green-700"} mt-0.5`}>
               {isStale
                 ? "Recommend backing up weekly"
                 : "Next reminder in " + (BACKUP_REMINDER_DAYS - daysSinceBackup) + " days"}

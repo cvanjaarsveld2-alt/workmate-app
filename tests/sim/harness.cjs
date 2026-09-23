@@ -194,7 +194,7 @@ async function handle(route) {
 
 async function run() {
   const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: "block", colorScheme: process.env.SIM_DARK ? "dark" : "light" });
+  const context = await browser.newContext({ viewport: { width: +(process.env.SIM_WIDTH || 390), height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: "block", colorScheme: process.env.SIM_DARK ? "dark" : "light" });
   await context.route(`${SUPA}/**`, handle);
   await context.route("https://api.frankfurter.app/**", r => json(r, 200, { amount: 1, base: "GHS", date: day(1), rates: { ZAR: 1.62 } }));
   await context.route(/^https:\/\/(?!localhost)/, r => { if (r.request().url().startsWith(SUPA)) return handle(r); log.unhandled.push("external " + new URL(r.request().url()).host); return r.abort(); });

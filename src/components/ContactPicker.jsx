@@ -210,7 +210,7 @@ export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCrea
             </div>
 
             {/* Footer */}
-            <div className="px-4 py-3 border-t border-slate-100" style={{ background: "#F7F3F3" }}>
+            <div className="px-4 py-3 border-t border-slate-100" style={{ background: "#EFECE6" }}>
               <button
                 onClick={onClose}
                 className="w-full rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
@@ -246,7 +246,7 @@ export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCrea
               </p>
             </div>
 
-            <div className="px-4 py-3 border-t border-slate-100" style={{ background: "#F7F3F3" }}>
+            <div className="px-4 py-3 border-t border-slate-100" style={{ background: "#EFECE6" }}>
               <button
                 onClick={handleCreate}
                 disabled={!newContact.name.trim() || saving}

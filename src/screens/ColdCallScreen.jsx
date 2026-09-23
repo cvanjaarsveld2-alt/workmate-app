@@ -148,7 +148,7 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
               <input type="date" value={callbackDate} min={todayISO()} onChange={e => setCallbackDate(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
                 style={{ fontSize: 16 }} />
-              <p className="text-[11px] text-slate-400 mt-1">Creates a follow-up in your calendar for this date.</p>
+              <p className="text-xs text-slate-400 mt-1">Creates a follow-up in your calendar for this date.</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -186,7 +186,7 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
                   <span className="text-sm font-bold text-slate-800 truncate block">{l.client_name || l.title}</span>
                   {l.outcome_notes && <span className="text-xs text-slate-400 truncate block">{l.outcome_notes}</span>}
                 </div>
-                <span className="text-[11px] text-slate-400 shrink-0">{(l.created_at || "").slice(5, 10)}</span>
+                <span className="text-xs text-slate-400 shrink-0">{(l.created_at || "").slice(5, 10)}</span>
               </button>
             ))}
           </div>

@@ -192,7 +192,7 @@ Power Works (Pty) Ltd`.trim();
 
         {/* Send buttons */}
         {docs.length > 0 && (
-          <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+          <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#EFECE6" }}>
             {selected.size === 0 && (
               <p className="text-xs text-slate-400 text-center">Select at least one document to send</p>
             )}

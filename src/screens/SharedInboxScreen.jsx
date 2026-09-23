@@ -56,7 +56,7 @@ function InboxItem({ notif, onAccept, onDecline, accepting, declining }) {
           <span className="text-xs font-black uppercase tracking-wide" style={{ color: meta.color }}>
             {meta.label}
           </span>
-          <span className="ml-auto text-[10px] text-slate-400">{timeAgo(notif.created_at)}</span>
+          <span className="ml-auto text-[11px] text-slate-400">{timeAgo(notif.created_at)}</span>
         </div>
 
         {/* Body */}

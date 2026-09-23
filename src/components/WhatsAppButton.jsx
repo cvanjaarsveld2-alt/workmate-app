@@ -105,7 +105,7 @@ export function WhatsAppButton({ phone, contactName, clientName, followupTitle, 
       <button
         onClick={() => setShowTemplates(true)}
         className={`inline-flex items-center gap-1.5 rounded-xl font-bold transition-all active:scale-95 ${size === "sm" ? "px-3 py-1.5 text-xs min-h-[36px]" : "px-4 py-2.5 text-sm min-h-[44px]"}`}
-        style={{ background: "#25D366", color: "#fff" }}
+        style={{ background: "#15803D", color: "#fff" }}
         title="Send WhatsApp message"
       >
         {/* WhatsApp icon SVG */}
@@ -206,7 +206,7 @@ export function WhatsAppButton({ phone, contactName, clientName, followupTitle, 
                     <button
                       onClick={sendWhatsApp}
                       className="flex-1 rounded-xl py-3 text-sm font-bold text-white"
-                      style={{ background: "#25D366" }}
+                      style={{ background: "#15803D" }}
                     >
                       Open WhatsApp →
                     </button>

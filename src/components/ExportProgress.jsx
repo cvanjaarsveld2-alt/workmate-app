@@ -179,7 +179,7 @@ function ExportProgressHost({ state, startTimeRef }) {
               </div>
 
               {/* Footer: percent + elapsed */}
-              <div className="flex items-center justify-between text-[11px] font-bold text-slate-400">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-400">
                 <span>{state.status === "done" ? "Complete" : state.status === "error" ? "Failed" : `${pct}%`}</span>
                 {state.status === "working" && <span>{elapsedLabel}</span>}
                 {state.status === "done" && <span>Done in {elapsedLabel}</span>}

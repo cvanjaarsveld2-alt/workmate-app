@@ -3,3 +3,29 @@ verify_jwt = false
 
 [functions.send-reminders]
 verify_jwt = false
+
+[functions.send-notifications]
+verify_jwt = true
+import_map = "./functions/send-notifications/deno.json"
+
+# These four also check the caller's session in code: verify_jwt alone accepts
+# the public anon key, which would let anyone spend the OpenAI / rate-API budget.
+[functions.transcribe-audio]
+verify_jwt = true
+
+[functions.format-meeting-minutes]
+verify_jwt = true
+
+[functions.scan-business-card]
+verify_jwt = true
+
+[functions.historical-rate]
+verify_jwt = true
+
+# Server-to-server: authenticated by INGEST_SHARED_SECRET instead of a user JWT.
+[functions.ingest-email-record]
+verify_jwt = false
+
+# Retired stub (replaced by send-reminders); delete in the dashboard.
+[functions.check-reminders]
+verify_jwt = true

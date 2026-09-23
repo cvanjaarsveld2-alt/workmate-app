@@ -5,7 +5,7 @@ export { COLORS, TYPE, RADIUS, TAP, TAP_LG, SHEET_SPRING, SHEET_ANIM, statusColo
 export const BRAND = {
   primary: "#8B1A1A",
   primaryDark: "#6B1414",
-  light: "#F7F3F3",
+  light: "#EFECE6",
   logo: "/pw-logo-wide.png",   // local asset — no dependency on external site being up
 };
 

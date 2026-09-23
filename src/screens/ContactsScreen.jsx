@@ -390,7 +390,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
             {catOpen && (
               <div className="px-3 pb-3 pt-2.5 border-t border-slate-100 bg-slate-50/50">
                 {contactGroupNames.length > 0 && (
-                  <p className="text-[11px] font-bold text-slate-400 mb-1.5">Tap an existing group or type a new one</p>
+                  <p className="text-xs font-bold text-slate-400 mb-1.5">Tap an existing group or type a new one</p>
                 )}
                 <GroupField label="" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} existing={contactGroupNames} placeholder="e.g. Expo 2026, Suppliers, Contractors" />
               </div>
@@ -406,7 +406,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
                 className="rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px] capitalize"
                 style={form.status === s
                   ? { background: STATUS_COLORS[s].bg, color: STATUS_COLORS[s].text, borderColor: STATUS_COLORS[s].dot }
-                  : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  : { background: "#F8FAFC", color: "#5E6A7C", borderColor: "#E2E8F0" }}>
                 {s}
               </button>
             ))}
@@ -489,7 +489,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
             {detailContact.phone ? (
               <a href={`https://wa.me/${detailContact.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer"
                 className="flex flex-col items-center justify-center gap-1 rounded-xl py-3 text-white min-h-[64px]"
-                style={{ background: "#25D366" }}>
+                style={{ background: "#15803D" }}>
                 <Send size={18} />
                 <span className="text-xs font-bold">WhatsApp</span>
               </a>
@@ -697,7 +697,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
           const isCol = groups.isCollapsed(company);
           return (
           <Card key={company} className="overflow-hidden">
-            <div className="flex items-center border-b border-slate-100" style={{ background: "#F7F3F3" }}>
+            <div className="flex items-center border-b border-slate-100" style={{ background: "#EFECE6" }}>
               <button onClick={() => groups.toggle(company)}
                 className="flex-1 px-4 py-2.5 active:bg-slate-100 transition-colors">
                 <div className="flex items-center justify-between">

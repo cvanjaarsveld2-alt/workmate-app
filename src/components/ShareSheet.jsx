@@ -111,7 +111,7 @@ export function ShareSheet({
                       onClick={() => setSelected(isSel ? null : m)}
                       className="w-full flex items-center gap-3 rounded-2xl px-4 py-3.5 border-2 transition-all min-h-[60px]"
                       style={isSel
-                        ? { background: "#F7F3F3", borderColor: BRAND.primary }
+                        ? { background: "#EFECE6", borderColor: BRAND.primary }
                         : { background: "white", borderColor: "#E2E8F0" }}>
                       <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0"
                         style={{ background: m.role === "admin" ? "#A16207" : BRAND.primary }}>

@@ -177,7 +177,7 @@ export function AssistantScreen({ data, setData, userId, teamId }) {
         subtitle={needsReview.length > 0 ? `${needsReview.length} email quote${needsReview.length !== 1 ? "s" : ""} to review` : "All caught up"}
       />
 
-      <Card className="p-3.5 flex items-start gap-3" style={{ background: "#F7F3F3" }}>
+      <Card className="p-3.5 flex items-start gap-3" style={{ background: "#EFECE6" }}>
         <Mail size={18} className="shrink-0 mt-0.5" style={{ color: BRAND.primary }} />
         <p className="text-xs text-slate-500 leading-relaxed">
           Quotes sent by plain email get read from a dedicated Gmail inbox once a day and show up below with the client and amount already pulled out. Nothing is sent automatically — you confirm each one before it becomes a real quote.
@@ -215,7 +215,7 @@ export function AssistantScreen({ data, setData, userId, teamId }) {
                         <p className="text-xs text-slate-400 truncate">{q.description}</p>
                         <p className="text-sm font-black mt-1" style={{ color: BRAND.primary }}>{formatCurrency(q.value)}</p>
                         {days != null && (
-                          <p className={`text-xs mt-0.5 ${days >= 7 ? "text-red-500 font-bold" : "text-slate-400"}`}>
+                          <p className={`text-xs mt-0.5 ${days >= 7 ? "text-red-600 font-bold" : "text-slate-400"}`}>
                             Sent {smartDate(q.sent_date)} · {days} day{days !== 1 ? "s" : ""} ago
                           </p>
                         )}
@@ -228,7 +228,7 @@ export function AssistantScreen({ data, setData, userId, teamId }) {
                         <Send size={13} /> Follow up
                       </a>
                     </div>
-                    {!toEmail && <p className="text-xs text-amber-600 mt-2">No email on file — fill in the "To" field once the draft opens.</p>}
+                    {!toEmail && <p className="text-xs text-amber-700 mt-2">No email on file — fill in the "To" field once the draft opens.</p>}
                   </Card>
                 );
               })}

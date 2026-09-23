@@ -121,12 +121,6 @@ import { PullToRefresh } from "./components/PullToRefresh";
 // where User A had records but User B had none locally yet, and logout()
 // never touched `data` at all. Kept in one place so the two reset sites and
 // the initial useState can never drift out of sync with each other.
-// Readable names for the top bar (route keys are internal identifiers).
-const SCREEN_TITLES = {
-  Followups: "Follow-ups", VehicleCheck: "Vehicle Check", ColdCall: "Cold Call", JackSelector: "Jack Selector",
-  BackfillZAR: "Backfill ZAR", SharedInbox: "Shared Inbox", Client360: "Client 360", TeamDashboard: "Team Dashboard",
-  Planner: "Weekly Planner",
-};
 const INITIAL_DATA = {
   clients: [],
   followups: [],
@@ -649,8 +643,9 @@ export default function PowerWorksApp() {
     const t = setTimeout(async () => {
       // Only this person's own/assigned records remind them, even with whole-team view on.
       const own = list => (list || []).filter(r => isOwnRecord(r, uid));
-      // With a push subscription the server sends follow-up reminders at the user's
-      // local time; scheduling them here too would notify twice.
+      // With a push subscription the server (send-reminders) sends all of these at the
+      // user's local time, app open or closed; scheduling them here too would notify
+      // twice. Without push (e.g. a desktop browser) the device schedules them itself.
       let hasPush = false;
       try {
         const reg = await navigator.serviceWorker?.ready;
@@ -659,7 +654,7 @@ export default function PowerWorksApp() {
       if (cancelled) return;
       registerReminderPeriodicSync();
       scheduleNotificationsViaSW(
-        buildNotificationItems(hasPush ? [] : own(data.followups), own(data.equipment), own(data.notes)),
+        hasPush ? [] : buildNotificationItems(own(data.followups), own(data.equipment), own(data.notes)),
         { replace: true, source: "digest" },
       );
     }, 1500);
@@ -1036,30 +1031,29 @@ export default function PowerWorksApp() {
             className="min-h-screen pb-32"
             style={{ background: "var(--pm-page-bg)", paddingTop: "calc(3.5rem + env(safe-area-inset-top))" }}
           >
+            {/* Graphite steel bar in both themes, with a brand-red rule underneath. */}
             <header
-              className="fixed top-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100"
-              style={{ paddingTop: "env(safe-area-inset-top)" }}
+              className="pm-graphite fixed top-0 left-0 right-0 z-40 border-b-2"
+              style={{ paddingTop: "env(safe-area-inset-top)", borderBottomColor: BRAND.primary }}
             >
               <div className="mx-auto max-w-2xl px-3 h-14 flex items-center justify-between gap-2">
                 <button
                   onClick={() => setDrawerOpen(true)}
-                  className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  className="p-2 rounded-xl text-white/85 hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center"
                   aria-label="Menu"
                 >
                   <Menu size={22} />
                 </button>
-                {screen === "Home" ? (
-                  <Wordmark variant="dark" size="sm" />
-                ) : (
-                  <div className="flex items-center gap-2 min-w-0">
-                    <p className="text-base font-black text-slate-900 truncate">{SCREEN_TITLES[screen] || screen}</p>
-                  </div>
-                )}
+                {/* Wordmark on every screen: each page already carries its own title,
+                    so repeating it here just doubled it. */}
+                <button onClick={() => navigate("Home")} aria-label="Home" className="min-w-0">
+                  <Wordmark variant="graphite" size="sm" />
+                </button>
                 <div className="flex items-center gap-1 shrink-0">
                   {teamId && (
                     <button
                       onClick={() => navigate("Notifications")}
-                      className="relative p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      className="relative p-2 rounded-xl text-white/85 hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center"
                       aria-label="Notifications"
                     >
                       <Bell size={20} />
@@ -1075,7 +1069,7 @@ export default function PowerWorksApp() {
                   )}
                   <button
                     onClick={() => setSearchOpen(true)}
-                    className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    className="p-2 rounded-xl text-white/85 hover:bg-white/10 min-w-[44px] min-h-[44px] flex items-center justify-center"
                     aria-label="Search"
                   >
                     <Search size={20} />

@@ -110,7 +110,7 @@ export function MemberSelector({
                   <p className="text-xs text-slate-400 truncate">{m.email}</p>
                 </div>
                 {m.role === "admin" && (
-                  <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full shrink-0">Admin</span>
+                  <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full shrink-0">Admin</span>
                 )}
               </button>
             ))}

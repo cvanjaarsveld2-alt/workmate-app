@@ -116,22 +116,17 @@ export function ShareToTeamModal({
       });
       if (error) throw error;
 
-      // 3. Push notification (best-effort)
+      // 3. Push notification (best-effort). The function looks up the teammate's
+      // devices itself: we can't read their push_subscriptions, and it needs to_user_id.
       try {
-        const { data: subs } = await supabase
-          .from("push_subscriptions")
-          .select("endpoint, p256dh, auth")
-          .eq("user_id", selectedId);
-        for (const sub of subs || []) {
-          await supabase.functions.invoke("send-notifications", {
-            body: {
-              subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-              title: `PowerMate — ${typeMeta.label} ${actionVerb} to you`,
-              body: fullMessage,
-              url: "/?screen=SharedInbox",
-            },
-          }).catch(() => {});
-        }
+        await supabase.functions.invoke("send-notifications", {
+          body: {
+            to_user_id: selectedId,
+            title: `PowerMate — ${typeMeta.label} ${actionVerb} to you`,
+            body: fullMessage,
+            url: "/?screen=SharedInbox",
+          },
+        });
       } catch {}
 
       setStatus("sent");
@@ -179,7 +174,7 @@ export function ShareToTeamModal({
                 <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
                   className="flex flex-col items-center justify-center px-6 py-12 gap-4">
                   <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
-                    <CheckCircle2 size={32} className="text-green-600" />
+                    <CheckCircle2 size={32} className="text-green-700" />
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-black text-slate-900">
@@ -235,7 +230,7 @@ export function ShareToTeamModal({
                             Assign
                           </button>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1.5">
+                        <p className="text-xs text-slate-400 mt-1.5">
                           {mode === "assign"
                             ? "The record will be assigned to this person. They become responsible for it."
                             : "They'll get a notification to view the record. Ownership stays with you."}
@@ -262,7 +257,7 @@ export function ShareToTeamModal({
                                   <p className="text-xs text-slate-400 truncate">{member.email}</p>
                                 </div>
                                 {member.role === "admin" && (
-                                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full shrink-0"
+                                  <span className="text-[11px] font-black px-2 py-0.5 rounded-full shrink-0"
                                     style={{ background: "#FEF9C3", color: "#A16207" }}>Admin</span>
                                 )}
                                 {isSelected && (

@@ -12,7 +12,7 @@ import ExcelJS from "exceljs";
 const BRAND = {
   primary:   "#8B1A1A",
   primaryHex: 0x8B1A1A,
-  light:     "#F7F3F3",
+  light:     "#EFECE6",
   text:      "#0F172A",
   textHex:   0x0F172A,
 };

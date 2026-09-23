@@ -228,7 +228,7 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
       {error && (
         <div className="rounded-xl bg-red-50 border border-red-200 p-3 space-y-2">
           <p className="text-sm font-bold text-red-700">{error}</p>
-          <p className="text-xs text-red-500 mt-0.5">
+          <p className="text-xs text-red-600 mt-0.5">
             {uploadedPath ? "Your photo is already stored. You will not lose it." : "No receipt was stored yet."}
           </p>
           {uploadedPath && (
@@ -281,7 +281,7 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
                 className="text-xs font-bold text-slate-400 py-2 px-4 min-h-[44px]">
                 Use a photo from my gallery instead
               </button>
-              <button onClick={onCancel} className="text-xs text-slate-300 py-1">
+              <button onClick={onCancel} className="text-xs font-bold text-slate-500 py-2 px-4 min-h-[44px]">
                 Cancel
               </button>
             </div>

@@ -5,6 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "../supabase";
 import { BRAND } from "../lib/constants";
 import { Card, Btn, Field } from "../components/ui";
+import { Wordmark } from "../components/Wordmark";
 
 const ALLOWED_DOMAIN = "pwrstart.com";
 
@@ -122,12 +123,13 @@ export function AuthScreen() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4" style={{ background: BRAND.light }}>
+    <div className="pm-graphite flex min-h-screen flex-col items-center justify-center px-4">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <img src={BRAND.logo} alt="PW" className="mb-4 h-16 object-contain" onError={e => e.target.style.display = "none"} />
-          <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>PowerMate</h1>
-          <p className="mt-1 text-sm text-slate-400">Power Works Field Service CRM</p>
+          <Wordmark variant="graphite" size="lg" />
+          <div className="mt-5 h-0.5 w-12" style={{ background: "var(--pm-hivis)" }} />
+          <h1 className="mt-4 font-display text-3xl font-extrabold uppercase tracking-wider text-white">PowerMate</h1>
+          <p className="mt-1 font-display text-sm font-bold uppercase tracking-wider text-white/70">Field Service · Sales · Reporting</p>
         </div>
 
         <Card className="p-6 space-y-4">
@@ -237,12 +239,12 @@ export function SetPasswordScreen({ onDone }) {
 
   const inputCls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 pr-12 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]";
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4" style={{ background: BRAND.light }}>
+    <div className="pm-graphite flex min-h-screen flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <img src={BRAND.logo} alt="PW" className="mb-4 h-16 object-contain" onError={e => e.target.style.display = "none"} />
-          <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>Set your password</h1>
-          <p className="mt-1 text-sm text-slate-400">Choose a password for signing in to PowerMate</p>
+          <Wordmark variant="graphite" size="lg" />
+          <h1 className="mt-6 font-display text-3xl font-extrabold uppercase tracking-wider text-white">Set your password</h1>
+          <p className="mt-1 text-sm text-white/70">Choose a password for signing in to PowerMate</p>
         </div>
         <Card className="p-6 space-y-4">
           <div className="relative">

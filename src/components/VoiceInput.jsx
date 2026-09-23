@@ -66,10 +66,9 @@ export function VoiceInput({
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true }),
-        mime = MediaRecorder.isTypeSupported?.("audio/webm;codecs=opus")
-          ? "audio/webm;codecs=opus"
-          : "audio/webm",
-        r = new MediaRecorder(stream, { mimeType: mime });
+        // iPhones record audio/mp4, not webm: pick what this device supports.
+        mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(t => MediaRecorder.isTypeSupported?.(t)),
+        r = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       mediaRecorderRef.current = r;
       chunksRef.current = [];
       r.ondataavailable = e => {
@@ -96,7 +95,7 @@ export function VoiceInput({
         r.onstop = resolve;
         setTimeout(resolve, 500);
       });
-      await transcribe(new Blob(chunksRef.current, { type: "audio/webm" }));
+      await transcribe(new Blob(chunksRef.current, { type: r.mimeType || "audio/webm" }));
       return;
     }
     setMode(transcript.trim() ? "done" : "idle");
@@ -108,7 +107,7 @@ export function VoiceInput({
       } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Session expired. Please sign in again.");
       const f = new FormData();
-      f.append("audio", blob, "recording.webm");
+      f.append("audio", blob, /mp4/.test(blob.type) ? "recording.m4a" : "recording.webm");
       f.append("language", language === "af-ZA" ? "af" : "en");
       const res = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-audio`, {
           method: "POST",
@@ -159,7 +158,7 @@ export function VoiceInput({
       {(transcript || mode === "listening") && (
         <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 min-h-[60px]">
           <p className="text-sm text-slate-700 leading-relaxed">
-            {transcript || <span className="text-slate-300 italic">Listening...</span>}
+            {transcript || <span className="text-slate-400 italic">Listening...</span>}
           </p>
         </div>
       )}

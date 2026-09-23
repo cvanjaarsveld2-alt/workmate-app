@@ -145,7 +145,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             );
           })}
         </div>
-        <p className="text-[11px] text-slate-400 mt-2.5">
+        <p className="text-xs text-slate-400 mt-2.5">
           Auto follows your phone's system setting.
         </p>
       </Card>
@@ -214,7 +214,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         {pendingCount > 0
           ? <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5">
               <p className="text-sm font-bold text-amber-700">⚠️ {pendingCount} change{pendingCount !== 1 ? "s" : ""} waiting to sync</p>
-              <p className="text-xs text-amber-600 mt-0.5">{isOnline ? "Tap Sync Now or wait — syncs automatically" : "Will sync automatically when you reconnect"}</p>
+              <p className="text-xs text-amber-700 mt-0.5">{isOnline ? "Tap Sync Now or wait — syncs automatically" : "Will sync automatically when you reconnect"}</p>
             </div>
           : null}
         {failedCount > 0
@@ -251,7 +251,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         {pendingCount === 0 && failedCount === 0
           ? <div className="rounded-xl bg-green-50 border border-green-200 p-3.5">
               <p className="text-sm font-bold text-green-700">✓ All data synced to cloud</p>
-              <p className="text-xs text-green-600 mt-0.5">Your data is safe and visible on all devices</p>
+              <p className="text-xs text-green-700 mt-0.5">Your data is safe and visible on all devices</p>
             </div>
           : null}
       </Card>
@@ -270,7 +270,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             </p>
           </div>
           {pushState === "active"
-            ? <span className="shrink-0 text-green-600 text-sm font-bold">Active ✓</span>
+            ? <span className="shrink-0 text-green-700 text-sm font-bold">Active ✓</span>
             : (pushState !== "denied" && pushState !== "ios-install") &&
               <Btn size="sm" variant="warning" onClick={handleEnablePush} disabled={pushState === "working"}>
                 <Bell size={14} />{pushState === "working" ? "…" : "Enable"}
@@ -282,7 +282,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-slate-700">Delivery test</p>
-                <p className="text-[11px] text-slate-400">Sends a real push to this device.</p>
+                <p className="text-xs text-slate-400">Sends a real push to this device.</p>
               </div>
               <Btn size="sm" variant="secondary" onClick={handleTestPush} disabled={testPushState === "working"}>
                 <Bell size={13} />
@@ -371,12 +371,12 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         {!pinEnabled && (
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
             <p className="text-sm font-bold text-amber-700">⚠️ PIN lock is off</p>
-            <p className="text-xs text-amber-600 leading-relaxed">
+            <p className="text-xs text-amber-700 leading-relaxed">
               Anyone who picks up your phone can open PowerMate and see all client data, field notes, quotes, and expenses — including your team's records.
             </p>
             <div className="pt-1 space-y-1.5">
               <p className="text-xs font-black text-amber-700">If you choose not to use PIN lock:</p>
-              <ul className="text-xs text-amber-600 space-y-1">
+              <ul className="text-xs text-amber-700 space-y-1">
                 <li>• Enable your phone's own screen lock (Face ID, fingerprint, or phone PIN) — this is your minimum protection</li>
                 <li>• Never leave your phone unattended at client sites</li>
                 <li>• Enable auto-lock (screen timeout) set to 30 seconds or less</li>
@@ -475,7 +475,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           </button>
         </div>
         {localStorage.getItem(`pm_revenue_target_${userId}`) && (
-          <p className="text-xs text-green-600 font-bold">
+          <p className="text-xs text-green-700 font-bold">
             ✓ Target: R {parseFloat(localStorage.getItem(`pm_revenue_target_${userId}`)).toLocaleString("en-ZA")} / month
           </p>
         )}
@@ -554,7 +554,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
       <Btn variant="danger" className="w-full" size="lg" onClick={handleLogout}>
         <LogOut size={16} />Sign Out
       </Btn>
-      <p className="text-center text-xs text-slate-300">PowerMate v2.4 · Power Works (Pty) Ltd</p>
+      <p className="text-center text-xs text-slate-400">PowerMate v2.4 · Power Works (Pty) Ltd</p>
       {toast && <Toast message={toast} onDone={() => setToast("")} />}
     </div>
   );
