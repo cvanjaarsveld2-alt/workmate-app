@@ -15,8 +15,8 @@ import { todayISO, genId, smartDate } from "../lib/helpers";
 import { withTeamId } from "../lib/teamId";
 import { offlineSave } from "../offline/offlineDb";
 import { useIsMine } from "../lib/teamView";
+import { supabase, SUPABASE_FUNCTIONS_URL } from "../supabase";
 
-const SUPABASE_URL = "https://hrqzqyfvbfzrfnuxovvr.supabase.co";
 
 function formatDuration(seconds) {
   const m = Math.floor(seconds / 60);
@@ -54,10 +54,9 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
     setError("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-          ? "audio/webm;codecs=opus" : "audio/webm",
-      });
+      // iPhones record audio/mp4, not webm: pick what this device supports.
+      const mimeType = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find(t => MediaRecorder.isTypeSupported?.(t));
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = recorder;
       chunksRef.current = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
@@ -81,21 +80,26 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
     mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
     await new Promise(r => setTimeout(r, 500));
 
-    const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+    const blob = new Blob(chunksRef.current, { type: mediaRecorderRef.current.mimeType || "audio/webm" });
     await processRecording(blob);
   }
 
   async function processRecording(blob) {
     try {
+      // Both functions only serve signed-in users, so send this session's token.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Session expired. Please sign in again.");
+      const auth = { Authorization: `Bearer ${session.access_token}` };
+
       // Step 1: Transcribe with Whisper
       const formData = new FormData();
-      formData.append("audio", blob, "meeting.webm");
+      formData.append("audio", blob, /mp4/.test(blob.type) ? "meeting.m4a" : "meeting.webm");
       formData.append("language", language === "mixed" ? "" : language);
       formData.append("prompt", "This is a business meeting in the mining and industrial sector. " +
         "Participants may speak English and Afrikaans. Companies discussed include Power Works.");
 
-      const transcribeRes = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-audio`, {
-        method: "POST", body: formData,
+      const transcribeRes = await fetch(`${SUPABASE_FUNCTIONS_URL}/transcribe-audio`, {
+        method: "POST", headers: auth, body: formData,
       });
       const { text: transcript, error: transcriptError } = await transcribeRes.json();
 
@@ -111,9 +115,9 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
         `Duration: ${formatDuration(duration)}`,
       ].filter(Boolean).join("\n");
 
-      const formatRes = await fetch(`${SUPABASE_URL}/functions/v1/format-meeting-minutes`, {
+      const formatRes = await fetch(`${SUPABASE_FUNCTIONS_URL}/format-meeting-minutes`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { ...auth, "Content-Type": "application/json" },
         body: JSON.stringify({ transcript, context }),
       });
       const formatted = await formatRes.json();
