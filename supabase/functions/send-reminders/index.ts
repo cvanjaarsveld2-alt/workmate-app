@@ -1,68 +1,61 @@
 // ─── Edge Function: send-reminders ───────────────────────────────────────────
-// Called every 5 minutes by pg_cron (job "powermate-followup-reminders").
-// Sends a push notification for each open follow-up whose reminder is due, to
-// the assignee (or creator), so reminders arrive even when the app is closed.
+// Called every 5 minutes by pg_cron (job "powermate-followup-reminders"). Sends
+// Web Push for every reminder that falls due, so reminders reach a phone even
+// when the app is closed. An iPhone never runs a closed web app's timers, so
+// anything that must arrive in the background has to come from here:
+//   • follow-ups (incl. calendar entries) at their chosen reminder time
+//   • the 07:00 "today's follow-ups" summary
+//   • equipment service: 3 days before and on the day (09:00)
+//   • unresolved notes on their resolve-by date (09:00)
+// All times are the person's local time (users.timezone, kept current by the app).
+//
+// Each reminder is claimed in public.reminder_deliveries before it is sent, so
+// overlapping or retried runs never deliver it twice.
 //
 // Auth: cron presents the x-cron-secret header; it is checked against the vault
 // secret "powermate_cron_secret" through public.cron_secret_matches(), which only
 // service_role may execute. No user JWT is involved (verify_jwt = false).
 //
-// Times: follow-ups store the user's local wall-clock date/time. Each target
-// user's IANA timezone (users.timezone, kept current by the app) converts it to
-// UTC, so reminders fire at local time in whichever country they are.
+// Body (all optional, all require the cron secret):
+//   {}                          normal run
+//   { "preview_hours": 48 }     list what would be sent in the next N hours; sends nothing
+//   { "test_user_id": "<id>" }  send a test push to that person's devices; reports each result
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as webPush from "https://esm.sh/web-push@3.6.7";
+import webPush from "npm:web-push@3.6.7";
+import {
+  DEFAULT_TZ, MAX_LOOKBACK_MINUTES, dueNow, planReminders, shiftDate, validTz,
+  type EquipmentRow, type FollowupRow, type NoteRow, type Reminder,
+} from "./schedule.ts";
 
-const DEFAULT_TZ = "Africa/Johannesburg";
-const WINDOW_MINUTES = 10; // cron runs every 5 min; 10 min tolerates one late run
-
-function tzOffsetMs(tz: string, at: Date): number {
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(at);
-  const get = (t: string) => Number(parts.find(p => p.type === t)?.value);
-  return Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second")) - at.getTime();
-}
-
-// Local wall-clock time in `tz` -> UTC instant (second pass settles DST changes).
-function localToUtc(date: string, hhmm: string, tz: string): Date {
-  const [y, m, d] = date.split("-").map(Number);
-  const [h, mi] = hhmm.split(":").map(Number);
-  const guess = Date.UTC(y, m - 1, d, h, mi);
-  let ts = guess - tzOffsetMs(tz, new Date(guess));
-  ts = guess - tzOffsetMs(tz, new Date(ts));
-  return new Date(ts);
-}
-
-function shiftDate(date: string, days: number): string {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-}
-
-// Codes the app offers (src/lib/constants.js) plus legacy codes found in data.
-function reminderFireAt(date: string, time: string | null, reminder: string, tz: string): Date | null {
-  const hhmm = /^\d{2}:\d{2}/.test(time || "") ? (time as string).slice(0, 5) : "09:00";
-  const due = localToUtc(date, hhmm, tz);
-  const minus = (mins: number) => new Date(due.getTime() - mins * 60_000);
-  switch (reminder) {
-    case "on_time": return due;
-    case "15_before": case "15_min": return minus(15);
-    case "30_before": case "30_min": return minus(30);
-    case "1h_before": case "1_hour": return minus(60);
-    case "2_hours": return minus(120);
-    case "1d_before": case "1_day": return localToUtc(shiftDate(date, -1), "09:00", tz);
-    case "2_days": return localToUtc(shiftDate(date, -2), "09:00", tz);
-    case "morning": return localToUtc(date, "07:00", tz);
-    default: return null; // "none" or unknown
-  }
-}
-
-function validTz(tz: string | null | undefined): string {
-  try { if (tz) { new Intl.DateTimeFormat("en-US", { timeZone: tz }); return tz; } } catch { /* fall through */ }
-  return DEFAULT_TZ;
-}
+type Sub = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string };
+type PushResult = { host: string; status: number | null; ok: boolean; stale: boolean; error?: string };
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+async function push(sub: Sub, payload: string, ttl: number): Promise<PushResult> {
+  const host = (() => { try { return new URL(sub.endpoint).host; } catch { return "?"; } })();
+  try {
+    const res = await webPush.sendNotification(
+      { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+      payload,
+      { TTL: ttl, urgency: "high" },
+    );
+    return { host, status: res?.statusCode ?? 201, ok: true, stale: false };
+  } catch (e: any) {
+    const status = Number(e?.statusCode) || null;
+    const error = String(e?.body || e?.message || e).slice(0, 200);
+    return {
+      host, status, ok: false,
+      // 404/410: the device unsubscribed or the app was removed. VapidPkHashMismatch:
+      // Apple's answer for a subscription made under an older VAPID key; it can never
+      // succeed again. Either way, forget it.
+      stale: status === 404 || status === 410 || /VapidPkHashMismatch/i.test(error),
+      error,
+    };
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -81,72 +74,131 @@ Deno.serve(async (req: Request) => {
   const vapidPublic = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
   const vapidPrivate = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
   if (!vapidPublic || !vapidPrivate) return json({ error: "VAPID keys not configured" }, 500);
-  webPush.setVapidDetails(Deno.env.get("VAPID_EMAIL") ?? "mailto:admin@pwrstart.com", vapidPublic, vapidPrivate);
+  // Apple rejects the VAPID token unless the subject is a mailto: or https: URL.
+  let subject = (Deno.env.get("VAPID_EMAIL") ?? "").trim();
+  if (!/^(mailto:|https:)/.test(subject)) subject = subject.includes("@") ? `mailto:${subject}` : "mailto:admin@pwrstart.com";
+  webPush.setVapidDetails(subject, vapidPublic, vapidPrivate);
+
+  let input: { preview_hours?: number; test_user_id?: string } = {};
+  try { input = await req.json(); } catch { /* empty body = normal run */ }
+
+  const subsFor = async (userIds: string[]): Promise<Sub[]> => {
+    if (!userIds.length) return [];
+    const { data, error } = await supabase.from("push_subscriptions").select("id, user_id, endpoint, p256dh, auth").in("user_id", userIds);
+    if (error) throw error;
+    return data || [];
+  };
+  const dropStale = async (results: Array<PushResult & { id: string }>) => {
+    const stale = results.filter(r => r.stale).map(r => r.id);
+    if (stale.length) await supabase.from("push_subscriptions").delete().in("id", stale);
+  };
 
   try {
+    // ── Test: one push to each of a person's devices, with Apple/Google's answer ──
+    if (input.test_user_id) {
+      const subs = await subsFor([input.test_user_id]);
+      const payload = JSON.stringify({
+        title: "PowerMate test ✓",
+        body: "Background notifications work — this came from the server, so it arrives even with the app closed.",
+        url: "/?screen=Notifications",
+        tag: "pm_test",
+      });
+      const results = await Promise.all(subs.map(async s => ({ id: s.id, ...(await push(s, payload, 600)) })));
+      await dropStale(results);
+      return json({ ok: results.some(r => r.ok), devices: subs.length, results: results.map(({ id: _id, ...r }) => r) });
+    }
+
     const now = new Date();
-    // Two days either side of today (UTC) covers every timezone and reminder lead time.
+    const preview = Number(input.preview_hours) > 0 ? Math.min(Number(input.preview_hours), 24 * 14) : 0;
+    const from = new Date(now.getTime() - MAX_LOOKBACK_MINUTES * 60_000);
+    const to = preview ? new Date(now.getTime() + preview * 3600_000) : now;
+
+    // Date ranges wide enough for every timezone and every lead time (2 days + 3 days).
     const today = now.toISOString().slice(0, 10);
-    const from = shiftDate(today, -2);
-    const to = shiftDate(today, 3);
+    const lastDay = shiftDate(to.toISOString().slice(0, 10), 3);
+    const [fu, eq, nt] = await Promise.all([
+      supabase.from("followups")
+        .select("id, user_id, assigned_to_user_id, title, client, date, time, reminder, completed")
+        .eq("completed", false).gte("date", shiftDate(today, -2)).lte("date", lastDay),
+      supabase.from("equipment")
+        .select("id, user_id, assigned_to_user_id, name, make, model, service_due")
+        .gte("service_due", shiftDate(today, -1)).lte("service_due", shiftDate(lastDay, 3)),
+      supabase.from("notes")
+        .select("id, user_id, assigned_to_user_id, client, note, urgency, resolve_by, resolved")
+        .eq("resolved", false).gte("resolve_by", shiftDate(today, -1)).lte("resolve_by", lastDay),
+    ]);
+    for (const r of [fu, eq, nt]) if (r.error) throw r.error;
+    const records = {
+      followups: (fu.data || []) as FollowupRow[],
+      equipment: (eq.data || []) as EquipmentRow[],
+      notes: (nt.data || []) as NoteRow[],
+    };
 
-    const { data: followups, error } = await supabase
-      .from("followups")
-      .select("id, user_id, assigned_to_user_id, title, client, date, time, reminder, notified_at")
-      .eq("completed", false)
-      .gte("date", from)
-      .lte("date", to)
-      .not("reminder", "is", null)
-      .neq("reminder", "none");
-    if (error) throw error;
-
-    const targets = [...new Set((followups || []).map(f => f.assigned_to_user_id || f.user_id).filter(Boolean))];
+    const userIds = [...new Set([...records.followups, ...records.equipment, ...records.notes]
+      .map(r => r.assigned_to_user_id || r.user_id).filter(Boolean) as string[])];
     const tzByUser = new Map<string, string>();
-    if (targets.length) {
-      const { data: users } = await supabase.from("users").select("id, timezone").in("id", targets);
+    if (userIds.length) {
+      const { data: users } = await supabase.from("users").select("id, timezone").in("id", userIds);
       for (const u of users || []) tzByUser.set(u.id, validTz(u.timezone));
     }
+    const tzOf = (id: string) => tzByUser.get(id) || DEFAULT_TZ;
+    const planned = planReminders(records, tzOf, from, to);
 
-    let sent = 0, due = 0;
-    const notifiedIds: string[] = [];
-    for (const fu of followups || []) {
-      const target = fu.assigned_to_user_id || fu.user_id;
-      if (!target) continue;
-      const fireAt = reminderFireAt(fu.date, fu.time, fu.reminder, tzByUser.get(target) || DEFAULT_TZ);
-      if (!fireAt) continue;
-      const lateBy = (now.getTime() - fireAt.getTime()) / 60_000;
-      if (lateBy < 0 || lateBy > WINDOW_MINUTES) continue;
-      // Already sent for this fire time (e.g. a previous run inside the window).
-      if (fu.notified_at && new Date(fu.notified_at).getTime() >= fireAt.getTime()) continue;
-      due++;
-
-      const { data: subs } = await supabase.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", target);
-      notifiedIds.push(fu.id);
-      if (!subs?.length) continue;
-
-      const payload = JSON.stringify({
-        title: `⏰ Reminder: ${fu.title}`,
-        body: `${fu.time ? `Due at ${fu.time.slice(0, 5)}` : "Due today"}${fu.client ? ` — ${fu.client}` : ""}`,
-        url: "/?screen=Followups",
-        tag: `fu_${fu.id}`, // same tag as on-device reminders, so a phone never shows both
+    // ── Preview: what would go out, when, in local time; nothing is sent ──
+    if (preview) {
+      const upcoming = planned.filter(r => r.fireAt.getTime() > now.getTime());
+      const subs = await subsFor([...new Set(upcoming.map(r => r.userId))]);
+      return json({
+        now: now.toISOString(),
+        reminders: upcoming.map(r => ({
+          kind: r.kind, user_id: r.userId, title: r.title,
+          fire_at_utc: r.fireAt.toISOString(),
+          fire_at_local: r.fireAt.toLocaleString("en-ZA", { timeZone: tzOf(r.userId) }) + ` (${tzOf(r.userId)})`,
+          devices: subs.filter(s => s.user_id === r.userId).length,
+        })),
       });
-      const stale: string[] = [];
-      for (const sub of subs) {
-        try {
-          await webPush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600 });
-          sent++;
-        } catch (e: any) {
-          if (e?.statusCode === 404 || e?.statusCode === 410) stale.push(sub.id);
-          else console.error("[send-reminders] push failed", e?.statusCode, String(e?.body || e?.message || e).slice(0, 200));
-        }
-      }
-      if (stale.length) await supabase.from("push_subscriptions").delete().in("id", stale);
     }
 
-    if (notifiedIds.length) {
-      await supabase.from("followups").update({ notified_at: now.toISOString() }).in("id", notifiedIds);
+    // ── Normal run ──
+    const due = dueNow(planned, now);
+    if (!due.length) return json({ ok: true, checked: planned.length, due: 0, sent: 0 });
+
+    // Claim first: only reminders this run inserted are sent, so a slow or
+    // repeated run can never deliver the same reminder twice.
+    const { data: claimed, error: claimError } = await supabase
+      .from("reminder_deliveries")
+      .upsert(due.map(r => ({ key: r.key, user_id: r.userId, kind: r.kind })), { onConflict: "key", ignoreDuplicates: true })
+      .select("key");
+    if (claimError) throw claimError;
+    const claimedKeys = new Set((claimed || []).map((c: { key: string }) => c.key));
+    const toSend: Reminder[] = due.filter(r => claimedKeys.has(r.key));
+
+    const subs = await subsFor([...new Set(toSend.map(r => r.userId))]);
+    let sent = 0;
+    const retry: string[] = [];
+    const allResults: Array<PushResult & { id: string }> = [];
+    for (const r of toSend) {
+      const mine = subs.filter(s => s.user_id === r.userId);
+      if (!mine.length) continue; // no devices: nothing to retry
+      const payload = JSON.stringify({ title: r.title, body: r.body, url: r.url, tag: r.tag });
+      const results = await Promise.all(mine.map(async s => ({ id: s.id, ...(await push(s, payload, r.ttl)) })));
+      allResults.push(...results);
+      if (results.some(x => x.ok)) sent++;
+      // Every device failed for a reason other than being gone: release the
+      // claim so the next run (still inside the lookback window) tries again.
+      else if (results.some(x => !x.stale)) retry.push(r.key);
+      for (const x of results.filter(x => !x.ok && !x.stale))
+        console.error("[send-reminders] push failed", r.kind, x.host, x.status, x.error);
     }
-    return json({ ok: true, checked: followups?.length || 0, due, sent });
+    await dropStale(allResults);
+    if (retry.length) await supabase.from("reminder_deliveries").delete().in("key", retry);
+
+    const sentFollowups = toSend.filter(r => r.kind === "followup" && !retry.includes(r.key)).map(r => r.key.split(":")[1]);
+    if (sentFollowups.length) await supabase.from("followups").update({ notified_at: now.toISOString() }).in("id", sentFollowups);
+    // Keep the delivery log small; a key only matters until its day has passed.
+    await supabase.from("reminder_deliveries").delete().lt("sent_at", new Date(now.getTime() - 30 * 86400_000).toISOString());
+
+    return json({ ok: true, checked: planned.length, due: due.length, claimed: toSend.length, sent, retry: retry.length });
   } catch (e) {
     console.error("[send-reminders]", e);
     return json({ error: "Reminder run failed" }, 500);

@@ -649,8 +649,9 @@ export default function PowerWorksApp() {
     const t = setTimeout(async () => {
       // Only this person's own/assigned records remind them, even with whole-team view on.
       const own = list => (list || []).filter(r => isOwnRecord(r, uid));
-      // With a push subscription the server sends follow-up reminders at the user's
-      // local time; scheduling them here too would notify twice.
+      // With a push subscription the server (send-reminders) sends all of these at the
+      // user's local time, app open or closed; scheduling them here too would notify
+      // twice. Without push (e.g. a desktop browser) the device schedules them itself.
       let hasPush = false;
       try {
         const reg = await navigator.serviceWorker?.ready;
@@ -659,7 +660,7 @@ export default function PowerWorksApp() {
       if (cancelled) return;
       registerReminderPeriodicSync();
       scheduleNotificationsViaSW(
-        buildNotificationItems(hasPush ? [] : own(data.followups), own(data.equipment), own(data.notes)),
+        hasPush ? [] : buildNotificationItems(own(data.followups), own(data.equipment), own(data.notes)),
         { replace: true, source: "digest" },
       );
     }, 1500);

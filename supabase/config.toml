@@ -3,3 +3,7 @@ verify_jwt = false
 
 [functions.send-reminders]
 verify_jwt = false
+
+[functions.send-notifications]
+verify_jwt = true
+import_map = "./functions/send-notifications/deno.json"

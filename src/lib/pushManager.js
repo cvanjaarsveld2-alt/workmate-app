@@ -16,6 +16,14 @@ function urlBase64ToUint8Array(base64String) {
   return arr;
 }
 
+// True when the subscription's key matches ours. A browser that doesn't expose
+// the key (null) gets the benefit of the doubt.
+function sameKey(buffer, expected) {
+  if (!buffer) return true;
+  const got = new Uint8Array(buffer);
+  return got.length === expected.length && got.every((b, i) => b === expected[i]);
+}
+
 // True only where background push can actually work.
 export function pushSupported() {
   return (
@@ -57,10 +65,16 @@ export async function subscribeToPush(userId) {
       return { ok: false, reason: "sw-not-ready" };
     }
 
-    // Reuse an existing subscription if present
+    // Reuse an existing subscription if present — but only if it was made with the
+    // current VAPID key. Apple rejects pushes to one made under an older key
+    // (VapidPkHashMismatch) forever, so replace it instead of reusing it.
     let sub;
     try {
       sub = await reg.pushManager.getSubscription();
+      if (sub && !sameKey(sub.options?.applicationServerKey, urlBase64ToUint8Array(VAPID_PUBLIC_KEY))) {
+        await sub.unsubscribe().catch(() => {});
+        sub = null;
+      }
     } catch (e) {
       console.warn("[Push] getSubscription failed:", e);
     }

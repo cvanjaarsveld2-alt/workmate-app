@@ -116,22 +116,17 @@ export function ShareToTeamModal({
       });
       if (error) throw error;
 
-      // 3. Push notification (best-effort)
+      // 3. Push notification (best-effort). The function looks up the teammate's
+      // devices itself: we can't read their push_subscriptions, and it needs to_user_id.
       try {
-        const { data: subs } = await supabase
-          .from("push_subscriptions")
-          .select("endpoint, p256dh, auth")
-          .eq("user_id", selectedId);
-        for (const sub of subs || []) {
-          await supabase.functions.invoke("send-notifications", {
-            body: {
-              subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-              title: `PowerMate — ${typeMeta.label} ${actionVerb} to you`,
-              body: fullMessage,
-              url: "/?screen=SharedInbox",
-            },
-          }).catch(() => {});
-        }
+        await supabase.functions.invoke("send-notifications", {
+          body: {
+            to_user_id: selectedId,
+            title: `PowerMate — ${typeMeta.label} ${actionVerb} to you`,
+            body: fullMessage,
+            url: "/?screen=SharedInbox",
+          },
+        });
       } catch {}
 
       setStatus("sent");

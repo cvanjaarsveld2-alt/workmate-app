@@ -69,8 +69,8 @@ async function fireDueReminders() {
   for (const item of due) {
     await self.registration.showNotification(item.title || "PowerMate Reminder", {
       body: item.body || "",
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
       vibrate: [100, 50, 100],
       tag: item.tag || item.id,
       data: { url: item.url || "/" },
@@ -173,8 +173,8 @@ self.addEventListener("push", e => {
   e.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/icon.svg",
-      badge: "/icon.svg",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
       vibrate: [100, 50, 100],
       tag: data.tag || "powermate",
       renotify: !!data.tag,
