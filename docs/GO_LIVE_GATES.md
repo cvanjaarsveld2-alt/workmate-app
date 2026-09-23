@@ -74,7 +74,8 @@ Goal: prove that a fresh project can be rebuilt from what you actually keep.
 
 2. **Storage files.** Database backups contain only the `storage.objects`
    rows, not the files. Use one of:
-   - the in-app **Backup Export** on the More screen. It includes Storage files with
+   - the in-app **Backup Export** on the More screen, signed in as the owner
+     (it only copies files that account can see). It includes Storage files with
      SHA-256 checksums in `storage_manifest.json`. Keep the ZIP off-device, or
    - an S3-compatible sync of the buckets (`receipts`, `powermate-media`,
      `powermate-files`, `company-docs`, `powermate-quotes`) to storage you
