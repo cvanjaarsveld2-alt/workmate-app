@@ -541,7 +541,7 @@ Kind regards`;
             {Object.keys(NOTE_URGENCY).map(u => (
               <button key={u} type="button" onClick={() => setForm(f => ({ ...f, urgency: u }))}
                 className="flex-1 rounded-xl py-3 text-sm font-bold border-2 transition-all min-h-[48px]"
-                style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#737F92", borderColor: "#E2E8F0" }}>
                 {u}
               </button>
             ))}
@@ -688,7 +688,7 @@ Kind regards`;
               {Object.keys(NOTE_URGENCY).map(u2 => (
                 <button key={u2} onClick={() => { changeUrgency(detailNote.id, u2); setDetailNote(n => ({ ...n, urgency: u2 })); }}
                   className="flex-1 rounded-lg px-2 py-2 text-xs font-bold border transition-all min-h-[48px]"
-                  style={(detailNote.urgency || "Normal") === u2 ? { background: NOTE_URGENCY[u2].bg, color: NOTE_URGENCY[u2].text, borderColor: NOTE_URGENCY[u2].dot } : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  style={(detailNote.urgency || "Normal") === u2 ? { background: NOTE_URGENCY[u2].bg, color: NOTE_URGENCY[u2].text, borderColor: NOTE_URGENCY[u2].dot } : { background: "#F8FAFC", color: "#737F92", borderColor: "#E2E8F0" }}>
                   {u2.charAt(0)}
                 </button>
               ))}

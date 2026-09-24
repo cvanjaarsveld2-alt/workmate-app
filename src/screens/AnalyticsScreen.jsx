@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { BRAND, STAGE_COLORS } from "../lib/constants";
 import { smartDate, todayISO } from "../lib/helpers";
-import { Card, PageHeader } from "../components/ui";
+import { Card, PageHeader, statValueClass } from "../components/ui";
 
 function money(n) {
   return "R\u00a0" + Math.round(n || 0).toLocaleString("en-ZA");
@@ -82,7 +82,7 @@ function RatioRing({ value, max, color, size = 64, strokeWidth = 8 }) {
   const filled = max > 0 ? (value / max) * circ : 0;
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E2E8F0" strokeWidth={strokeWidth} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" style={{ stroke: "var(--pm-chart-track)" }} strokeWidth={strokeWidth} />
       <motion.circle
         cx={size / 2} cy={size / 2} r={r} fill="none"
         stroke={color} strokeWidth={strokeWidth}
@@ -109,7 +109,7 @@ function Tile({ label, value, sub, color, icon: Icon, trend }) {
           </div>
         )}
       </div>
-      <p className="text-2xl font-black leading-none mt-1" style={{ color: color || BRAND.primary }}>{value}</p>
+      <p className={`${statValueClass(value)} font-black leading-none mt-1`} style={{ color: color || BRAND.primary }}>{value}</p>
       {sub && <p className="text-xs text-slate-400 mt-1 leading-snug">{sub}</p>}
       {trend !== undefined && (
         <div className="flex items-center gap-1 mt-1.5">
@@ -118,7 +118,7 @@ function Tile({ label, value, sub, color, icon: Icon, trend }) {
             : trend < 0
               ? <TrendingDown size={12} className="text-red-500" />
               : <span className="w-3" />}
-          <p className="text-xs font-bold" style={{ color: trend > 0 ? "#16A34A" : trend < 0 ? "#DC2626" : "#94A3B8" }}>
+          <p className="text-xs font-bold" style={{ color: trend > 0 ? "#16A34A" : trend < 0 ? "#DC2626" : "#737F92" }}>
             {trend > 0 ? `+${trend}` : trend} vs prev quarter
           </p>
         </div>
@@ -233,6 +233,8 @@ export function AnalyticsScreen({ data, onNavigate }) {
     stage: s,
     count: clients.filter(c => (c.stage || "New Lead") === s).length,
     color: STAGE_COLORS[s]?.dot || BRAND.primary,
+    // Dot colours are too pale for text on white; labels use the stage's text colour.
+    textColor: STAGE_COLORS[s]?.text || BRAND.primary,
   }));
   const totalInPipeline = pipelineCount.reduce((s, p) => s + p.count, 0);
 
@@ -500,11 +502,11 @@ export function AnalyticsScreen({ data, onNavigate }) {
         <Card className="p-4">
           <div className="space-y-3">
             {pipelineCount.concat([
-              { stage: "Won",  count: wonClients,  color: "#16A34A" },
-              { stage: "Lost", count: lostClients,  color: "#94A3B8" },
-            ]).map(({ stage, count, color }) => (
+              { stage: "Won",  count: wonClients,  color: "#16A34A", textColor: "#15803D" },
+              { stage: "Lost", count: lostClients,  color: "#737F92", textColor: "#64748B" },
+            ]).map(({ stage, count, color, textColor }) => (
               <div key={stage} className="flex items-center gap-3">
-                <p className="w-20 text-sm font-bold shrink-0" style={{ color }}>{stage}</p>
+                <p className="w-20 text-sm font-bold shrink-0" style={{ color: textColor || color }}>{stage}</p>
                 <div className="flex-1 h-2.5 rounded-full bg-slate-100 overflow-hidden">
                   <motion.div className="h-full rounded-full"
                     style={{ background: color }}

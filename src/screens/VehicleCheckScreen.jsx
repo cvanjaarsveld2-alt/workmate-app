@@ -111,7 +111,7 @@ function statusStyle(s) {
   if (s === "ok")    return { bg: "#DCFCE7", color: "#166534", border: "#BBF7D0" };
   if (s === "issue") return { bg: "#FEE2E2", color: "#991B1B", border: "#FECACA" };
   if (s === "na")    return { bg: "#F1F5F9", color: "#64748B", border: "#E2E8F0" };
-  return { bg: "#F8FAFC", color: "#94A3B8", border: "#E2E8F0" };
+  return { bg: "#F8FAFC", color: "#737F92", border: "#E2E8F0" };
 }
 
 // ─── Issue sheet ──────────────────────────────────────────────────────────────
@@ -300,7 +300,7 @@ function WeekRow({ week, checksMap, selected, onSelect, onDayClick, selectMode }
                 borderColor: hasItems ? (dayIssue ? "#FECACA" : "#BBF7D0") : "#E2E8F0",
               }}>
               <span className="text-[10px] font-bold text-slate-400 leading-none">{DAY_LABELS[i]}</span>
-              <span className="text-xs font-black leading-none" style={{ color: hasItems ? (dayIssue ? "#991B1B" : "#166534") : "#94A3B8" }}>
+              <span className="text-xs font-black leading-none" style={{ color: hasItems ? (dayIssue ? "#991B1B" : "#166534") : "#737F92" }}>
                 {new Date(date + "T12:00:00").getDate()}
               </span>
               {hasItems && (
@@ -804,7 +804,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                       borderColor: isActive ? "#8B1A1A" : hasIssue ? "#FECACA" : isOk ? "#BBF7D0" : "#E2E8F0",
                       opacity: isFuture ? 0.35 : 1,
                     }}>
-                    <span className="text-[10px] font-bold leading-none" style={{ color: isActive ? "rgba(255,255,255,0.7)" : "#94A3B8" }}>{DAY_LABELS[i]}</span>
+                    <span className="text-[10px] font-bold leading-none" style={{ color: isActive ? "rgba(255,255,255,0.7)" : "#737F92" }}>{DAY_LABELS[i]}</span>
                     <span className="text-sm font-black leading-none mt-0.5" style={{ color: isActive ? "white" : "#1E293B" }}>
                       {new Date(date + "T12:00:00").getDate()}
                     </span>
@@ -935,7 +935,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                                       <div className="flex-1 rounded-xl bg-red-50 border border-red-100 px-3 py-2">
                                         <p className="text-xs font-black text-red-700 mb-0.5">Issue note</p>
                                         <p className="text-xs text-red-600 leading-snug">{comment}</p>
-                                        <p className="text-[10px] text-red-400 mt-1.5 font-medium">Tap to edit</p>
+                                        <p className="text-[10px] text-red-600 mt-1.5 font-medium">Tap to edit</p>
                                       </div>
                                     ) : (
                                       <div className="flex-1 rounded-xl border-2 border-dashed border-red-200 px-3 py-2.5 flex items-center gap-2">

@@ -34,7 +34,7 @@ const STAGE_STYLE = {
   "In Progress": { bg: "#EDE9FE", color: "#5B21B6", dot: "#8B5CF6" },
   "Quoted":      { bg: "#CFFAFE", color: "#0E7490", dot: "#06B6D4" },
   "Won":         { bg: "#DCFCE7", color: "#166534", dot: "#22C55E" },
-  "Lost":        { bg: "#F1F5F9", color: "#64748B", dot: "#94A3B8" },
+  "Lost":        { bg: "#F1F5F9", color: "#64748B", dot: "#737F92" },
 };
 
 // ─── Product categories (matches ClientsScreen) ───────────────────────────────
@@ -198,7 +198,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
                 className="rounded-full px-3 py-1.5 text-xs font-bold border-2 transition-all min-h-[36px]"
                 style={sel
                   ? { background: cat.bg, color: cat.color, borderColor: cat.color }
-                  : { background: "white", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  : { background: "white", color: "#737F92", borderColor: "#E2E8F0" }}>
                 {cat.label}
               </button>
             );
@@ -218,7 +218,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
                 className="rounded-full px-3 py-1.5 text-xs font-bold border-2 transition-all min-h-[36px]"
                 style={sel
                   ? { background: s.bg, color: s.color, borderColor: s.dot }
-                  : { background: "white", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  : { background: "white", color: "#737F92", borderColor: "#E2E8F0" }}>
                 {stage}
               </button>
             );
@@ -637,7 +637,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
                   {count}
                 </span>
                 <span className="text-[10px] font-bold leading-tight mt-0.5"
-                  style={{ color: filterStage === stage ? s.color : "#94A3B8" }}>
+                  style={{ color: filterStage === stage ? s.color : "#737F92" }}>
                   {stage}
                 </span>
               </button>

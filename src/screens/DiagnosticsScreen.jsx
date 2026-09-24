@@ -28,7 +28,7 @@ function StatusDot({ status }) {
     ok: { bg: "#22C55E", label: "OK" },
     warn: { bg: "#F59E0B", label: "Warning" },
     error: { bg: "#EF4444", label: "Error" },
-    idle: { bg: "#94A3B8", label: "Idle" },
+    idle: { bg: "#737F92", label: "Idle" },
   };
   const m = map[status] || map.idle;
   return (

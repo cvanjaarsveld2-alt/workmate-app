@@ -27,7 +27,7 @@ export const STAGE_COLORS = {
   Active:     { bg: "#FAF5FF", text: "#7E22CE", dot: "#A855F7" },
   Won:        { bg: "#F0FDF4", text: "#15803D", dot: "#16A34A" },
   Lost:       { bg: "#FFF1F2", text: "#BE123C", dot: "#F43F5E" },
-  Dormant:    { bg: "#F1F5F9", text: "#64748B", dot: "#94A3B8" },
+  Dormant:    { bg: "#F1F5F9", text: "#64748B", dot: "#737F92" },
 };
 
 // Cold-call / interaction outcome options for the client interaction log.

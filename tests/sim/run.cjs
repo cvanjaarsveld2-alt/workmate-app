@@ -58,6 +58,8 @@ function runScript(script, account) {
       const flows = JSON.parse(fs.readFileSync(path.join(OUT, account.name, "flows.json"), "utf8"));
       if (flows.violations.length) { ok = false; console.error("FAIL schema violations:", JSON.stringify(flows.violations.slice(0, 5))); }
     }
+    console.log("\n=== visual audit: contrast, wrapped numbers, overflow (light + dark) ===");
+    if (!(await runScript("visual-audit.cjs", { ...ACCOUNTS[0], name: "visual" }))) ok = false;
     console.log("\n=== offline app shell (service worker on) ===");
     if (!(await runScript("offline-shell.cjs", { ...ACCOUNTS[0], name: "offline" }))) ok = false;
   } finally {

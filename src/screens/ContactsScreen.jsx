@@ -32,7 +32,7 @@ const STATUS_COLORS = {
   lead:      { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
   active:    { bg: "#DBEAFE", text: "#1E40AF", dot: "#3B82F6" },
   converted: { bg: "#DCFCE7", text: "#166534", dot: "#16A34A" },
-  archived:  { bg: "#F1F5F9", text: "#64748B", dot: "#94A3B8" },
+  archived:  { bg: "#F1F5F9", text: "#64748B", dot: "#737F92" },
 };
 
 function StatusPill({ status }) {
@@ -406,7 +406,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
                 className="rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px] capitalize"
                 style={form.status === s
                   ? { background: STATUS_COLORS[s].bg, color: STATUS_COLORS[s].text, borderColor: STATUS_COLORS[s].dot }
-                  : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  : { background: "#F8FAFC", color: "#737F92", borderColor: "#E2E8F0" }}>
                 {s}
               </button>
             ))}
@@ -489,7 +489,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
             {detailContact.phone ? (
               <a href={`https://wa.me/${detailContact.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer"
                 className="flex flex-col items-center justify-center gap-1 rounded-xl py-3 text-white min-h-[64px]"
-                style={{ background: "#25D366" }}>
+                style={{ background: "#128C7E" }}>
                 <Send size={18} />
                 <span className="text-xs font-bold">WhatsApp</span>
               </a>

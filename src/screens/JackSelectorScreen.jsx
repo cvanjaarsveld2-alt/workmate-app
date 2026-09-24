@@ -246,7 +246,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
   const Line = ({ n, name, sub }) => (
     <div className="rounded-2xl border px-4 py-3 mb-2" style={{ borderColor: "rgba(139,26,26,0.2)" }}>
       <div className="flex items-center gap-2">
-        <span className="w-6 h-6 rounded-full grid place-items-center text-[11px] font-black text-white shrink-0" style={{ background: n === 1 ? BRAND.primary : "#94A3B8" }}>{n}</span>
+        <span className="w-6 h-6 rounded-full grid place-items-center text-[11px] font-black text-white shrink-0" style={{ background: n === 1 ? BRAND.primary : "#737F92" }}>{n}</span>
         <span className="text-base font-black text-slate-900">{name}</span>
       </div>
       {sub && <p className="text-xs text-slate-500 mt-1 pl-8">{sub}</p>}
@@ -278,7 +278,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
         <div className="rounded-2xl bg-slate-50 px-4 py-3 mb-1">
           <div className="flex items-center justify-between py-1">
             <span className="text-xs font-bold text-slate-500">Ground clearance</span>
-            <span className="text-sm font-black" style={{ color: m.groundClearance ? "#0F172A" : "#94A3B8" }}>
+            <span className="text-sm font-black" style={{ color: m.groundClearance ? "#0F172A" : "#737F92" }}>
               {m.groundClearance ? `${m.groundClearance} mm` : "Measure on site"}
             </span>
           </div>
@@ -381,7 +381,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
                         style={{ borderColor: checked ? BRAND.primary : "#F1F5F9", background: checked ? BRAND.light : "#F8FAFC" }}>
                         <span
                           className="w-6 h-6 rounded-full grid place-items-center text-[11px] font-black shrink-0"
-                          style={{ background: checked ? BRAND.primary : "#E2E8F0", color: checked ? "#fff" : "#94A3B8" }}>
+                          style={{ background: checked ? BRAND.primary : "#E2E8F0", color: checked ? "#fff" : "#737F92" }}>
                           {checked ? order + 1 : ""}
                         </span>
                         <span className="flex-1 min-w-0">

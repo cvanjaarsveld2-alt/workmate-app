@@ -37,7 +37,7 @@ export const COLORS = {
   ink:          "#0F172A",   // slate-900 — primary text
   inkSoft:      "#334155",   // slate-700
   muted:        "#64748B",   // slate-500 — secondary text
-  faint:        "#94A3B8",   // slate-400 — hints/placeholders
+  faint:        "#737F92",   // slate-400 — hints/placeholders
   line:         "#E2E8F0",   // slate-200 — borders
   lineSoft:     "#F1F5F9",   // slate-100 — dividers
   surface:      "#FFFFFF",
