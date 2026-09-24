@@ -52,6 +52,15 @@ export function clearHistoricalFollowupsCrashes() {
   } catch {}
 }
 
+// A lazy screen whose file couldn't be fetched (offline and not cached, or a
+// file from an older deploy). React caches a failed lazy import, so "Try
+// again" has to reload the page for these instead of re-rendering.
+export function isChunkLoadError(error) {
+  return /dynamically imported module|Importing a module script failed|Unable to preload|Failed to fetch dynamically|error loading dynamically/i.test(
+    String(error?.message || error || ""),
+  );
+}
+
 export class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -78,6 +87,10 @@ export class ErrorBoundary extends React.Component {
   }
 
   reset = () => {
+    if (isChunkLoadError(this.state.error)) {
+      window.location.reload();
+      return;
+    }
     this.setState({ hasError: false, error: null });
   };
 
@@ -88,6 +101,7 @@ export class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      const chunkError = isChunkLoadError(this.state.error);
       return (
         <div className="p-6 max-w-md mx-auto">
           <div className="rounded-2xl bg-white border-2 border-red-100 p-6 shadow-sm">
@@ -101,12 +115,20 @@ export class ErrorBoundary extends React.Component {
               </div>
             </div>
 
-            <p className="text-sm text-slate-600 leading-relaxed mb-2">
-              The rest of the app is still working. You can try again, go back home, or check the
-              Diagnostics screen in Settings for details.
-            </p>
+            {chunkError ? (
+              <p className="text-sm text-slate-600 leading-relaxed mb-4">
+                {navigator.onLine
+                  ? "This screen was updated. Tap Try again to load the latest version."
+                  : "This screen isn't saved on this phone yet. Connect to the internet once and it will work offline from then on. Your saved work is safe."}
+              </p>
+            ) : (
+              <p className="text-sm text-slate-600 leading-relaxed mb-2">
+                The rest of the app is still working. You can try again, go back home, or check the
+                Diagnostics screen in Settings for details.
+              </p>
+            )}
 
-            {this.state.error?.message && (
+            {!chunkError && this.state.error?.message && (
               <p className="text-xs font-mono text-red-700 bg-red-50 rounded-lg p-2 mb-4 break-all">
                 {this.state.error.message}
               </p>

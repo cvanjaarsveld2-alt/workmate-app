@@ -41,3 +41,24 @@ test("startup asks the browser not to evict the offline IndexedDB store", () => 
   assert.match(read("src/main.jsx"), /requestPersistentStorage\(\)/);
   assert.match(read("src/offline/offlineDb.js"), /navigator\.storage\.persist\(\)/);
 });
+
+test("service worker precaches every built file so unvisited screens open offline", () => {
+  const sw = read("public/service-worker.js");
+  assert.match(sw, /const BUILD_ASSETS = \[\];/, "placeholder the build fills in");
+  assert.match(sw, /BUILD_ASSETS\.slice\(\)/);
+  // Module scripts carry an Origin header; a "Vary: Origin" server would
+  // otherwise never match the cached copy.
+  assert.match(sw, /caches\.match\(request, \{ ignoreVary: true \}\)/);
+  const vite = read("vite.config.js");
+  assert.match(vite, /precacheServiceWorker\(\)/);
+});
+
+test("preloadError is only cancelled when the app actually reloads", () => {
+  // Cancelling it makes Vite resolve the lazy import with undefined, which
+  // crashed offline screens with "undefined is not an object (m.QuotesScreen)".
+  const main = read("src/main.jsx");
+  const handler = main.slice(main.indexOf('"vite:preloadError"'), main.indexOf("window.location.reload()"));
+  const offlineReturn = handler.indexOf("if (!navigator.onLine) return;");
+  const cancel = handler.indexOf("event.preventDefault()");
+  assert.ok(offlineReturn >= 0 && cancel > offlineReturn, "preventDefault must come after the offline early-return");
+});

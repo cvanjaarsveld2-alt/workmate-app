@@ -1,7 +1,10 @@
 // ─── PowerMate Service Worker ────────────────────────────────────────────────
 // Offline shell, push notifications and durable reminder scheduling.
-const CACHE_NAME = "powermate-v16";
+const CACHE_NAME = "powermate-v17";
 const PRECACHE = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest"];
+// Filled in at build time (vite.config.js) with every built JS/CSS/image file,
+// so every screen opens offline, not just the ones visited while online.
+const BUILD_ASSETS = [];
 const REMINDER_DB = "powermate_sw";
 const REMINDER_STORE = "reminders";
 
@@ -88,6 +91,17 @@ self.addEventListener("install", e =>
             await cache.add(url);
           } catch {}
         }
+        // A few at a time; one failed file must not abort the install.
+        const queue = BUILD_ASSETS.slice();
+        const worker = async () => {
+          while (queue.length) {
+            const url = queue.shift();
+            try {
+              if (!(await cache.match(url, { ignoreVary: true }))) await cache.add(url);
+            } catch {}
+          }
+        };
+        await Promise.all([worker(), worker(), worker(), worker()]);
       })
       .then(() => self.skipWaiting()),
   ),
@@ -107,10 +121,29 @@ self.addEventListener("activate", e =>
   ),
 );
 
-// Cache-first for static assets keeps the currently working app shell usable in the field.
-// A successful network response refreshes the cache in the background.
+// Built files under /assets/ have content hashes in their names and never
+// change, so they are served from cache first: no network wait on a weak
+// signal, and they keep working offline.
+// ignoreVary: module scripts are requested with an Origin header, and a server
+// that answers with "Vary: Origin" would otherwise never match the copy cached
+// at install (no Origin), leaving every lazy screen unavailable offline.
+async function immutableAsset(request) {
+  const cached = await caches.match(request, { ignoreVary: true });
+  if (cached) return cached;
+  const res = await fetch(request);
+  if (res.ok) {
+    const clone = res.clone();
+    caches
+      .open(CACHE_NAME)
+      .then(c => c.put(request, clone))
+      .catch(() => {});
+  }
+  return res;
+}
+// Network-first for other static files (icons etc.), with the cache as the
+// offline fallback. A successful network response refreshes the cache.
 async function cachedAsset(request) {
-  const cached = await caches.match(request);
+  const cached = await caches.match(request, { ignoreVary: true });
   try {
     const res = await fetch(request);
     if (res.ok) {
@@ -150,7 +183,9 @@ self.addEventListener("fetch", e => {
     );
     return;
   }
-  if (/\.(js|css)$/i.test(url.pathname) || /\.(png|jpg|jpeg|svg|ico|woff2?)$/i.test(url.pathname))
+  if (url.origin === self.location.origin && url.pathname.startsWith("/assets/"))
+    e.respondWith(immutableAsset(e.request));
+  else if (/\.(js|css)$/i.test(url.pathname) || /\.(png|jpg|jpeg|svg|ico|woff2?)$/i.test(url.pathname))
     e.respondWith(cachedAsset(e.request));
 });
 self.addEventListener("sync", e => {

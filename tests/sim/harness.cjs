@@ -192,9 +192,8 @@ async function handle(route) {
   log.unhandled.push(`${m} ${p}`); return json(route, 404, {});
 }
 
-async function run() {
-  const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: "block", colorScheme: process.env.SIM_DARK ? "dark" : "light" });
+async function newSimContext(browser, { serviceWorkers = "block" } = {}) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers, colorScheme: process.env.SIM_DARK ? "dark" : "light" });
   await context.route(`${SUPA}/**`, handle);
   await context.route("https://api.frankfurter.app/**", r => json(r, 200, { amount: 1, base: "GHS", date: day(1), rates: { ZAR: 1.62 } }));
   await context.route(/^https:\/\/(?!localhost)/, r => { if (r.request().url().startsWith(SUPA)) return handle(r); log.unhandled.push("external " + new URL(r.request().url()).host); return r.abort(); });
@@ -208,6 +207,12 @@ async function run() {
       }
     } catch {}
   }, { UID, session: { access_token: JWT, refresh_token: "sim", expires_at: exp, expires_in: 86400, token_type: "bearer", user: USER } });
+  return context;
+}
+
+async function run() {
+  const browser = await chromium.launch();
+  const context = await newSimContext(browser);
 
   const page = await context.newPage();
   const perScreen = {};
@@ -234,5 +239,5 @@ async function run() {
   // hand the live objects to the flows script
   return { browser, context, page, perScreen, log, db, setTag: t => { screenTag = t; } };
 }
-module.exports = { run, db, log, UID, TEAM, APP };
+module.exports = { run, newSimContext, db, log, UID, TEAM, APP };
 if (require.main === module) run().then(async ({ browser }) => { await browser.close(); console.log("done"); }).catch(e => { console.error(e); process.exit(1); });
