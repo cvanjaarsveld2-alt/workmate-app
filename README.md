@@ -21,7 +21,9 @@ The production build is Vite-based and outputs to `dist`.
 npm run lint       # ESLint: undefined names/components, hook rules
 npm test           # node:test unit and source checks
 npm run test:sim   # builds the app and drives every screen + save/sync/offline
-                   # flows in Chromium against an in-memory Supabase emulator
+                   # flows in Chromium against an in-memory Supabase emulator,
+                   # then audits contrast/wrapped numbers/overflow in light and
+                   # dark mode and opens every screen offline via the service worker
 npm run check      # lint + tests + field/security checks + production build
 ```
 The simulation uses synthetic data only and never contacts Supabase; writes are

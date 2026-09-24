@@ -31,3 +31,10 @@ test("sync failures report which tables and error codes failed", () => {
   const sync = read("src/lib/sync.js");
   assert.match(sync, /logEvent\("sync_failed",\s*\{\s*count: failed\.length,\s*items:/);
 });
+
+test("server-rejected events are not buffered, so one bad row can't block the queue", () => {
+  const helpers = read("src/lib/helpers.js");
+  assert.match(helpers, /function isRetryableEventError\(error\) \{\s*return !error\?\.code;/);
+  assert.match(helpers, /if \(row && isRetryableEventError\(e\)\) writeEventBuffer/);
+  assert.match(helpers, /if \(error && isRetryableEventError\(error\)\) return;/);
+});

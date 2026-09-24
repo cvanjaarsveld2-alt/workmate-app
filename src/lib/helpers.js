@@ -237,6 +237,12 @@ function buildEventRow(name, data, userId) {
   };
 }
 
+// A PostgREST/Postgres rejection carries a code (e.g. 42501, P0001) and will
+// fail the same way on every retry; only network failures are worth keeping.
+function isRetryableEventError(error) {
+  return !error?.code;
+}
+
 async function currentUserId() {
   const { data: { session } = {} } = await supabase.auth.getSession();
   return session?.user?.id || null;
@@ -254,7 +260,9 @@ export async function flushEventBuffer() {
     const mine = buffered.filter(e => e.user_id === userId);
     if (!mine.length) return;
     const { error } = await supabase.from("events").insert(mine);
-    if (error) return;
+    // A rejected batch would be rejected forever and block everything behind
+    // it, so it's dropped; a network failure keeps it for the next attempt.
+    if (error && isRetryableEventError(error)) return;
     const sentKeys = new Set(mine.map(e => `${e.timestamp}|${e.name}`));
     writeEventBuffer(readEventBuffer().filter(e => !sentKeys.has(`${e.timestamp}|${e.name}`)));
   } catch {
@@ -276,7 +284,7 @@ export async function logEvent(name, data = {}) {
     if (error) throw error;
     flushEventBuffer();
   } catch (e) {
-    if (row) writeEventBuffer([...readEventBuffer(), row]);
+    if (row && isRetryableEventError(e)) writeEventBuffer([...readEventBuffer(), row]);
     if (e?.message !== "offline") console.warn("[PowerMate] Telemetry failed:", e?.message);
   }
 }
