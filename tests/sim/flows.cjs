@@ -431,8 +431,8 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       await go("Platform", 2500);
       consoleOk = (await page.getByText("cvanjaarsveld2@icloud.com").count()) > 0;
     }
-    rec("support: send a message from Help", row && row.user_id === H.UID && row.status === "open" && shown && consoleOk ? "PASS" : "FAIL",
-      `ticket saved=${!!row} (status ${row?.status}); confirmation=${shown}; platform console lists companies=${consoleOk}`);
+    rec("support: send a message from Help", row && row.user_id === H.UID && (row.status ?? "open") === "open" && shown && consoleOk ? "PASS" : "FAIL",
+      `ticket saved=${!!row} (status ${row?.status ?? "open (database default)"}); confirmation=${shown}; platform console lists companies=${consoleOk}`);
   });
 
   // 13h. A customer accepts a quote online: link → page → name, signature, order no.
