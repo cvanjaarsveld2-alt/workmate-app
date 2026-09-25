@@ -2,7 +2,7 @@
 // Turns a saved quote or invoice (plus its client and the company profile)
 // into the input for buildDocumentPDF. Pure functions, so they're unit-tested
 // in tests/documentData.test.mjs.
-import { addDays, documentTotals } from "./documentPDF.js";
+import { addDays, chargesVat, documentTotals } from "./documentPDF.js";
 
 export function parseItems(raw) {
   let list = raw;
@@ -72,7 +72,8 @@ export function invoiceToDocument(inv, kind, { clients = [], quotes = [], profil
   if (!items.length && quote) {
     const qItems = parseItems(quote.line_items);
     const qIncl = quote.vat_inclusive !== false;
-    if (qItems.length && Math.abs(documentTotals(qItems, { vatInclusive: qIncl }).total - total) < 0.02) {
+    const qTotal = documentTotals(qItems, { vatInclusive: qIncl, vatRegistered: chargesVat(profile) }).total;
+    if (qItems.length && Math.abs(qTotal - total) < 0.02) {
       items = qItems;
       vatInclusive = qIncl;
     }
@@ -82,7 +83,7 @@ export function invoiceToDocument(inv, kind, { clients = [], quotes = [], profil
       {
         description: (inv.notes || quote?.description || "Services rendered").split("\n")[0].slice(0, 200),
         qty: 1,
-        unitPrice: Number(inv.subtotal) || total / 1.15,
+        unitPrice: Number(inv.subtotal) || (chargesVat(profile) ? total / 1.15 : total),
       },
     ];
     vatInclusive = false;

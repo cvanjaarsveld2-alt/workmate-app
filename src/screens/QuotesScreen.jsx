@@ -287,6 +287,7 @@ export function QuotesScreen({
           items={lineItems}
           onChange={setLineItems}
           vatInclusive={vatInclusive}
+          vatRegistered={profile.vat_registered !== false}
           onVatToggle={setVatInclusive}
         />
         {lineItems.length === 0 && (

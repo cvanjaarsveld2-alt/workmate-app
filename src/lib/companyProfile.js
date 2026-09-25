@@ -12,6 +12,7 @@ export const DEFAULT_PROFILE = {
   legal_name: "",
   registration_no: "",
   vat_no: "",
+  vat_registered: true,
   address: "",
   phone: "",
   email: "",
@@ -72,6 +73,8 @@ export function cleanProfile(input) {
     if (["quote_validity_days", "payment_terms_days", "next_invoice_number"].includes(k)) {
       const n = Math.round(Number(v));
       out[k] = Number.isFinite(n) ? n : DEFAULT_PROFILE[k];
+    } else if (k === "vat_registered") {
+      out[k] = v !== false;
     } else if (k === "logo_data") {
       out[k] = v || null;
     } else {

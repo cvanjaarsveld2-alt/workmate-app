@@ -4,6 +4,7 @@ import { saveAndSync } from "./sync";
 import { withTeamId } from "./teamId";
 import { genId } from "./helpers";
 import { calculateVat } from "./finance";
+import { readCachedProfile } from "./companyProfile";
 
 const onlineNow = value =>
   value !== undefined ? value : typeof navigator !== "undefined" ? navigator.onLine : true;
@@ -110,7 +111,8 @@ export async function createInvoiceFromJob(
     total = Number(quote?.value || 0);
     if (quote?.vat_inclusive !== undefined) quoteVatInclusive = quote.vat_inclusive !== false;
   }
-  const money = calculateVat(total, quoteVatInclusive);
+  const vatRegistered = readCachedProfile(teamId || job.team_id).vat_registered !== false;
+  const money = calculateVat(total, quoteVatInclusive, vatRegistered);
   const item = withTeamId(
     {
       id: genId(),

@@ -135,3 +135,25 @@ test("the company profile is owner-only and invoices get server numbers", () => 
   // Re-upserting an existing invoice must not spend a number.
   assert.match(sql, /exists \(select 1 from public\.invoices where id = new\.id\)/);
 });
+
+test("companies not registered for VAT charge none and never issue tax invoices", async () => {
+  const noVat = { ...profile, vat_registered: false };
+  assert.equal(documentTitle("invoice", noVat), "INVOICE");
+  assert.deepEqual(documentTotals([{ qty: 2, unitPrice: 500 }], { vatInclusive: false, vatRegistered: false }), {
+    subtotal: 1000,
+    vat: 0,
+    total: 1000,
+    paid: 0,
+    balance: 1000,
+  });
+  const { calculateVat } = await import("../src/lib/finance.js");
+  assert.deepEqual(calculateVat(1000, true, false), { subtotal: 1000, vat: 0, total: 1000 });
+  assert.deepEqual(calculateVat(1150, true), { subtotal: 1000, vat: 150, total: 1150 });
+  // An invoice raised without VAT prints its full amount as one line.
+  const d = invoiceToDocument({ id: "x", invoice_number: "INV-00009", subtotal: 1000, vat: 0, total: 1000 }, "invoice", {
+    profile: noVat,
+  });
+  assert.equal(documentTotals(d.items, { vatInclusive: d.vatInclusive, vatRegistered: false }).total, 1000);
+  const blob = await buildDocumentPDF(d, noVat);
+  assert.ok((await blob.arrayBuffer()).byteLength > 2000);
+});

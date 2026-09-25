@@ -123,7 +123,7 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           <ReadOnly label="Trading name" value={profile.trading_name} />
           <ReadOnly label="Registered name" value={profile.legal_name} />
           <ReadOnly label="Registration no." value={profile.registration_no} />
-          <ReadOnly label="VAT no." value={profile.vat_no} />
+          <ReadOnly label="VAT" value={profile.vat_registered === false ? "Not registered" : profile.vat_no} />
           <ReadOnly label="Address" value={profile.address} />
           <ReadOnly label="Phone" value={profile.phone} />
           <ReadOnly label="Email" value={profile.email} />
@@ -144,7 +144,7 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           You're offline. Changes can be saved once you're back online.
         </div>
       )}
-      {!form.vat_no && (
+      {form.vat_registered !== false && !form.vat_no && (
         <div className="rounded-xl bg-blue-50 border border-blue-100 p-3 text-sm text-blue-800 leading-snug">
           Add your VAT number to issue <b>tax invoices</b>. Without it, invoices are titled "Invoice".
         </div>
@@ -204,16 +204,33 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           placeholder="e.g. Example Holdings (Pty) Ltd"
           maxLength={160}
         />
-        <div className="grid grid-cols-2 gap-3">
-          <Field
-            label="Registration no."
-            value={form.registration_no}
-            onChange={set("registration_no")}
-            placeholder="2015/123456/07"
-            maxLength={40}
+        <Field
+          label="Registration no."
+          value={form.registration_no}
+          onChange={set("registration_no")}
+          placeholder="2015/123456/07"
+          maxLength={40}
+        />
+        <label className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 border-2 border-slate-100 px-4 py-3 min-h-[56px] cursor-pointer">
+          <span>
+            <span className="block text-base font-bold text-slate-800">Registered for VAT</span>
+            <span className="block text-xs text-slate-500 leading-snug">
+              {form.vat_registered !== false
+                ? "15% VAT is added to quotes and invoices."
+                : "No VAT is added. Documents show one total and say you're not VAT registered."}
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={form.vat_registered !== false}
+            onChange={e => set("vat_registered")(e.target.checked)}
+            aria-label="Registered for VAT"
+            className="h-6 w-6 shrink-0"
           />
+        </label>
+        {form.vat_registered !== false && (
           <Field label="VAT no." value={form.vat_no} onChange={set("vat_no")} placeholder="4123456789" maxLength={20} />
-        </div>
+        )}
         <Field label="Address" value={form.address} onChange={set("address")} multiline maxLength={400} />
         <div className="grid grid-cols-2 gap-3">
           <Field label="Phone" value={form.phone} onChange={set("phone")} type="tel" maxLength={40} />

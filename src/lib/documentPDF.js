@@ -10,10 +10,12 @@
 
 export const VAT_RATE = 15;
 
+export const chargesVat = profile => profile?.vat_registered !== false;
+
 export function documentTitle(kind, profile = {}) {
   if (kind === "quote") return "QUOTATION";
   if (kind === "proforma") return "PRO FORMA INVOICE";
-  return profile.vat_no ? "TAX INVOICE" : "INVOICE";
+  return chargesVat(profile) && profile.vat_no ? "TAX INVOICE" : "INVOICE";
 }
 
 // "R 12 345.67" built by hand: locale formatting can use narrow no-break
@@ -25,9 +27,12 @@ export const money = v => {
 };
 
 // Line totals and VAT. Prices are entered VAT-inclusive or exclusive per document.
-export function documentTotals(items = [], { vatInclusive = true, vatRate = VAT_RATE, amountPaid = 0 } = {}) {
+export function documentTotals(
+  items = [],
+  { vatInclusive = true, vatRate = VAT_RATE, amountPaid = 0, vatRegistered = true } = {},
+) {
   const gross = items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0);
-  const r = vatRate / 100;
+  const r = vatRegistered ? vatRate / 100 : 0;
   const subtotal = vatInclusive ? gross / (1 + r) : gross;
   const vat = vatInclusive ? gross - subtotal : gross * r;
   const total = subtotal + vat;
@@ -135,7 +140,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
   const companyLines = [
     profile.legal_name && profile.legal_name !== companyName ? profile.legal_name : "",
     profile.registration_no ? `Reg. No: ${profile.registration_no}` : "",
-    profile.vat_no ? `VAT No: ${profile.vat_no}` : "",
+    chargesVat(profile) && profile.vat_no ? `VAT No: ${profile.vat_no}` : "",
     ...String(profile.address || "")
       .split(/\n/)
       .map(s => s.trim())
@@ -254,12 +259,19 @@ export async function buildDocumentPDF(doc, profile = {}) {
   y = pdf.lastAutoTable.finalY + 6;
 
   // ── Totals ──
-  const t = documentTotals(items, { vatInclusive: doc.vatInclusive !== false, amountPaid: doc.amountPaid });
-  const rows = [
-    ["Subtotal (excl. VAT)", money(t.subtotal)],
-    [`VAT (${VAT_RATE}%)`, money(t.vat)],
-    ["Total (incl. VAT)", money(t.total), true],
-  ];
+  const vatOn = chargesVat(profile);
+  const t = documentTotals(items, {
+    vatInclusive: doc.vatInclusive !== false,
+    amountPaid: doc.amountPaid,
+    vatRegistered: vatOn,
+  });
+  const rows = vatOn
+    ? [
+        ["Subtotal (excl. VAT)", money(t.subtotal)],
+        [`VAT (${VAT_RATE}%)`, money(t.vat)],
+        ["Total (incl. VAT)", money(t.total), true],
+      ]
+    : [["Total", money(t.total), true]];
   if (kind === "invoice" && t.paid > 0) {
     rows.push(["Paid", money(t.paid)]);
     rows.push(["Balance due", money(t.balance), true]);
@@ -300,7 +312,9 @@ export async function buildDocumentPDF(doc, profile = {}) {
   if (kind === "proforma")
     section(
       "Please note",
-      "This is a pro forma invoice and not a tax invoice. A tax invoice will be issued once payment is received or the goods or services are supplied.",
+      chargesVat(profile)
+        ? "This is a pro forma invoice and not a tax invoice. A tax invoice will be issued once payment is received or the goods or services are supplied."
+        : "This is a pro forma invoice. An invoice will be issued once payment is received or the goods or services are supplied.",
     );
 
   // ── Banking details (what the customer pays into) ──
@@ -371,7 +385,8 @@ export async function buildDocumentPDF(doc, profile = {}) {
   const footer = [
     profile.legal_name || companyName,
     profile.registration_no ? `Reg. No ${profile.registration_no}` : "",
-    profile.vat_no ? `VAT No ${profile.vat_no}` : "",
+    chargesVat(profile) && profile.vat_no ? `VAT No ${profile.vat_no}` : "",
+    chargesVat(profile) ? "" : "Not registered for VAT",
   ]
     .filter(Boolean)
     .join("  ·  ");

@@ -17,7 +17,7 @@ function emptyLine() {
   return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, description: "", qty: "1", unitPrice: "" };
 }
 
-export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVatToggle }) {
+export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVatToggle, vatRegistered = true }) {
   function update(id, field, value) {
     onChange(items.map(i => i.id === id ? { ...i, [field]: value } : i));
   }
@@ -26,17 +26,21 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
 
   const lineSubtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0), 0);
   const subtotal = roundMoney(lineSubtotal);
-  const { vat: vatAmount, total } = calculateVat(subtotal, vatInclusive);
+  const { vat: vatAmount, total } = calculateVat(subtotal, vatInclusive, vatRegistered);
 
   return (
     <div className="stack-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Line items</p>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => onVatToggle?.(!vatInclusive)}
-            className="text-[10px] font-bold px-2 py-1 rounded-full border border-slate-200 text-slate-500">
-            VAT {vatInclusive ? "incl" : "excl"}
-          </button>
+          {vatRegistered ? (
+            <button type="button" onClick={() => onVatToggle?.(!vatInclusive)}
+              className="text-[10px] font-bold px-2 py-1 rounded-full border border-slate-200 text-slate-500">
+              VAT {vatInclusive ? "incl" : "excl"}
+            </button>
+          ) : (
+            <span className="text-[10px] font-bold px-2 py-1 rounded-full border border-slate-200 text-slate-500">No VAT</span>
+          )}
         </div>
       </div>
 
@@ -81,16 +85,18 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
       {/* Totals */}
       {items.length > 0 && (
         <div className="rounded-xl bg-white border border-slate-100 p-3.5 stack-y-2">
-          {!vatInclusive && (
+          {vatRegistered && !vatInclusive && (
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Subtotal</span>
               <span className="font-bold text-slate-700">R {subtotal.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
             </div>
           )}
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-500">VAT ({VAT_PERCENT}%){vatInclusive ? " incl." : ""}</span>
-            <span className="font-bold text-slate-500">R {vatAmount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
-          </div>
+          {vatRegistered && (
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">VAT ({VAT_PERCENT}%){vatInclusive ? " incl." : ""}</span>
+              <span className="font-bold text-slate-500">R {vatAmount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
+            </div>
+          )}
           <div className="flex justify-between text-base pt-1 border-t border-slate-100">
             <span className="font-black text-slate-900">Total</span>
             <span className="font-black" style={{ color: BRAND.primary }}>R {total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
