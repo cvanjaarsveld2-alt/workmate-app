@@ -88,6 +88,10 @@ export const PIN_LOCKOUT_KEY  = "pm_pin_lockout_until";
 export const PIN_DISABLED_KEY = "pm_pin_disabled";
 export const PIN_MAX_ATTEMPTS = 5;
 export const PIN_LOCKOUT_MS   = 5 * 60 * 1000; // 5 minutes
+// Ask for the PIN again after the app has been in the background this long
+// (a lost or borrowed phone shouldn't stay unlocked).
+export const PIN_AUTO_LOCK_MS = 15 * 60 * 1000;
+export const PIN_HIDDEN_AT_KEY = "pm_pin_hidden_at";
 
 // FIX (Build 8, Phase 3) — every PIN/biometric key above used to be read and
 // written completely unscoped. On a shared device that meant User B, signing

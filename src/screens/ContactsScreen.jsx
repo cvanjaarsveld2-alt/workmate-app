@@ -67,6 +67,17 @@ function ExpandableText({ text, limit = 100, className = "" }) {
   );
 }
 
+// Card photo above the contact form (stored as a storage path; signed on show).
+function CardFormPreview({ stored }) {
+  const { url, status } = useStoredPhoto(stored);
+  if (status !== "ready") return null;
+  return (
+    <div className="rounded-xl overflow-hidden border border-slate-200">
+      <img src={url} alt="Business card" className="w-full max-h-48 object-contain bg-slate-50" />
+    </div>
+  );
+}
+
 // Business card photo in the contact detail. Rendered only once the image has
 // actually loaded: if it can't be (a teammate can't read the uploader's files,
 // or there's no signal) the whole section is left out, not an empty box.
@@ -381,11 +392,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
           )}
         </div>
 
-        {cardPhotoUrl && (
-          <div className="rounded-xl overflow-hidden border border-slate-200">
-            <img src={cardPhotoUrl} alt="Business card" className="w-full max-h-48 object-contain bg-slate-50" />
-          </div>
-        )}
+        {cardPhotoUrl && <CardFormPreview stored={cardPhotoUrl} />}
 
         <Field label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. John Smith" required />
         <div className="grid grid-cols-1 gap-3">

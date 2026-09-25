@@ -12,6 +12,8 @@ import {
   PIN_KEY,
   PIN_UNLOCKED_KEY,
   PIN_DISABLED_KEY,
+  PIN_AUTO_LOCK_MS,
+  PIN_HIDDEN_AT_KEY,
   scopedPinKey,
   BRAND,
 } from "./lib/constants";
@@ -480,6 +482,30 @@ export default function PowerWorksApp() {
       window.removeEventListener("powermate:sync_failed", onSyncFailed);
     };
   }, []);
+  // Auto-lock: after PIN_AUTO_LOCK_MS in the background the PIN is asked for
+  // again. The lock screen covers the app ("relocked") rather than replacing
+  // it, so a half-finished form is still there after unlocking.
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    const key = scopedPinKey(PIN_HIDDEN_AT_KEY, uid);
+    const onVisibility = () => {
+      try {
+        if (document.visibilityState === "hidden") {
+          localStorage.setItem(key, String(Date.now()));
+          return;
+        }
+        const hiddenAt = Number(localStorage.getItem(key) || 0);
+        localStorage.removeItem(key);
+        if (!hiddenAt || Date.now() - hiddenAt < PIN_AUTO_LOCK_MS) return;
+        if (localStorage.getItem(scopedPinKey(PIN_DISABLED_KEY, uid)) === "1" || !getPINHash(uid)) return;
+        sessionStorage.removeItem(scopedPinKey(PIN_UNLOCKED_KEY, uid));
+        setPinState(s => (s === "unlocked" ? "relocked" : s));
+      } catch {}
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [session?.user?.id]);
   useEffect(() => {
     if (!session?.user?.id) return;
     const uid = session.user.id;
@@ -488,7 +514,13 @@ export default function PowerWorksApp() {
         setPinState("unlocked");
         return;
       }
-      if (isSessionUnlocked(uid)) {
+      // A still-open session counts as unlocked unless the app sat in the
+      // background past the auto-lock limit (covers a relaunch after that).
+      let hiddenAt = 0;
+      try {
+        hiddenAt = Number(localStorage.getItem(scopedPinKey(PIN_HIDDEN_AT_KEY, uid)) || 0);
+      } catch {}
+      if (isSessionUnlocked(uid) && !(hiddenAt && Date.now() - hiddenAt >= PIN_AUTO_LOCK_MS)) {
         setPinState("unlocked");
         return;
       }
@@ -1030,6 +1062,11 @@ export default function PowerWorksApp() {
   };
   return (
     <ErrorBoundary>
+      {pinState === "relocked" && (
+        <div className="fixed inset-0 z-[200] overflow-y-auto" style={{ background: "var(--pm-page-bg)" }}>
+          <PINLockScreen userId={session.user.id} onUnlock={() => setPinState("unlocked")} onForgot={logout} />
+        </div>
+      )}
       <TeamViewContext.Provider value={{ teamId, showTeam: !!teamAccess?.can_view_team && teamViewOn }}>
         <ExportProgressProvider>
           <div

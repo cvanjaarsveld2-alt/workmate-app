@@ -118,7 +118,9 @@ export function SharedInboxScreen({ userId, userEmail, teamId, onBack, onAccepte
         .eq("to_user_id", userId)
         .eq("accepted", false)
         .is("declined", null)         // null = pending (not yet declined)
-        .neq("record_type", "team_view_request") // access requests are answered on the Team screen
+        // Access requests are answered on the Team screen; the daily problem
+        // digest is a notice, not a record to accept.
+        .not("record_type", "in", "(team_view_request,problem_digest)")
         .order("created_at", { ascending: false })
         .limit(50);
       if (!error) setItems(data || []);

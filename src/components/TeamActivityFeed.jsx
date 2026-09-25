@@ -48,6 +48,7 @@ export function TeamActivityFeed({ teamId, userId, limit = 20 }) {
         .from("team_notifications")
         .select("*")
         .eq("team_id", teamId)
+        .neq("record_type", "problem_digest") // owner-only health notice, not team activity
         .order("created_at", { ascending: false })
         .limit(limit);
       if (!error && data) setItems(data);

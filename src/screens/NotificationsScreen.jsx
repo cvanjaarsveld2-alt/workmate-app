@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Check, Users, TrendingUp, Calendar, UserPlus, Inbox } from "lucide-react";
+import { Bell, Check, Users, TrendingUp, Calendar, UserPlus, Inbox, AlertTriangle } from "lucide-react";
 import { supabase } from "../supabase";
 import { markNotificationsRead } from "../lib/teamNotifications";
 import { Card, PageHeader, Empty, Toast, Btn, useConfirm } from "../components/ui";
@@ -17,6 +17,8 @@ const TYPE_ICON = {
   followup: { icon: Calendar,   bg: "#DBEAFE", color: "#1E40AF" },
   client:   { icon: Users,      bg: "#DCFCE7", color: "#166534" },
   contact:  { icon: UserPlus,   bg: "#FEF3C7", color: "#92400E" },
+  // Daily app-health summary for the master account (problem-digest function).
+  problem_digest: { icon: AlertTriangle, bg: "#FEE2E2", color: "#991B1B" },
 };
 
 export function NotificationsScreen({ userId, onNavigate, onMarkRead }) {

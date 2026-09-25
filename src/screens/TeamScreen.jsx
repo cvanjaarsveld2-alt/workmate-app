@@ -509,6 +509,8 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
   const [viewAccess, setViewAccess]   = useState({});
   const [viewRequests, setViewRequests] = useState([]);
   const [teamViewOn, setTeamViewOn]   = useState(readTeamViewPref);
+  // Master account removing a teammate: who takes over their work.
+  const [removing, setRemoving]       = useState(null);
   const { confirm, dialog }           = useConfirm();
 
   useEffect(() => { loadTeam(); }, [userId, appUserRole]);
@@ -658,6 +660,11 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
 
   async function removeMember(member) {
     const isMe = member.user_id === userId;
+    // The master account hands a leaver's work to someone else in one step.
+    if (!isMe && access?.is_owner) {
+      setRemoving({ member, reassignTo: userId, blockLogin: true, busy: false });
+      return;
+    }
     const ok = await confirm(
       isMe ? "Leave this team? Your data will remain." : `Remove ${member.email} from the team?`,
       { confirmLabel: isMe ? "Leave" : "Remove" }
@@ -668,6 +675,26 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
     if (error) { setToast("Could not remove"); return; }
     if (isMe) { setTeam(null); setMembers([]); setMyRole(null); onTeamChange?.(null); }
     else { setMembers(m => m.filter(x => x.user_id !== member.user_id)); setToast("Member removed"); }
+  }
+
+  async function confirmRemoveMember() {
+    if (!removing || removing.busy) return;
+    const { member, reassignTo, blockLogin } = removing;
+    setRemoving(r => ({ ...r, busy: true }));
+    const { data, error } = await supabase.rpc("remove_team_member", {
+      p_user_id: member.user_id, p_reassign_to: reassignTo, p_block_login: blockLogin,
+    });
+    if (error) {
+      setRemoving(r => ({ ...r, busy: false }));
+      setToast(error.message || "Could not remove");
+      return;
+    }
+    const to = members.find(m => m.user_id === reassignTo);
+    const moved = (data?.records_moved || 0) + (data?.assignments_moved || 0);
+    setMembers(m => m.filter(x => x.user_id !== member.user_id));
+    setRemoving(null);
+    setToast(`${member.email} removed · ${moved} record${moved === 1 ? "" : "s"} moved to ${reassignTo === userId ? "you" : to?.email || "teammate"}`);
+    triggerImmediateSync();
   }
 
   // Only the master account changes roles or access (enforced by set_member_access).
@@ -861,6 +888,46 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
     <div className="space-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+
+      {removing && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-end sm:items-center justify-center p-4"
+          onClick={() => !removing.busy && setRemoving(null)}>
+          <div className="w-full max-w-md" onClick={e => e.stopPropagation()}>
+          <Card className="p-5 space-y-4">
+            <div>
+              <p className="text-lg font-black text-slate-900">Remove {removing.member.email}?</p>
+              <p className="text-sm text-slate-500 mt-1 leading-snug">
+                Their clients, contacts, follow-ups, quotes, notes, leads and jobs move to the person you choose.
+                Their expenses and vehicle checks stay on record for the team.
+              </p>
+            </div>
+            <label className="block">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-wider">Hand their work to</span>
+              <select value={removing.reassignTo}
+                onChange={e => setRemoving(r => ({ ...r, reassignTo: e.target.value }))}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-800">
+                {members.filter(m => m.user_id !== removing.member.user_id).map(m => (
+                  <option key={m.user_id} value={m.user_id}>{m.user_id === userId ? `Me (${m.email})` : m.email}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-start gap-3 rounded-xl bg-slate-50 p-3">
+              <input type="checkbox" checked={removing.blockLogin}
+                onChange={e => setRemoving(r => ({ ...r, blockLogin: e.target.checked }))}
+                className="mt-0.5 h-5 w-5 shrink-0" />
+              <span className="text-sm text-slate-700 leading-snug">
+                <span className="font-bold">Block their login</span> — recommended when someone leaves the company.
+                They are signed out everywhere either way.
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <Btn variant="outline" onClick={() => setRemoving(null)} disabled={removing.busy}>Cancel</Btn>
+              <Btn onClick={confirmRemoveMember} disabled={removing.busy}>{removing.busy ? "Removing…" : "Remove"}</Btn>
+            </div>
+          </Card>
+          </div>
+        </div>
+      )}
 
       <PageHeader
         title={team.name}
