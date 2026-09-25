@@ -58,7 +58,7 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
+            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-xs"
           />
         )}
       </AnimatePresence>
@@ -91,7 +91,7 @@ export function QuickCaptureFAB({ currentScreen, onTrigger }) {
                 onClick={() => handleSelect(primary.key)}
                 className="w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-slate-100 active:opacity-80 transition-opacity"
                 style={{ background: primary.bg }}>
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm" style={{ background: "white" }}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs" style={{ background: "white" }}>
                   <primary.icon size={17} style={{ color: primary.color }} />
                 </div>
                 <div className="flex-1 min-w-0">

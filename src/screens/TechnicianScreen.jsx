@@ -139,7 +139,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
 
   if (editing)
     return (
-      <div className="space-y-4 pb-28">
+      <div className="stack-y-4 pb-28">
         <PageHeader
           title="Technician Job"
           subtitle={
@@ -151,7 +151,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
           }
           onBack={() => setEditing(null)}
         />
-        <Card className="p-4 space-y-3">
+        <Card className="p-4 stack-y-3">
           <Field
             label="Customer"
             value={editing.client_name}
@@ -177,7 +177,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
             placeholder="Technician name"
           />
         </Card>
-        <Card className="p-4 space-y-3">
+        <Card className="p-4 stack-y-3">
           <p className="text-sm font-black text-slate-700">Safety & job checklist</p>
           {editing.checklist.map((c, i) => (
             <button
@@ -199,7 +199,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
             </button>
           ))}
         </Card>
-        <Card className="p-4 space-y-3">
+        <Card className="p-4 stack-y-3">
           <Field
             label="Fault / diagnosis"
             value={editing.fault}
@@ -215,7 +215,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
             multiline
           />
         </Card>
-        <Card className="p-4 space-y-3">
+        <Card className="p-4 stack-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-black text-slate-700">Parts used</p>
             <Btn size="sm" variant="secondary" onClick={addPart}>
@@ -262,7 +262,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
             </div>
           ))}
         </Card>
-        <Card className="p-4 space-y-3">
+        <Card className="p-4 stack-y-3">
           <p className="text-sm font-black text-slate-700">Service photos</p>
           <div className="grid grid-cols-2 gap-2">
             {editing.photos.map(p => (
@@ -282,7 +282,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
             <Camera size={16} /> Add photo
           </MediaPicker>
         </Card>
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-100 p-3 max-w-2xl mx-auto flex gap-2">
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-t border-slate-100 p-3 max-w-2xl mx-auto flex gap-2">
           <Btn variant="secondary" className="flex-1" onClick={() => save(editing)}>
             <Save size={15} /> Save
           </Btn>
@@ -301,7 +301,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
     );
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="stack-y-4 pb-24">
       <PageHeader
         title="Technician"
         subtitle={
@@ -327,7 +327,7 @@ export function TechnicianScreen({ data, setData, userId, teamId, onBack }) {
           onAction={newJob}
         />
       ) : (
-        <div className="space-y-2">
+        <div className="stack-y-2">
           {reports.map(r => (
             <button key={r.id} onClick={() => openJob(r)} className="w-full text-left">
               <Card className="p-4">

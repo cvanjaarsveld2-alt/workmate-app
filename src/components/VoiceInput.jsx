@@ -139,7 +139,7 @@ export function VoiceInput({
     setError("");
   }
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div className={`stack-y-2 ${className}`}>
       <div className="flex items-center gap-2">
         <button
           onClick={() => setLanguage("en-ZA")}

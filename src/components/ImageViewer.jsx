@@ -50,18 +50,18 @@ export function ImageViewer({ images, startIndex = 0, onClose }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[80] bg-black flex flex-col"
+      className="fixed inset-0 z-80 bg-black flex flex-col"
       onClick={onClose}>
 
       {/* Close button (top-right) — bigger touch target than X icon alone */}
       <button onClick={(e) => { e.stopPropagation(); onClose(); }}
-        className="absolute top-4 right-4 z-10 w-11 h-11 rounded-full bg-black/50 backdrop-blur flex items-center justify-center text-white">
+        className="absolute top-4 right-4 z-10 w-11 h-11 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white">
         <X size={22} />
       </button>
 
       {/* Caption */}
       {current.caption && (
-        <div className="absolute top-4 left-4 right-16 z-10 text-white text-sm font-bold px-3 py-2 rounded-lg bg-black/40 backdrop-blur truncate">
+        <div className="absolute top-4 left-4 right-16 z-10 text-white text-sm font-bold px-3 py-2 rounded-lg bg-black/40 backdrop-blur-sm truncate">
           {current.caption}
         </div>
       )}

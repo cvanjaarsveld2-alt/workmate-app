@@ -4,7 +4,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Home, Calendar, Settings, Search, Menu, Plus, Bell } from "lucide-react";
 import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
-import { offlineGetAll, offlineSave, offlineReplaceAll, setOfflineUser, getCurrentOfflineUser } from "./offline/offlineDb";
+import {
+  offlineGetAll,
+  offlineSave,
+  offlineReplaceAll,
+  setOfflineUser,
+  getCurrentOfflineUser,
+} from "./offline/offlineDb";
 import { todayISO, reportError, genId } from "./lib/helpers";
 import {
   localStorageKey,
@@ -46,6 +52,7 @@ import { Wordmark } from "./components/Wordmark";
 import { ExportProgressProvider } from "./components/ExportProgress";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
+import { readHiddenScreens, saveHiddenScreens, syncHiddenScreens } from "./lib/menuPrefs";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 import { HomeScreen } from "./screens/HomeScreen";
 const EquipmentScreen = lazy(() =>
@@ -125,8 +132,14 @@ import { PullToRefresh } from "./components/PullToRefresh";
 // the initial useState can never drift out of sync with each other.
 // Readable names for the top bar (route keys are internal identifiers).
 const SCREEN_TITLES = {
-  Followups: "Follow-ups", VehicleCheck: "Vehicle Check", ColdCall: "Cold Call", JackSelector: "Jack Selector",
-  BackfillZAR: "Backfill ZAR", SharedInbox: "Shared Inbox", Client360: "Client 360", TeamDashboard: "Team Dashboard",
+  Followups: "Follow-ups",
+  VehicleCheck: "Vehicle Check",
+  ColdCall: "Cold Call",
+  JackSelector: "Jack Selector",
+  BackfillZAR: "Backfill ZAR",
+  SharedInbox: "Shared Inbox",
+  Client360: "Client 360",
+  TeamDashboard: "Team Dashboard",
   Planner: "Weekly Planner",
 };
 const INITIAL_DATA = {
@@ -167,7 +180,7 @@ class ErrorBoundary extends React.Component {
           className="flex min-h-screen flex-col items-center justify-center px-6 text-center"
           style={{ background: "var(--pm-page-bg)" }}
         >
-          <div className="bg-white rounded-2xl max-w-sm w-full p-8 space-y-4 shadow-sm border border-slate-100">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-8 stack-y-4 shadow-xs border border-slate-100">
             <div className="text-4xl">⚠️</div>
             <h2 className="text-lg font-black text-slate-900">Something went wrong</h2>
             <button
@@ -260,7 +273,13 @@ export default function PowerWorksApp() {
     for (const item of data.syncQueue || []) {
       if (!item?.id || persistedQueueIds.current.has(item.id)) continue;
       persistedQueueIds.current.add(item.id);
-      const durable = { attempts: 0, next_attempt_at: null, status: "pending", created_at: new Date().toISOString(), ...item };
+      const durable = {
+        attempts: 0,
+        next_attempt_at: null,
+        status: "pending",
+        created_at: new Date().toISOString(),
+        ...item,
+      };
       writes.push(offlineSave("syncQueue", durable).catch(() => persistedQueueIds.current.delete(item.id)));
     }
     // Not every screen starts a sync after queueing; do it here once the new
@@ -454,7 +473,12 @@ export default function PowerWorksApp() {
         const kept = (d.syncQueue || []).filter(i => i.status !== "failed");
         // Clear the stored copy too, or the next sync merges the failed items back.
         offlineGetAll("syncQueue")
-          .then(rows => offlineReplaceAll("syncQueue", (rows || []).filter(i => i.status !== "failed")))
+          .then(rows =>
+            offlineReplaceAll(
+              "syncQueue",
+              (rows || []).filter(i => i.status !== "failed"),
+            ),
+          )
           .catch(() => {});
         return { ...d, syncQueue: kept };
       });
@@ -658,6 +682,30 @@ export default function PowerWorksApp() {
       return;
     subscribeToPush(session.user.id).catch(() => {});
   }, [session?.user?.id, isOnline]);
+  // Each teammate's own menu: screens they chose to hide. Instant from this
+  // device, then reconciled with their user record (and any offline change sent).
+  const [hiddenScreens, setHiddenScreens] = useState([]);
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid) return;
+    setHiddenScreens(readHiddenScreens(uid));
+    if (!isOnline) return;
+    let live = true;
+    syncHiddenScreens(uid).then(
+      list => live && setHiddenScreens(list),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [session?.user?.id, isOnline]);
+  const onSaveHidden = useCallback(
+    list => {
+      const uid = session?.user?.id;
+      if (uid) saveHiddenScreens(uid, list).then(setHiddenScreens);
+    },
+    [session?.user?.id],
+  );
   // Server reminders fire at each user's local time, so keep their timezone current.
   useEffect(() => {
     if (!session?.user?.id || !isOnline) return;
@@ -1063,8 +1111,12 @@ export default function PowerWorksApp() {
   return (
     <ErrorBoundary>
       {pinState === "relocked" && (
-        <div className="fixed inset-0 z-[200] overflow-y-auto" style={{ background: "var(--pm-page-bg)" }}>
-          <PINLockScreen userId={session.user.id} onUnlock={() => setPinState("unlocked")} onForgot={logout} />
+        <div className="fixed inset-0 z-200 overflow-y-auto" style={{ background: "var(--pm-page-bg)" }}>
+          <PINLockScreen
+            userId={session.user.id}
+            onUnlock={() => setPinState("unlocked")}
+            onForgot={logout}
+          />
         </div>
       )}
       <TeamViewContext.Provider value={{ teamId, showTeam: !!teamAccess?.can_view_team && teamViewOn }}>
@@ -1089,7 +1141,9 @@ export default function PowerWorksApp() {
                   <Wordmark variant="dark" size="sm" />
                 ) : (
                   <div className="flex items-center gap-2 min-w-0">
-                    <p className="text-base font-black text-slate-900 truncate">{SCREEN_TITLES[screen] || screen}</p>
+                    <p className="text-base font-black text-slate-900 truncate">
+                      {SCREEN_TITLES[screen] || screen}
+                    </p>
                   </div>
                 )}
                 <div className="flex items-center gap-1 shrink-0">
@@ -1128,6 +1182,8 @@ export default function PowerWorksApp() {
               badges={{}}
               userEmail={session.user?.email}
               onLogout={logout}
+              hiddenScreens={hiddenScreens}
+              onSaveHidden={onSaveHidden}
               userId={session.user.id}
               teamId={teamId}
               setData={setData}

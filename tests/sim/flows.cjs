@@ -287,6 +287,41 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     rec("pin: auto-lock after background keeps unsaved work", locked && unlocked && draft === "SIM draft kept" ? "PASS" : "FAIL", `locked after 16 min away=${locked}; unlocked with PIN=${unlocked}; draft kept="${draft}"`);
   });
 
+  // 13b. Each teammate chooses what shows in their own menu; it is saved to their user record.
+  await safe("menu: hide a screen from my menu", async () => {
+    await go("Home");
+    const openMenu = async () => { await page.getByRole("button", { name: /menu/i }).first().click(); await page.waitForTimeout(700); };
+    const drawerHas = label => page.locator("div.fixed.z-71 button", { hasText: new RegExp(`^\\s*${label}\\s*$`) }).count();
+    await openMenu();
+    const before = await drawerHas("Invoices");
+    await page.getByRole("button", { name: "Customise menu" }).click(); await page.waitForTimeout(400);
+    const homeLocked = await page.getByLabel("Show Dashboard").isDisabled();
+    await page.getByLabel("Show Invoices").uncheck();
+    await page.getByRole("button", { name: "Done", exact: true }).click(); await page.waitForTimeout(1200);
+    const after = await drawerHas("Invoices");
+    const call = log.writes.find(w => w.fn === "set_my_hidden_screens");
+    await shot("menu-custom");
+    // Survives a reload (read back from the user record), then restore it.
+    await go("Home"); await openMenu();
+    const afterReload = await drawerHas("Invoices");
+    await page.getByRole("button", { name: "Customise menu" }).click(); await page.waitForTimeout(300);
+    await page.getByLabel("Show Invoices").check();
+    await page.getByRole("button", { name: "Done", exact: true }).click(); await page.waitForTimeout(1200);
+    const restored = await drawerHas("Invoices");
+    const me = H.db.users.find(u => u.id === H.UID);
+    rec("menu: hide a screen from my menu", before === 1 && homeLocked && after === 0 && afterReload === 0 && restored === 1 && JSON.stringify(call?.body?.p_screens) === '["Invoices"]' && me?.hidden_screens?.length === 0 ? "PASS" : "FAIL",
+      `shown before=${before}; Dashboard locked=${homeLocked}; hidden after Done=${after === 0}; still hidden after reload=${afterReload === 0}; saved=${JSON.stringify(call?.body?.p_screens)}; restored=${restored === 1}`);
+  });
+
+  // 13c. Phones: form fields are at least 16px so iPhone Safari does not zoom in on focus.
+  await safe("touch: form fields never trigger iPhone zoom", async () => {
+    await go("Notes");
+    await page.getByRole("button", { name: "Add", exact: true }).first().click(); await page.waitForTimeout(600);
+    const sizes = await page.evaluate(() => [...document.querySelectorAll("input:not([type=checkbox]):not([type=radio]), select, textarea")].filter(e => e.getBoundingClientRect().width > 0).map(e => parseFloat(getComputedStyle(e).fontSize)));
+    const small = sizes.filter(x => x < 16);
+    rec("touch: form fields never trigger iPhone zoom", sizes.length > 0 && small.length === 0 ? "PASS" : "FAIL", `${sizes.length} visible fields; under 16px: ${small.length}`);
+  });
+
   // 14. Master account removes a teammate and hands their work over (runs last: it changes the team).
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("team: remove teammate hands over work", async () => {
     const GREG = "f16f3dd1-c87c-4066-8a38-750d7bc31d65";

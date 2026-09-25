@@ -50,7 +50,7 @@ export function MemberSelector({
         tabIndex={0}
         onClick={() => setOpen(!open)}
         onKeyDown={e => { if (e.key === "Enter" || e.key === " ") setOpen(!open); }}
-        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base text-left flex items-center gap-3 outline-none focus:border-red-300 min-h-[56px] transition-colors cursor-pointer">
+        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base text-left flex items-center gap-3 outline-hidden focus:border-red-300 min-h-[56px] transition-colors cursor-pointer">
         {selected ? (
           <>
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-black shrink-0"

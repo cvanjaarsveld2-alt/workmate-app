@@ -64,7 +64,7 @@ function Section({ icon: Icon, title, subtitle, filled, children, defaultOpen = 
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="overflow-hidden">
-            <div className="px-4 pb-4 pt-1 space-y-3 border-t border-slate-100">
+            <div className="px-4 pb-4 pt-1 stack-y-3 border-t border-slate-100">
               {children}
             </div>
           </motion.div>
@@ -84,7 +84,7 @@ function TextBlock({ label, value, onChange, placeholder, rows = 3 }) {
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full text-sm text-slate-800 bg-slate-50 rounded-xl px-3 py-2.5 border-2 border-slate-100 focus:border-red-300 focus:bg-white focus:outline-none resize-none transition-colors" />
+        className="w-full text-sm text-slate-800 bg-slate-50 rounded-xl px-3 py-2.5 border-2 border-slate-100 focus:border-red-300 focus:bg-white focus:outline-hidden resize-none transition-colors" />
     </div>
   );
 }
@@ -124,7 +124,7 @@ export function EngineeringSections({ engineering = {}, onChange }) {
   const hasObj = (o) => o && Object.values(o).some(v => has(v));
 
   return (
-    <div className="space-y-2.5">
+    <div className="stack-y-2.5">
       <div className="flex items-center gap-2 px-1 pt-1">
         <FileText size={15} style={{ color: BRAND_PRIMARY }} />
         <p className="text-sm font-black text-slate-700">Engineering report detail</p>
@@ -200,7 +200,7 @@ export function EngineeringSections({ engineering = {}, onChange }) {
           <select
             value={eng.rca?.method || ""}
             onChange={e => setIn("rca", "method", e.target.value)}
-            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2.5 text-sm outline-none focus:border-red-300 focus:bg-white transition-colors">
+            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2.5 text-sm outline-hidden focus:border-red-300 focus:bg-white transition-colors">
             {RCA_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
         </div>
@@ -226,7 +226,7 @@ export function EngineeringSections({ engineering = {}, onChange }) {
               <select
                 value={impact[area.key]?.severity || ""}
                 onChange={e => setIn("impact", area.key, { ...(impact[area.key] || {}), severity: e.target.value })}
-                className="text-xs font-bold rounded-lg border border-slate-200 bg-white px-2 py-1.5 outline-none">
+                className="text-xs font-bold rounded-lg border border-slate-200 bg-white px-2 py-1.5 outline-hidden">
                 {SEVERITY_LEVELS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
@@ -234,7 +234,7 @@ export function EngineeringSections({ engineering = {}, onChange }) {
               value={impact[area.key]?.description || ""}
               onChange={e => setIn("impact", area.key, { ...(impact[area.key] || {}), description: e.target.value })}
               placeholder={area.hint}
-              className="w-full text-sm text-slate-700 bg-white rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-none" />
+              className="w-full text-sm text-slate-700 bg-white rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-hidden" />
           </div>
         ))}
       </Section>
@@ -244,12 +244,12 @@ export function EngineeringSections({ engineering = {}, onChange }) {
         subtitle={actions.length ? `${actions.length} action${actions.length !== 1 ? "s" : ""}` : "Action items, owners, dates"}
         filled={actions.length > 0}>
         {actions.map((a, i) => (
-          <div key={a.id} className="rounded-xl bg-slate-50 p-3 border border-slate-100 space-y-2">
+          <div key={a.id} className="rounded-xl bg-slate-50 p-3 border border-slate-100 stack-y-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-black text-slate-400 shrink-0">#{i + 1}</span>
               <input value={a.action} onChange={e => patchAction(a.id, { action: e.target.value })}
                 placeholder="Action item…"
-                className="flex-1 text-sm font-bold text-slate-800 bg-white rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-none" />
+                className="flex-1 text-sm font-bold text-slate-800 bg-white rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-hidden" />
               <button onClick={() => removeAction(a.id)} className="w-8 h-8 rounded-lg bg-white text-slate-400 flex items-center justify-center shrink-0 border border-slate-100">
                 <Trash2 size={14} />
               </button>
@@ -257,10 +257,10 @@ export function EngineeringSections({ engineering = {}, onChange }) {
             <div className="grid grid-cols-2 gap-2">
               <input value={a.responsible} onChange={e => patchAction(a.id, { responsible: e.target.value })}
                 placeholder="Responsible"
-                className="text-xs text-slate-700 bg-white rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-none" />
+                className="text-xs text-slate-700 bg-white rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-hidden" />
               <input value={a.target_date} onChange={e => patchAction(a.id, { target_date: e.target.value })}
                 placeholder="Target date"
-                className="text-xs text-slate-700 bg-white rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-none" />
+                className="text-xs text-slate-700 bg-white rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-hidden" />
             </div>
             <div className="flex gap-2">
               {["pending", "in_progress", "done"].map(st => (

@@ -63,7 +63,7 @@ export function Btn({ children, onClick, disabled, variant = "solid", className 
 // ─── Field ────────────────────────────────────────────────────────────────────
 // 56px min height — easy to tap accurately when the phone is bouncing.
 export function Field({ label, value, onChange, placeholder = "", type = "text", multiline = false, required = false, maxLength }) {
-  const cls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[56px]";
+  const cls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-hidden focus:border-red-300 focus:bg-white transition-colors min-h-[56px]";
   return (
     <div>
       {label && (
@@ -90,7 +90,7 @@ export function SelectField({ label, value, onChange, options }) {
       <select
         value={value || ""}
         onChange={e => onChange(e.target.value)}
-        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[56px]">
+        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-hidden focus:border-red-300 focus:bg-white transition-colors min-h-[56px]">
         {options.map(o => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
@@ -220,7 +220,7 @@ export function ClientSelector({ label, value, onChange, clients = [], placehold
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base text-left flex items-center justify-between outline-none focus:border-red-300 min-h-[56px] transition-colors">
+        className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base text-left flex items-center justify-between outline-hidden focus:border-red-300 min-h-[56px] transition-colors">
         <span className={selected ? "text-slate-900 font-medium" : "text-slate-400"}>
           {selected ? `${selected.company}${selected.branch ? ` — ${selected.branch}` : ""}` : placeholder}
         </span>
@@ -233,7 +233,7 @@ export function ClientSelector({ label, value, onChange, clients = [], placehold
             className="absolute z-30 mt-1 w-full bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden max-h-64 flex flex-col">
             <div className="p-2 border-b border-slate-50">
               <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Search clients…"
-                className="w-full rounded-lg bg-slate-50 px-3 py-2.5 text-sm outline-none min-h-[44px]" />
+                className="w-full rounded-lg bg-slate-50 px-3 py-2.5 text-sm outline-hidden min-h-[44px]" />
             </div>
             <div className="overflow-y-auto">
               <button type="button"
@@ -267,7 +267,7 @@ export function SearchBar({ value, onChange, placeholder = "Search…" }) {
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border-2 border-slate-100 bg-white py-3.5 pl-11 pr-11 text-base outline-none focus:border-red-300 transition-colors min-h-[56px]" />
+        className="w-full rounded-xl border-2 border-slate-100 bg-white py-3.5 pl-11 pr-11 text-base outline-hidden focus:border-red-300 transition-colors min-h-[56px]" />
       {value && (
         <button onClick={() => onChange("")}
           className="absolute right-3 top-1/2 -translate-y-1/2 p-2 min-w-[40px] min-h-[40px] flex items-center justify-center text-slate-400">
@@ -286,7 +286,7 @@ export function FilterPills({ options, value, onChange, dangerValue }) {
       {options.map(o => (
         <button key={o} onClick={() => onChange(o)}
           className={`shrink-0 rounded-full px-5 py-2.5 text-sm font-bold transition-all min-h-[44px] ${
-            value === o ? "text-white shadow-sm" : "bg-white border border-slate-200 text-slate-500"
+            value === o ? "text-white shadow-xs" : "bg-white border border-slate-200 text-slate-500"
           }`}
           style={value === o ? {
             background: o === dangerValue ? "#DC2626" : o === "Due Soon" ? "#D97706" : BRAND.primary
@@ -440,7 +440,7 @@ export function GroupField({ label = "Group", value = "", onChange, existing = [
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-hidden focus:border-slate-400"
           style={{ fontSize: 16 }} />
         {isNew && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase tracking-wide"
@@ -474,7 +474,7 @@ export function Toast({ message, onDone, type = "success" }) {
       style={{ maxWidth: "calc(100vw - 2rem)" }}>
       <div className="rounded-2xl px-5 py-3.5 shadow-lg max-w-sm w-full"
         style={{ background: "#1e293b", color: "#fff" }}>
-        <p className="text-sm font-bold leading-snug whitespace-normal break-words">{message}</p>
+        <p className="text-sm font-bold leading-snug whitespace-normal wrap-break-word">{message}</p>
       </div>
     </motion.div>
   );
@@ -646,9 +646,9 @@ export function Spinner() {
 export function DataLoadingScreen() {
   return (
     <div className="min-h-screen pb-28" style={{ background: BRAND.light }}>
-      <main className="mx-auto max-w-2xl px-4 pt-4 space-y-4">
+      <main className="mx-auto max-w-2xl px-4 pt-4 stack-y-4">
         <div className="flex items-start justify-between mb-5">
-          <div className="space-y-2">
+          <div className="stack-y-2">
             <div className="h-7 w-32 rounded-xl bg-slate-200 animate-pulse" />
             <div className="h-4 w-48 rounded-xl bg-slate-100 animate-pulse" />
           </div>
@@ -663,7 +663,7 @@ export function DataLoadingScreen() {
             </div>
           ))}
         </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-100 space-y-3">
+        <div className="bg-white rounded-2xl p-4 border border-slate-100 stack-y-3">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="flex items-center gap-3">
               <div className="h-4 w-16 rounded-lg bg-slate-100 animate-pulse" />
@@ -721,7 +721,7 @@ export function ConfirmDialog({ message, onConfirm, onCancel, confirmLabel = "De
       onClick={onCancel}>
       <motion.div
         initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }}
-        className="w-full max-w-sm bg-white rounded-3xl p-5 space-y-4 shadow-2xl"
+        className="w-full max-w-sm bg-white rounded-3xl p-5 stack-y-4 shadow-2xl"
         onClick={e => e.stopPropagation()}>
         <p className="text-base font-bold text-slate-800 text-center pt-1">{message}</p>
         <div className="flex gap-3">

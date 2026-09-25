@@ -133,13 +133,13 @@ function ExportProgressHost({ state, startTimeRef }) {
         <>
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm" />
+            className="fixed inset-0 z-200 bg-black/40 backdrop-blur-xs" />
           <motion.div
             initial={{ opacity: 0, scale: 0.94, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ type: "spring", damping: 24, stiffness: 320 }}
-            className="fixed inset-0 z-[201] flex items-center justify-center px-6 pointer-events-none">
+            className="fixed inset-0 z-201 flex items-center justify-center px-6 pointer-events-none">
             <div className="w-full max-w-xs rounded-3xl bg-white p-6 shadow-2xl pointer-events-auto">
               {/* Icon */}
               <div className="flex justify-center mb-4">

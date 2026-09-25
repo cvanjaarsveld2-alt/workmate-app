@@ -1,50 +1,123 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@import './tailwind-v3-colors.css';
 
-html, body {
-  margin: 0;
-  background: #f1f5f9;
-  width: 100%;
-  max-width: 100vw;
-  /* Respect iPhone safe areas (notch / home indicator) */
-  -webkit-text-size-adjust: 100%;
+@theme {
+  /* Stock slate-400 is 2.6:1 on white, hard to read outdoors; this is 4:1.
+     Dark mode remaps text-slate-400 separately (darkMode.css). */
+  --color-slate-400: #737f92;
+  /* The exact font stack Tailwind 3 produced, so text renders as before on
+     every device (Tailwind 4.3's default list resolves differently on some
+     Android phones). */
+  --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
+  /* Tailwind 3's line-heights. v4 sets them as ratios (e.g. 1.333), which
+     children inherit and scale by their own font size, so small badges inside
+     text-xs buttons came out 4px shorter. Fixed lengths inherit as before. */
+  --text-xs--line-height: 1rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
 }
 
-/* Prevent stray-wide elements from causing horizontal scroll / zoom-out.
-   Use `clip` (not `hidden`): clip stops horizontal overflow WITHOUT turning
-   the element into a scroll container, so `position: sticky` on the header
-   keeps working. `overflow: hidden` implicitly makes overflow-y compute to
-   auto, which creates a scroll container and un-sticks the top bar.
-   Only applied where `clip` is supported (iOS Safari 16+, all modern browsers). */
-@supports (overflow: clip) {
-  html, body, #root {
-    overflow-x: clip;
-    overflow-y: visible;
+/* stack-y-N: Tailwind 3's space-y-N. The gap goes on the top of every item
+   after the first, with enough specificity to win over the item's own
+   margin-top. Tailwind 4's space-y puts it on the bottom of every item but the
+   last with zero specificity, so an item's own bottom margin (e.g. PageHeader's
+   mb-2) replaces the gap and flex columns can double it; screens shifted by
+   8px. The app uses stack-y so layouts stay exactly as they were. */
+@utility stack-y-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    margin-top: calc(var(--spacing) * --value(number));
   }
 }
 
-/* Fallback for older browsers (pre-2022) that lack overflow: clip.
-   Put the horizontal guard on #root only, NOT on html/body, so the page's
-   own scroll (and the sticky header) stay on the body where sticky works. */
-@supports not (overflow: clip) {
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+/* The app's own base rules sit in the base layer: Tailwind 4 keeps utilities
+   in a cascade layer, and unlayered element rules (like the input font-size
+   below) would otherwise beat classes such as text-sm, which they did not in
+   Tailwind 3. */
+@layer base {
+  html, body {
+    margin: 0;
+    background: #f1f5f9;
+    width: 100%;
+    max-width: 100vw;
+    /* Respect iPhone safe areas (notch / home indicator) */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Prevent stray-wide elements from causing horizontal scroll / zoom-out.
+     Use `clip` (not `hidden`): clip stops horizontal overflow WITHOUT turning
+     the element into a scroll container, so `position: sticky` on the header
+     keeps working. `overflow: hidden` implicitly makes overflow-y compute to
+     auto, which creates a scroll container and un-sticks the top bar.
+     Only applied where `clip` is supported (iOS Safari 16+, all modern browsers). */
+  @supports (overflow: clip) {
+    html, body, #root {
+      overflow-x: clip;
+      overflow-y: visible;
+    }
+  }
+
+  /* Fallback for older browsers (pre-2022) that lack overflow: clip.
+     Put the horizontal guard on #root only, NOT on html/body, so the page's
+     own scroll (and the sticky header) stay on the body where sticky works. */
+  @supports not (overflow: clip) {
+    #root {
+      overflow-x: hidden;
+    }
+  }
+
   #root {
-    overflow-x: hidden;
+    width: 100%;
+    max-width: 100vw;
   }
-}
 
-#root {
-  width: 100%;
-  max-width: 100vw;
-}
+  /* iOS zooms in on focus for any input with font-size < 16px. Force 16px on
+     form controls so focusing a field never triggers an unwanted zoom. */
+  input, select, textarea {
+    font-size: 16px;
+  }
+  /* On phones and tablets, fields styled smaller (text-sm, text-xs) still
+     zoom the page on iPhone. Keep them at 16px there; desktop keeps the
+     compact sizes. */
+  @media (pointer: coarse) {
+    input, select, textarea {
+      font-size: max(16px, 1em) !important;
+    }
+  }
 
-/* iOS zooms in on focus for any input with font-size < 16px. Force 16px on
-   form controls so focusing a field never triggers an unwanted zoom. */
-input, select, textarea {
-  font-size: 16px;
-}
+  /* Tailwind 3's placeholder grey (v4 uses half-transparent text colour).
+     Dark mode sets its own placeholder colour in darkMode.css. */
+  input::placeholder,
+  textarea::placeholder {
+    opacity: 1;
+    color: #9ca3af;
+  }
 
-/* Long unbroken strings (emails, URLs, part numbers) must wrap, not overflow */
-* {
-  overflow-wrap: break-word;
+  /* Long unbroken strings (emails, URLs, part numbers) must wrap, not overflow */
+  * {
+    overflow-wrap: break-word;
+  }
 }

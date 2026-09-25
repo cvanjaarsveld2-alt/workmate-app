@@ -52,7 +52,7 @@ export function BulkGroupBar({ active, count, allCount, onCancel, onAssign, onSe
   if (!active) return null;
   const allSelected = count > 0 && count === allCount;
   return (
-    <div className="bg-white rounded-2xl border-2 border-red-200 p-3 shadow-sm">
+    <div className="bg-white rounded-2xl border-2 border-red-200 p-3 shadow-xs">
       <div className="flex items-center justify-between mb-2">
         <div>
           <p className="text-base font-black text-slate-900">{count} selected</p>
@@ -105,13 +105,13 @@ export function BulkGroupSheet({ open, existingGroups = [], onClose, onConfirm }
       {open && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onClose} className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm" />
+            onClick={onClose} className="fixed inset-0 z-90 bg-black/50 backdrop-blur-xs" />
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[91] rounded-t-3xl bg-white"
+            className="fixed bottom-0 left-0 right-0 z-91 rounded-t-3xl bg-white"
             style={{ maxWidth: 480, margin: "0 auto" }}>
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
-            <div className="px-6 pb-8 pt-3 space-y-4">
+            <div className="px-6 pb-8 pt-3 stack-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-base font-black text-slate-900">Assign to group</p>
                 <button onClick={onClose} className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 text-slate-500">
@@ -125,7 +125,7 @@ export function BulkGroupSheet({ open, existingGroups = [], onClose, onConfirm }
                   onChange={e => setName(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && confirm()}
                   autoFocus
-                  className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-none focus:border-red-300 focus:bg-white transition-colors"
+                  className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-hidden focus:border-red-300 focus:bg-white transition-colors"
                   placeholder="New group name…" />
               </div>
 
@@ -225,13 +225,13 @@ export function RenameGroupSheet({ open, currentName, existingGroups = [], onClo
       {open && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onClose} className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm" />
+            onClick={onClose} className="fixed inset-0 z-90 bg-black/50 backdrop-blur-xs" />
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[91] rounded-t-3xl bg-white"
+            className="fixed bottom-0 left-0 right-0 z-91 rounded-t-3xl bg-white"
             style={{ maxWidth: 480, margin: "0 auto" }}>
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
-            <div className="px-6 pb-8 pt-3 space-y-4">
+            <div className="px-6 pb-8 pt-3 stack-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-base font-black text-slate-900">Rename group</p>
                 <button onClick={onClose} className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 text-slate-500">
@@ -248,7 +248,7 @@ export function RenameGroupSheet({ open, currentName, existingGroups = [], onClo
                 onChange={e => setName(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && confirm()}
                 autoFocus
-                className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-none focus:border-red-300 focus:bg-white transition-colors"
+                className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-4 text-sm font-bold text-slate-900 outline-hidden focus:border-red-300 focus:bg-white transition-colors"
                 placeholder="New group name…" />
 
               {clash && <p className="text-xs font-bold text-red-500 -mt-2">A group with that name already exists.</p>}

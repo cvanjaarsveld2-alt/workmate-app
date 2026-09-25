@@ -202,7 +202,7 @@ export function CardScanner({ userId, onExtracted, onCancel }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="space-y-3"
+              className="stack-y-3"
             >
               <div className="flex items-start gap-3 p-3 rounded-xl bg-red-50 border border-red-200">
                 <AlertCircle size={20} className="text-red-600 shrink-0 mt-0.5" />

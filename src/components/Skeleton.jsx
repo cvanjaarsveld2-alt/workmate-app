@@ -17,7 +17,7 @@ export function SkeletonLine({ w = "100%", h = 14, className = "" }) {
 }
 export function SkeletonCard() {
   return (
-    <div className="rounded-2xl bg-white p-4 border border-slate-100 space-y-3">
+    <div className="rounded-2xl bg-white p-4 border border-slate-100 stack-y-3">
       <div className="flex items-center justify-between">
         <SkeletonLine w="45%" h={16} />
         <SkeletonLine w="60px" h={22} className="rounded-full" />
@@ -28,5 +28,5 @@ export function SkeletonCard() {
   );
 }
 export function SkeletonList({ count = 5 }) {
-  return <div className="space-y-3">{Array.from({ length: count }).map((_, i) => <SkeletonCard key={i} />)}</div>;
+  return <div className="stack-y-3">{Array.from({ length: count }).map((_, i) => <SkeletonCard key={i} />)}</div>;
 }

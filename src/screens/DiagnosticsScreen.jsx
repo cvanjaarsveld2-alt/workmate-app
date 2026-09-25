@@ -45,7 +45,7 @@ function Row({ icon: Icon, label, value, status, hint }) {
         {Icon && <Icon size={16} className="text-slate-400 mt-0.5 shrink-0" />}
         <div className="min-w-0">
           <p className="text-sm font-bold text-slate-700">{label}</p>
-          {hint && <p className="text-xs text-slate-400 mt-0.5 break-words">{hint}</p>}
+          {hint && <p className="text-xs text-slate-400 mt-0.5 wrap-break-word">{hint}</p>}
         </div>
       </div>
       <div className="text-right shrink-0">
@@ -150,7 +150,7 @@ export function DiagnosticsScreen({ data, setData, userId, isOnline, onBack, onB
   const invoicePaid = invoices.reduce((sum, inv) => sum + Number(inv.amount_paid || 0), 0);
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <div className="flex items-center gap-2">
         <button
@@ -327,7 +327,7 @@ export function DiagnosticsScreen({ data, setData, userId, isOnline, onBack, onB
             <p className="text-sm text-slate-600">No crashes recorded.</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="stack-y-2">
             {crashes.slice(0, 5).map((c, i) => (
               <div key={i} className="rounded-xl bg-red-50 border border-red-100 p-3">
                 <div className="flex items-baseline justify-between gap-2 mb-1">

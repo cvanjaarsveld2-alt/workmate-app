@@ -154,7 +154,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
   }
 
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-4 stack-y-3">
       <div className="flex items-center justify-between">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Opportunity" : "New Opportunity"}</p>
         {!isEdit && (
@@ -177,7 +177,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
       <div>
         <label className="mb-2 block text-sm font-bold text-slate-500">Contact person</label>
         <select value={form.contact_id || ""} onChange={handleContactChange}
-          className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-none focus:border-red-300 min-h-[56px]">
+          className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-hidden focus:border-red-300 min-h-[56px]">
           <option value="">— No contact</option>
           {clientContacts.map(c => (
             <option key={c.id} value={c.id}>{c.name}{c.company ? ` (${c.company})` : ""}</option>
@@ -260,7 +260,7 @@ function LeadForm({ initial, clients, contacts, teamMembers, currentUserId, onSa
           <input type="text" inputMode="numeric" value={form.estimated_value}
             onChange={e => setForm(s => ({ ...s, estimated_value: e.target.value.replace(/[^0-9]/g, "") }))}
             placeholder="0"
-            className="flex-1 rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-none focus:border-red-300 min-h-[56px]" />
+            className="flex-1 rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base outline-hidden focus:border-red-300 min-h-[56px]" />
         </div>
       </div>
 
@@ -446,7 +446,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
     .reduce((s, l) => s + parseFloat(l.estimated_value || 0), 0);
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
@@ -475,7 +475,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
         title={detailLead?.title || ""}
         subtitle={[detailLead?.client_name, detailLead?.stage].filter(Boolean).join(" · ")}
         primaryActions={detailLead && (
-          <div className="space-y-2">
+          <div className="stack-y-2">
             {!["Won", "Lost"].includes(detailLead.stage) && (
               <button onClick={() => advanceStage(detailLead)}
                 className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
@@ -527,7 +527,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
         {detailLead && (() => {
           const cats = parseCats(detailLead.categories);
           return (
-            <div className="space-y-3">
+            <div className="stack-y-3">
               <StagePill stage={detailLead.stage} />
 
               {cats.length > 0 && (
@@ -672,7 +672,7 @@ export function LeadsScreen({ data, setData, userId, userEmail, teamId, teamMemb
           icon={TrendingUp}
         />
       ) : (
-        <div className="space-y-2">
+        <div className="stack-y-2">
           {filtered.map(lead => {
             const cats = parseCats(lead.categories);
             const isOverdue = lead.follow_up_date && lead.follow_up_date < todayISO()

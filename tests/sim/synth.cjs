@@ -20,7 +20,7 @@ module.exports = function synth() {
     clients, contacts, quotes, followups, notes, jobs, company_documents,
     team_members: members.map(([u], i) => ({ id: uuid(), team_id: TEAM, user_id: u, role: "admin", can_view_team: false, joined_at: day(80 - i) + "T08:00:00Z" })),
     teams: [{ id: TEAM, name: "Power Works", invite_code: "SIM123", created_at: day(90) + "T08:00:00Z" }],
-    users: members.map(([id, email, full_name]) => ({ id, email, role: id === ADMIN ? "admin" : "employee", full_name })),
+    users: members.map(([id, email, full_name]) => ({ id, email, role: id === ADMIN ? "admin" : "employee", full_name, hidden_screens: [] })),
     push_subscriptions: [],
     _rpc: { current_team_id: TEAM, get_my_effective_role: "admin", get_team_member_emails: members.map(([user_id, email, full_name], i) => ({ user_id, role: "admin", joined_at: day(80 - i) + "T08:00:00Z", email, full_name })) },
   };

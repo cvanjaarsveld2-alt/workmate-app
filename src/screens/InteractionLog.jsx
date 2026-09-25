@@ -82,7 +82,7 @@ export function InteractionLog({ client, setData, userId, teamId }) {
       {sorted.length === 0 ? (
         <p className="text-xs text-slate-400 py-2">No interactions logged yet. Tap “+ Log” after a call or visit.</p>
       ) : (
-        <div className="space-y-1.5">
+        <div className="stack-y-1.5">
           {sorted.map(it => {
             const m = outcomeMeta(it.outcome);
             return (
@@ -105,7 +105,7 @@ export function InteractionLog({ client, setData, userId, teamId }) {
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setPicking(false)}
-            className="fixed inset-0 z-[120] flex items-end justify-center"
+            className="fixed inset-0 z-120 flex items-end justify-center"
             style={{ background: "rgba(15,23,42,0.4)", backdropFilter: "blur(2px)" }}>
             <motion.div
               initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}
@@ -140,7 +140,7 @@ export function InteractionLog({ client, setData, userId, teamId }) {
               <textarea
                 value={note} onChange={e => setNote(e.target.value)}
                 rows={3} placeholder="e.g. Spoke to Johan — already using a competitor, revisit next year"
-                className="w-full rounded-2xl border border-slate-200 p-3 text-[15px] outline-none focus:border-slate-400 resize-none"
+                className="w-full rounded-2xl border border-slate-200 p-3 text-[15px] outline-hidden focus:border-slate-400 resize-none"
                 style={{ fontSize: 16 }} />
 
               <button onClick={saveInteraction} disabled={!chosen}
@@ -159,7 +159,7 @@ export function InteractionLog({ client, setData, userId, teamId }) {
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setOfferDormant(false)}
-            className="fixed inset-0 z-[121] flex items-center justify-center px-6"
+            className="fixed inset-0 z-121 flex items-center justify-center px-6"
             style={{ background: "rgba(15,23,42,0.5)", backdropFilter: "blur(2px)" }}>
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}

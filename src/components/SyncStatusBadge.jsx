@@ -59,7 +59,7 @@ export default function SyncStatusBadge({ isOnline, pendingCount, syncing }) {
           className="fixed left-1/2 -translate-x-1/2 z-30 pointer-events-none"
           style={{ bottom: "calc(env(safe-area-inset-bottom, 0px) + 90px)" }}>
           <div
-            className="rounded-full bg-white/95 backdrop-blur px-3 py-1 text-[11px] font-bold text-slate-500"
+            className="rounded-full bg-white/95 backdrop-blur-sm px-3 py-1 text-[11px] font-bold text-slate-500"
             style={{
               border: "1px solid #E2E8F0",
               boxShadow: "0 1px 4px rgba(15, 23, 42, 0.08)",

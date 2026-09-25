@@ -22,7 +22,7 @@ function ExpandableText({ text, limit = 110, className = "" }) {
   const display = isLong && !expanded ? text.slice(0, limit).trimEnd() + "…" : text;
   return (
     <div className={className}>
-      <p className="text-sm text-slate-500 break-words whitespace-pre-wrap italic">{display}</p>
+      <p className="text-sm text-slate-500 wrap-break-word whitespace-pre-wrap italic">{display}</p>
       {isLong && (
         <button type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v); }}
@@ -165,7 +165,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
   // ── Shared form: rendered at top for NEW, in-place for EDIT ──
   function renderEquipForm(isEdit) {
     return (
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Equipment" : "Register Equipment"}</p>
         <Field label="Equipment Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. Main Compressor Unit" required />
         <Field label="Type / Category" value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))} placeholder="e.g. Compressor, Generator…" />
@@ -178,7 +178,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
           <div className="relative">
             <Hash size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={form.serial} onChange={e => setForm(f => ({ ...f, serial: e.target.value }))} placeholder="Serial / Asset number"
-              className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 pl-9 text-base outline-none focus:border-red-300 focus:bg-white transition-colors font-mono min-h-[52px]" />
+              className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 pl-9 text-base outline-hidden focus:border-red-300 focus:bg-white transition-colors font-mono min-h-[52px]" />
           </div>
         </div>
         <Field label="Location / Site" value={form.location} onChange={v => setForm(f => ({ ...f, location: v }))} placeholder="e.g. Pump Room B" />
@@ -212,7 +212,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
   const dueSoonCount  = equipment.filter(e => e.service_due && daysDiff(e.service_due) !== null && daysDiff(e.service_due) >= 0 && daysDiff(e.service_due) <= 14).length;
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <ShareSheet
         open={!!shareSheet}
@@ -280,7 +280,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
             {detailEq.notes && (
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Notes</p>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 border border-slate-100">{detailEq.notes}</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap wrap-break-word rounded-xl bg-slate-50 p-3 border border-slate-100">{detailEq.notes}</p>
               </div>
             )}
 
@@ -354,7 +354,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
       </div>
       {filtered.length === 0 && <Empty title="No equipment found" text="Register your first piece of equipment." icon={Wrench} />}
 
-      <div className="space-y-2">
+      <div className="stack-y-2">
         {filtered.map(eq => {
           // ── Edit-in-place: form replaces this item at its list position ──
           if (editId === eq.id) {

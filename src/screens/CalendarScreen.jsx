@@ -488,7 +488,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
           </div>
           <div className="flex-1 min-w-0">
             <p
-              className={`text-sm font-bold text-slate-900 break-words ${item.completed ? "line-through" : ""}`}
+              className={`text-sm font-bold text-slate-900 wrap-break-word ${item.completed ? "line-through" : ""}`}
             >
               {cleanTitle(item)}
             </p>
@@ -544,7 +544,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
   }
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="stack-y-4 pb-24">
       <div className="flex items-end justify-between px-1">
         <div>
           <button onClick={goToday} className="text-sm font-bold mb-1" style={{ color: BRAND.primary }}>
@@ -568,13 +568,13 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
       <div className="mx-auto flex w-full max-w-[260px] rounded-xl bg-slate-200/70 p-1">
         <button
           onClick={() => setDisplayMode("month")}
-          className={`flex-1 min-h-[36px] rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 ${displayMode === "month" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+          className={`flex-1 min-h-[36px] rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 ${displayMode === "month" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
         >
           <Grid3X3 size={13} /> Month
         </button>
         <button
           onClick={() => setDisplayMode("schedule")}
-          className={`flex-1 min-h-[36px] rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 ${displayMode === "schedule" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+          className={`flex-1 min-h-[36px] rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 ${displayMode === "schedule" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500"}`}
         >
           <List size={14} /> Schedule
         </button>
@@ -652,11 +652,11 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                         />
                       ))}
                     </div>
-                    <div className="hidden sm:block w-full px-1 mt-1 space-y-0.5">
+                    <div className="hidden sm:block w-full px-1 mt-1 stack-y-0.5">
                       {items.slice(0, 2).map(item => (
                         <div
                           key={item.id}
-                          className="text-[9px] font-bold truncate text-left px-1 py-0.5 rounded"
+                          className="text-[9px] font-bold truncate text-left px-1 py-0.5 rounded-sm"
                           style={{ color: eventColor(item), background: `${eventColor(item)}14` }}
                         >
                           {item.time ? `${item.time} ` : ""}
@@ -691,7 +691,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                   >
                     <p className="text-sm font-black text-slate-800">{friendlyHeading(date, today)}</p>
                   </button>
-                  <div className="space-y-2">{items.map(item => renderEvent(item, true))}</div>
+                  <div className="stack-y-2">{items.map(item => renderEvent(item, true))}</div>
                 </div>
               ))
             )}
@@ -733,20 +733,20 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
               </button>
             </Card>
           ) : (
-            <div className="space-y-2">{dayItems.map(item => renderEvent(item))}</div>
+            <div className="stack-y-2">{dayItems.map(item => renderEvent(item))}</div>
           )}
         </>
       )}
 
       {showEditor && (
         <div
-          className="fixed inset-0 z-[90] bg-black/35 flex items-end sm:items-center justify-center"
+          className="fixed inset-0 z-90 bg-black/35 flex items-end sm:items-center justify-center"
           onMouseDown={event => {
             if (event.target === event.currentTarget) closeEditor();
           }}
         >
           <div className="bg-[#F7F7FA] w-full sm:max-w-xl sm:rounded-3xl rounded-t-3xl max-h-[92vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex items-center justify-between">
               <button
                 onClick={closeEditor}
                 className="min-h-[44px] px-1 text-sm font-bold"
@@ -763,20 +763,20 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                 Done
               </button>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="p-4 stack-y-4">
               <div className="bg-white rounded-2xl overflow-hidden border border-slate-200">
                 <input
                   value={form.title}
                   onChange={event => setForm(current => ({ ...current, title: event.target.value }))}
                   placeholder="Title"
                   autoFocus
-                  className="w-full px-4 py-4 text-lg font-semibold outline-none border-b border-slate-100"
+                  className="w-full px-4 py-4 text-lg font-semibold outline-hidden border-b border-slate-100"
                 />
                 <input
                   value={form.location}
                   onChange={event => setForm(current => ({ ...current, location: event.target.value }))}
                   placeholder="Location"
-                  className="w-full px-4 py-4 text-base outline-none"
+                  className="w-full px-4 py-4 text-base outline-hidden"
                 />
               </div>
 
@@ -785,7 +785,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                   <button
                     key={type}
                     onClick={() => setForm(current => ({ ...current, type }))}
-                    className={`min-h-[40px] rounded-lg text-sm font-bold ${form.type === type ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}
+                    className={`min-h-[40px] rounded-lg text-sm font-bold ${form.type === type ? "bg-white shadow-xs text-slate-900" : "text-slate-500"}`}
                   >
                     {type}
                   </button>
@@ -803,7 +803,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                     className={`w-12 h-7 rounded-full p-0.5 transition-colors ${form.allDay ? "bg-green-500" : "bg-slate-300"}`}
                   >
                     <span
-                      className={`block w-6 h-6 bg-white rounded-full shadow transition-transform ${form.allDay ? "translate-x-5" : ""}`}
+                      className={`block w-6 h-6 bg-white rounded-full shadow-sm transition-transform ${form.allDay ? "translate-x-5" : ""}`}
                     />
                   </button>
                 </label>
@@ -813,7 +813,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                     type="date"
                     value={form.date}
                     onChange={event => setForm(current => ({ ...current, date: event.target.value }))}
-                    className="text-right text-slate-600 bg-transparent outline-none"
+                    className="text-right text-slate-600 bg-transparent outline-hidden"
                   />
                 </label>
                 {!form.allDay && (
@@ -823,7 +823,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                       type="time"
                       value={form.time}
                       onChange={event => setForm(current => ({ ...current, time: event.target.value }))}
-                      className="text-right text-slate-600 bg-transparent outline-none"
+                      className="text-right text-slate-600 bg-transparent outline-hidden"
                     />
                   </label>
                 )}
@@ -863,7 +863,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                   <select
                     value={form.reminder}
                     onChange={event => setForm(current => ({ ...current, reminder: event.target.value }))}
-                    className="ml-auto min-w-0 max-w-[60%] text-right text-slate-600 bg-transparent outline-none"
+                    className="ml-auto min-w-0 max-w-[60%] text-right text-slate-600 bg-transparent outline-hidden"
                   >
                     {REMINDERS.map(([value, label]) => (
                       <option key={value} value={value}>
@@ -878,7 +878,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                     value={form.related_to}
                     onChange={event => setForm(current => ({ ...current, related_to: event.target.value }))}
                     placeholder="Related to (optional)"
-                    className="flex-1 min-w-0 text-slate-700 outline-none"
+                    className="flex-1 min-w-0 text-slate-700 outline-hidden"
                   />
                 </label>
               </div>
@@ -889,7 +889,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
                   onChange={event => setForm(current => ({ ...current, notes: event.target.value }))}
                   rows="4"
                   placeholder="Notes"
-                  className="w-full text-base outline-none resize-none"
+                  className="w-full text-base outline-hidden resize-none"
                 />
               </div>
               {message && <p className="text-sm font-bold text-red-600 px-1">{message}</p>}
@@ -914,7 +914,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
       )}
 
       {contactPickerOpen && (
-        <div className="fixed inset-0 z-[110]">
+        <div className="fixed inset-0 z-110">
           <ContactPicker
             contacts={data.contacts || []}
             selectedIds={form.contact_id ? [form.contact_id] : []}

@@ -257,7 +257,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
   const activeQ = selectedQuarter || currentQKey;
 
   return (
-    <div className="space-y-5 pb-6">
+    <div className="stack-y-5 pb-6">
       <PageHeader
         title="Analytics"
         subtitle="Business performance · Power Works (Pty) Ltd"
@@ -312,7 +312,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
               <p className="text-[9px] text-slate-400 font-bold leading-none mt-0.5">win rate</p>
             </div>
           </div>
-          <div className="flex-1 space-y-2">
+          <div className="flex-1 stack-y-2">
             {[
               { label: "Won",        count: wonClients,             color: "#16A34A" },
               { label: "Lost",       count: lostClients,            color: "#DC2626" },
@@ -426,7 +426,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
                 <p className="text-xs font-black" style={{ color: "#0E7490" }}>{fuRate}%</p>
               </div>
             </div>
-            <div className="flex-1 space-y-1.5">
+            <div className="flex-1 stack-y-1.5">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-teal-500 shrink-0" />
                 <p className="text-xs text-slate-600 flex-1">Completed</p>
@@ -500,7 +500,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
       <div>
         <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 px-1">Pipeline Snapshot</p>
         <Card className="p-4">
-          <div className="space-y-3">
+          <div className="stack-y-3">
             {pipelineCount.concat([
               { stage: "Won",  count: wonClients,  color: "#16A34A", textColor: "#15803D" },
               { stage: "Lost", count: lostClients,  color: "#737F92", textColor: "#64748B" },

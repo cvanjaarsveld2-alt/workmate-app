@@ -64,7 +64,7 @@ export function TeamRecordDetailScreen({ data, teamMembers = [], recordType, rec
   const record = config ? (data[recordType] || []).find(r => r.id === recordId) : null;
   if (!config || !record)
     return (
-      <div className="space-y-4">
+      <div className="stack-y-4">
         <button onClick={onBack} className="p-3 rounded-xl bg-white">
           <ArrowLeft size={18} />
         </button>
@@ -74,7 +74,7 @@ export function TeamRecordDetailScreen({ data, teamMembers = [], recordType, rec
   const Icon = config.icon || FileText;
   const owner = teamMembers.find(m => m.user_id === record.user_id);
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <button
         onClick={onBack}
         className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-100 text-sm font-bold text-slate-600"
@@ -98,7 +98,7 @@ export function TeamRecordDetailScreen({ data, teamMembers = [], recordType, rec
               className={`${key === "notes" || key === "description" || key === "outcome_notes" ? "sm:col-span-2" : ""} rounded-xl bg-slate-50 p-3`}
             >
               <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{label}</p>
-              <p className="text-sm font-semibold text-slate-800 whitespace-pre-wrap break-words mt-1">
+              <p className="text-sm font-semibold text-slate-800 whitespace-pre-wrap wrap-break-word mt-1">
                 {displayValue(key, record[key])}
               </p>
             </div>

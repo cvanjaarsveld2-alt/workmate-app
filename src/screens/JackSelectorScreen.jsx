@@ -69,7 +69,7 @@ export function JackSelectorScreen({ userId, teamId }) {
   const isSearching = search.trim().length > 0;
 
   return (
-    <div className="space-y-3">
+    <div className="stack-y-3">
       <PageHeader title="Jack Selector" subtitle="Find the right jack & stand for a machine" />
 
       {/* Search */}
@@ -79,7 +79,7 @@ export function JackSelectorScreen({ userId, teamId }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search machine (e.g. 860E, Cat 793, Bell)…"
-          className="w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 py-3 text-[15px] outline-none focus:border-slate-400"
+          className="w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 py-3 text-[15px] outline-hidden focus:border-slate-400"
           style={{ fontSize: 16 }} />
       </div>
 
@@ -109,7 +109,7 @@ export function JackSelectorScreen({ userId, teamId }) {
             </button>
 
             {brandOpen && (
-              <div className="pl-2 mt-1.5 space-y-1.5">
+              <div className="pl-2 mt-1.5 stack-y-1.5">
                 {catTypes.map(type => {
                   const machines = cats[type];
                   const catKey = `${brand}::${type}`;
@@ -254,7 +254,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
   );
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center"
+    <div className="fixed inset-0 z-120 flex items-end justify-center"
       style={{ background: "rgba(15,23,42,0.4)", backdropFilter: "blur(2px)" }}
       onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
@@ -356,7 +356,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
               )}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="stack-y-3">
               <p className="text-[11px] font-black uppercase tracking-wider text-slate-400">Confirm jack fit</p>
 
               <Field
@@ -368,7 +368,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
 
               <div>
                 <label className="mb-2 block text-sm font-bold text-slate-500">Jacks that fit (tap to select, in order)</label>
-                <div className="space-y-1.5">
+                <div className="stack-y-1.5">
                   {JACK_CATALOGUE.map(j => {
                     const order = selJacks.indexOf(j.name);
                     const checked = order !== -1;
@@ -416,7 +416,7 @@ function MachineDetail({ machine: m, onClose, userId, teamId, onSaved }) {
         // Wrapped in its own fixed, higher-z layer — the modal backdrop above
         // is z-[120], which would otherwise sit in front of Toast's own z-50
         // and hide it.
-        <div className="fixed inset-0 z-[200] pointer-events-none">
+        <div className="fixed inset-0 z-200 pointer-events-none">
           <Toast message={toast} type={toast.startsWith("Couldn't") ? "error" : "success"} onDone={() => setToast("")} />
         </div>
       )}

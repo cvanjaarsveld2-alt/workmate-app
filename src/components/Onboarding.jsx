@@ -28,7 +28,7 @@ export function Onboarding({ userId, onDone }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col bg-white">
+    <div className="fixed inset-0 z-200 flex flex-col bg-white">
       <div className="flex justify-end p-4">
         {!last && <button onClick={finish} className="text-sm font-bold text-slate-400 px-3 py-2 min-h-[44px]">Skip</button>}
       </div>
@@ -46,7 +46,7 @@ export function Onboarding({ userId, onDone }) {
           </motion.div>
         </AnimatePresence>
       </div>
-      <div className="px-8 pb-10 space-y-6">
+      <div className="px-8 pb-10 stack-y-6">
         <div className="flex justify-center gap-2">
           {SLIDES.map((_, idx) => (
             <div key={idx} className="h-2 rounded-full transition-all duration-300"

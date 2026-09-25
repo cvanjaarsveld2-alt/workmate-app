@@ -229,3 +229,10 @@ in the background. Anything half-typed is still there after unlocking.
 whole-team view can open teammates' business cards, note and vehicle-check
 photos and receipts. Other members can only open photos they took
 themselves (a business card they can't open is left out of the contact).
+
+**Each person's own menu.** Menu → *Customise menu*: untick the screens you
+don't use and tap Done. It only changes that person's menu, follows them to
+any phone they sign in on (saved as `users.hidden_screens`), and works
+offline (sent once back online). Dashboard and Settings & More can't be
+hidden, and a hidden screen still opens from links and notifications.
+Tick it again to bring it back.

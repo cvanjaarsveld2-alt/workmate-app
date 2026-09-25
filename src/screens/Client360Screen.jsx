@@ -120,7 +120,7 @@ function TimelineItem({ event, onTap }) {
           </span>
           <span className="text-[10px] text-slate-400 ml-auto shrink-0">{timeAgo(event.date)}</span>
         </div>
-        <p className="text-sm font-bold text-slate-900 mt-0.5 break-words">{event.title}</p>
+        <p className="text-sm font-bold text-slate-900 mt-0.5 wrap-break-word">{event.title}</p>
         {event.subtitle && <p className="text-xs text-slate-500 mt-0.5">{event.subtitle}</p>}
         {event.badge && (
           <span
@@ -356,7 +356,7 @@ export function Client360Screen({
   // ── Not-found guard — safe here because every hook above has already run ──
   if (!client)
     return (
-      <div className="space-y-4">
+      <div className="stack-y-4">
         <button
           onClick={onBack}
           className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -452,7 +452,7 @@ export function Client360Screen({
             }}
           />
         ) : (
-          <div className="space-y-3">
+          <div className="stack-y-3">
             {contacts.map(c => (
               <ContactCard key={c.id} contact={c} />
             ))}
@@ -471,7 +471,7 @@ export function Client360Screen({
             }}
           />
         ) : (
-          <div className="space-y-2">
+          <div className="stack-y-2">
             {followups
               .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
               .map(f => (
@@ -528,7 +528,7 @@ export function Client360Screen({
             }}
           />
         ) : (
-          <div className="space-y-2">
+          <div className="stack-y-2">
             {notes
               .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
               .map(n => {
@@ -542,7 +542,7 @@ export function Client360Screen({
                     <Card className="p-3" style={{ borderLeft: `3px solid ${u.border}` }}>
                       <div className="flex items-start gap-2">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-slate-900 break-words">{(n.note || "").slice(0, 150)}</p>
+                          <p className="text-sm text-slate-900 wrap-break-word">{(n.note || "").slice(0, 150)}</p>
                           {n.resolve_by && (
                             <p className="text-xs text-slate-400 mt-1">
                               Resolve by {smartDate(n.resolve_by)}
@@ -596,7 +596,7 @@ export function Client360Screen({
             }}
           />
         ) : (
-          <div className="space-y-2">
+          <div className="stack-y-2">
             {quotes
               .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))
               .map(q => {
@@ -646,7 +646,7 @@ export function Client360Screen({
             }}
           />
         ) : (
-          <div className="space-y-2">
+          <div className="stack-y-2">
             {leads.map(l => (
               <button
                 key={l.id}
@@ -687,7 +687,7 @@ export function Client360Screen({
             }}
           />
         ) : (
-          <div className="space-y-2">
+          <div className="stack-y-2">
             {equipment.map(e => (
               <button
                 key={e.id}
@@ -722,7 +722,7 @@ export function Client360Screen({
             }}
           />
         ) : (
-          <div className="space-y-2">
+          <div className="stack-y-2">
             <div className="flex justify-between items-center px-1 pb-1">
               <p className="text-xs font-bold text-slate-400">Total: {formatCurrency(totalExpenses)}</p>
             </div>
@@ -761,7 +761,7 @@ export function Client360Screen({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
       {/* ── Header ── */}
@@ -993,21 +993,21 @@ export function Client360Screen({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setAddForm(null)}
-              className="fixed inset-0 z-[82] bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 z-82 bg-black/50 backdrop-blur-xs"
             />
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-[83] rounded-t-3xl bg-white"
+              className="fixed bottom-0 left-0 right-0 z-83 rounded-t-3xl bg-white"
               style={{ maxHeight: "85vh" }}
             >
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 rounded-full bg-slate-200" />
               </div>
               <div
-                className="overflow-y-auto px-5 pb-8 pt-2 space-y-4"
+                className="overflow-y-auto px-5 pb-8 pt-2 stack-y-4"
                 style={{ maxHeight: "calc(85vh - 24px)" }}
               >
                 <div className="flex items-center justify-between">
@@ -1491,20 +1491,20 @@ export function Client360Screen({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setDetailItem(null)}
-              className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 z-80 bg-black/50 backdrop-blur-xs"
             />
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white"
+              className="fixed bottom-0 left-0 right-0 z-81 rounded-t-3xl bg-white"
               style={{ maxHeight: "82vh" }}
             >
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 rounded-full bg-slate-200" />
               </div>
-              <div className="overflow-y-auto px-5 pb-8 space-y-4" style={{ maxHeight: "calc(82vh - 24px)" }}>
+              <div className="overflow-y-auto px-5 pb-8 stack-y-4" style={{ maxHeight: "calc(82vh - 24px)" }}>
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3 pt-1">
                   <p className="text-lg font-black text-slate-900 flex-1 leading-snug">
@@ -1632,7 +1632,7 @@ export function Client360Screen({
                     const e = detailItem.data;
                     return (
                       <>
-                        <div className="rounded-xl bg-slate-50 p-4 space-y-1.5">
+                        <div className="rounded-xl bg-slate-50 p-4 stack-y-1.5">
                           {e.type && (
                             <p className="text-sm text-slate-700">
                               <span className="font-bold">Type:</span> {e.type}
@@ -1730,7 +1730,7 @@ export function Client360Screen({
                     const e = detailItem.data;
                     return (
                       <>
-                        <div className="rounded-xl bg-slate-50 p-4 space-y-1.5">
+                        <div className="rounded-xl bg-slate-50 p-4 stack-y-1.5">
                           <p className="text-2xl font-black" style={{ color: BRAND.primary }}>
                             {formatCurrency(e.amount_zar || e.amount)}
                           </p>
