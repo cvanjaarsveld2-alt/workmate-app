@@ -166,7 +166,9 @@ export function storagePathFromSignedUrl(value, bucket = "powermate-media") {
   if (!value || typeof value !== "string" || !value.includes("/storage/v1/object/")) return null;
   try {
     const u = new URL(value);
-    for (const kind of ["sign", "authenticated"]) {
+    // "public" covers links saved before the bucket was made private (e.g.
+    // business-card photos): the file is still there, only the link is refused.
+    for (const kind of ["sign", "authenticated", "public"]) {
       const marker = `/storage/v1/object/${kind}/${bucket}/`;
       const i = u.pathname.indexOf(marker);
       if (i >= 0) return decodeURIComponent(u.pathname.slice(i + marker.length));

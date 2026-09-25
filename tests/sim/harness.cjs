@@ -178,7 +178,9 @@ async function handle(route) {
       if (body.paths) return json(route, 200, body.paths.map(x => ({ path: x, signedURL: `/object/sign/${objPath}/${x}?token=sim`, error: null })));
       return json(route, 200, { signedURL: `/object/sign/${objPath}?token=sim` });
     }
-    if (p.includes("/object/public/") || m === "GET") return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
+    // Every PowerMate bucket is private: like production, public links are refused.
+    if (p.includes("/object/public/")) { log.storage.push({ screen: screenTag, refusedPublic: true }); return json(route, 400, { statusCode: "400", error: "Bucket not found", message: "Bucket not found" }); }
+    if (m === "GET") return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
     if (m === "POST" || m === "PUT") return json(route, 200, { Key: p.split("/object/")[1], Id: uuid() });
     if (m === "DELETE") return json(route, 200, []);
     return json(route, 200, {});

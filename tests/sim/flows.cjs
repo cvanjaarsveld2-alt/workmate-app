@@ -162,6 +162,15 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
   });
   await createFlow("clients: add lead/client", "Clients", "Add Lead", [["e.g. Anglo American", "SIM Mining Co"], ["e.g. Mogalakwena Mine", "SIM Shaft"], ["Contact name", "Sim Person"]], "Add Lead", "clients", r => r.company === "SIM Mining Co");
   await createFlow("contacts: add contact", "Contacts", "Add", [["e.g. John Smith", "SIM Contact"], ["e.g. ACME Mining", "SIM Mining Co"]], "Add Contact", "contacts", r => r.name === "SIM Contact");
+  await safe("contacts: business card photo shows", async () => {
+    await go("Contacts");
+    await page.getByText("Contact 0", { exact: true }).first().click(); await page.waitForTimeout(2500);
+    const img = page.getByAltText(/business card$/).first();
+    const shown = (await img.count()) ? await img.evaluate(el => ({ src: el.currentSrc || el.src, ok: el.complete && el.naturalWidth > 0 })) : null;
+    await shot("contact-card");
+    rec("contacts: business card photo shows", shown?.ok && /\/object\/sign\//.test(shown.src) ? "PASS" : "FAIL", `image loaded=${!!shown?.ok}; via fresh signed link=${/\/object\/sign\//.test(shown?.src || "")}`);
+    await page.keyboard.press("Escape").catch(() => {});
+  });
   await safe("leads: add opportunity", async () => {
     await go("Leads");
     const v0 = log.violations.length, before = db.leads.length;

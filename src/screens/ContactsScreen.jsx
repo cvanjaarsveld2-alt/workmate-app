@@ -22,6 +22,7 @@ import { SalesFollowupComposer } from "../lib/industrialSalesEmail.jsx";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { logCrash } from "../components/ErrorBoundary";
+import { StorageImage } from "../components/StorageImage";
 import {
   Card, Btn, Field, GroupField, SearchBar, FilterPills, CollapsibleFilters,
   Toast, Empty, PageHeader, useConfirm,
@@ -547,7 +548,8 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Business card · tap to enlarge</p>
                 <button onClick={() => setViewerImages({ list: [{ url: detailContact.card_photo_url, caption: detailContact.name }], startIndex: 0 })}
                   className="w-full rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80">
-                  <img src={detailContact.card_photo_url} alt="" className="w-full h-48 object-contain bg-slate-50" />
+                  <StorageImage src={detailContact.card_photo_url} alt={`${detailContact.name} business card`}
+                    className="w-full h-48 object-contain bg-slate-50" fallbackText="Business card photo unavailable" />
                 </button>
               </div>
             )}
