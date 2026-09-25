@@ -399,7 +399,45 @@ async function stageMissingDependencies(table, payload) {
   }
   return out;
 }
+// Detailed-quote photos are uploaded as part of pushing the quote, so the
+// server row never lands without them (a later pull would otherwise replace
+// the local copy that still holds the photo). The paths are also written back
+// to the device copy, which keeps its base64 for offline PDFs.
+async function uploadQuotePhotosBeforePush(rawData) {
+  const sections = rawData?.details?.sections;
+  if (!Array.isArray(sections) || !navigator.onLine) return rawData;
+  if (!sections.some(sec => (sec.photos || []).some(p => p?.base64 && !p.storage_path))) return rawData;
+  const paths = {};
+  for (const sec of sections)
+    for (const p of sec.photos || []) {
+      if (!p?.base64 || p.storage_path) continue;
+      try {
+        const up = await uploadPhotoToSupabaseWithPath(p.base64, `quotes/${rawData.id}/${p.id}`);
+        if (up?.path) paths[p.id] = up.path;
+      } catch (e) {
+        console.warn("[Sync] quote photo upload failed", e);
+      }
+    }
+  if (!Object.keys(paths).length) return rawData;
+  const withPaths = row => ({
+    ...row,
+    details: {
+      ...row.details,
+      sections: (row.details?.sections || []).map(sec => ({
+        ...sec,
+        photos: (sec.photos || []).map(p => (paths[p?.id] ? { ...p, storage_path: paths[p.id], uploadStatus: "done" } : p)),
+      })),
+    },
+  });
+  try {
+    const local = (await offlineGetAll("quotes")).find(r => r.id === rawData.id);
+    if (local) await offlineSave("quotes", withPaths(local));
+    _globalSetData?.(d => ({ ...d, quotes: (d.quotes || []).map(q => (q.id === rawData.id ? withPaths(q) : q)) }));
+  } catch {}
+  return withPaths(rawData);
+}
 async function pushOne(table, action, rawData) {
+  if (table === "quotes") rawData = await uploadQuotePhotosBeforePush(rawData);
   let payload = sanitizeRemotePayload(table, cleanDates(cleanNumerics(cleanUUIDs(rawData))));
   if (table === "vehicle_checks") payload = normalizeVehicleCheckPayload(payload);
   if (payload.media) payload = { ...payload, media: payload.media.map(m => ({ ...m, base64: undefined })) };
@@ -1141,6 +1179,49 @@ function queueMediaCorrection(table, updated, setData) {
   }));
   return offlineSave("syncQueue", queueItem);
 }
+// quotes: photos inside details.sections[].photos (detailed quotes). The local
+// copy keeps its base64 after upload so the quote PDF still works offline;
+// the sync payload never carries it (stripEmbeddedBase64).
+async function retryQuoteMedia(setData) {
+  let rows;
+  try {
+    rows = await offlineGetAll("quotes");
+  } catch {
+    return false;
+  }
+  let any = false;
+  for (const row of rows) {
+    const sections = Array.isArray(row.details?.sections) ? row.details.sections : [];
+    if (!sections.some(sec => (sec.photos || []).some(p => p && p.base64 && !p.storage_path))) continue;
+    let changed = false;
+    const nextSections = [];
+    for (const sec of sections) {
+      const photos = [];
+      for (const p of sec.photos || []) {
+        if (p && p.base64 && !p.storage_path) {
+          try {
+            const uploaded = await uploadPhotoToSupabaseWithPath(p.base64, `quotes/${row.id}/${p.id}`);
+            if (uploaded) {
+              photos.push({ ...p, storage_path: uploaded.path, uploadStatus: "done" });
+              changed = true;
+              continue;
+            }
+          } catch (e) {
+            console.warn(`[Sync] quote photo upload failed for ${row.id}/${p.id}`, e);
+          }
+        }
+        photos.push(p);
+      }
+      nextSections.push({ ...sec, photos });
+    }
+    if (!changed) continue;
+    any = true;
+    const updated = { ...row, details: { ...row.details, sections: nextSections }, sync_status: "pending" };
+    await offlineSave("quotes", updated);
+    await queueMediaCorrection("quotes", updated, setData);
+  }
+  return any;
+}
 // notes / equipment: a flat media:[{id,base64,url,uploadStatus}] array on the record.
 async function retryFlatMedia(table, setData) {
   const local = localStoreName(table);
@@ -1310,6 +1391,7 @@ export async function retryPendingMedia(uid, setData) {
       retryReportMedia("breakdown_reports", uid, setData),
       retryReportMedia("repair_reports", uid, setData),
       retryVehicleCheckMedia(uid, setData),
+      retryQuoteMedia(setData),
     ]);
     const any = results.some(Boolean);
     if (any) triggerImmediateSync();

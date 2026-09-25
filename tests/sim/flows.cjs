@@ -360,6 +360,41 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       `saved VAT=${saved.vat_no} bank=${saved.bank_name} validity=${saved.quote_validity_days}; invoice PDF=${hasInvoice ? file + " " + size + "B" : "no invoice seeded"}; pro forma=${pf}`);
   });
 
+  // 13e. Detailed quote: write-up, a section with a photo, cover page, validity.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("quotes: detailed quote with photo and PDF", async () => {
+    await go("Quotes", 3000);
+    const edit = page.locator("button:has(svg[class*='lucide-pen']), button:has(svg[class*='lucide-edit']), button:has(svg[class*='square-pen'])").first();
+    await edit.click(); await page.waitForTimeout(800);
+    const panel = page.getByTestId("quote-details");
+    await panel.locator("summary").click(); await page.waitForTimeout(300);
+    await page.getByLabel("Include a cover page").check();
+    await page.locator('label:text-is("Quote title") + input').fill("Shaft 2 jack service");
+    await page.locator('label:text-is("Introduction") + textarea').fill("Following our site visit we propose the work below.");
+    await page.getByRole("button", { name: "+ Site findings" }).click(); await page.waitForTimeout(300);
+    const section = page.getByTestId("quote-section").first();
+    await section.locator('label:text-is("Text") + textarea').fill("Two cylinders leak at the gland seal.");
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    await section.locator("input[type=file][multiple]").setInputFiles({ name: "leak.png", mimeType: "image/png", buffer: png });
+    await page.waitForTimeout(800);
+    await section.getByLabel("Photo caption").first().fill("Leaking gland seal");
+    await page.locator('label:text-is("Valid for (days)") + input').fill("21");
+    await page.getByRole("button", { name: "Update", exact: true }).last().click(); await page.waitForTimeout(5000);
+    const row = H.db.quotes.find(q => q.details && q.details.title === "Shaft 2 jack service");
+    const photo = row?.details?.sections?.[0]?.photos?.[0];
+    const leaked = JSON.stringify(row?.details || {}).includes("data:image");
+    const expectedExpiry = row?.sent_date ? new Date(new Date(row.sent_date + "T12:00:00").getTime() + 21 * 86400000).toISOString().slice(0, 10) : null;
+    await shot("quote-detailed");
+    // Quotation PDF of that quote.
+    await go("Quotes", 3000);
+    const card = page.locator("div.rounded-2xl, div[class*='rounded']", { hasText: row?.client_name || "" }).filter({ has: page.getByRole("button", { name: "Make a PDF" }) }).last();
+    await card.getByRole("button", { name: "Make a PDF" }).first().click(); await page.waitForTimeout(300);
+    const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 20000 }), page.getByRole("button", { name: "Quotation", exact: true }).first().click()]);
+    const pth = await dl.path(); const size = pth ? fs.statSync(pth).size : 0;
+    rec("quotes: detailed quote with photo and PDF",
+      row && row.details.cover === true && photo?.storage_path && photo.caption === "Leaking gland seal" && !leaked && row.expiry_date === expectedExpiry && /^Quotation_/.test(dl.suggestedFilename()) && size > 5000 ? "PASS" : "FAIL",
+      `saved=${!!row}; cover=${row?.details?.cover}; photo path=${photo?.storage_path ? "yes" : "no"}; caption=${photo?.caption}; base64 on server=${leaked}; expiry=${row?.expiry_date} (want ${expectedExpiry}); pdf=${dl.suggestedFilename()} ${size}B`);
+  });
+
   // 14. Master account removes a teammate and hands their work over (runs last: it changes the team).
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("team: remove teammate hands over work", async () => {
     const GREG = "f16f3dd1-c87c-4066-8a38-750d7bc31d65";

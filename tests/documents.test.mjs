@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { buildDocumentPDF, documentFilename, documentTitle, documentTotals, money } from "../src/lib/documentPDF.js";
-import { invoiceToDocument, isTemporaryInvoiceNumber, parseItems, quoteToDocument } from "../src/lib/documentData.js";
+import { invoiceToDocument, isTemporaryInvoiceNumber, parseItems, quoteDetails, quoteToDocument } from "../src/lib/documentData.js";
+import { PW_LOGO_B64 } from "../src/lib/pwLogo.js";
 
 const profile = {
   trading_name: "Acme Hydraulics",
@@ -156,4 +157,40 @@ test("companies not registered for VAT charge none and never issue tax invoices"
   assert.equal(documentTotals(d.items, { vatInclusive: d.vatInclusive, vatRegistered: false }).total, 1000);
   const blob = await buildDocumentPDF(d, noVat);
   assert.ok((await blob.arrayBuffer()).byteLength > 2000);
+});
+
+test("detailed quotes carry their write-up, sections and photos into the PDF", async () => {
+  const jpeg = PW_LOGO_B64.startsWith("data:") ? PW_LOGO_B64 : "data:image/jpeg;base64," + PW_LOGO_B64;
+  const details = {
+    title: "Shaft 2 jack service",
+    intro: "Following our site visit we propose the work below.",
+    cover: true,
+    exclusions: "Crane hire.",
+    sections: [
+      { id: "s1", title: "Site findings", body: "Two cylinders leak.", photos: [{ id: "p1", data: jpeg, caption: "Leaking seal" }, { id: "p2", storage_path: "u/quotes/q/p2" }] },
+      { id: "s2", title: "", body: "", photos: [] }, // empty sections are dropped
+    ],
+  };
+  const d = quoteDetails(details);
+  assert.equal(d.sections.length, 1);
+  assert.equal(d.sections[0].photos.length, 2);
+  const q = { id: "q9", quote_number: "Q-9", sent_date: "2026-09-25", description: "Summary", details,
+    line_items: [{ description: "Service", qty: 1, unitPrice: 1000 }], vat_inclusive: false };
+  const doc = quoteToDocument(q, "quote", { profile, preparedBy: "Christo" });
+  assert.equal(doc.title, "Shaft 2 jack service");
+  assert.equal(doc.cover, true);
+  assert.equal(doc.preparedBy, "Christo");
+  assert.equal(doc.notes, ""); // the write-up replaces the summary
+  // The pro forma keeps the title only — no cover, sections or photos.
+  const pf = quoteToDocument(q, "proforma", { profile });
+  assert.equal(pf.cover, undefined);
+  assert.equal(pf.sections, undefined);
+  // One photo resolved, one not on this device.
+  const withData = { ...doc, sections: doc.sections.map(sec => ({ ...sec, photos: sec.photos.map(p => ({ caption: p.caption, data: p.data || null })) })) };
+  const blob = await buildDocumentPDF(withData, { ...profile, logo_data: jpeg });
+  const buf = Buffer.from(await blob.arrayBuffer());
+  assert.equal(buf.subarray(0, 5).toString(), "%PDF-");
+  fs.writeFileSync("tests/sim/out/sample-detailed-quote.pdf", buf);
+  // Cover + body pages.
+  assert.match(buf.toString("latin1"), /\/Type \/Pages[\s\S]*?\/Count [2-9]/);
 });

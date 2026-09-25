@@ -40,7 +40,30 @@ const shortId = id => String(id || "").replace(/-/g, "").slice(0, 8).toUpperCase
 // Numbers phones give invoices before the server assigns the real one.
 export const isTemporaryInvoiceNumber = n => !n || /^INV-\d{4}-\d{6,7}$/.test(String(n));
 
-export function quoteToDocument(q, kind, { clients = [], profile = {}, today } = {}) {
+// details → the write-up parts of a quote document. Photos keep whatever the
+// device has (base64 or storage_path); resolveDocumentPhotos turns them into
+// image data just before the PDF is built.
+export function quoteDetails(details) {
+  const d = details && typeof details === "object" ? details : {};
+  const text = v => String(v ?? "").trim();
+  return {
+    title: text(d.title),
+    intro: text(d.intro),
+    cover: !!d.cover,
+    exclusions: text(d.exclusions),
+    sections: (Array.isArray(d.sections) ? d.sections : [])
+      .map(sec => ({
+        title: text(sec?.title),
+        body: text(sec?.body),
+        photos: (Array.isArray(sec?.photos) ? sec.photos : [])
+          .filter(p => p && (p.base64 || p.storage_path || p.data))
+          .map(p => ({ ...p, caption: text(p.caption) })),
+      }))
+      .filter(sec => sec.title || sec.body || sec.photos.length),
+  };
+}
+
+export function quoteToDocument(q, kind, { clients = [], profile = {}, today, preparedBy = "" } = {}) {
   const date = (q.sent_date || q.created_at || today || new Date().toISOString()).slice(0, 10);
   let items = parseItems(q.line_items);
   if (!items.length) items = [{ description: q.description || "Quotation", qty: 1, unitPrice: Number(q.value) || 0 }];
@@ -57,8 +80,12 @@ export function quoteToDocument(q, kind, { clients = [], profile = {}, today } =
     client: clientDetails(client, q.client_name),
     items,
     vatInclusive: q.vat_inclusive !== false,
-    // Line items already carry the detail; the description is the write-up.
-    notes: parseItems(q.line_items).length ? q.description || "" : "",
+    ...(kind === "quote"
+      ? { ...quoteDetails(q.details), preparedBy }
+      : { title: quoteDetails(q.details).title }),
+    // Line items already carry the detail; the description is the summary,
+    // left out when there's a proper write-up.
+    notes: parseItems(q.line_items).length && !(kind === "quote" && quoteDetails(q.details).intro) ? q.description || "" : "",
   };
 }
 

@@ -91,6 +91,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
   const title = documentTitle(kind, profile);
   const companyName = profile.trading_name || profile.legal_name || "Your company";
   const text = (s, x, y, opts) => pdf.text(String(s ?? ""), x, y, opts);
+  const right = W - M;
   let y = M;
 
   const ensureSpace = need => {
@@ -99,6 +100,74 @@ export async function buildDocumentPDF(doc, profile = {}) {
       y = M;
     }
   };
+
+  // ── Cover page (detailed quotes) ──
+  if (doc.cover) {
+    pdf.setFillColor(...brand);
+    pdf.rect(0, 0, W, 10, "F");
+    let cy = 45;
+    if (profile.logo_data) {
+      try {
+        const props = pdf.getImageProperties(profile.logo_data);
+        const scale = Math.min(110 / props.width, 40 / props.height);
+        pdf.addImage(profile.logo_data, props.fileType || "PNG", M, cy, props.width * scale, props.height * scale);
+        cy += props.height * scale + 25;
+      } catch {
+        cy += 10;
+      }
+    } else {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(22);
+      pdf.setTextColor(...brand);
+      text(companyName, M, cy + 10);
+      cy += 35;
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11);
+    pdf.setTextColor(...grey);
+    text(title, M, cy);
+    cy += 10;
+    pdf.setFontSize(24);
+    pdf.setTextColor(...ink);
+    const heading = pdf.splitTextToSize(doc.title || title, right - M);
+    text(heading, M, cy);
+    cy += heading.length * 10 + 8;
+    pdf.setDrawColor(...brand);
+    pdf.setLineWidth(1.2);
+    pdf.line(M, cy, M + 40, cy);
+    cy += 14;
+    const cc = doc.client || {};
+    const rows = [
+      ["Prepared for", [cc.name, cc.contact ? `Attn: ${cc.contact}` : ""].filter(Boolean).join("\n")],
+      ["Quote no.", doc.number || ""],
+      ["Date", fmtDate(doc.date)],
+      doc.validUntil ? ["Valid until", fmtDate(doc.validUntil)] : null,
+      doc.preparedBy ? ["Prepared by", doc.preparedBy] : null,
+    ].filter(r => r && r[1]);
+    for (const [k, v] of rows) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...grey);
+      text(k, M, cy);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11);
+      pdf.setTextColor(...ink);
+      const lines = String(v).split("\n");
+      text(lines, M + 38, cy);
+      cy += 6 + (lines.length - 1) * 5;
+    }
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8.5);
+    pdf.setTextColor(...grey);
+    const contact = [
+      profile.legal_name || companyName,
+      String(profile.address || "").replace(/\s*\n\s*/g, ", "),
+      [profile.phone, profile.email, profile.website].filter(Boolean).join("  ·  "),
+    ].filter(Boolean);
+    contact.forEach((l, i) => text(pdf.splitTextToSize(l, right - M)[0], M, H - FOOT - 18 + i * 4.5));
+    pdf.addPage();
+    y = M;
+  }
 
   // ── Header: logo left, company details right ──
   let logoH = 0;
@@ -124,7 +193,6 @@ export async function buildDocumentPDF(doc, profile = {}) {
     text(lines, M, y + 6);
     logoH = 6 + lines.length * 6;
   }
-  const right = W - M;
   let ry = y + 3;
   // The name is already the big heading when there's no logo.
   if (hasLogo) {
@@ -171,6 +239,14 @@ export async function buildDocumentPDF(doc, profile = {}) {
     text("DRAFT · number is assigned once synced", right, y, { align: "right" });
   }
   y += 8;
+  if (doc.title) {
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(12);
+    pdf.setTextColor(...ink);
+    const lines = pdf.splitTextToSize(doc.title, right - M);
+    text(lines, M, y - 1);
+    y += lines.length * 5.5 + 2;
+  }
 
   const meta = [
     [kind === "quote" ? "Quote no." : kind === "proforma" ? "Pro forma no." : "Invoice no.", doc.number || "—"],
@@ -179,6 +255,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
     kind !== "quote" && doc.dueDate ? ["Payment due", fmtDate(doc.dueDate)] : null,
     doc.reference ? ["Reference", doc.reference] : null,
     doc.orderNumber ? ["Order no.", doc.orderNumber] : null,
+    kind === "quote" && doc.preparedBy ? ["Prepared by", doc.preparedBy] : null,
   ].filter(Boolean);
 
   const c = doc.client || {};
@@ -233,6 +310,86 @@ export async function buildDocumentPDF(doc, profile = {}) {
       y += 4.4;
     }
     y += 3;
+  }
+
+  // ── Write-up sections with photos (detailed quotes) ──
+  const sections = (doc.sections || []).filter(sec => sec && (sec.title || sec.body || sec.photos?.length));
+  for (const sec of sections) {
+    ensureSpace(16);
+    if (sec.title) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11.5);
+      pdf.setTextColor(...brand);
+      text(sec.title, M, y);
+      y += 6;
+    }
+    if (sec.body) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(...ink);
+      for (const line of pdf.splitTextToSize(sec.body, right - M)) {
+        ensureSpace(5);
+        text(line, M, y);
+        y += 4.4;
+      }
+      y += 2;
+    }
+    const photos = (sec.photos || []).filter(p => p && p.data);
+    const gap = 6,
+      cw = photos.length === 1 ? Math.min(right - M, 125) : (right - M - gap) / 2,
+      maxH = photos.length === 1 ? 95 : 68;
+    for (let i = 0; i < photos.length; i += photos.length === 1 ? 1 : 2) {
+      const row = photos.slice(i, i + (photos.length === 1 ? 1 : 2)).map(p => {
+        let props = null;
+        try {
+          props = pdf.getImageProperties(p.data);
+        } catch {}
+        const ratio = props ? props.height / props.width : 0.75;
+        let w = cw,
+          h = cw * ratio;
+        if (h > maxH) {
+          h = maxH;
+          w = h / ratio;
+        }
+        pdf.setFontSize(8);
+        const caption = p.caption ? pdf.splitTextToSize(p.caption, cw) : [];
+        return { p, props, w, h, caption };
+      });
+      const rowH = Math.max(...row.map(r => r.h + (r.caption.length ? 2 + r.caption.length * 3.6 : 0))) + 5;
+      ensureSpace(rowH);
+      row.forEach((r, j) => {
+        const x = M + j * (cw + gap);
+        try {
+          pdf.addImage(r.p.data, r.props?.fileType || "JPEG", x, y, r.w, r.h);
+        } catch {
+          pdf.setDrawColor(220, 220, 220);
+          pdf.rect(x, y, r.w, r.h);
+        }
+        if (r.caption.length) {
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(8);
+          pdf.setTextColor(...grey);
+          text(r.caption, x, y + r.h + 4);
+        }
+      });
+      y += rowH;
+    }
+    if (photos.length < (sec.photos || []).length) {
+      pdf.setFont("helvetica", "italic");
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(...grey);
+      text("Some photos couldn't be included (not available on this device).", M, y);
+      y += 5;
+    }
+    y += 3;
+  }
+  if (sections.length) {
+    ensureSpace(24);
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(11.5);
+    pdf.setTextColor(...brand);
+    text("Pricing", M, y);
+    y += 4;
   }
 
   // ── Line items ──
@@ -309,6 +466,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
   };
 
   section("Notes", doc.notes, 9);
+  section("Exclusions", doc.exclusions, 8.5);
   if (kind === "proforma")
     section(
       "Please note",

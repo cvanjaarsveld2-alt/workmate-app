@@ -5,6 +5,9 @@ import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download } from
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, genId } from "../lib/helpers";
 import { QuoteLineItems } from "../components/QuoteLineItems";
+import { QuoteDetailsEditor, emptyDetails, hasDetails } from "../components/QuoteDetailsEditor";
+import { resolveDocumentPhotos } from "../lib/documentPhotos";
+import { addDays } from "../lib/documentPDF";
 import { useCompanyProfile } from "../lib/companyProfile";
 import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
 import { quoteToDocument } from "../lib/documentData";
@@ -71,7 +74,12 @@ export function QuotesScreen({
   const [pdfFor, setPdfFor] = useState(null);
   async function sharePdf(q, kind) {
     try {
-      const doc = quoteToDocument(q, kind, { clients: data.clients || [], profile });
+      setToast(kind === "quote" && hasDetails(q.details) ? "Preparing PDF…" : "");
+      const me = teamMembers.find(m => m.user_id === userId || m.id === userId);
+      const preparedBy = me?.full_name || me?.name || userEmail || "";
+      const doc = await resolveDocumentPhotos(
+        quoteToDocument(q, kind, { clients: data.clients || [], profile, preparedBy }),
+      );
       const blob = await buildDocumentPDF(doc, profile);
       const r = await shareDocumentPDF(blob, documentFilename(doc, profile), `${documentTitle(kind, profile)} ${doc.number}`);
       if (r !== "cancelled") setToast(r === "shared" ? "PDF shared" : "PDF downloaded");
@@ -95,6 +103,8 @@ export function QuotesScreen({
     }),
     [lineItems, setLineItems] = useState([]),
     [vatInclusive, setVatInclusive] = useState(true),
+    [details, setDetails] = useState(emptyDetails),
+    [validDays, setValidDays] = useState(""),
     [shareSheet, setShareSheet] = useState(null),
     [sharing, setSharing] = useState(false);
   const { confirm, dialog } = useConfirm();
@@ -111,6 +121,8 @@ export function QuotesScreen({
     setForm({ client_name: "", client_id: null, description: "", value: "", status: "Pending" });
     setLineItems([]);
     setVatInclusive(true);
+    setDetails(emptyDetails());
+    setValidDays("");
     setEditId(null);
     setShowForm(false);
   }
@@ -119,6 +131,22 @@ export function QuotesScreen({
       setToast("Please enter a description");
       return;
     }
+    const days = Math.round(Number(validDays));
+    if (validDays !== "" && !(days >= 1 && days <= 365)) {
+      setToast("Valid for must be 1 to 365 days");
+      return;
+    }
+    const extra = {
+      details: hasDetails(details) ? details : null,
+      ...(validDays !== ""
+        ? {
+            expiry_date: addDays(
+              (editId && quotes.find(q => q.id === editId)?.sent_date) || todayISO(),
+              days,
+            ),
+          }
+        : {}),
+    };
     if (editId) {
       const existing = quotes.find(q => q.id === editId);
       const totalFromLines = lineItems.reduce(
@@ -131,6 +159,7 @@ export function QuotesScreen({
         value: lineItems.length > 0 ? totalFromLines : parseFloat(form.value || 0),
         line_items: lineItems.length > 0 ? JSON.stringify(lineItems) : null,
         vat_inclusive: vatInclusive,
+        ...extra,
         sync_status: "pending",
       };
       setData(d => ({
@@ -167,6 +196,7 @@ export function QuotesScreen({
             value: quoteValue,
             line_items: lineItems.length > 0 ? JSON.stringify(lineItems) : null,
             vat_inclusive: vatInclusive,
+            ...extra,
             sent_date: todayISO(),
             created_at: new Date().toISOString(),
             sync_status: "pending",
@@ -216,6 +246,12 @@ export function QuotesScreen({
       setLineItems([]);
     }
     setVatInclusive(q.vat_inclusive !== false);
+    setDetails(q.details && typeof q.details === "object" ? { ...emptyDetails(), ...q.details } : emptyDetails());
+    setValidDays(
+      q.expiry_date && q.sent_date
+        ? String(Math.round((new Date(q.expiry_date) - new Date(q.sent_date)) / 86400000))
+        : "",
+    );
     setEditId(q.id);
     setShowForm(true);
   }
@@ -299,6 +335,14 @@ export function QuotesScreen({
             placeholder="0.00"
           />
         )}
+        <Field
+          label="Valid for (days)"
+          type="number"
+          value={validDays}
+          onChange={setValidDays}
+          placeholder={`${profile.quote_validity_days || 30} (company default)`}
+        />
+        <QuoteDetailsEditor details={details} onChange={setDetails} />
         <SelectField
           label="Status"
           value={form.status}

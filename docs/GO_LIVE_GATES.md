@@ -254,3 +254,17 @@ uses the app keeps its own (`team_profiles`, one row per team).
   from another system.
 - Customer VAT number and billing address: edit the client → *Invoicing
   details*. SARS requires these on tax invoices over R5 000.
+- *Registered for VAT* off: no VAT is added to new quotes or job invoices,
+  and documents show one total and say the company isn't VAT registered.
+- **Detailed quotes.** In the quote form, open *Detailed quote* and add:
+  - a cover page;
+  - a title and introduction;
+  - sections (scope of work, site findings, recommendations…), each with
+    text and photos with captions;
+  - exclusions.
+
+  *Valid for (days)* sets that quote's validity; blank uses the company
+  default. Photos are kept on the phone and uploaded with the quote when
+  there's signal. PDFs scale them down (a quote with ten photos is about
+  1–2 MB). A photo that isn't on the phone can only be included while
+  online.
