@@ -48,6 +48,7 @@ export function TeamActivityFeed({ teamId, userId, limit = 20 }) {
         .from("team_notifications")
         .select("*")
         .eq("team_id", teamId)
+        .neq("record_type", "problem_digest") // owner-only health notice, not team activity
         .order("created_at", { ascending: false })
         .limit(limit);
       if (!error && data) setItems(data);
@@ -72,7 +73,7 @@ export function TeamActivityFeed({ teamId, userId, limit = 20 }) {
       </div>
 
       {loading ? (
-        <div className="px-4 py-6"><div className="h-4 bg-slate-100 rounded animate-pulse" /></div>
+        <div className="px-4 py-6"><div className="h-4 bg-slate-100 rounded-sm animate-pulse" /></div>
       ) : items.length === 0 ? (
         <div className="px-4 py-6 text-center"><p className="text-xs text-slate-400">No team activity yet</p></div>
       ) : (
@@ -93,7 +94,7 @@ export function TeamActivityFeed({ teamId, userId, limit = 20 }) {
                   <Icon size={12} style={{ color: meta.color }} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-700 break-words leading-relaxed">
+                  <p className="text-xs text-slate-700 wrap-break-word leading-relaxed">
                     {actionText}
                   </p>
                   <p className="text-[10px] text-slate-400 mt-0.5">{timeAgo(item.created_at)}</p>

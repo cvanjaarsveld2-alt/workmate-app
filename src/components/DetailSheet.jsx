@@ -26,7 +26,7 @@ export function DetailSheet({ open, onClose, title, subtitle, primaryActions, ch
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs" />
 
           <motion.div
             initial={{ y: "100%" }}
@@ -50,8 +50,8 @@ export function DetailSheet({ open, onClose, title, subtitle, primaryActions, ch
             {/* Header */}
             <div className="px-5 pt-2 pb-3 flex items-start justify-between gap-3 border-b border-slate-100">
               <div className="flex-1 min-w-0">
-                <p className="text-xl font-black text-slate-900 leading-tight break-words">{title}</p>
-                {subtitle && <p className="text-sm text-slate-500 mt-0.5 break-words">{subtitle}</p>}
+                <p className="text-xl font-black text-slate-900 leading-tight wrap-break-word">{title}</p>
+                {subtitle && <p className="text-sm text-slate-500 mt-0.5 wrap-break-word">{subtitle}</p>}
               </div>
               <button onClick={onClose}
                 className="shrink-0 p-2 rounded-lg text-slate-400 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center">
@@ -67,7 +67,7 @@ export function DetailSheet({ open, onClose, title, subtitle, primaryActions, ch
             )}
 
             {/* Body — scrollable details */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div className="flex-1 overflow-y-auto px-4 py-3 stack-y-3">
               {children}
             </div>
 
@@ -91,7 +91,7 @@ export function DetailRow({ label, value, mono = false }) {
   return (
     <div className="flex flex-col">
       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{label}</span>
-      <span className={`text-sm text-slate-800 ${mono ? "font-mono" : "font-medium"} break-words mt-0.5`}>
+      <span className={`text-sm text-slate-800 ${mono ? "font-mono" : "font-medium"} wrap-break-word mt-0.5`}>
         {value}
       </span>
     </div>

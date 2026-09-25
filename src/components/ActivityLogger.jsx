@@ -87,9 +87,9 @@ export function ActivityLogger({ open, onClose, client, userId, teamId, data, se
     <AnimatePresence>
       {open && (
         <>
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={handleClose} className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"/>
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onClick={handleClose} className="fixed inset-0 z-80 bg-black/50 backdrop-blur-xs"/>
           <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}} transition={{type:"spring",damping:28,stiffness:300}}
-            className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white overflow-hidden" style={{maxHeight:"80vh"}}>
+            className="fixed bottom-0 left-0 right-0 z-81 rounded-t-3xl bg-white overflow-hidden" style={{maxHeight:"80vh"}}>
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
             <div className="flex items-center justify-between px-5 pb-3 border-b border-slate-100">
               <div><p className="text-base font-black text-slate-900">Log interaction</p>
@@ -113,16 +113,16 @@ export function ActivityLogger({ open, onClose, client, userId, teamId, data, se
               )}
 
               {step === "detail" && (
-                <div className="space-y-4">
+                <div className="stack-y-4">
                   <div><label className="text-xs font-bold text-slate-500 mb-1.5 block">What happened?</label>
                     <textarea value={summary} onChange={e=>setSummary(e.target.value)} rows={3} placeholder="Quick summary of the interaction…"
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-none focus:border-red-300 resize-none"/></div>
+                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-hidden focus:border-red-300 resize-none"/></div>
                   <div><label className="text-xs font-bold text-slate-500 mb-1.5 block">Outcome / next step</label>
                     <input value={outcome} onChange={e=>setOutcome(e.target.value)} placeholder="e.g. Client wants a quote for starters"
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-none focus:border-red-300"/></div>
+                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-hidden focus:border-red-300"/></div>
                   <div><label className="text-xs font-bold text-slate-500 mb-1.5 block">Duration (minutes)</label>
                     <input type="number" value={duration} onChange={e=>setDuration(e.target.value)} placeholder="15"
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-none focus:border-red-300"/></div>
+                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-hidden focus:border-red-300"/></div>
                   <button onClick={saveActivity} disabled={!summary.trim()}
                     className="w-full rounded-2xl py-4 text-sm font-black text-white min-h-[56px] disabled:opacity-40" style={{background:BRAND.primary}}>
                     Save interaction
@@ -131,7 +131,7 @@ export function ActivityLogger({ open, onClose, client, userId, teamId, data, se
               )}
 
               {step === "followup" && (
-                <div className="space-y-4">
+                <div className="stack-y-4">
                   <div className="flex items-center gap-3 rounded-xl bg-green-50 p-3">
                     <CheckCircle2 size={18} className="text-green-600 shrink-0"/>
                     <p className="text-sm font-bold text-green-700">Interaction logged</p>
@@ -139,14 +139,14 @@ export function ActivityLogger({ open, onClose, client, userId, teamId, data, se
                   <p className="text-sm font-black text-slate-700">Schedule a follow-up?</p>
                   <div><label className="text-xs font-bold text-slate-500 mb-1.5 block">Follow-up title</label>
                     <input value={followupTitle} onChange={e=>setFollowupTitle(e.target.value)} placeholder="e.g. Chase quote for starters"
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-none focus:border-red-300"/></div>
+                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-hidden focus:border-red-300"/></div>
                   <div><label className="text-xs font-bold text-slate-500 mb-1.5 block">Date</label>
                     <input type="date" value={followupDate} onChange={e=>setFollowupDate(e.target.value)} min={todayISO()}
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-none focus:border-red-300"/></div>
+                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-hidden focus:border-red-300"/></div>
                   <div className="flex gap-3">
                     <button onClick={() => setStep("done")} className="flex-1 rounded-2xl py-3.5 text-sm font-bold border-2 border-slate-200 text-slate-600 min-h-[48px]">Skip</button>
                     <button onClick={saveFollowup} disabled={!followupTitle.trim() || !followupDate}
-                      className="flex-[2] rounded-2xl py-3.5 text-sm font-black text-white min-h-[48px] disabled:opacity-40" style={{background:BRAND.primary}}>
+                      className="flex-2 rounded-2xl py-3.5 text-sm font-black text-white min-h-[48px] disabled:opacity-40" style={{background:BRAND.primary}}>
                       <Calendar size={14} className="inline mr-1"/> Create follow-up
                     </button>
                   </div>

@@ -49,8 +49,9 @@ export default defineConfig({
     // manual vendor chunking splitting an import cycle. With automatic chunking,
     // minified builds were verified by opening all 28 screens and running the
     // save/sync flows in a browser (2026-09-22); main bundle 1.68 MB -> 755 KB.
-    rollupOptions: {},
-    minify: "esbuild",
+    // Vite 8 builds with Rolldown and minifies with Oxc (its default); the
+    // simulation re-checks every screen and flow against the minified build.
+    minify: true,
     // Source maps stay out of the public deploy; they exposed the full source tree.
     sourcemap: false,
     chunkSizeWarningLimit: 600,

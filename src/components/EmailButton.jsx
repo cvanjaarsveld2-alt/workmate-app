@@ -161,7 +161,7 @@ export function EmailComposer({ contact, onClose, onGapSelling }) {
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[120] flex items-end justify-center bg-black/50"
+      className="fixed inset-0 z-120 flex items-end justify-center bg-black/50"
       onClick={onClose}>
       <motion.div
         initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }}
@@ -182,7 +182,7 @@ export function EmailComposer({ contact, onClose, onGapSelling }) {
         </div>
 
         {!tpl ? (
-          <div className="p-3 space-y-2 overflow-y-auto">
+          <div className="p-3 stack-y-2 overflow-y-auto">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Choose a template</p>
             {EMAIL_TEMPLATES.map(t => (
               <button key={t.id} onClick={() => pick(t)}
@@ -193,16 +193,16 @@ export function EmailComposer({ contact, onClose, onGapSelling }) {
             ))}
           </div>
         ) : (
-          <div className="p-4 space-y-3 overflow-y-auto">
+          <div className="p-4 stack-y-3 overflow-y-auto">
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Subject</label>
               <input value={subject} onChange={e => setSubject(e.target.value)}
-                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300" style={{ fontSize: 16 }} />
+                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-hidden focus:border-blue-300" style={{ fontSize: 16 }} />
             </div>
             <div>
               <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Message — edit as needed</label>
               <textarea value={body} onChange={e => setBody(e.target.value)} rows={9}
-                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 resize-none" style={{ fontSize: 16 }} />
+                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-hidden focus:border-blue-300 resize-none" style={{ fontSize: 16 }} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={copy}
@@ -302,7 +302,7 @@ export function EmailButton({ email, contactName, clientName, size = "sm" }) {
 
               {/* Template list or editor */}
               {!editing ? (
-                <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+                <div className="p-3 stack-y-2 max-h-80 overflow-y-auto">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">Choose a template</p>
                   {EMAIL_TEMPLATES.map(t => (
                     <button key={t.id} onClick={() => selectTemplate(t)}
@@ -313,17 +313,17 @@ export function EmailButton({ email, contactName, clientName, size = "sm" }) {
                   ))}
                 </div>
               ) : (
-                <div className="p-4 space-y-3">
+                <div className="p-4 stack-y-3">
                   <div>
                     <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Subject</label>
                     <input value={customSubject} onChange={e => setCustomSubject(e.target.value)}
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300" />
+                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-hidden focus:border-blue-300" />
                   </div>
                   <div>
                     <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Message — edit if needed</label>
                     <textarea value={customBody} onChange={e => setCustomBody(e.target.value)}
                       rows={8}
-                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-blue-300 resize-none" />
+                      className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-hidden focus:border-blue-300 resize-none" />
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => setEditing(false)}

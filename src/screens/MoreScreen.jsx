@@ -116,7 +116,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
   }
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <PageHeader title="Settings" subtitle="Sync, security & account" />
 
@@ -196,7 +196,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
       )}
 
       {/* Sync */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Sync Status</p>
         <div className="flex items-center justify-between">
           <div>
@@ -256,7 +256,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           : null}
       </Card>
 
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Notifications</p>
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
@@ -278,7 +278,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           }
         </div>
         {pushState === "active" && (
-          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-2">
+          <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 stack-y-2">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-slate-700">Delivery test</p>
@@ -292,7 +292,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           </div>
         )}
         {pushState === "error" && (
-          <div className="rounded-xl bg-red-50 border border-red-200 p-3 space-y-2">
+          <div className="rounded-xl bg-red-50 border border-red-200 p-3 stack-y-2">
             <p className="text-xs font-bold text-red-800">⚠ Couldn't enable notifications</p>
             <p className="text-xs text-red-700 leading-relaxed">{pushError}</p>
             <Btn size="sm" variant="warning" onClick={handleEnablePush}>
@@ -324,7 +324,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         )}
       </Card>
 
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Security</p>
 
         {/* PIN toggle */}
@@ -355,7 +355,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             }}
             className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${pinEnabled ? "" : "bg-slate-200"}`}
             style={pinEnabled ? { background: BRAND.primary } : {}}>
-            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${pinEnabled ? "translate-x-6" : "translate-x-0.5"}`} />
+            <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${pinEnabled ? "translate-x-6" : "translate-x-0.5"}`} />
           </button>
         </div>
 
@@ -369,14 +369,14 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
 
         {/* Warning when disabled */}
         {!pinEnabled && (
-          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 stack-y-2">
             <p className="text-sm font-bold text-amber-700">⚠️ PIN lock is off</p>
             <p className="text-xs text-amber-600 leading-relaxed">
               Anyone who picks up your phone can open PowerMate and see all client data, field notes, quotes, and expenses — including your team's records.
             </p>
-            <div className="pt-1 space-y-1.5">
+            <div className="pt-1 stack-y-1.5">
               <p className="text-xs font-black text-amber-700">If you choose not to use PIN lock:</p>
-              <ul className="text-xs text-amber-600 space-y-1">
+              <ul className="text-xs text-amber-600 stack-y-1">
                 <li>• Enable your phone's own screen lock (Face ID, fingerprint, or phone PIN) — this is your minimum protection</li>
                 <li>• Never leave your phone unattended at client sites</li>
                 <li>• Enable auto-lock (screen timeout) set to 30 seconds or less</li>
@@ -399,11 +399,11 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
       </Card>
 
       {/* ── Dashboard Settings ── */}
-      <Card className="p-4 space-y-4">
+      <Card className="p-4 stack-y-4">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Dashboard Settings</p>
 
         {/* Neglect threshold */}
-        <div className="space-y-2">
+        <div className="stack-y-2">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-bold text-slate-700">Client neglect warning</p>
@@ -445,7 +445,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
         <div className="h-px bg-slate-100"/>
 
         {/* Monthly Revenue Target */}
-        <div className="space-y-2">
+        <div className="stack-y-2">
           <p className="text-sm font-bold text-slate-700">Monthly Revenue Target</p>
           <p className="text-xs text-slate-400">Shows a progress bar on your dashboard</p>
         <p className="text-xs text-slate-400">Set your monthly won-revenue target. Shows a progress bar on your dashboard.</p>
@@ -456,7 +456,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             value={targetInput}
             onChange={e => setTargetInput(e.target.value)}
             placeholder="e.g. 100000"
-            className="flex-1 rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-red-300"
+            className="flex-1 rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-hidden focus:border-red-300"
           />
           <button
             onClick={() => {

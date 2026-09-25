@@ -226,7 +226,7 @@ function AmountField({ label, value, onChange, placeholder = "0.00", required = 
         value={value}
         onChange={e => onChange(normaliseDecimalInput(e.target.value))}
         placeholder={placeholder}
-        className="w-full rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-none focus:border-red-300 min-h-[48px]"
+        className="w-full rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-hidden focus:border-red-300 min-h-[48px]"
       />
     </div>
   );
@@ -305,7 +305,7 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="space-y-2 overflow-hidden"
+            className="stack-y-2 overflow-hidden"
           >
             {items.map(ex => {
               if (editId === ex.id) {
@@ -534,7 +534,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   async function saveExpense() {
     if (!form.amount || parseFloat(form.amount) <= 0) { setToast("Enter a valid amount"); return; }
 
-    let zarInfo = null;
+    let zarInfo;
     const manualZARNum = parseFloat(manualZAR);
     if (!form.currency || form.currency === "ZAR") {
       zarInfo = { amount_zar: parseFloat(form.amount), exchange_rate: 1, rate_date: todayISO(), rate_source: "ZAR" };
@@ -839,7 +839,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
 
   function renderExpenseForm() {
     return (
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <div className="flex items-center justify-between">
           <p className="text-base font-black text-slate-800">{editId ? "Edit Expense" : "New Expense"}</p>
           {scannedNotice && (
@@ -866,7 +866,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 </button>
               </div>
             ) : (
-              <div className="space-y-1.5">
+              <div className="stack-y-1.5">
                 <button type="button"
                   onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
                   className="w-full h-24 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
@@ -938,7 +938,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
           <div>
             <label className="mb-1.5 block text-sm font-bold text-slate-500">Currency</label>
             <select value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
-              className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[52px]">
+              className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-hidden focus:border-red-300 min-h-[52px]">
               {["ZAR","USD","GBP","EUR","GHS","NGN","KES","TZS","UGX","BWP","NAD","MWK","MZN","ZMW","AED","SAR","INR","CNY","JPY","AUD","CAD"].map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
@@ -954,7 +954,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               <input type="text" inputMode="decimal" value={manualZAR}
                 onChange={e => setManualZAR(normaliseDecimalInput(e.target.value))}
                 placeholder="leave blank to use ECB rate"
-                className="flex-1 rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-none focus:border-red-300 min-h-[48px]" />
+                className="flex-1 rounded-xl border-2 border-slate-100 bg-white p-3 text-base outline-hidden focus:border-red-300 min-h-[48px]" />
             </div>
             <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
               Leave blank for USD/GBP/EUR — the app fetches the ECB rate. Fill in for Cedi, Naira, etc.
@@ -1004,7 +1004,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
 
   // ─── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
@@ -1097,7 +1097,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             {detailExpense.notes && (
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Notes</p>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 border border-slate-100">{detailExpense.notes}</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap wrap-break-word rounded-xl bg-slate-50 p-3 border border-slate-100">{detailExpense.notes}</p>
               </div>
             )}
 
@@ -1146,7 +1146,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={closeFinancePack}
-              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs" />
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
@@ -1169,7 +1169,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 </div>
                 <p className="text-xs text-slate-400 mt-1.5 text-center">Pinch / scroll to review · {financePack.filename}</p>
               </div>
-              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+              <div className="px-4 py-3 border-t border-slate-100 stack-y-2" style={{ background: "#F7F3F3" }}>
                 <button onClick={shareFinancePack}
                   className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
                   style={{ background: "#8B1A1A" }}>
@@ -1246,7 +1246,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border-2 border-red-200 p-3 shadow-sm">
+        <div className="bg-white rounded-2xl border-2 border-red-200 p-3 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-base font-black text-slate-900">{selectedIds.size} selected</p>
@@ -1338,7 +1338,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       )}
 
       {/* ── Expense list grouped by calendar month, collapsible ── */}
-      <div className="space-y-5">
+      <div className="stack-y-5">
         {orderedMonthKeys.map(monthKey => {
           const { label, items } = byMonthMap[monthKey];
           return (

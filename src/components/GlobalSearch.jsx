@@ -151,7 +151,7 @@ export function GlobalSearch({ open, onClose, data, onNavigate }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-60 bg-black/40 backdrop-blur-xs"
             onClick={onClose}
           />
 
@@ -160,7 +160,7 @@ export function GlobalSearch({ open, onClose, data, onNavigate }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.15 }}
-            className="fixed inset-x-0 top-0 z-[61] bg-white shadow-xl rounded-b-2xl max-h-[85vh] flex flex-col">
+            className="fixed inset-x-0 top-0 z-61 bg-white shadow-xl rounded-b-2xl max-h-[85vh] flex flex-col">
 
             {/* Search input bar */}
             <div className="px-4 pt-3 pb-2 flex items-center gap-2 border-b border-slate-100">
@@ -171,7 +171,7 @@ export function GlobalSearch({ open, onClose, data, onNavigate }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search clients, contacts, notes, follow-ups…"
-                className="flex-1 text-base outline-none placeholder:text-slate-400 min-h-[44px]"
+                className="flex-1 text-base outline-hidden placeholder:text-slate-400 min-h-[44px]"
               />
               {query && (
                 <button onClick={() => setQuery("")} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100">
@@ -215,14 +215,14 @@ export function GlobalSearch({ open, onClose, data, onNavigate }) {
                     return (
                       <div key={entity} className="mb-3">
                         <div className="px-3 py-1.5 flex items-center gap-2">
-                          <div className="w-5 h-5 rounded flex items-center justify-center" style={{ background: config.bg, color: config.color }}>
+                          <div className="w-5 h-5 rounded-sm flex items-center justify-center" style={{ background: config.bg, color: config.color }}>
                             <Icon size={11} />
                           </div>
                           <p className="text-xs font-black text-slate-500 uppercase tracking-wider">
                             {config.label}{items.length !== 1 ? "s" : ""} ({items.length})
                           </p>
                         </div>
-                        <div className="space-y-1">
+                        <div className="stack-y-1">
                           {items.map((item) => (
                             <button
                               key={item.id}

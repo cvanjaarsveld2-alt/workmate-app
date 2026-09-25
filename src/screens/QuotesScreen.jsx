@@ -35,7 +35,7 @@ function ExpandableText({ text, limit = 110, className = "" }) {
   const display = isLong && !expanded ? text.slice(0, limit).trimEnd() + "…" : text;
   return (
     <div className={className}>
-      <p className="text-sm text-slate-500 break-words whitespace-pre-wrap">{display}</p>
+      <p className="text-sm text-slate-500 wrap-break-word whitespace-pre-wrap">{display}</p>
       {isLong && (
         <button
           type="button"
@@ -243,7 +243,7 @@ export function QuotesScreen({
   }
   function renderQuoteForm(isEdit) {
     return (
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Quote" : "New Quote"}</p>
         <ClientSelector
           label="Client"
@@ -309,7 +309,7 @@ export function QuotesScreen({
       ),
     totalValue = filtered.reduce((s, q) => s + parseFloat(q.value || 0), 0);
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <ShareSheet
         open={!!shareSheet && !sharing}
@@ -363,7 +363,7 @@ export function QuotesScreen({
       {filtered.length === 0 && (
         <Empty title="No quotes found" text="Add a quote or change filters." icon={FileIcon} />
       )}
-      <div className="space-y-2">
+      <div className="stack-y-2">
         {filtered.map(q => {
           if (editId === q.id)
             return (
@@ -377,7 +377,7 @@ export function QuotesScreen({
               <div className="min-w-0">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-base font-bold text-slate-900 break-words">
+                    <p className="text-base font-bold text-slate-900 wrap-break-word">
                       {q.client_name || "Unknown client"}
                     </p>
                     <span

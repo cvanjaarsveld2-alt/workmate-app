@@ -6,7 +6,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Search, CheckSquare, Square, User, UserPlus, Check, ChevronDown, ChevronRight, Tag } from "lucide-react";
 
-const inputCls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-2.5 px-3 text-sm outline-none focus:border-red-300 focus:bg-white min-h-[44px]";
+const inputCls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-2.5 px-3 text-sm outline-hidden focus:border-red-300 focus:bg-white min-h-[44px]";
 
 export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCreate }) {
   const [search, setSearch] = useState("");
@@ -72,7 +72,7 @@ export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCrea
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs" />
 
       <motion.div
         initial={{ y: "100%" }}
@@ -120,7 +120,7 @@ export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCrea
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search contacts…"
-                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-red-300 focus:bg-white min-h-[44px]"
+                  className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-hidden focus:border-red-300 focus:bg-white min-h-[44px]"
                 />
               </div>
               {onCreate && (
@@ -222,7 +222,7 @@ export function ContactPicker({ contacts, selectedIds, onChange, onClose, onCrea
         ) : (
           <>
             {/* New contact mini-form */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div className="flex-1 overflow-y-auto px-4 py-3 stack-y-3">
               <div>
                 <label className="mb-1.5 block text-sm font-bold text-slate-500">Name <span className="text-red-500">*</span></label>
                 <input autoFocus value={newContact.name}

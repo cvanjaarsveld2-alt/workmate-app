@@ -35,15 +35,15 @@ export function PDFNamePrompt({ open, defaultName = "PowerMate-Export", ext = "p
       {open && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onCancel} className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm" />
+            onClick={onCancel} className="fixed inset-0 z-90 bg-black/50 backdrop-blur-xs" />
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[91] rounded-t-3xl bg-white"
+            className="fixed bottom-0 left-0 right-0 z-91 rounded-t-3xl bg-white"
             style={{ maxWidth: 480, margin: "0 auto" }}>
             <div className="flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 rounded-full bg-slate-200" />
             </div>
-            <div className="px-6 pb-8 pt-3 space-y-4">
+            <div className="px-6 pb-8 pt-3 stack-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-base font-black text-slate-900">Name your {ext === "doc" ? "Word doc" : ext.toUpperCase()}</p>
                 <button onClick={onCancel} className="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-100 text-slate-500">
@@ -57,7 +57,7 @@ export function PDFNamePrompt({ open, defaultName = "PowerMate-Export", ext = "p
                   value={name}
                   onChange={e => setName(e.target.value)}
                   onKeyDown={e => e.key === "Enter" && handleConfirm()}
-                  className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-4 pr-16 text-sm font-bold text-slate-900 outline-none focus:border-red-300 focus:bg-white transition-colors"
+                  className="w-full rounded-2xl border-2 border-slate-100 bg-slate-50 px-4 py-4 pr-16 text-sm font-bold text-slate-900 outline-hidden focus:border-red-300 focus:bg-white transition-colors"
                   placeholder="Enter filename…"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-300">.pdf</span>

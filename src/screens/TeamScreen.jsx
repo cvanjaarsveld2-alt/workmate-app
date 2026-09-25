@@ -157,7 +157,7 @@ function MemberDashboard({ member, data, setData, members, currentUserId, userEm
     const { data: sectionData, label: sectionLabel } = sectionMap[drillSection] || { data: [], label: "" };
 
     return (
-      <div className="space-y-4">
+      <div className="stack-y-4">
         <AnimatePresence>{reassignToast && <Toast message={reassignToast} onDone={() => setReassignToast("")} />}</AnimatePresence>
         <div className="flex items-center gap-3">
           <button onClick={() => setDrillSection(null)}
@@ -271,7 +271,7 @@ function MemberDashboard({ member, data, setData, members, currentUserId, userEm
   const displayName = name.charAt(0).toUpperCase() + name.slice(1);
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <AnimatePresence>{reassignToast && <Toast message={reassignToast} onDone={() => setReassignToast("")} />}</AnimatePresence>
       <div className="flex items-center gap-3">
         <button onClick={onBack}
@@ -440,7 +440,7 @@ function SharedWithMe({ userId, data, setData, onRefresh }) {
   return (
     <>
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
-      <div className="space-y-3">
+      <div className="stack-y-3">
         {items.map(notif => {
           const cfg  = TYPE_CONFIG[notif.record_type] || TYPE_CONFIG.client;
           const Icon = cfg.icon;
@@ -509,6 +509,8 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
   const [viewAccess, setViewAccess]   = useState({});
   const [viewRequests, setViewRequests] = useState([]);
   const [teamViewOn, setTeamViewOn]   = useState(readTeamViewPref);
+  // Master account removing a teammate: who takes over their work.
+  const [removing, setRemoving]       = useState(null);
   const { confirm, dialog }           = useConfirm();
 
   useEffect(() => { loadTeam(); }, [userId, appUserRole]);
@@ -658,6 +660,11 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
 
   async function removeMember(member) {
     const isMe = member.user_id === userId;
+    // The master account hands a leaver's work to someone else in one step.
+    if (!isMe && access?.is_owner) {
+      setRemoving({ member, reassignTo: userId, blockLogin: true, busy: false });
+      return;
+    }
     const ok = await confirm(
       isMe ? "Leave this team? Your data will remain." : `Remove ${member.email} from the team?`,
       { confirmLabel: isMe ? "Leave" : "Remove" }
@@ -668,6 +675,26 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
     if (error) { setToast("Could not remove"); return; }
     if (isMe) { setTeam(null); setMembers([]); setMyRole(null); onTeamChange?.(null); }
     else { setMembers(m => m.filter(x => x.user_id !== member.user_id)); setToast("Member removed"); }
+  }
+
+  async function confirmRemoveMember() {
+    if (!removing || removing.busy) return;
+    const { member, reassignTo, blockLogin } = removing;
+    setRemoving(r => ({ ...r, busy: true }));
+    const { data, error } = await supabase.rpc("remove_team_member", {
+      p_user_id: member.user_id, p_reassign_to: reassignTo, p_block_login: blockLogin,
+    });
+    if (error) {
+      setRemoving(r => ({ ...r, busy: false }));
+      setToast(error.message || "Could not remove");
+      return;
+    }
+    const to = members.find(m => m.user_id === reassignTo);
+    const moved = (data?.records_moved || 0) + (data?.assignments_moved || 0);
+    setMembers(m => m.filter(x => x.user_id !== member.user_id));
+    setRemoving(null);
+    setToast(`${member.email} removed · ${moved} record${moved === 1 ? "" : "s"} moved to ${reassignTo === userId ? "you" : to?.email || "teammate"}`);
+    triggerImmediateSync();
   }
 
   // Only the master account changes roles or access (enforced by set_member_access).
@@ -781,7 +808,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
   // ── Loading ─────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="stack-y-4">
         <PageHeader title="Team" subtitle="Loading…" />
         <Card className="p-6 flex items-center justify-center">
           <RefreshCw size={20} className="animate-spin text-slate-300" />
@@ -793,11 +820,11 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
   // ── No team ─────────────────────────────────────────────────────────────────
   if (!team) {
     return (
-      <div className="space-y-4">
+      <div className="stack-y-4">
         {dialog}
         <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
         <PageHeader title="Team" subtitle="Set up team sharing for Power Works" />
-        <Card className="p-5 text-center space-y-3">
+        <Card className="p-5 text-center stack-y-3">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "#F7F3F3" }}>
             <Users size={28} style={{ color: BRAND.primary }} />
           </div>
@@ -818,7 +845,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
           {showCreate && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-              <Card className="p-4 space-y-3">
+              <Card className="p-4 stack-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-base font-black text-slate-800">Create team</p>
                   <button onClick={() => setShowCreate(false)}><X size={18} className="text-slate-400" /></button>
@@ -836,7 +863,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
           {showJoin && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-              <Card className="p-4 space-y-3">
+              <Card className="p-4 stack-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-base font-black text-slate-800">Join a team</p>
                   <button onClick={() => setShowJoin(false)}><X size={18} className="text-slate-400" /></button>
@@ -858,9 +885,49 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
   const otherMembers = members.filter(m => m.user_id !== userId);
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
+
+      {removing && (
+        <div className="fixed inset-0 z-80 bg-black/50 flex items-end sm:items-center justify-center p-4"
+          onClick={() => !removing.busy && setRemoving(null)}>
+          <div className="w-full max-w-md" onClick={e => e.stopPropagation()}>
+          <Card className="p-5 stack-y-4">
+            <div>
+              <p className="text-lg font-black text-slate-900">Remove {removing.member.email}?</p>
+              <p className="text-sm text-slate-500 mt-1 leading-snug">
+                Their clients, contacts, follow-ups, quotes, notes, leads and jobs move to the person you choose.
+                Their expenses and vehicle checks stay on record for the team.
+              </p>
+            </div>
+            <label className="block">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-wider">Hand their work to</span>
+              <select value={removing.reassignTo}
+                onChange={e => setRemoving(r => ({ ...r, reassignTo: e.target.value }))}
+                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-800">
+                {members.filter(m => m.user_id !== removing.member.user_id).map(m => (
+                  <option key={m.user_id} value={m.user_id}>{m.user_id === userId ? `Me (${m.email})` : m.email}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex items-start gap-3 rounded-xl bg-slate-50 p-3">
+              <input type="checkbox" checked={removing.blockLogin}
+                onChange={e => setRemoving(r => ({ ...r, blockLogin: e.target.checked }))}
+                className="mt-0.5 h-5 w-5 shrink-0" />
+              <span className="text-sm text-slate-700 leading-snug">
+                <span className="font-bold">Block their login</span> — recommended when someone leaves the company.
+                They are signed out everywhere either way.
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <Btn variant="outline" onClick={() => setRemoving(null)} disabled={removing.busy}>Cancel</Btn>
+              <Btn onClick={confirmRemoveMember} disabled={removing.busy}>{removing.busy ? "Removing…" : "Remove"}</Btn>
+            </div>
+          </Card>
+          </div>
+        </div>
+      )}
 
       <PageHeader
         title={team.name}
@@ -901,7 +968,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
           <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Team Pipeline</p>
           <p className="text-xs text-slate-400">{teamStats.totalInPipeline} total</p>
         </div>
-        <div className="space-y-2">
+        <div className="stack-y-2">
           {[
             { label: "New Lead",  color: "#92400E" },
             { label: "Contacted", color: "#1E40AF" },
@@ -933,7 +1000,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
           <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 px-1">
             Team Members
           </p>
-          <div className="space-y-3">
+          <div className="stack-y-3">
             {otherMembers.map(m => {
               const allClients  = data?.clients   || [];
               const allContacts = data?.contacts  || [];
@@ -1058,7 +1125,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
 
       {/* ── Whole-team view: master approves; others request ── */}
       {access?.is_owner && viewRequests.length > 0 && (
-        <Card className="p-4 space-y-3">
+        <Card className="p-4 stack-y-3">
           <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Access requests</p>
           {viewRequests.map(req => {
             const who = members.find(m => m.user_id === req.from_user_id);
@@ -1073,7 +1140,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
         </Card>
       )}
       {access && (
-        <Card className="p-4 space-y-2">
+        <Card className="p-4 stack-y-2">
           <div className="flex items-center gap-2">
             <ShieldCheck size={16} style={{ color: BRAND.primary }} />
             <p className="text-sm font-black text-slate-800">{access.is_owner ? "Master account" : "Whole-team view"}</p>
@@ -1181,7 +1248,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
         {showManage && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.2 }}
-            className="overflow-hidden space-y-4">
+            className="overflow-hidden stack-y-4">
 
             {/* Invite code */}
             <Card className="p-4">

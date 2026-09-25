@@ -79,7 +79,7 @@ async function verifyPIN(pin, userId) {
     return ok;
   }
   // Everything below is a pre-v3 format: verify it once, then upgrade to v3.
-  let ok = false;
+  let ok;
   if (stored.startsWith("v2$")) {
     const [, salt, hash] = stored.split("$");
     ok = !!salt && !!hash && _safeEqual(await _hashPINLegacy(pin, salt), hash);
@@ -220,7 +220,7 @@ function NumKey({ digit, sub, onPress, disabled }) {
       whileTap={{ scale: 0.93 }}
       onClick={() => !disabled && onPress(String(digit))}
       disabled={disabled}
-      className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-sm select-none w-[72px] h-[66px] sm:w-[80px] sm:h-[72px]">
+      className="flex flex-col items-center justify-center rounded-2xl bg-white border border-slate-200 shadow-xs select-none w-[72px] h-[66px] sm:w-[80px] sm:h-[72px]">
       <span className="text-2xl font-bold text-slate-900 leading-none">{digit}</span>
       {sub
         ? <span className="text-[9px] font-bold text-slate-400 tracking-[0.18em] mt-1">{sub}</span>
@@ -436,7 +436,7 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
       </div>
 
       <div className="w-full px-6">
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 px-8 py-8 flex flex-col items-center gap-5">
+        <div className="bg-white rounded-3xl shadow-xs border border-slate-100 px-8 py-8 flex flex-col items-center gap-5">
           <PINDots entered={entered.length} shake={shake} />
           <AnimatePresence mode="wait">
             {lockedOut ? (
@@ -560,7 +560,7 @@ export function PINSetupScreen({ userId, onComplete }) {
       </div>
 
       <div className="w-full px-6">
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 px-8 py-8 flex flex-col items-center gap-5">
+        <div className="bg-white rounded-3xl shadow-xs border border-slate-100 px-8 py-8 flex flex-col items-center gap-5">
           <PINDots entered={entered.length} shake={shake} />
           <AnimatePresence mode="wait">
             {error ? (

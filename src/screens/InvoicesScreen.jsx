@@ -141,7 +141,7 @@ export function InvoicesScreen({ userId, teamId, setData }) {
   const outstanding = invoices.reduce((s, x) => s + Number(x.balance_due || 0), 0),
     received = invoices.reduce((s, x) => s + Number(x.amount_paid || 0), 0);
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <PageHeader title="Invoices" subtitle="Billing, balances & payments" />
       {!online && (
         <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 flex gap-2">
@@ -186,7 +186,7 @@ export function InvoicesScreen({ userId, teamId, setData }) {
         visible.map(inv => {
           const paidFlag = Number(inv.balance_due || 0) <= 0 || inv.status === "paid";
           return (
-            <Card key={inv.id} className="p-4 space-y-3">
+            <Card key={inv.id} className="p-4 stack-y-3">
               <div className="flex items-start gap-3">
                 <div className="flex-1">
                   <p className="font-black truncate">{inv.invoice_number || "Invoice"}</p>

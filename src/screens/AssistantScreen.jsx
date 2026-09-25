@@ -68,7 +68,7 @@ function ReviewCard({ candidate, clients, onConfirm, onDismiss }) {
   const days = daysSince((candidate.sent_at || "").slice(0, 10));
 
   return (
-    <Card className="p-4 space-y-2.5">
+    <Card className="p-4 stack-y-2.5">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-base font-bold text-slate-900 truncate">{candidate.extracted_client_name || "Unknown client"}</p>
@@ -89,7 +89,7 @@ function ReviewCard({ candidate, clients, onConfirm, onDismiss }) {
       {candidate.snippet && <p className="text-xs text-slate-400 line-clamp-2">{candidate.snippet}</p>}
 
       {editing ? (
-        <div className="space-y-2 pt-1">
+        <div className="stack-y-2 pt-1">
           <Field label="Client" value={name} onChange={setName} placeholder="Client name" />
           <Field label="Amount (R)" type="number" value={amount} onChange={setAmount} placeholder="0.00" />
           <div className="flex gap-2">
@@ -168,7 +168,7 @@ export function AssistantScreen({ data, setData, userId, teamId }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
@@ -189,7 +189,7 @@ export function AssistantScreen({ data, setData, userId, teamId }) {
         <p className="text-sm font-bold uppercase tracking-wider px-1 mb-2 text-slate-400">Needs review ({needsReview.length})</p>
         {needsReview.length === 0
           ? <Empty title="Nothing to review" text="Emailed quotes will show up here once the Gmail pipeline is set up." icon={Inbox} />
-          : <div className="space-y-2">
+          : <div className="stack-y-2">
               {needsReview.map(c => (
                 <ReviewCard key={c.id} candidate={c} clients={clients} onConfirm={handleConfirm} onDismiss={handleDismiss} />
               ))}
@@ -201,7 +201,7 @@ export function AssistantScreen({ data, setData, userId, teamId }) {
         <p className="text-sm font-bold uppercase tracking-wider px-1 mb-2 text-slate-400">Awaiting reply ({awaitingReply.length})</p>
         {awaitingReply.length === 0
           ? <Empty title="No quotes waiting" text="Pending quotes needing a follow-up will show up here." icon={Clock} />
-          : <div className="space-y-2">
+          : <div className="stack-y-2">
               {awaitingReply.map(q => {
                 const client = clients.find(c => c.id === q.client_id);
                 const linkedEmail = emailQuotes.find(e => e.promoted_quote_id === q.id);
@@ -244,7 +244,7 @@ export function AssistantScreen({ data, setData, userId, teamId }) {
           </button>
           <AnimatePresence>
             {showDismissed && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="space-y-2">
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="stack-y-2">
                 {dismissed.map(c => (
                   <Card key={c.id} className="p-3 flex items-center justify-between gap-2">
                     <div className="min-w-0">

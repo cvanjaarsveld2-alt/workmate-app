@@ -256,7 +256,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
   if (view === "list") {
     const openBreakdowns = (data.breakdowns || []).filter(b => b.status !== "resolved");
     return (
-      <div className="space-y-4 pb-24">
+      <div className="stack-y-4 pb-24">
         <PageHeader
           title={isRepair ? "Repair Reports" : "Breakdown Reports"}
           subtitle={reports.length ? `${reports.length} report${reports.length !== 1 ? "s" : ""}` : (isRepair ? "Log a completed repair" : "Log a breakdown with photos")} />
@@ -288,7 +288,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
         {isRepair && openBreakdowns.length > 0 && (
           <Card className="p-4">
             <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Repair an open breakdown</p>
-            <div className="space-y-2">
+            <div className="stack-y-2">
               {openBreakdowns.slice(0, 5).map(bd => (
                 <button key={bd.id} onClick={() => newReport(bd)}
                   className="w-full flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 active:bg-red-50 transition-colors text-left">
@@ -313,7 +313,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
         ) : (!isRepair && listMode === "board") ? (
           <BreakdownBoard reports={reports} onOpen={openReport} onChangeStatus={changeStatus} />
         ) : (
-          <div className="space-y-3">
+          <div className="stack-y-3">
             {reports.map(r => {
               const sev = severityMeta(r.severity);
               const st  = statusMeta(r.status);
@@ -474,7 +474,7 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
   }
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="stack-y-4 pb-28">
       <div className="flex items-center gap-3">
         <button onClick={onBack} className="p-2.5 rounded-xl border-2 border-slate-200 bg-white text-slate-500 min-w-[44px] min-h-[44px] flex items-center justify-center">
           <ArrowLeft size={18} />
@@ -505,7 +505,7 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
         </div>
       )}
 
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <Field label="Title" value={r.title} onChange={v => patch({ title: v })}
           placeholder={isRepair ? "e.g. Hydraulic ram reseal" : "e.g. Tyre Handler hydraulic failure"} />
         <Field label="Equipment / Vehicle" value={r.equipment} onChange={v => patch({ equipment: v })} placeholder="e.g. TH-500, Reg CA 123-456" />
@@ -542,7 +542,7 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
         )}
       </Card>
 
-      <div className="space-y-3">
+      <div className="stack-y-3">
         <div className="flex items-center justify-between px-1">
           <p className="text-sm font-black text-slate-700">{isRepair ? "Repair items" : "Inspection items"}</p>
           <span className="text-xs text-slate-400 font-bold">{r.items.length} item{r.items.length !== 1 ? "s" : ""}</span>
@@ -551,11 +551,11 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
         {r.items.map((it, idx) => {
           const photos = itemPhotos(it);
           return (
-            <Card key={it.id} className="p-3 space-y-2.5">
+            <Card key={it.id} className="p-3 stack-y-2.5">
               <div className="flex items-center gap-2">
                 <input value={it.heading} onChange={e => patchItem(it.id, { heading: e.target.value })}
                   placeholder={`${isRepair ? "Repair" : "Item"} ${idx + 1} heading…`}
-                  className="flex-1 text-sm font-bold text-slate-900 bg-slate-50 rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-none" />
+                  className="flex-1 text-sm font-bold text-slate-900 bg-slate-50 rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-hidden" />
                 <button onClick={() => removeItem(it.id)} className="w-9 h-9 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
                   <Trash2 size={15} />
                 </button>
@@ -622,13 +622,13 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
                   )}
                   <textarea value={it.action || ""} onChange={e => patchItem(it.id, { action: e.target.value })}
                     placeholder="What was done to fix it…" rows={2}
-                    className="w-full text-sm text-slate-700 bg-slate-50 rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-none resize-none" />
+                    className="w-full text-sm text-slate-700 bg-slate-50 rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-hidden resize-none" />
                 </>
               )}
 
               <input value={it.note} onChange={e => patchItem(it.id, { note: e.target.value })}
                 placeholder="Note (optional)…"
-                className="w-full text-xs text-slate-700 bg-slate-50 rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-none" />
+                className="w-full text-xs text-slate-700 bg-slate-50 rounded-lg px-2.5 py-2 border border-slate-100 focus:border-red-300 focus:outline-hidden" />
             </Card>
           );
         })}
@@ -676,15 +676,15 @@ function ReportEditor({ isRepair, report, clients, customFaults, onAddCustomFaul
         {exporting && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setExporting(false)} className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm" />
+              onClick={() => setExporting(false)} className="fixed inset-0 z-90 bg-black/50 backdrop-blur-xs" />
             <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-[91] rounded-t-3xl bg-white p-5"
+              className="fixed bottom-0 left-0 right-0 z-91 rounded-t-3xl bg-white p-5"
               style={{ maxWidth: 672, margin: "0 auto" }}>
               <div className="flex justify-center pb-3"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
               <p className="text-base font-black text-slate-900 mb-1">Export report</p>
               <p className="text-xs text-slate-400 mb-4">Download a branded document to share or print.</p>
-              <div className="space-y-2.5">
+              <div className="stack-y-2.5">
                 <button onClick={() => handleExport("pdf")}
                   className="w-full flex items-center gap-3 p-4 rounded-2xl border-2 border-slate-100 active:bg-slate-50 transition-colors text-left">
                   <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FEF2F2" }}>
@@ -760,7 +760,7 @@ function BreakdownBoard({ reports, onOpen, onChangeStatus }) {
               </div>
 
               {/* Column cards */}
-              <div className="space-y-2">
+              <div className="stack-y-2">
                 {items.length === 0 && (
                   <div className="rounded-xl border-2 border-dashed border-slate-100 py-8 text-center">
                     <p className="text-xs text-slate-300 font-bold">Empty</p>
@@ -892,10 +892,10 @@ function FaultPickerSheet({ item, customFaults = [], onAddCustomFault, onRemoveC
   return (
     <>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose} className="fixed inset-0 z-[90] bg-black/50 backdrop-blur-sm" />
+        onClick={onClose} className="fixed inset-0 z-90 bg-black/50 backdrop-blur-xs" />
       <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 300 }}
-        className="fixed bottom-0 left-0 right-0 z-[91] rounded-t-3xl bg-white flex flex-col"
+        className="fixed bottom-0 left-0 right-0 z-91 rounded-t-3xl bg-white flex flex-col"
         style={{ maxHeight: "85vh", maxWidth: 672, margin: "0 auto" }}>
         <div className="flex justify-center pt-3 pb-1 shrink-0"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
         <div className="px-5 pt-1 pb-3 shrink-0">
@@ -909,7 +909,7 @@ function FaultPickerSheet({ item, customFaults = [], onAddCustomFault, onRemoveC
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search or add a fault…"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-red-200" />
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-100 text-sm focus:outline-hidden focus:ring-2 focus:ring-red-200" />
           </div>
         </div>
         <div className="overflow-y-auto px-5 pb-6 flex-1">
@@ -927,7 +927,7 @@ function FaultPickerSheet({ item, customFaults = [], onAddCustomFault, onRemoveC
           {filteredCustom.length > 0 && (
             <div className="mb-4">
               <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2">Your saved faults</p>
-              <div className="space-y-1.5">
+              <div className="stack-y-1.5">
                 {filteredCustom.map(cf => {
                   const on = selected.includes(cf.label);
                   return (
@@ -954,7 +954,7 @@ function FaultPickerSheet({ item, customFaults = [], onAddCustomFault, onRemoveC
           {groups.map(g => (
             <div key={g.group} className="mb-4">
               <p className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2">{g.group}</p>
-              <div className="space-y-1.5">
+              <div className="stack-y-1.5">
                 {g.faults.map(f => {
                   const on = selected.includes(f);
                   return (

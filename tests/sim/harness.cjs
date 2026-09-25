@@ -142,6 +142,23 @@ async function handle(route) {
     const access = { team_id: TEAM, owner_user_id: OWNER, is_owner: UID === OWNER, role: me.role || "member", can_view_team: UID === OWNER || !!me.can_view_team, request_pending: (db.team_notifications || []).some(n => n.from_user_id === UID && n.record_type === "team_view_request" && !n.read) };
     let body = {}; try { body = req.postDataJSON() || {}; } catch {}
     if (fn === "set_member_access") { if (UID !== OWNER) return json(route, 400, { code: "P0001", message: "Only the master account can change roles or access" }); const row = db.team_members.find(m => m.user_id === body.p_user_id); if (row) { if (body.p_role) row.role = body.p_role; if (body.p_can_view_team !== null && body.p_can_view_team !== undefined) row.can_view_team = body.p_can_view_team; } log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
+    if (fn === "remove_team_member") {
+      // Mirrors private.remove_team_member: owner only; team work moves to the chosen teammate.
+      if (UID !== OWNER) return json(route, 400, { code: "P0001", message: "Only the master account can remove a teammate" });
+      if (body.p_user_id === OWNER) return json(route, 400, { code: "P0001", message: "The master account cannot be removed" });
+      if (!db.team_members.some(m => m.user_id === body.p_reassign_to) || body.p_reassign_to === body.p_user_id) return json(route, 400, { code: "P0001", message: "Choose a teammate to take over their work" });
+      let moved = 0, assigned = 0;
+      for (const t of ["clients", "contacts", "followups", "quotes", "notes", "equipment", "leads", "activities", "jobs", "breakdown_reports", "repair_reports"])
+        for (const r of db[t] || []) {
+          if (r.team_id !== TEAM) continue;
+          if (r.user_id === body.p_user_id) { r.user_id = body.p_reassign_to; r.updated_at = new Date().toISOString(); moved++; }
+          if (r.assigned_to_user_id === body.p_user_id) { r.assigned_to_user_id = body.p_reassign_to; r.updated_at = new Date().toISOString(); assigned++; }
+        }
+      db.team_members = db.team_members.filter(m => m.user_id !== body.p_user_id);
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, { records_moved: moved, assignments_moved: assigned, login_blocked: body.p_block_login !== false });
+    }
+    if (fn === "set_my_hidden_screens") { const bad = (body.p_screens || []).some(x => !/^[A-Za-z0-9]{1,40}$/.test(x)); if (bad) return json(route, 400, { code: "P0001", message: "Invalid screen name" }); const me = (db.users || []).find(u => u.id === UID); if (me) me.hidden_screens = [...new Set(body.p_screens)].sort(); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "request_team_view") { db.team_notifications.push({ id: uuid(), team_id: TEAM, from_user_id: UID, to_user_id: OWNER, record_type: "team_view_request", record_id: UID, record_title: "Whole-team view", message: "asked", read: false, accepted: false, created_at: new Date().toISOString() }); log.writes.push({ screen: screenTag, kind: "rpc", fn }); return json(route, 200, null); }
     const map = { current_team_id: TEAM, get_my_effective_role: RPC.get_my_effective_role, get_team_member_emails: RPC.get_team_member_emails, get_my_team_access: access, set_my_timezone: null };
     if (!(fn in map)) log.writes.push({ screen: screenTag, kind: "rpc", fn, body: req.postDataJSON?.() });

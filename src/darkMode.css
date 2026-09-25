@@ -65,8 +65,10 @@
 .dark .border-white        { border-color: #1C1C1E !important; }
 
 /* ── Dividers ─────────────────────────────────────────────────────────────── */
-.dark .divide-slate-50 > * + *   { border-color: rgba(84,84,88,0.34) !important; }
-.dark .divide-slate-100 > * + *  { border-color: rgba(84,84,88,0.34) !important; }
+/* Tailwind 4 draws dividers on each child except the last (v3: every child
+   but the first), so colour all children's borders. */
+.dark .divide-slate-50 > *   { border-color: rgba(84,84,88,0.34) !important; }
+.dark .divide-slate-100 > *  { border-color: rgba(84,84,88,0.34) !important; }
 
 /* ── Placeholders ─────────────────────────────────────────────────────────── */
 .dark ::placeholder        { color: rgba(235,235,245,0.40) !important; }
@@ -247,24 +249,27 @@
 .dark .text-slate-950                               { color: #FFFFFF !important; }
 
 /* ── Tap / hover highlights ────────────────────────────────────────────────
-   iOS keeps :hover on the last tapped row, so an unmapped hover:bg-slate-50
-   left a white row with white text in the menu. Map the variants too. */
-.dark .hover\:bg-slate-50:hover,
-.dark .active\:bg-slate-50:active,
-.dark .hover\:bg-slate-50\/50:hover,
-.dark .hover\:bg-slate-50\/60:hover     { background-color: #2C2C2E !important; }
-.dark .hover\:bg-slate-100:hover,
-.dark .active\:bg-slate-100:active,
-.dark .group:hover .group-hover\:bg-slate-200 { background-color: #3A3A3C !important; }
-.dark .active\:bg-slate-200:active       { background-color: #48484A !important; }
-.dark .hover\:bg-red-50:hover,
+   Unmapped hover:/active: fills stayed light in dark mode (a white menu row
+   with white text). Tailwind 4 applies hover: only on devices that can hover
+   (not touch screens, where :hover sticks after a tap); these match that. */
+@media (hover: hover) {
+  .dark .hover\:bg-slate-50:hover,
+  .dark .hover\:bg-slate-50\/50:hover,
+  .dark .hover\:bg-slate-50\/60:hover     { background-color: #2C2C2E !important; }
+  .dark .hover\:bg-slate-100:hover,
+  .dark .group:hover .group-hover\:bg-slate-200 { background-color: #3A3A3C !important; }
+  .dark .hover\:bg-red-50:hover,
+  .dark .hover\:bg-red-100:hover         { background-color: rgba(239, 68, 68, 0.18) !important; }
+  .dark .hover\:bg-blue-50:hover         { background-color: rgba(59, 130, 246, 0.18) !important; }
+  .dark .hover\:bg-amber-100:hover       { background-color: rgba(245, 158, 11, 0.20) !important; }
+}
+.dark .active\:bg-slate-50:active       { background-color: #2C2C2E !important; }
+.dark .active\:bg-slate-100:active      { background-color: #3A3A3C !important; }
+.dark .active\:bg-slate-200:active      { background-color: #48484A !important; }
 .dark .active\:bg-red-50:active,
-.dark .hover\:bg-red-100:hover,
-.dark .active\:bg-red-100:active         { background-color: rgba(239, 68, 68, 0.18) !important; }
-.dark .hover\:bg-blue-50:hover,
-.dark .active\:bg-blue-50:active         { background-color: rgba(59, 130, 246, 0.18) !important; }
-.dark .hover\:bg-amber-100:hover         { background-color: rgba(245, 158, 11, 0.20) !important; }
-.dark .active\:text-slate-700:active     { color: #FFFFFF !important; }
+.dark .active\:bg-red-100:active        { background-color: rgba(239, 68, 68, 0.18) !important; }
+.dark .active\:bg-blue-50:active        { background-color: rgba(59, 130, 246, 0.18) !important; }
+.dark .active\:text-slate-700:active    { color: #FFFFFF !important; }
 
 /* Light inline borders on chips/pills (#E2E8F0, #F1F5F9) → dark separator. */
 .dark [style*="border-color: rgb(226, 232, 240)"],

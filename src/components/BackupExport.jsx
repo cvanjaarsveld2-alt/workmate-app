@@ -302,7 +302,7 @@ export function BackupExport({ data }) {
     (data.equipment || []).length;
 
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-4 stack-y-3">
       <div className="flex items-center gap-2">
         <Database size={16} style={{ color: "#8B1A1A" }} />
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Data Backup</p>
@@ -353,7 +353,7 @@ export function BackupExport({ data }) {
       </p>
 
       {lastResult && !exporting && (
-        <div className="rounded-xl bg-slate-50 p-3 text-xs space-y-1">
+        <div className="rounded-xl bg-slate-50 p-3 text-xs stack-y-1">
           <p className="font-bold text-slate-700 mb-1">✓ Last backup contained:</p>
           {Object.entries(lastResult).map(([k, v]) => (
             <div key={k} className="flex justify-between">

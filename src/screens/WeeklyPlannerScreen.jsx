@@ -212,7 +212,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
     : `${week[0].slice(5)} – ${week[6].slice(5)}`;
 
   return (
-    <div className="space-y-3">
+    <div className="stack-y-3">
       <PageHeader title="Weekly Planner" subtitle={`${totalItems} item${totalItems !== 1 ? "s" : ""} · auto-prioritised`} />
 
       {/* Week switcher */}
@@ -233,7 +233,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
               Needs attention ({backlog.length})
             </span>
           </div>
-          <div className="space-y-1.5">
+          <div className="stack-y-1.5">
             {backlog.map(it => <PlanItem key={it.id} item={it} onMove={() => setMoving(it)} onDone={() => completeFollowup(it)} onOpen={onNavigate} onDraft={() => setDrafting({ item: it, client: clientForItem(it) })} />)}
           </div>
         </Card>
@@ -257,7 +257,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
             </div>
             {items.length === 0
               ? <p className="text-xs text-slate-400 py-1">Nothing scheduled</p>
-              : <div className="space-y-1.5">
+              : <div className="stack-y-1.5">
                   {items.map(it => <PlanItem key={it.id} item={it} onMove={() => setMoving(it)} onDone={() => completeFollowup(it)} onOpen={onNavigate} onDraft={() => setDrafting({ item: it, client: clientForItem(it) })} />)}
                 </div>}
           </Card>
@@ -279,7 +279,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
               <motion.div
                 initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.2 }} className="overflow-hidden">
-                <div className="pt-2.5 space-y-1.5">
+                <div className="pt-2.5 stack-y-1.5">
                   {reachouts.map(it => (
                     <div key={it.id} className="flex items-center gap-2.5 rounded-xl px-3 py-2 bg-slate-50">
                       <span className="w-7 h-7 rounded-lg shrink-0 grid place-items-center" style={{ background: "#DC262618" }}>
@@ -338,7 +338,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setMoving(null)}
-            className="fixed inset-0 z-[120] flex items-end justify-center"
+            className="fixed inset-0 z-120 flex items-end justify-center"
             style={{ background: "rgba(15,23,42,0.4)", backdropFilter: "blur(2px)" }}>
             <motion.div
               initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}
@@ -444,7 +444,7 @@ function DraftComposer({ draft, onClose, onContacted }) {
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       onClick={onClose}
-      className="fixed inset-0 z-[120] flex items-end justify-center"
+      className="fixed inset-0 z-120 flex items-end justify-center"
       style={{ background: "rgba(15,23,42,0.4)", backdropFilter: "blur(2px)" }}>
       <motion.div
         initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}
@@ -483,7 +483,7 @@ function DraftComposer({ draft, onClose, onContacted }) {
           value={text}
           onChange={e => setText(e.target.value)}
           rows={channel === "email" ? 10 : 5}
-          className="w-full rounded-2xl border border-slate-200 p-3 text-[15px] outline-none focus:border-slate-400 resize-none"
+          className="w-full rounded-2xl border border-slate-200 p-3 text-[15px] outline-hidden focus:border-slate-400 resize-none"
           style={{ fontSize: 16 }} />
 
         <button onClick={copy}

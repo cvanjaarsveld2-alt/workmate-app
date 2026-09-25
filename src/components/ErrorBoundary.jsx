@@ -104,7 +104,7 @@ export class ErrorBoundary extends React.Component {
       const chunkError = isChunkLoadError(this.state.error);
       return (
         <div className="p-6 max-w-md mx-auto">
-          <div className="rounded-2xl bg-white border-2 border-red-100 p-6 shadow-sm">
+          <div className="rounded-2xl bg-white border-2 border-red-100 p-6 shadow-xs">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center shrink-0">
                 <AlertTriangle size={24} className="text-red-600" />

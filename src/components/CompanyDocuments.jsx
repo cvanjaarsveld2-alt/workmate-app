@@ -189,7 +189,7 @@ export function CompanyDocuments({ userId, teamId }) {
   }, {});
 
   return (
-    <Card className="p-4 space-y-3">
+    <Card className="p-4 stack-y-3">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
@@ -212,7 +212,7 @@ export function CompanyDocuments({ userId, teamId }) {
       <AnimatePresence>
         {showForm && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 space-y-3">
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 stack-y-3">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">New Document</p>
 
               {/* File picker */}
@@ -250,7 +250,7 @@ export function CompanyDocuments({ userId, teamId }) {
                   value={docName}
                   onChange={e => setDocName(e.target.value)}
                   placeholder="e.g. Company Profile 2026"
-                  className="w-full rounded-xl border-2 border-slate-100 bg-white p-3 text-sm outline-none focus:border-red-300 min-h-[44px]" />
+                  className="w-full rounded-xl border-2 border-slate-100 bg-white p-3 text-sm outline-hidden focus:border-red-300 min-h-[44px]" />
               </div>
 
               {/* Category */}
@@ -259,7 +259,7 @@ export function CompanyDocuments({ userId, teamId }) {
                 <select
                   value={category}
                   onChange={e => setCategory(e.target.value)}
-                  className="w-full rounded-xl border-2 border-slate-100 bg-white p-3 text-sm outline-none focus:border-red-300 min-h-[44px]">
+                  className="w-full rounded-xl border-2 border-slate-100 bg-white p-3 text-sm outline-hidden focus:border-red-300 min-h-[44px]">
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
@@ -293,14 +293,14 @@ export function CompanyDocuments({ userId, teamId }) {
           <p className="text-xs text-slate-400 mt-1">Upload your company profile, brochures and price lists to send them directly from contact cards.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="stack-y-3">
           {Object.entries(grouped).map(([cat, catDocs]) => {
             const cc = CATEGORY_COLORS[cat] || CATEGORY_COLORS.Other;
             return (
               <div key={cat}>
                 <p className="text-xs font-bold uppercase tracking-wider px-1 mb-1.5"
                   style={{ color: cc.text }}>{cat}</p>
-                <div className="space-y-1.5">
+                <div className="stack-y-1.5">
                   {catDocs.map(doc => (
                     <div key={doc.id}
                       className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">

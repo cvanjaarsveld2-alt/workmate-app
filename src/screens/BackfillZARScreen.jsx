@@ -103,7 +103,7 @@ export function BackfillZARScreen({ data, setData, userId, onBack }) {
   const fixedCount = Object.values(statuses).filter(s => s === "done").length;
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <div className="flex items-center gap-2">
         <button onClick={onBack} className="p-2 rounded-xl text-slate-600 hover:bg-slate-100 min-w-[40px] min-h-[40px] flex items-center justify-center">
           <ArrowLeft size={20} />
@@ -134,7 +134,7 @@ export function BackfillZARScreen({ data, setData, userId, onBack }) {
             </p>
           </Card>
 
-          <div className="space-y-2">
+          <div className="stack-y-2">
             {missing.map(e => {
               const status = statuses[e.id];
               return (
@@ -154,7 +154,7 @@ export function BackfillZARScreen({ data, setData, userId, onBack }) {
                   </div>
 
                   {status !== "done" && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+                    <div className="mt-3 pt-3 border-t border-slate-100 stack-y-2">
                       {status === "failed" && (
                         <p className="text-xs text-amber-700 flex items-center gap-1.5">
                           <AlertCircle size={12} className="shrink-0" />
@@ -175,7 +175,7 @@ export function BackfillZARScreen({ data, setData, userId, onBack }) {
                             placeholder="from bank statement"
                             value={manualValues[e.id] || ""}
                             onChange={ev => setManualValues(v => ({ ...v, [e.id]: ev.target.value.replace(",", ".") }))}
-                            className="flex-1 rounded-lg border-2 border-slate-100 bg-white px-2.5 py-2 text-sm outline-none focus:border-red-300 min-h-[40px]"
+                            className="flex-1 rounded-lg border-2 border-slate-100 bg-white px-2.5 py-2 text-sm outline-hidden focus:border-red-300 min-h-[40px]"
                           />
                           <Btn size="sm" onClick={() => saveManual(e)} disabled={!manualValues[e.id]}>Save</Btn>
                         </div>

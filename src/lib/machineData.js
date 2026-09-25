@@ -1009,7 +1009,7 @@ export function recommendForMachine(machine) {
     : [];
 
   let jack;
-  let alternatives = [];
+  let alternatives;
   if (overrideList.length) {
     [jack, ...alternatives] = overrideList;
   } else if (basis !== null) {

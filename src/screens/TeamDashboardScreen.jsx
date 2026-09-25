@@ -296,7 +296,7 @@ export function TeamDashboardScreen({
   // Do not default to member while the authoritative role is still resolving.
   if (resolvedAdmin === null && !propAdmin) {
     return (
-      <div className="space-y-4">
+      <div className="stack-y-4">
         <Card className="p-5 text-center">
           <p className="text-base font-black text-slate-900">Loading team access…</p>
           <p className="text-sm text-slate-400 mt-1">Checking your team permissions.</p>
@@ -311,7 +311,7 @@ export function TeamDashboardScreen({
     const myOpenFU = (data.followups || []).filter(f => (f.user_id === userId || f.assigned_to_user_id === userId) && !f.completed);
     const myOverdue = myOpenFU.filter(f => f.date < today);
     return (
-      <div className="space-y-4">
+      <div className="stack-y-4">
         <Card className="p-5 text-center">
           <p className="text-base font-black text-slate-900">Team Overview</p>
           <p className="text-sm text-slate-400 mt-1">Contact your admin to see full team analytics</p>
@@ -405,7 +405,7 @@ export function TeamDashboardScreen({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {/* Stats */}
       <div>
         <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2 px-0.5">Team totals</p>
@@ -552,7 +552,7 @@ export function TeamDashboardScreen({
           <div className="px-4 py-3 border-b border-slate-50">
             <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Pipeline — admin view</p>
           </div>
-          <div className="px-4 py-3 space-y-2">
+          <div className="px-4 py-3 stack-y-2">
             {PIPELINE_STAGES.map(stage => {
               const filtered = clients.filter(c => (c.stage || "New Lead") === stage);
               if (filtered.length === 0) return null;
@@ -575,13 +575,13 @@ export function TeamDashboardScreen({
         {detailItem && (
           <>
             <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-              onClick={() => setDetailItem(null)} className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"/>
+              onClick={() => setDetailItem(null)} className="fixed inset-0 z-80 bg-black/50 backdrop-blur-xs"/>
             <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}}
               transition={{type:"spring",damping:28,stiffness:300}}
-              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white"
+              className="fixed bottom-0 left-0 right-0 z-81 rounded-t-3xl bg-white"
               style={{maxHeight:"82vh"}}>
               <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
-              <div className="overflow-y-auto px-5 pb-8 space-y-4" style={{maxHeight:"calc(82vh - 24px)"}}>
+              <div className="overflow-y-auto px-5 pb-8 stack-y-4" style={{maxHeight:"calc(82vh - 24px)"}}>
 
                 {/* Header */}
                 <div className="flex items-start justify-between pt-1">
@@ -606,7 +606,7 @@ export function TeamDashboardScreen({
                     <StagePill stage={d.stage || "New Lead"} />
                     {d.sync_status === "pending" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Not synced</span>}
                   </div>
-                  <div className="rounded-xl bg-slate-50 p-4 space-y-2">
+                  <div className="rounded-xl bg-slate-50 p-4 stack-y-2">
                     {d.contact  && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Contact</p><p className="text-sm text-slate-800">{d.contact}</p></div>}
                     {d.phone    && <div className="flex gap-2 items-center"><p className="text-xs font-bold text-slate-400 w-16">Phone</p>
                       <a href={`tel:${d.phone}`} className="text-sm text-blue-600 font-medium">{d.phone}</a>
@@ -628,7 +628,7 @@ export function TeamDashboardScreen({
 
                 {/* CONTACT detail */}
                 {detailItem.type === "contact" && (() => { const d = detailItem.data; return (<>
-                  <div className="rounded-xl bg-slate-50 p-4 space-y-2">
+                  <div className="rounded-xl bg-slate-50 p-4 stack-y-2">
                     {d.company  && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-16">Company</p><p className="text-sm text-slate-800">{d.company}</p></div>}
                     {d.phone    && <div className="flex gap-2 items-center"><p className="text-xs font-bold text-slate-400 w-16">Phone</p>
                       <a href={`tel:${d.phone}`} className="text-sm text-blue-600 font-medium">{d.phone}</a>
@@ -651,7 +651,7 @@ export function TeamDashboardScreen({
                     <StagePill stage={d.stage || "New Lead"} />
                     {d.estimated_value && <p className="text-sm font-black" style={{color:BRAND.primary}}>R {parseFloat(d.estimated_value||0).toLocaleString("en-ZA")}</p>}
                   </div>
-                  <div className="rounded-xl bg-slate-50 p-4 space-y-2">
+                  <div className="rounded-xl bg-slate-50 p-4 stack-y-2">
                     {d.lead_date      && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-20">Lead date</p><p className="text-sm text-slate-800">{smartDate(d.lead_date)}</p></div>}
                     {d.follow_up_date && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-20">Follow up</p><p className="text-sm text-slate-800">{smartDate(d.follow_up_date)}</p></div>}
                     {d.assigned_to    && <div className="flex gap-2"><p className="text-xs font-bold text-slate-400 w-20">Assigned</p><p className="text-sm text-slate-800">{d.assigned_to}</p></div>}
@@ -689,13 +689,13 @@ export function TeamDashboardScreen({
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setDetailFU(null)}
-              className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm" />
+              className="fixed inset-0 z-80 bg-black/50 backdrop-blur-xs" />
             <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white overflow-hidden"
+              className="fixed bottom-0 left-0 right-0 z-81 rounded-t-3xl bg-white overflow-hidden"
               style={{ maxHeight: "80vh" }}>
               <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
-              <div className="px-5 pb-6 space-y-4 overflow-y-auto" style={{ maxHeight: "calc(80vh - 24px)" }}>
+              <div className="px-5 pb-6 stack-y-4 overflow-y-auto" style={{ maxHeight: "calc(80vh - 24px)" }}>
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -730,7 +730,7 @@ export function TeamDashboardScreen({
                 </div>
 
                 {/* Date + time */}
-                <div className="rounded-xl bg-slate-50 p-3.5 space-y-2">
+                <div className="rounded-xl bg-slate-50 p-3.5 stack-y-2">
                   <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Schedule</p>
                   <div className="flex items-center gap-2">
                     <Calendar size={14} className="text-slate-400 shrink-0" />

@@ -29,7 +29,7 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
   const { vat: vatAmount, total } = calculateVat(subtotal, vatInclusive);
 
   return (
-    <div className="space-y-3">
+    <div className="stack-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Line items</p>
         <div className="flex items-center gap-2">
@@ -41,22 +41,22 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
       </div>
 
       {items.map((item, idx) => (
-        <div key={item.id} className="rounded-xl bg-slate-50 border border-slate-100 p-3 space-y-2">
+        <div key={item.id} className="rounded-xl bg-slate-50 border border-slate-100 p-3 stack-y-2">
           <div className="flex items-start gap-2">
             <span className="text-xs font-black text-slate-300 mt-3 w-5 shrink-0">{idx + 1}.</span>
             <div className="flex-1 min-w-0">
               <input value={item.description} onChange={e => update(item.id, "description", e.target.value)}
-                placeholder="Item description" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-300" />
+                placeholder="Item description" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-hidden focus:border-red-300" />
               <div className="grid grid-cols-[72px_1fr] gap-2 mt-2">
                 <div className="w-20">
                   <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">Qty</label>
                   <input type="number" min="1" value={item.qty} onChange={e => update(item.id, "qty", e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-red-300 text-center" />
+                    className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-hidden focus:border-red-300 text-center" />
                 </div>
                 <div className="min-w-0">
                   <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">Unit price (R)</label>
                   <input type="number" step="0.01" value={item.unitPrice} onChange={e => update(item.id, "unitPrice", e.target.value)}
-                    placeholder="0.00" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-none focus:border-red-300" />
+                    placeholder="0.00" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-hidden focus:border-red-300" />
                 </div>
                 <div className="col-span-2 flex items-center justify-between gap-2 pt-1">
                   <p className="text-sm font-black text-slate-700 truncate">
@@ -80,7 +80,7 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
 
       {/* Totals */}
       {items.length > 0 && (
-        <div className="rounded-xl bg-white border border-slate-100 p-3.5 space-y-2">
+        <div className="rounded-xl bg-white border border-slate-100 p-3.5 stack-y-2">
           {!vatInclusive && (
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Subtotal</span>

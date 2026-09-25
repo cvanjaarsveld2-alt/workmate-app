@@ -245,7 +245,7 @@ export default function ReportExport({ data }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+    <div className="bg-white rounded-2xl shadow-xs border border-slate-100 p-4 stack-y-3">
       <div className="flex items-center gap-2">
         <FileText size={16} style={{ color: BRAND.primary }} />
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Export Report</p>
@@ -254,7 +254,7 @@ export default function ReportExport({ data }) {
         Generate a report that opens in Excel or Google Sheets — ready to send to management.
       </p>
 
-      <div className="space-y-2">
+      <div className="stack-y-2">
         <button onClick={() => exportReport("full")} disabled={exporting}
           className="w-full flex items-center justify-between rounded-xl border-2 border-slate-100 p-3.5 text-left hover:border-red-200 transition-colors disabled:opacity-40 min-h-[56px]">
           <div>

@@ -55,7 +55,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShar
         </button>
         <div className="flex-1 min-w-0">
           <p
-            className={`text-sm font-bold break-words ${f.completed ? "line-through text-slate-400" : "text-slate-900"}`}
+            className={`text-sm font-bold wrap-break-word ${f.completed ? "line-through text-slate-400" : "text-slate-900"}`}
           >
             {displayText}
           </p>
@@ -80,7 +80,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShar
             {f.time ? ` at ${f.time}` : ""}
           </p>
           {f.notes && (
-            <p className="text-xs text-slate-400 mt-1 break-words whitespace-pre-wrap">{f.notes}</p>
+            <p className="text-xs text-slate-400 mt-1 wrap-break-word whitespace-pre-wrap">{f.notes}</p>
           )}
           {reminder && reminder.value !== "none" && !f.completed && (
             <p className="text-xs text-blue-600 mt-0.5">🔔 {reminder.label}</p>
@@ -362,7 +362,7 @@ export function FollowupsScreen({
   function renderFollowupForm(isEdit) {
     const linkedNote = notes.find(n => n.id === form.linked_note_id);
     return (
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Follow-up" : "New Follow-up"}</p>
         <Field
           label="What to follow up on"
@@ -386,7 +386,7 @@ export function FollowupsScreen({
           <select
             value={form.linked_note_id}
             onChange={e => setForm(f => ({ ...f, linked_note_id: e.target.value }))}
-            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[56px]"
+            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-hidden focus:border-red-300 min-h-[56px]"
           >
             <option value="">— No linked note</option>
             {clientNotes.map(n => (
@@ -427,7 +427,7 @@ export function FollowupsScreen({
           <select
             value={form.reminder}
             onChange={e => setForm(f => ({ ...f, reminder: e.target.value }))}
-            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 min-h-[52px]"
+            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-hidden focus:border-red-300 min-h-[52px]"
           >
             {REMINDER_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>
@@ -554,7 +554,7 @@ export function FollowupsScreen({
   const bucketOrder = ["Overdue", "Today", "This Week", "Later", "Done"];
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
 
       {/* Share sheet */}
@@ -619,20 +619,20 @@ export function FollowupsScreen({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setNextActionPrompt(null)}
-              className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"
+              className="fixed inset-0 z-80 bg-black/50 backdrop-blur-xs"
             />
             <motion.div
               initial={{ y: "100%" }}
               animate={{ y: 0 }}
               exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 28, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white"
+              className="fixed bottom-0 left-0 right-0 z-81 rounded-t-3xl bg-white"
               style={{ maxWidth: 480, margin: "0 auto" }}
             >
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 rounded-full bg-slate-200" />
               </div>
-              <div className="px-6 pb-8 pt-2 space-y-4">
+              <div className="px-6 pb-8 pt-2 stack-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                     <span className="text-lg">&#10003;</span>
@@ -810,7 +810,7 @@ export function FollowupsScreen({
       )}
 
       {byClient ? (
-        <div className="space-y-4">
+        <div className="stack-y-4">
           {Object.entries(byClient)
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([clientName, fus]) => {
@@ -819,7 +819,7 @@ export function FollowupsScreen({
               return (
                 <div
                   key={clientName}
-                  className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden"
+                  className="bg-white rounded-2xl shadow-xs border border-slate-100 overflow-hidden"
                 >
                   <div className="px-4 py-3 border-b border-slate-100" style={{ background: "#F7F3F3" }}>
                     <div className="flex items-center justify-between">
@@ -836,7 +836,7 @@ export function FollowupsScreen({
                       </div>
                     </div>
                   </div>
-                  <div className="px-3 py-2 space-y-2">
+                  <div className="px-3 py-2 stack-y-2">
                     {fus
                       .sort((a, b) => {
                         const aOverdue = a.date < today && !a.completed;
@@ -854,7 +854,7 @@ export function FollowupsScreen({
             })}
         </div>
       ) : grouped ? (
-        <div className="space-y-4">
+        <div className="stack-y-4">
           {bucketOrder
             .filter(b => grouped[b]?.length > 0)
             .map(bucket => (
@@ -865,12 +865,12 @@ export function FollowupsScreen({
                   {bucket === "Overdue" ? `⚠️ ${bucket}` : bucket === "Today" ? `📍 ${bucket}` : bucket} (
                   {grouped[bucket].length})
                 </p>
-                <div className="space-y-2">{grouped[bucket].map(f => renderFollowupOrForm(f))}</div>
+                <div className="stack-y-2">{grouped[bucket].map(f => renderFollowupOrForm(f))}</div>
               </div>
             ))}
         </div>
       ) : (
-        <div className="space-y-2">{filtered.map(f => renderFollowupOrForm(f))}</div>
+        <div className="stack-y-2">{filtered.map(f => renderFollowupOrForm(f))}</div>
       )}
     </div>
   );

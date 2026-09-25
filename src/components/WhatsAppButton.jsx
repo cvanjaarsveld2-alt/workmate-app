@@ -166,7 +166,7 @@ export function WhatsAppButton({ phone, contactName, clientName, followupTitle, 
 
               {/* Template list or message editor */}
               {!editing ? (
-                <div className="p-3 space-y-2 max-h-80 overflow-y-auto">
+                <div className="p-3 stack-y-2 max-h-80 overflow-y-auto">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
                     Choose a template
                   </p>
@@ -186,7 +186,7 @@ export function WhatsAppButton({ phone, contactName, clientName, followupTitle, 
                   ))}
                 </div>
               ) : (
-                <div className="p-4 space-y-3">
+                <div className="p-4 stack-y-3">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                     {selectedTemplate?.emoji} {selectedTemplate?.label} — edit if needed
                   </p>
@@ -194,7 +194,7 @@ export function WhatsAppButton({ phone, contactName, clientName, followupTitle, 
                     value={customMessage}
                     onChange={e => setCustomMessage(e.target.value)}
                     rows={8}
-                    className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-green-300 focus:bg-white transition-colors resize-none"
+                    className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-hidden focus:border-green-300 focus:bg-white transition-colors resize-none"
                   />
                   <div className="flex gap-2">
                     <button

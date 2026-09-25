@@ -130,19 +130,19 @@ export function AuthScreen() {
           <p className="mt-1 text-sm text-slate-400">Power Works Field Service CRM</p>
         </div>
 
-        <Card className="p-6 space-y-4">
+        <Card className="p-6 stack-y-4">
           {/* Tab switcher */}
           <div className="flex rounded-xl bg-slate-100 p-1">
             <button
               type="button"
               onClick={() => switchMode("signin")}
-              className={`flex-1 rounded-lg py-2.5 text-sm font-bold transition-all ${mode === "signin" ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}>
+              className={`flex-1 rounded-lg py-2.5 text-sm font-bold transition-all ${mode === "signin" ? "bg-white shadow-xs text-slate-900" : "text-slate-500"}`}>
               Sign In
             </button>
             <button
               type="button"
               onClick={() => switchMode("signup")}
-              className={`flex-1 rounded-lg py-2.5 text-sm font-bold transition-all ${mode === "signup" ? "bg-white shadow-sm text-slate-900" : "text-slate-500"}`}>
+              className={`flex-1 rounded-lg py-2.5 text-sm font-bold transition-all ${mode === "signup" ? "bg-white shadow-xs text-slate-900" : "text-slate-500"}`}>
               Sign Up
             </button>
           </div>
@@ -159,7 +159,7 @@ export function AuthScreen() {
                 onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && login()}
                 placeholder="••••••••"
-                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 pr-12 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]" />
+                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 pr-12 text-base outline-hidden focus:border-red-300 focus:bg-white transition-colors min-h-[52px]" />
               <button
                 type="button"
                 onClick={() => setShowPw(!showPw)}
@@ -235,7 +235,7 @@ export function SetPasswordScreen({ onDone }) {
     onDone();
   }
 
-  const inputCls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 pr-12 text-base outline-none focus:border-red-300 focus:bg-white transition-colors min-h-[52px]";
+  const inputCls = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 pr-12 text-base outline-hidden focus:border-red-300 focus:bg-white transition-colors min-h-[52px]";
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4" style={{ background: BRAND.light }}>
       <div className="w-full max-w-sm">
@@ -244,7 +244,7 @@ export function SetPasswordScreen({ onDone }) {
           <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>Set your password</h1>
           <p className="mt-1 text-sm text-slate-400">Choose a password for signing in to PowerMate</p>
         </div>
-        <Card className="p-6 space-y-4">
+        <Card className="p-6 stack-y-4">
           <div className="relative">
             <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
               placeholder="New password (min 8 characters)" autoComplete="new-password" className={inputCls} />

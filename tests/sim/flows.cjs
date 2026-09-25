@@ -262,6 +262,85 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     rec("sync: queue drains", Array.isArray(q) && q.length === 0 ? "PASS" : "FAIL", `remaining queue: ${JSON.stringify(q).slice(0, 300)}`);
   });
 
+  // 13. Auto-lock after 15 minutes in the background, without losing a half-typed note.
+  await safe("pin: auto-lock after background keeps unsaved work", async () => {
+    const crypto = require("crypto");
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = crypto.pbkdf2Sync("135790", salt, 600000, 32, "sha256").toString("hex");
+    await go("Notes");
+    await page.getByRole("button", { name: "Add", exact: true }).first().click(); await page.waitForTimeout(600);
+    await page.getByPlaceholder("Type your visit note…").fill("SIM draft kept");
+    await page.evaluate(({ uid, stored }) => {
+      localStorage.setItem(`pm_pin_hash__${uid}`, stored);
+      localStorage.removeItem(`pm_pin_disabled__${uid}`);
+      localStorage.setItem(`pm_pin_hidden_at__${uid}`, String(Date.now() - 16 * 60 * 1000));
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, { uid: H.UID, stored: `v3$600000$${salt}$${hash}` });
+    await page.waitForTimeout(800);
+    const locked = (await page.getByText("Enter your PIN to open PowerMate").count()) > 0;
+    for (const d of "135790") { await page.getByRole("button", { name: new RegExp(`^${d}`) }).first().click(); await page.waitForTimeout(120); }
+    await page.waitForTimeout(3000);
+    const unlocked = (await page.getByText("Enter your PIN to open PowerMate").count()) === 0;
+    const draft = await page.getByPlaceholder("Type your visit note…").inputValue().catch(() => "");
+    await page.evaluate(uid => localStorage.setItem(`pm_pin_disabled__${uid}`, "1"), H.UID);
+    await shot("pin-relock");
+    rec("pin: auto-lock after background keeps unsaved work", locked && unlocked && draft === "SIM draft kept" ? "PASS" : "FAIL", `locked after 16 min away=${locked}; unlocked with PIN=${unlocked}; draft kept="${draft}"`);
+  });
+
+  // 13b. Each teammate chooses what shows in their own menu; it is saved to their user record.
+  await safe("menu: hide a screen from my menu", async () => {
+    await go("Home");
+    const openMenu = async () => { await page.getByRole("button", { name: /menu/i }).first().click(); await page.waitForTimeout(700); };
+    const drawerHas = label => page.locator("div.fixed.z-71 button", { hasText: new RegExp(`^\\s*${label}\\s*$`) }).count();
+    await openMenu();
+    const before = await drawerHas("Invoices");
+    await page.getByRole("button", { name: "Customise menu" }).click(); await page.waitForTimeout(400);
+    const homeLocked = await page.getByLabel("Show Dashboard").isDisabled();
+    await page.getByLabel("Show Invoices").uncheck();
+    await page.getByRole("button", { name: "Done", exact: true }).click(); await page.waitForTimeout(1200);
+    const after = await drawerHas("Invoices");
+    const call = log.writes.find(w => w.fn === "set_my_hidden_screens");
+    await shot("menu-custom");
+    // Survives a reload (read back from the user record), then restore it.
+    await go("Home"); await openMenu();
+    const afterReload = await drawerHas("Invoices");
+    await page.getByRole("button", { name: "Customise menu" }).click(); await page.waitForTimeout(300);
+    await page.getByLabel("Show Invoices").check();
+    await page.getByRole("button", { name: "Done", exact: true }).click(); await page.waitForTimeout(1200);
+    const restored = await drawerHas("Invoices");
+    const me = H.db.users.find(u => u.id === H.UID);
+    rec("menu: hide a screen from my menu", before === 1 && homeLocked && after === 0 && afterReload === 0 && restored === 1 && JSON.stringify(call?.body?.p_screens) === '["Invoices"]' && me?.hidden_screens?.length === 0 ? "PASS" : "FAIL",
+      `shown before=${before}; Dashboard locked=${homeLocked}; hidden after Done=${after === 0}; still hidden after reload=${afterReload === 0}; saved=${JSON.stringify(call?.body?.p_screens)}; restored=${restored === 1}`);
+  });
+
+  // 13c. Phones: form fields are at least 16px so iPhone Safari does not zoom in on focus.
+  await safe("touch: form fields never trigger iPhone zoom", async () => {
+    await go("Notes");
+    await page.getByRole("button", { name: "Add", exact: true }).first().click(); await page.waitForTimeout(600);
+    const sizes = await page.evaluate(() => [...document.querySelectorAll("input:not([type=checkbox]):not([type=radio]), select, textarea")].filter(e => e.getBoundingClientRect().width > 0).map(e => parseFloat(getComputedStyle(e).fontSize)));
+    const small = sizes.filter(x => x < 16);
+    rec("touch: form fields never trigger iPhone zoom", sizes.length > 0 && small.length === 0 ? "PASS" : "FAIL", `${sizes.length} visible fields; under 16px: ${small.length}`);
+  });
+
+  // 14. Master account removes a teammate and hands their work over (runs last: it changes the team).
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("team: remove teammate hands over work", async () => {
+    const GREG = "f16f3dd1-c87c-4066-8a38-750d7bc31d65";
+    const gregBefore = H.db.clients.filter(c => c.user_id === GREG && c.team_id === H.TEAM).length;
+    await go("Team", 4000);
+    const row = page.locator("div", { hasText: "greg@pwrstart.com" }).filter({ has: page.locator("svg.lucide-user-minus") }).last();
+    await row.locator("button:has(svg.lucide-user-minus)").click(); await page.waitForTimeout(600);
+    const sheet = (await page.getByText("Hand their work to").count()) > 0;
+    const blockDefault = await page.locator("input[type=checkbox]").first().isChecked().catch(() => null);
+    await page.getByRole("button", { name: "Remove", exact: true }).last().click(); await page.waitForTimeout(2500);
+    const stillMember = H.db.team_members.some(m => m.user_id === GREG);
+    const gregAfter = H.db.clients.filter(c => c.user_id === GREG && c.team_id === H.TEAM).length;
+    const call = log.writes.find(w => w.fn === "remove_team_member");
+    const toast = await page.getByText(/greg@pwrstart\.com removed · \d+ records? moved to you/).count();
+    await shot("team-remove");
+    rec("team: remove teammate hands over work", sheet && blockDefault === true && !stillMember && gregBefore > 0 && gregAfter === 0 && call?.body?.p_block_login === true && toast > 0 ? "PASS" : "FAIL",
+      `sheet=${sheet}; block login default=${blockDefault}; still member=${stillMember}; Greg's team clients ${gregBefore}→${gregAfter}; toast=${toast > 0}`);
+  });
+
   fs.writeFileSync(path.join(OUT, "flows.json"), JSON.stringify({ results, violations: log.violations, errors4xx: log.errors4xx, unhandled: [...new Set(log.unhandled)], functions: log.functions, writes: log.writes }, null, 1));
   await S.browser.close();
   const failed = results.filter(r => r.status === "FAIL");

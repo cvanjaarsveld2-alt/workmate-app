@@ -134,7 +134,7 @@ function IssueSheet({ item, date, currentComment, currentPhoto, onSave, onClose 
   return (
     <>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+        onClick={onClose} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs" />
       <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
         className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-w-2xl mx-auto max-h-[90vh] overflow-y-auto">
@@ -152,7 +152,7 @@ function IssueSheet({ item, date, currentComment, currentPhoto, onSave, onClose 
           </div>
           <textarea autoFocus value={text} onChange={e => setText(e.target.value)}
             placeholder="e.g. Left rear tyre is flat, oil below minimum…" rows={4}
-            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-none focus:border-red-300 resize-none" />
+            className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-base outline-hidden focus:border-red-300 resize-none" />
 
           {/* Photo of the fault */}
           <div className="mt-3">
@@ -209,7 +209,7 @@ function SettingsPanel({ settings, userId, onSave, onClose }) {
   return (
     <>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+        onClick={onClose} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs" />
       <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
         className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-w-2xl mx-auto">
@@ -218,7 +218,7 @@ function SettingsPanel({ settings, userId, onSave, onClose }) {
           <p className="text-base font-black text-slate-900">Vehicle Settings</p>
           <button onClick={onClose} className="p-2 rounded-lg text-slate-400 min-w-[40px] min-h-[40px] flex items-center justify-center"><X size={18} /></button>
         </div>
-        <div className="px-5 pb-2 space-y-3">
+        <div className="px-5 pb-2 stack-y-3">
           {/* Permanent vehicle photo */}
           <div>
             <label className="mb-1.5 block text-sm font-bold text-slate-500">Vehicle photo</label>
@@ -459,7 +459,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
     const photos = Array.isArray(dayData.photos) ? dayData.photos : [];
     const id = genId();
     // Compress and store a local base64 preview immediately; upload in background
-    let base64 = null;
+    let base64;
     try {
       base64 = await compressImage(file, 1600, 0.75);
     } catch { base64 = null; }
@@ -627,7 +627,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
@@ -655,7 +655,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
         {pdfPack && (
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={closePdfPack} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+              onClick={closePdfPack} className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs" />
             <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
               className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl max-w-2xl mx-auto">
@@ -676,7 +676,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
                 </div>
                 <p className="text-xs text-slate-400 mt-1.5 text-center">{pdfPack.filename}</p>
               </div>
-              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+              <div className="px-4 py-3 border-t border-slate-100 stack-y-2" style={{ background: "#F7F3F3" }}>
                 <button onClick={sharePdfPack}
                   className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
                   style={{ background: "#8B1A1A" }}>
@@ -839,7 +839,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
 
           {/* All Good button */}
           <motion.button whileTap={{ scale: 0.97 }} onClick={() => markAllGood(selectedDate)}
-            className="w-full flex items-center justify-center gap-2.5 rounded-2xl py-4 text-base font-black text-white shadow-sm min-h-[60px]"
+            className="w-full flex items-center justify-center gap-2.5 rounded-2xl py-4 text-base font-black text-white shadow-xs min-h-[60px]"
             style={{ background: allGood ? "#16A34A" : "#8B1A1A" }}>
             <CheckCircle2 size={22} />
             {allGood ? "All Good — Tap to re-confirm" : "All Good — Mark Everything OK"}
@@ -964,7 +964,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
               <textarea value={getDayData(selectedDate).generalComment || ""}
                 onChange={e => persistDay(selectedDate, { ...getDayData(selectedDate), generalComment: e.target.value })}
                 placeholder="Any other observations for today…" rows={3}
-                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-none focus:border-red-300 resize-none" />
+                className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-hidden focus:border-red-300 resize-none" />
             </Card>
           </div>
         </>

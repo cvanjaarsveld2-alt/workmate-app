@@ -111,10 +111,10 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="stack-y-3">
       <PageHeader title="Log a Cold Call" subtitle="Logs a lead you can chase or park" />
 
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <Field label="Name / contact" value={name} onChange={setName} placeholder="e.g. Johan / receptionist" />
         <Field label="Company (optional)" value={company} onChange={setCompany} placeholder="e.g. Kumba Iron Ore" />
         <Field label="Phone (optional)" value={phone} onChange={setPhone} placeholder="Phone number" type="tel" />
@@ -146,7 +146,7 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
                 <CalendarIcon size={13} style={{ color: BRAND.primary }} /> Call back on
               </label>
               <input type="date" value={callbackDate} min={todayISO()} onChange={e => setCallbackDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-hidden focus:border-slate-400"
                 style={{ fontSize: 16 }} />
               <p className="text-[11px] text-slate-400 mt-1">Creates a follow-up in your calendar for this date.</p>
             </motion.div>
@@ -157,7 +157,7 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
           <label className="block text-xs font-bold text-slate-500 mb-1.5">Note (optional)</label>
           <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
             placeholder="e.g. Spoke to admin, needs maintenance manager — try mornings"
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400 resize-none"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-hidden focus:border-slate-400 resize-none"
             style={{ fontSize: 16 }} />
         </div>
 
@@ -175,7 +175,7 @@ export function ColdCallScreen({ data, setData, userId, teamId, onNavigate }) {
             <PhoneCall size={15} style={{ color: BRAND.primary }} />
             <span className="text-xs font-black uppercase tracking-wider text-slate-500">Recent cold calls</span>
           </div>
-          <div className="space-y-1.5">
+          <div className="stack-y-1.5">
             {recent.map(l => (
               <button key={l.id} onClick={() => onNavigate?.("Leads")}
                 className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 bg-slate-50 text-left active:bg-slate-100">

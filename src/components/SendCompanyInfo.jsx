@@ -128,7 +128,7 @@ Power Works (Pty) Ltd`.trim();
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs" />
 
       <motion.div
         initial={{ y: "100%" }}
@@ -165,7 +165,7 @@ Power Works (Pty) Ltd`.trim();
               <p className="text-xs text-slate-400 mt-1">Go to More &rarr; Company Documents to upload your company profile and brochures.</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="stack-y-2">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Select documents to send</p>
               {docs.map(doc => {
                 const isSelected = selected.has(doc.id);
@@ -192,7 +192,7 @@ Power Works (Pty) Ltd`.trim();
 
         {/* Send buttons */}
         {docs.length > 0 && (
-          <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+          <div className="px-4 py-3 border-t border-slate-100 stack-y-2" style={{ background: "#F7F3F3" }}>
             {selected.size === 0 && (
               <p className="text-xs text-slate-400 text-center">Select at least one document to send</p>
             )}

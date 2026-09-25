@@ -52,7 +52,7 @@ export function NavGrid({ open, onClose, onOpen, currentScreen, onNavigate, badg
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onClose}
-              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs" />
 
             <motion.div
               initial={{ y: "100%" }}

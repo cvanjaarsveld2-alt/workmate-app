@@ -70,7 +70,7 @@ function ExpandableText({ text, limit = 100, className = "" }) {
   const display = isLong && !expanded ? text.slice(0, limit).trimEnd() + "…" : text;
   return (
     <div className={className}>
-      <p className="text-xs text-slate-500 break-words whitespace-pre-wrap">{display}</p>
+      <p className="text-xs text-slate-500 wrap-break-word whitespace-pre-wrap">{display}</p>
       {isLong && (
         <button
           type="button"
@@ -117,7 +117,7 @@ function InlineFollowupForm({ client, userId, teamId, setData, onDone }) {
 
   return (
     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-      className="bg-slate-50 rounded-xl p-3 space-y-2.5 mb-3">
+      className="bg-slate-50 rounded-xl p-3 stack-y-2.5 mb-3">
       <Field label="What to follow up on" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))}
         placeholder={`e.g. Call ${client.contact || client.company} re quote`} />
       <div className="grid grid-cols-2 gap-2">
@@ -127,7 +127,7 @@ function InlineFollowupForm({ client, userId, teamId, setData, onDone }) {
       <div>
         <label className="mb-1.5 block text-sm font-bold text-slate-500">Reminder</label>
         <select value={form.reminder} onChange={e => setForm(f => ({ ...f, reminder: e.target.value }))}
-          className="w-full rounded-xl border-2 border-slate-100 bg-white p-3 text-sm outline-none focus:border-red-300 min-h-[48px]">
+          className="w-full rounded-xl border-2 border-slate-100 bg-white p-3 text-sm outline-hidden focus:border-red-300 min-h-[48px]">
           {REMINDER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
       </div>
@@ -178,7 +178,7 @@ function InlineNoteForm({ client, userId, teamId, setData, onDone }) {
 
   return (
     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
-      className="bg-slate-50 rounded-xl p-3 space-y-2.5 mb-3">
+      className="bg-slate-50 rounded-xl p-3 stack-y-2.5 mb-3">
       <Field label="Note" value={form.note} onChange={v => setForm(f => ({ ...f, note: v }))} placeholder="Visit note, issue, reminder…" multiline />
       <div>
         <label className="mb-1.5 block text-sm font-bold text-slate-500">Urgency</label>
@@ -238,7 +238,7 @@ function ClientNoteRow({ note: n, setData }) {
           <Check size={15} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm break-words ${n.resolved ? "line-through text-slate-400" : "text-slate-700"}`}>
+          <p className={`text-sm wrap-break-word ${n.resolved ? "line-through text-slate-400" : "text-slate-700"}`}>
             {displayText}
           </p>
           {isLong && (
@@ -308,7 +308,7 @@ function ClientFollowupRow({ followup: f, setData }) {
           <Check size={15} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className={`text-sm font-bold break-words ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"}`}>
+          <p className={`text-sm font-bold wrap-break-word ${f.completed ? "line-through text-slate-400" : isOverdue ? "text-red-800" : "text-slate-900"}`}>
             {displayText}
           </p>
           {isLong && (
@@ -520,7 +520,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
   // ── Shared client form JSX (top for NEW, in-place for EDIT) ──
   function renderClientForm(isEdit) {
     return (
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Client" : "New Lead / Client"}</p>
         {!isEdit && (
           <div className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5">
@@ -616,7 +616,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
   const collapse = useCollapsibleGroups(groupMode === "category" ? groupKeys.filter(k => k !== "(No group)") : null, groupMode === "category");
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
@@ -717,7 +717,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
 
       {Object.keys(grouped).length === 0 && <Empty title="No clients or leads found" text="Add new leads and clients here. Use the Leads screen for new opportunities at existing clients." />}
 
-      <div className="space-y-3">
+      <div className="stack-y-3">
         {(() => {
           // In category mode, group the companies under category-group headers.
           // In company mode, render the company cards directly (no wrapper).
@@ -740,7 +740,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
               const isCol = collapse.isCollapsed(gName);
               const companyCount = Object.keys(sections[gName]).length;
               return (
-                <div key={`grp-${gName}`} className="space-y-2">
+                <div key={`grp-${gName}`} className="stack-y-2">
                   <div className="flex items-center px-1">
                     <button onClick={() => collapse.toggle(gName)}
                       className="flex-1 flex items-center justify-between py-1 active:opacity-70 transition-opacity">
@@ -761,7 +761,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
                     )}
                   </div>
                   {!isCol && (
-                    <div className="space-y-3">
+                    <div className="stack-y-3">
                       {Object.entries(sections[gName]).sort(([a],[b]) => a.localeCompare(b)).map(([cn, branches]) =>
                         renderCompanyCard(cn, branches))}
                     </div>
@@ -807,7 +807,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
               <button className="w-full text-left px-4 pt-4 pb-3 flex items-center justify-between"
                 onClick={() => setExpandedClient(isExpanded ? null : cn)}>
                 <div className="flex-1 min-w-0 pr-2">
-                  <p className="font-black text-slate-900 text-base break-words">{cn}</p>
+                  <p className="font-black text-slate-900 text-base wrap-break-word">{cn}</p>
                   <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                     <p className="text-sm text-slate-400">{branches.length} branch{branches.length !== 1 ? "es" : ""}</p>
                     {pendingFU.length > 0 && (

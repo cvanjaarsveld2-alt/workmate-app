@@ -202,3 +202,37 @@ Also check **Reports → API** and **Usage** in the Supabase dashboard:
 egress and request counts should grow roughly in line with the number of
 people, not faster. If the team grows past about 50 active users, re-run
 the performance advisor and check Database → Query performance.
+
+## 6. Running the team
+
+**Daily problem digest.** At 17:00 (SA time) the `problem-digest` function
+checks the last 24 hours of crash and sync-failure reports. If there are
+any, the master account gets a push notification and an entry under
+Notifications, e.g. "3 sync failures (2 people) · 1 screen crash on
+Quotes". Quiet days send nothing. Schedule: cron job
+`powermate-problem-digest`.
+
+**When someone leaves.** Team → the person's remove button (master account
+only). Choose who takes over their work and leave *Block their login*
+ticked. In one step their clients, contacts, follow-ups, quotes, notes,
+leads, equipment, jobs and reports move to that person, they leave the
+team, their sessions and push devices are cleared, and their login is
+blocked. Their expenses and vehicle checks stay on record for the team.
+Each removal is logged as a `member_removed` event.
+To undo a blocked login: Supabase → Authentication → Users → the person →
+Unban, then re-invite them to the team.
+
+**Auto-lock.** With a PIN set, the app asks for it again after 15 minutes
+in the background. Anything half-typed is still there after unlocking.
+
+**Photos across the team.** The master account, admins and members granted
+whole-team view can open teammates' business cards, note and vehicle-check
+photos and receipts. Other members can only open photos they took
+themselves (a business card they can't open is left out of the contact).
+
+**Each person's own menu.** Menu → *Customise menu*: untick the screens you
+don't use and tap Done. It only changes that person's menu, follows them to
+any phone they sign in on (saved as `users.hidden_screens`), and works
+offline (sent once back online). Dashboard and Settings & More can't be
+hidden, and a hidden screen still opens from links and notifications.
+Tick it again to bring it back.

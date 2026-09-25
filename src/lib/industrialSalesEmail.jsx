@@ -193,7 +193,7 @@ export function SalesFollowupComposer({ contact, onClose }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[130] flex items-end justify-center bg-black/50" onClick={onClose}>
+      className="fixed inset-0 z-130 flex items-end justify-center bg-black/50" onClick={onClose}>
       <motion.div initial={{ y: 100 }} animate={{ y: 0 }} exit={{ y: 100 }}
         className="w-full max-w-md bg-white rounded-t-3xl overflow-hidden max-h-[94vh] flex flex-col"
         onClick={e => e.stopPropagation()} style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
@@ -214,7 +214,7 @@ export function SalesFollowupComposer({ contact, onClose }) {
           </div>
         </div>
 
-        <div className="p-4 overflow-y-auto space-y-4">
+        <div className="p-4 overflow-y-auto stack-y-4">
           {step === 1 && <>
             <div>
               <p className="text-base font-black text-slate-900">How did you meet?</p>
@@ -303,6 +303,6 @@ function Field({label,value,onChange,placeholder,multiline=false}) {
   return <div>
     <label className="text-xs font-bold text-slate-500 mb-1 block">{label}</label>
     <C value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
-      rows={multiline ? 3 : undefined} className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-none focus:border-red-200 resize-none" style={{fontSize:16}} />
+      rows={multiline ? 3 : undefined} className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3 text-sm outline-hidden focus:border-red-200 resize-none" style={{fontSize:16}} />
   </div>;
 }

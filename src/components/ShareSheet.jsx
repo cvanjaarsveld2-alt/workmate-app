@@ -71,7 +71,7 @@ export function ShareSheet({
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs"
           />
           <motion.div
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
@@ -98,7 +98,7 @@ export function ShareSheet({
             </div>
 
             {/* Member list */}
-            <div className="px-4 pb-3 space-y-2 max-h-64 overflow-y-auto">
+            <div className="px-4 pb-3 stack-y-2 max-h-64 overflow-y-auto">
               {members.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-4">
                   No team members yet. Set up your team first.

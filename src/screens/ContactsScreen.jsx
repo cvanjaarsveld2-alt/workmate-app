@@ -54,7 +54,7 @@ function ExpandableText({ text, limit = 100, className = "" }) {
   const display = isLong && !expanded ? text.slice(0, limit).trimEnd() + "…" : text;
   return (
     <div className={className}>
-      <p className="text-xs text-slate-500 italic break-words whitespace-pre-wrap">{display}</p>
+      <p className="text-xs text-slate-500 italic wrap-break-word whitespace-pre-wrap">{display}</p>
       {isLong && (
         <button type="button"
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v); }}
@@ -63,6 +63,17 @@ function ExpandableText({ text, limit = 100, className = "" }) {
           {expanded ? "▲ Show less" : "▼ Show more"}
         </button>
       )}
+    </div>
+  );
+}
+
+// Card photo above the contact form (stored as a storage path; signed on show).
+function CardFormPreview({ stored }) {
+  const { url, status } = useStoredPhoto(stored);
+  if (status !== "ready") return null;
+  return (
+    <div className="rounded-xl overflow-hidden border border-slate-200">
+      <img src={url} alt="Business card" className="w-full max-h-48 object-contain bg-slate-50" />
     </div>
   );
 }
@@ -371,7 +382,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   // ── Shared form: rendered at top for NEW, in-place for EDIT ──
   function renderContactForm(isEdit) {
     return (
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <div className="flex items-center justify-between">
           <p className="text-base font-black text-slate-800">{isEdit ? "Edit Contact" : "New Contact"}</p>
           {scannedNotice && (
@@ -381,11 +392,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
           )}
         </div>
 
-        {cardPhotoUrl && (
-          <div className="rounded-xl overflow-hidden border border-slate-200">
-            <img src={cardPhotoUrl} alt="Business card" className="w-full max-h-48 object-contain bg-slate-50" />
-          </div>
-        )}
+        {cardPhotoUrl && <CardFormPreview stored={cardPhotoUrl} />}
 
         <Field label="Name" value={form.name} onChange={v => setForm(f => ({ ...f, name: v }))} placeholder="e.g. John Smith" required />
         <div className="grid grid-cols-1 gap-3">
@@ -458,7 +465,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
   const leadCount = contacts.filter(c => (c.status || "lead") === "lead").length;
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
@@ -556,7 +563,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
             {detailContact.notes && (
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Notes</p>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 border border-slate-100">{detailContact.notes}</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap wrap-break-word rounded-xl bg-slate-50 p-3 border border-slate-100">{detailContact.notes}</p>
               </div>
             )}
 
@@ -564,7 +571,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
               onOpen={url => setViewerImages({ list: [{ url, caption: detailContact.name }], startIndex: 0 })} />
 
             {((detailContact.status === "lead" || detailContact.status === "active") && detailContact.company?.trim()) && (
-              <div className="pt-2 space-y-2 border-t border-slate-100">
+              <div className="pt-2 stack-y-2 border-t border-slate-100">
                 <button
                   onClick={() => { setSendInfo({ name: detailContact.name, email: detailContact.email, phone: detailContact.phone }); setDetailContact(null); }}
                   className="w-full flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-blue-200 bg-blue-50 text-blue-700 min-h-[48px]">
@@ -703,7 +710,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
         <Empty title="No contacts yet" text="Add the people you meet at events and site visits — they'll be searchable here." icon={User} />
       )}
 
-      <div className="space-y-3">
+      <div className="stack-y-3">
         {Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([company, list]) => {
           const isCol = groups.isCollapsed(company);
           return (

@@ -186,7 +186,7 @@ export function JobsScreen({ userId, teamId, setData }) {
     setAssistantLoading(null);
   }
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <PageHeader title="Jobs" subtitle="Technician jobs, field work & invoicing" />
       {!online && (
         <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 flex gap-2">
@@ -215,7 +215,7 @@ export function JobsScreen({ userId, teamId, setData }) {
         jobs.map(job => {
           const d = draft(job);
           return (
-            <Card key={job.id} className="p-4 space-y-3">
+            <Card key={job.id} className="p-4 stack-y-3">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="font-black text-slate-900 truncate">
@@ -239,7 +239,7 @@ export function JobsScreen({ userId, teamId, setData }) {
                 </span>
               </div>
               {(job.status === "scheduled" || job.status === "in_progress") && (
-                <div className="space-y-2 rounded-xl bg-slate-50 p-3">
+                <div className="stack-y-2 rounded-xl bg-slate-50 p-3">
                   <textarea
                     value={d.technician_notes}
                     onChange={e =>
@@ -325,7 +325,7 @@ export function JobsScreen({ userId, teamId, setData }) {
                 )}
               </div>
               {assistant?.jobId === job.id && (
-                <div className="rounded-xl bg-violet-50 p-3 space-y-2">
+                <div className="rounded-xl bg-violet-50 p-3 stack-y-2">
                   <p className="text-xs font-black">
                     Technician assistant · {assistant.mode === "ai" ? "AI" : "safe fallback"}
                   </p>

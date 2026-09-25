@@ -147,10 +147,10 @@ export function ShareToTeamModal({
       {open && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={handleClose} className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm" />
+            onClick={handleClose} className="fixed inset-0 z-80 bg-black/50 backdrop-blur-xs" />
           <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white overflow-hidden"
+            className="fixed bottom-0 left-0 right-0 z-81 rounded-t-3xl bg-white overflow-hidden"
             style={{ maxHeight: "85vh" }}>
 
             <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200" /></div>
@@ -200,7 +200,7 @@ export function ShareToTeamModal({
                   </button>
                 </motion.div>
               ) : (
-                <div className="px-5 py-4 space-y-5">
+                <div className="px-5 py-4 stack-y-5">
                   {/* Error */}
                   {status === "error" && (
                     <div className="flex items-start gap-3 rounded-xl bg-red-50 p-3.5">
@@ -245,7 +245,7 @@ export function ShareToTeamModal({
                       {/* Teammate picker */}
                       <div>
                         <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">Send to</p>
-                        <div className="space-y-2">
+                        <div className="stack-y-2">
                           {recipients.map(member => {
                             const name = member.email?.split("@")[0] || member.user_id.slice(0, 8);
                             const display = name.charAt(0).toUpperCase() + name.slice(1);
@@ -282,7 +282,7 @@ export function ShareToTeamModal({
                         <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Message (optional)</p>
                         <textarea value={message} onChange={e => setMessage(e.target.value)}
                           placeholder="Add context for your teammate…" maxLength={200} rows={3}
-                          className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-none focus:border-red-300 focus:bg-white transition-colors resize-none" />
+                          className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 p-3.5 text-sm outline-hidden focus:border-red-300 focus:bg-white transition-colors resize-none" />
                       </div>
 
                       {/* Send button */}

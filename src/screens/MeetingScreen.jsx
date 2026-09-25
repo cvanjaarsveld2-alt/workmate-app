@@ -199,10 +199,10 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
 
   // ── PHASE: setup ──────────────────────────────────────────────────────────
   if (phase === "setup") return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <PageHeader title="Record Meeting" />
 
-      <Card className="p-4 space-y-4">
+      <Card className="p-4 stack-y-4">
         <Field label="Meeting title (optional)" value={meetingTitle}
           onChange={setMeetingTitle} placeholder="e.g. Site visit Anglo Sishen" />
 
@@ -249,7 +249,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
 
   // ── PHASE: recording ─────────────────────────────────────────────────────
   if (phase === "recording") return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <PageHeader title="Recording…" />
       <Card className="p-6">
         <div className="flex flex-col items-center gap-6 py-4">
@@ -267,7 +267,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
             {selectedClient && <p className="text-xs font-bold mt-2" style={{ color: BRAND.primary }}>{selectedClient.company}</p>}
           </div>
 
-          <div className="w-full space-y-2.5">
+          <div className="w-full stack-y-2.5">
             <button onClick={stopRecording}
               className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl text-white font-black text-base"
               style={{ background: "#DC2626" }}>
@@ -282,7 +282,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
 
   // ── PHASE: processing ────────────────────────────────────────────────────
   if (phase === "processing") return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <PageHeader title="Processing…" />
       <Card className="p-8">
         <div className="flex flex-col items-center gap-4 py-4">
@@ -291,7 +291,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
             <p className="text-base font-black text-slate-900">Transcribing your meeting</p>
             <p className="text-sm text-slate-400 mt-1">This takes about {Math.max(10, Math.floor(duration / 6))} seconds…</p>
           </div>
-          <div className="w-full space-y-2 text-xs text-slate-400">
+          <div className="w-full stack-y-2 text-xs text-slate-400">
             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-400" /><span>Audio captured ({formatDuration(duration)})</span></div>
             <div className="flex items-center gap-2"><Loader2 size={8} className="animate-spin" /><span>Transcribing with Whisper AI…</span></div>
             <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-slate-200" /><span>Formatting meeting minutes…</span></div>
@@ -303,10 +303,10 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
 
   // ── PHASE: review ────────────────────────────────────────────────────────
   if (phase === "review" && minutes) return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <PageHeader title="Meeting Minutes" />
 
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <div className="flex items-center justify-between">
           <p className="text-base font-black text-slate-900">{minutes.title || meetingTitle || "Meeting Notes"}</p>
           <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">⏱ {formatDuration(minutes.rawDuration)}</span>
@@ -328,7 +328,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
         {minutes.keyPoints?.length > 0 && (
           <div>
             <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Key Points</p>
-            <div className="space-y-1">
+            <div className="stack-y-1">
               {minutes.keyPoints.map((p, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
                   <span className="text-slate-300 mt-0.5">•</span><span>{p}</span>
@@ -341,7 +341,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
         {minutes.decisions?.length > 0 && (
           <div>
             <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-1">Decisions</p>
-            <div className="space-y-1">
+            <div className="stack-y-1">
               {minutes.decisions.map((d, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm">
                   <Check size={14} className="text-green-500 mt-0.5 shrink-0" />
@@ -357,7 +357,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
             <p className="text-xs font-black text-slate-400 uppercase tracking-wider mb-1">
               Action Items ({minutes.actionItems.length})
             </p>
-            <div className="space-y-2">
+            <div className="stack-y-2">
               {minutes.actionItems.map((a, i) => (
                 <div key={i} className="rounded-xl bg-amber-50 border border-amber-100 p-2.5">
                   <p className="text-sm font-bold text-amber-900">{a.action}</p>
@@ -380,7 +380,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
       </Card>
 
       {/* Save options */}
-      <div className="space-y-2.5">
+      <div className="stack-y-2.5">
         <button onClick={() => saveAsNote("both")}
           className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl text-white font-black text-sm min-h-[56px]"
           style={{ background: BRAND.primary }}>

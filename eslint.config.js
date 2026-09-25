@@ -16,7 +16,7 @@ export default [
       globals: { ...globals.browser },
     },
     plugins: { react, "react-hooks": reactHooks },
-    settings: { react: { version: "18.3" } },
+    settings: { react: { version: "19.3" } },
     rules: {
       ...js.configs.recommended.rules,
       "no-unused-vars": "off",

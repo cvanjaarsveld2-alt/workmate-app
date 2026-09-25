@@ -332,7 +332,7 @@ Kind regards`;
     if (editId && !existing) { setToast("Note not found"); return; }
 
     const noteId = editId || genId();
-    let uploadedMedia = [];
+    let uploadedMedia;
     if (isOnline && pendingMedia.length > 0) {
       uploadedMedia = await Promise.all(pendingMedia.map(async m => {
         const path = "notes/" + noteId + "/" + m.id;
@@ -474,7 +474,7 @@ Kind regards`;
   // Plain function returning JSX (not a component) so inputs keep focus.
   function renderNoteForm(isEdit) {
     return (
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 stack-y-3">
         <p className="text-base font-black text-slate-800">{isEdit ? "Edit Note" : "New Note"}</p>
 
         <div>
@@ -493,7 +493,7 @@ Kind regards`;
           ) : (
             <div>
               <label className="mb-1.5 block text-sm font-bold text-slate-500">Client</label>
-              <div className="rounded-xl bg-slate-50 border-2 border-slate-200 p-3 space-y-2.5">
+              <div className="rounded-xl bg-slate-50 border-2 border-slate-200 p-3 stack-y-2.5">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#8B1A1A" }}>New Client</p>
                   <button type="button"
@@ -552,7 +552,7 @@ Kind regards`;
           <label className="block text-xs font-bold text-slate-500 mb-1.5">Date I was there</label>
           <input type="date" value={form.visit_date || ""} max={todayISO()}
             onChange={e => setForm(f => ({ ...f, visit_date: e.target.value }))}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-none focus:border-slate-400"
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[15px] outline-hidden focus:border-slate-400"
             style={{ fontSize: 16 }} />
         </div>
         <GroupField label="Group / Site (optional)" value={form.category} onChange={v => setForm(f => ({ ...f, category: v }))} existing={noteGroupNames} placeholder="e.g. Newmont Ghana, Accra site" />
@@ -582,7 +582,7 @@ Kind regards`;
   }
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       {dialog}
     <ShareSheet
         open={!!shareSheet}
@@ -617,7 +617,7 @@ Kind regards`;
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={closeNotesPack}
-              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm" />
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs" />
             <motion.div
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
@@ -644,7 +644,7 @@ Kind regards`;
                 <p className="text-xs text-slate-400 mt-1.5 text-center">Scroll to review · {notesPack.filename}</p>
               </div>
 
-              <div className="px-4 py-3 border-t border-slate-100 space-y-2" style={{ background: "#F7F3F3" }}>
+              <div className="px-4 py-3 border-t border-slate-100 stack-y-2" style={{ background: "#F7F3F3" }}>
                 <button onClick={shareNotesPack}
                   className="w-full flex items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold text-white min-h-[52px]"
                   style={{ background: "#8B1A1A" }}>
@@ -712,7 +712,7 @@ Kind regards`;
           <>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Note</p>
-              <p className="text-sm text-slate-800 whitespace-pre-wrap break-words rounded-xl bg-slate-50 p-3 border border-slate-100 leading-relaxed">
+              <p className="text-sm text-slate-800 whitespace-pre-wrap wrap-break-word rounded-xl bg-slate-50 p-3 border border-slate-100 leading-relaxed">
                 {detailNote.note || <span className="text-slate-400 italic">(empty)</span>}
               </p>
             </div>
@@ -788,7 +788,7 @@ Kind regards`;
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border-2 border-red-200 p-3 shadow-sm">
+        <div className="bg-white rounded-2xl border-2 border-red-200 p-3 shadow-xs">
           <div className="flex items-center justify-between mb-2">
             <div>
               <p className="text-base font-black text-slate-900">{selectedIds.size} selected</p>
@@ -828,7 +828,7 @@ Kind regards`;
       <AnimatePresence>
         {showExportMenu && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowExportMenu(false)} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowExportMenu(false)} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs" />
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed left-4 right-4 top-1/2 -translate-y-1/2 z-50 max-w-sm mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100" style={{ background: "#F7F3F3" }}>
                 <p className="text-base font-black text-slate-900">Export {selectedIds.size} Note{selectedIds.size !== 1 ? "s" : ""}</p>
@@ -893,7 +893,7 @@ Kind regards`;
 
       <SearchBar value={search} onChange={setSearch} placeholder="Search notes…" />
 
-      <div className="space-y-2">
+      <div className="stack-y-2">
         <div className="flex items-center justify-end">
           <CollapsibleFilters
             groups={[
@@ -916,7 +916,7 @@ Kind regards`;
       </div>
       {filtered.length === 0 && <Empty title="No notes found" text="Add a note or change your filters." icon={Clipboard} />}
 
-      <div className="space-y-2">
+      <div className="stack-y-2">
         {(groupedNotes
           ? groupedNotes.flatMap(sec => [
               { _header: sec.group, _count: sec.notes.length },
@@ -982,7 +982,7 @@ Kind regards`;
                       {n.resolved && <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-700">Resolved</span>}
                       {isOverdue && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">Overdue</span>}
                     </div>
-                    <p className={"text-sm leading-relaxed break-words line-clamp-2 " + (n.resolved ? "text-slate-400" : "text-slate-600")}>{n.note}</p>
+                    <p className={"text-sm leading-relaxed wrap-break-word line-clamp-2 " + (n.resolved ? "text-slate-400" : "text-slate-600")}>{n.note}</p>
 
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       {n.visit_date && <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600"><Calendar size={10} />{smartDate(n.visit_date)}</span>}

@@ -60,7 +60,7 @@ function InboxItem({ notif, onAccept, onDecline, accepting, declining }) {
         </div>
 
         {/* Body */}
-        <div className="px-4 py-3.5 space-y-1">
+        <div className="px-4 py-3.5 stack-y-1">
           <p className="text-sm font-black text-slate-900 leading-snug">
             {notif.record_title || "Unnamed record"}
           </p>
@@ -87,7 +87,7 @@ function InboxItem({ notif, onAccept, onDecline, accepting, declining }) {
           <button
             onClick={() => !busy && onAccept(notif)}
             disabled={busy}
-            className="flex-[2] flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-black text-white min-h-[48px] disabled:opacity-40 transition-opacity"
+            className="flex-2 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-black text-white min-h-[48px] disabled:opacity-40 transition-opacity"
             style={{ background: BRAND.primary }}>
             {accepting ? (
               <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
@@ -118,7 +118,9 @@ export function SharedInboxScreen({ userId, userEmail, teamId, onBack, onAccepte
         .eq("to_user_id", userId)
         .eq("accepted", false)
         .is("declined", null)         // null = pending (not yet declined)
-        .neq("record_type", "team_view_request") // access requests are answered on the Team screen
+        // Access requests are answered on the Team screen; the daily problem
+        // digest is a notice, not a record to accept.
+        .not("record_type", "in", "(team_view_request,problem_digest)")
         .order("created_at", { ascending: false })
         .limit(50);
       if (!error) setItems(data || []);
@@ -199,7 +201,7 @@ export function SharedInboxScreen({ userId, userEmail, teamId, onBack, onAccepte
   const pending = items.filter(i => !i.accepted && !i.declined);
 
   return (
-    <div className="space-y-4">
+    <div className="stack-y-4">
       <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
 
       {/* Header */}

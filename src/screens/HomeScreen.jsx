@@ -241,7 +241,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
   const todayOverflow = Math.max(0, todayFU.length - 5);
 
   return (
-    <div className="space-y-5">
+    <div className="stack-y-5">
 
       {/* ── Header ── */}
       <div>
@@ -279,7 +279,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                     : <p className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Any time</p>}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-900 break-words">{f.title}</p>
+                  <p className="text-sm font-bold text-slate-900 wrap-break-word">{f.title}</p>
                   {(f.client || f.branch) && (
                     <p className="text-xs text-slate-500 mt-0.5">{f.client}{f.branch ? ` — ${f.branch}` : ""}</p>
                   )}
@@ -355,7 +355,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
             </div>
             <span className="text-[10px] text-slate-400">{NEGLECT_DAYS}+ days</span>
           </div>
-          <div className="space-y-2">
+          <div className="stack-y-2">
             {neglected.map(cl => (
               <div key={cl.id} className="flex items-center gap-1">
                 <button
@@ -395,13 +395,13 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
           <>
             <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
               onClick={() => setNeglectSheet(null)}
-              className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"/>
+              className="fixed inset-0 z-80 bg-black/50 backdrop-blur-xs"/>
             <motion.div initial={{y:"100%"}} animate={{y:0}} exit={{y:"100%"}}
               transition={{type:"spring",damping:28,stiffness:300}}
-              className="fixed bottom-0 left-0 right-0 z-[81] rounded-t-3xl bg-white"
+              className="fixed bottom-0 left-0 right-0 z-81 rounded-t-3xl bg-white"
               style={{maxWidth:480,margin:"0 auto"}}>
               <div className="flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-slate-200"/></div>
-              <div className="px-5 pb-8 pt-2 space-y-3">
+              <div className="px-5 pb-8 pt-2 stack-y-3">
                 {/* Header */}
                 <div className="flex items-start justify-between">
                   <div>
@@ -423,7 +423,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                 </div>
 
                 {/* Action options */}
-                <div className="space-y-2">
+                <div className="stack-y-2">
                   {neglectSheet.phone && (
                     <a href={`tel:${neglectSheet.phone}`}
                       onClick={() => setNeglectSheet(null)}
@@ -541,7 +541,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
             <ChevronRight size={12} style={{ color: BRAND.primary }} />
           </button>
         </div>
-        <div className="space-y-2.5">
+        <div className="stack-y-2.5">
           {PIPELINE_STAGES.filter(s => s !== "Lost" && s !== "Dormant").map(stage => {
             const count = pCount[stage] || 0;
             const total = inPipeline || 1;
@@ -580,7 +580,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden">
-                      <div className="pl-1 pr-1 pt-2 pb-1 space-y-1">
+                      <div className="pl-1 pr-1 pt-2 pb-1 stack-y-1">
                         {stageClients.slice(0, 8).map(cl => (
                           <button
                             key={cl.id}
@@ -625,7 +625,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setMovingClient(null)}
-            className="fixed inset-0 z-[120] flex items-end justify-center"
+            className="fixed inset-0 z-120 flex items-end justify-center"
             style={{ background: "rgba(15,23,42,0.4)", backdropFilter: "blur(2px)" }}>
             <motion.div
               initial={{ y: 40 }} animate={{ y: 0 }} exit={{ y: 40 }}
@@ -637,7 +637,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
               <p className="text-lg font-black text-slate-900 mb-4 truncate">
                 {movingClient.company || "Unnamed"}{movingClient.branch ? ` — ${movingClient.branch}` : ""}
               </p>
-              <div className="space-y-1.5">
+              <div className="stack-y-1.5">
                 {PIPELINE_STAGES.map(stage => {
                   const sc = STAGE_COLORS[stage] || {};
                   const current = (movingClient.stage || "New Lead") === stage;

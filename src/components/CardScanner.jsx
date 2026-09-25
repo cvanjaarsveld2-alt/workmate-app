@@ -56,11 +56,9 @@ async function uploadCardImage(blob, userId) {
     console.error("[CardScanner] Photo upload failed:", error);
     throw new Error("Photo upload failed: " + (error.message || "unknown storage error"));
   }
-  const { data: signed, error: urlError } = await supabase.storage
-    .from("powermate-media")
-    .createSignedUrl(data.path, 7 * 24 * 60 * 60);
-  if (urlError || !signed?.signedUrl) throw new Error("Photo URL could not be created");
-  return signed.signedUrl;
+  // Store the object path: signed links expire, and the bucket is private.
+  // Screens sign a fresh link when they show the card (useStoredPhoto).
+  return data.path;
 }
 
 async function extractCardData(imageBase64) {
@@ -204,7 +202,7 @@ export function CardScanner({ userId, onExtracted, onCancel }) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="space-y-3"
+              className="stack-y-3"
             >
               <div className="flex items-start gap-3 p-3 rounded-xl bg-red-50 border border-red-200">
                 <AlertCircle size={20} className="text-red-600 shrink-0 mt-0.5" />
