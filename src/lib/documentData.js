@@ -3,6 +3,7 @@
 // into the input for buildDocumentPDF. Pure functions, so they're unit-tested
 // in tests/documentData.test.mjs.
 import { addDays, chargesVat, documentTotals } from "./documentPDF.js";
+import { normaliseParts } from "./products.js";
 
 export function parseItems(raw) {
   let list = raw;
@@ -19,6 +20,7 @@ export function parseItems(raw) {
       description: String(i?.description ?? i?.desc ?? "").trim(),
       qty: Number(i?.qty ?? i?.quantity ?? 1) || 0,
       unitPrice: Number(i?.unitPrice ?? i?.unit_price ?? i?.price ?? 0) || 0,
+      ...(String(i?.part_number ?? i?.code ?? "").trim() ? { code: String(i.part_number ?? i.code).trim() } : {}),
     }))
     .filter(i => i.description || i.unitPrice);
 }
@@ -163,11 +165,7 @@ export function jobPhotos(job) {
 export function jobToCard(job, { clients = [], quotes = [] } = {}) {
   const client = clients.find(c => c.id === job.client_id);
   const quote = quotes.find(q => q.id === job.quote_id);
-  const parts = Array.isArray(job.parts_used)
-    ? job.parts_used
-    : typeof job.parts_used === "string"
-      ? job.parts_used.split(",")
-      : [];
+  const parts = normaliseParts(job.parts_used);
   return {
     number: job.job_number || shortId(job.id),
     title: job.title || "",
@@ -186,7 +184,7 @@ export function jobToCard(job, { clients = [], quotes = [] } = {}) {
     description: String(job.description || "").trim(),
     notes: String(job.technician_notes || "").trim(),
     workDone: String(job.work_done || "").trim(),
-    parts: parts.map(x => String(x).trim()).filter(Boolean),
+    parts: parts.map(p => ({ code: p.part_number || "", description: p.description, qty: p.quantity })),
     photos: jobPhotos(job),
   };
 }

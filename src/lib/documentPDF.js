@@ -437,24 +437,36 @@ export async function buildDocumentPDF(doc, profile = {}) {
 
     // ── Line items ──
     const items = (doc.items || []).filter(i => i && (i.description || Number(i.unitPrice)));
+    // A code column only when some line carries a part number.
+    const codes = items.some(i => i.code);
     autoTable(pdf, {
       startY: y,
-      head: [["#", "Description", "Qty", "Unit price", "Amount"]],
+      head: [codes ? ["#", "Code", "Description", "Qty", "Unit price", "Amount"] : ["#", "Description", "Qty", "Unit price", "Amount"]],
       body: items.map((i, n) => {
         const qty = Number(i.qty) || 0,
           price = Number(i.unitPrice) || 0;
-        return [n + 1, i.description || "", qty % 1 ? qty.toFixed(2) : qty, money(price), money(qty * price)];
+        const row = [n + 1, i.description || "", qty % 1 ? qty.toFixed(2) : qty, money(price), money(qty * price)];
+        if (codes) row.splice(1, 0, i.code || "");
+        return row;
       }),
       margin: { left: M, right: M, bottom: FOOT + 4 },
       styles: { fontSize: 9, cellPadding: 2.6, textColor: ink, lineColor: [230, 230, 230], lineWidth: 0.1 },
       headStyles: { fillColor: brand, textColor: [255, 255, 255], fontStyle: "bold" },
       alternateRowStyles: { fillColor: [248, 248, 248] },
-      columnStyles: {
-        0: { cellWidth: 9, halign: "center" },
-        2: { cellWidth: 14, halign: "center" },
-        3: { cellWidth: 30, halign: "right" },
-        4: { cellWidth: 32, halign: "right" },
-      },
+      columnStyles: codes
+        ? {
+            0: { cellWidth: 9, halign: "center" },
+            1: { cellWidth: 26, fontSize: 8 },
+            3: { cellWidth: 14, halign: "center" },
+            4: { cellWidth: 28, halign: "right" },
+            5: { cellWidth: 30, halign: "right" },
+          }
+        : {
+            0: { cellWidth: 9, halign: "center" },
+            2: { cellWidth: 14, halign: "center" },
+            3: { cellWidth: 30, halign: "right" },
+            4: { cellWidth: 32, halign: "right" },
+          },
     });
     y = pdf.lastAutoTable.finalY + 6;
 
@@ -615,12 +627,14 @@ export async function buildDocumentPDF(doc, profile = {}) {
       text("Parts used", M, y);
       autoTable(pdf, {
         startY: y + 2,
-        head: [["#", "Part"]],
-        body: jc.parts.map((part, n) => [n + 1, part]),
+        head: [["#", "Code", "Part", "Qty"]],
+        body: jc.parts.map((part, n) =>
+          typeof part === "string" ? [n + 1, "", part, 1] : [n + 1, part.code || "", part.description, part.qty ?? 1],
+        ),
         margin: { left: M, right: M, bottom: FOOT + 4 },
         styles: { fontSize: 9, cellPadding: 2, textColor: ink },
         headStyles: { fillColor: brand, textColor: [255, 255, 255] },
-        columnStyles: { 0: { cellWidth: 10, halign: "center" } },
+        columnStyles: { 0: { cellWidth: 10, halign: "center" }, 1: { cellWidth: 28, fontSize: 8 }, 3: { cellWidth: 14, halign: "center" } },
       });
       y = pdf.lastAutoTable.finalY + 6;
     }

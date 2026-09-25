@@ -58,7 +58,7 @@ export const WA_TEMPLATES = [
 ];
 
 // ─── Format phone for WhatsApp ─────────────────────────────────────────────────
-function formatPhone(phone) {
+export function formatPhone(phone) {
   if (!phone) return null;
   // Strip spaces, dashes, brackets
   let clean = phone.replace(/[\s\-()]/g, "");

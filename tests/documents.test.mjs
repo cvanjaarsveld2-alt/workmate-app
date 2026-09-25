@@ -212,7 +212,10 @@ test("job cards: linked jobs, card content, and pages after the invoice", async 
   assert.equal(card.number, "JOB-2026-0012");
   assert.equal(card.customer, "Mine Co");
   assert.equal(card.reference, "Quote Q-7");
-  assert.deepEqual(card.parts, ["Seal kit", "Hose"]);
+  assert.deepEqual(card.parts, [
+    { code: "", description: "Seal kit", qty: 1 },
+    { code: "", description: "Hose", qty: 1 },
+  ]);
   assert.equal(card.photos.length, 1);
   const inv = invoiceToDocument({ id: "i1", invoice_number: "INV-00003", total: 1150, subtotal: 1000 }, "invoice", { profile });
   const blob = await buildDocumentPDF({ ...inv, jobCards: [card] }, { ...profile, logo_data: jpeg });

@@ -37,6 +37,10 @@ export const DEFAULT_PROFILE = {
   // Jack Selector: see CompanySetup).
   disabled_modules: [],
   require_admin_mfa: false,
+  // Per hour, excluding VAT: what the company charges for labour, and what an
+  // hour of a technician's time costs it (for job costing).
+  labour_rate: 0,
+  labour_cost: 0,
 };
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
@@ -106,6 +110,9 @@ export function cleanProfile(input) {
     if (["quote_validity_days", "payment_terms_days", "next_invoice_number"].includes(k)) {
       const n = Math.round(Number(v));
       out[k] = Number.isFinite(n) ? n : DEFAULT_PROFILE[k];
+    } else if (k === "labour_rate" || k === "labour_cost") {
+      const n = Math.round(Number(v) * 100) / 100;
+      out[k] = Number.isFinite(n) && n > 0 ? n : 0;
     } else if (k === "disabled_modules") {
       out[k] = Array.isArray(v) ? [...new Set(v.map(String))] : [];
     } else if (k === "vat_registered") {

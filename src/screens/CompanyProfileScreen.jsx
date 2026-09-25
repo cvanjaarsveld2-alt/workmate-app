@@ -6,7 +6,7 @@ import { Building2, Upload, Trash2, FileText, Lock, WifiOff } from "lucide-react
 import { Card, Btn, Field, PageHeader, Toast } from "../components/ui";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { compressLogo, saveCompanyProfile, useCompanyProfile } from "../lib/companyProfile";
-import { MODULES } from "../lib/modules";
+import { offeredModules } from "../lib/modules";
 import { supabase } from "../supabase";
 import { buildCompanyZip } from "../lib/companyExport";
 import { useTeamPlan } from "../lib/plan";
@@ -175,6 +175,7 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           <ReadOnly label="Bank" value={profile.bank_name} />
           <ReadOnly label="Quotes valid for" value={`${profile.quote_validity_days} days`} />
           <ReadOnly label="Payment terms" value={`${profile.payment_terms_days} days`} />
+          {Number(profile.labour_rate) > 0 && <ReadOnly label="Labour rate" value={`R ${Number(profile.labour_rate).toFixed(2)} per hour`} />}
         </Card>
       </div>
     );
@@ -335,6 +336,24 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
+          <Field
+            label="Labour rate per hour (R, excl. VAT)"
+            value={String(form.labour_rate || "")}
+            onChange={set("labour_rate")}
+            type="number"
+          />
+          <Field
+            label="Labour cost per hour (R)"
+            value={String(form.labour_cost || "")}
+            onChange={set("labour_cost")}
+            type="number"
+          />
+        </div>
+        <p className="text-xs text-slate-500 -mt-1">
+          The rate is charged for timesheet hours on jobs invoiced without a quote. The cost is what an hour of a
+          technician's time costs you, for job profit.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
           <Field label="Invoice prefix" value={form.invoice_prefix} onChange={set("invoice_prefix")} maxLength={12} />
           <Field
             label="Next invoice no."
@@ -367,7 +386,7 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
       </Section>
 
       <Section title="Modules" hint="Switch off what your company doesn't use. It disappears for everyone in your company.">
-        {MODULES.map(m => {
+        {offeredModules(profile.disabled_modules).map(m => {
           const on = !(form.disabled_modules || []).includes(m.key);
           return (
             <label key={m.key} className="flex items-center gap-3 min-h-[52px] cursor-pointer">

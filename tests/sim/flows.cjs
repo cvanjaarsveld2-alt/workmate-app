@@ -123,9 +123,10 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
   await safe("jobs: save field report with parts", async () => {
     await go("Jobs");
     const job = db.jobs[0]; const v0 = log.violations.length;
-    const parts = page.getByPlaceholder("Parts used (comma separated)");
+    const parts = page.getByPlaceholder("Other parts (comma separated)");
     if (!(await parts.count())) { rec("jobs: save field report with parts", "INFO", `job status is "${job?.status}", field report only editable when scheduled/in progress`); await shot("jobs"); return; }
-    await parts.first().fill("Hose, Clamp"); await page.getByText("Save field report").first().click(); await page.waitForTimeout(3000);
+    await parts.first().fill("Hose, Clamp"); await parts.first().press("Enter");
+    await page.getByText("Save field report").first().click(); await page.waitForTimeout(3000);
     const after = db.jobs.find(x => x.id === job.id);
     const err = await page.locator("text=/changed on another device|could not sync|failed/i").count();
     rec("jobs: save field report with parts", JSON.stringify(after?.parts_used) === JSON.stringify(["Hose", "Clamp"]) && !err ? "PASS" : "FAIL", `server parts_used=${JSON.stringify(after?.parts_used)}; error banner=${err > 0}; schema errors=${JSON.stringify(errsSince(v0))}`);
@@ -416,6 +417,106 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     }
     rec("documents: job card PDFs", /^Job_Card_/.test(alone) && hasBox && s2 > s1 ? "PASS" : "FAIL",
       `job card=${alone}; attach option shown=${hasBox}; invoice ${s1}B → with job card ${s2}B`);
+  });
+
+  // 13f2. Products & stock: add an item, receive stock, pick it on a job.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("products: add item, receive stock, use on job", async () => {
+    await go("Products", 3000);
+    const lowShown = (await page.getByText(/at or below the reorder level/).count()) > 0;
+    await page.getByRole("button", { name: "Add", exact: true }).first().click(); await page.waitForTimeout(600);
+    await page.locator('label:text-is("Part number") + input').fill("SIM-77");
+    await page.locator('label:has-text("Name") + input').first().fill("Sim grease cartridge");
+    await page.locator('label:text-is("Cost price (R)") + input').fill("40");
+    await page.locator('label:text-is("Sell price excl. VAT (R)") + input').fill("65");
+    const marginShown = (await page.getByText(/Margin R 25\.00 \(38\.5%\)/).count()) > 0;
+    await page.getByText("Keep track of stock").click();
+    await page.getByRole("button", { name: "Save", exact: true }).last().click(); await page.waitForTimeout(1500);
+    const row = H.db.products.find(p => p.part_number === "SIM-77");
+    await page.getByRole("button", { name: /0 each in stock/ }).first().click(); await page.waitForTimeout(800);
+    await page.locator('label:text-is("Quantity") + input').fill("12");
+    await page.getByRole("button", { name: "Update stock" }).click(); await page.waitForTimeout(1500);
+    await shot("products-stock");
+    const stocked = row && Number(row.stock_on_hand) === 12 && H.db.stock_movements.some(m => m.product_id === row.id && m.reason === "receive");
+    await go("Jobs", 3500);
+    const pick = page.getByRole("button", { name: "Add from catalogue" }).first();
+    let saved = null;
+    if (await pick.count()) {
+      await pick.click(); await page.waitForTimeout(600);
+      await page.getByPlaceholder("Part number, name or supplier code").fill("SIM-77");
+      await page.getByRole("button", { name: /Sim grease cartridge/ }).first().click(); await page.waitForTimeout(400);
+      await page.getByText("Save field report").first().click(); await page.waitForTimeout(3000);
+      saved = H.db.jobs.flatMap(j => (Array.isArray(j.parts_used) ? j.parts_used : [])).find(p => p && p.product_id === row?.id);
+    }
+    rec("products: add item, receive stock, use on job", lowShown && marginShown && stocked && saved?.part_number === "SIM-77" && saved?.unit_price === 65 ? "PASS" : "FAIL",
+      `low-stock banner=${lowShown}; margin shown=${marginShown}; saved=${!!row}; stock=${row?.stock_on_hand}; job part=${JSON.stringify(saved)}`);
+  });
+
+  // 13f3. Timesheets: clock in on a job, see it running, clock out.
+  await safe("timesheets: clock in on a job and out", async () => {
+    await go("Jobs", 3500);
+    const clockIn = page.getByRole("button", { name: "Clock in", exact: true }).first();
+    if (!(await clockIn.count())) { rec("timesheets: clock in on a job and out", "FAIL", "no Clock in button on an open job"); return; }
+    await clockIn.click(); await page.waitForTimeout(2500);
+    const row = (H.db.time_entries || []).find(e => e.user_id === H.UID && !e.ended_at);
+    const onJob = !!row?.job_id && H.db.jobs.some(j => j.id === row.job_id);
+    const outBtn = (await page.getByRole("button", { name: /Clock out/ }).count()) > 0;
+    await go("Timesheets", 3000);
+    const running = (await page.getByText(/Clocked in · /).count()) > 0;
+    await shot("timesheets-running");
+    await page.getByRole("button", { name: /Clock out/ }).first().click(); await page.waitForTimeout(2500);
+    const after = (H.db.time_entries || []).find(e => e.id === row?.id);
+    const listed = (await page.getByText(/ – \d\d:\d\d/).count()) > 0;
+    rec("timesheets: clock in on a job and out", onJob && outBtn && running && !!after?.ended_at && listed ? "PASS" : "FAIL",
+      `entry on job=${onJob}; clock-out button on job=${outBtn}; running shown=${running}; ended=${after?.ended_at || null}; listed in week=${listed}; schema errors=${JSON.stringify(log.violations.slice(-3))}`);
+  });
+
+  // 13f4. Service plans: add a quarterly plan, then make its job now.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("service plans: add plan and make its job", async () => {
+    await go("ServicePlans", 3000);
+    await page.getByRole("button", { name: /New service plan/ }).click(); await page.waitForTimeout(600);
+    await page.locator('label:has-text("Name") + input').first().fill("Sim quarterly service");
+    const client = H.db.clients.find(c => c.team_id === H.TEAM && c.company) || H.db.clients[0];
+    await page.getByRole("button", { name: "Select client…" }).click(); await page.waitForTimeout(300);
+    await page.getByPlaceholder("Search clients…").fill(client.company.slice(0, 12));
+    await page.getByRole("button", { name: new RegExp(client.company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
+    await page.locator('label:text-is("Price per visit (R, excl. VAT)") + input').fill("4500");
+    await page.getByRole("button", { name: "Save", exact: true }).last().click(); await page.waitForTimeout(2000);
+    const plan = (H.db.service_plans || []).find(p => p.title === "Sim quarterly service");
+    const listed = (await page.getByText("Sim quarterly service").count()) > 0;
+    const worth = (await page.getByText(/R 18.000\.00/).count()) > 0;
+    await shot("service-plans");
+    let job = null;
+    if (listed) {
+      await page.getByText("Sim quarterly service").first().click(); await page.waitForTimeout(600);
+      await page.getByRole("button", { name: "Make the job now" }).click(); await page.waitForTimeout(1500);
+      job = H.db.jobs.find(j => j.service_plan_id === plan?.id);
+    }
+    rec("service plans: add plan and make its job", plan?.every_months === 3 && plan?.client_id === client.id && Number(plan?.value) === 4500 && listed && worth && !!job ? "PASS" : "FAIL",
+      `saved=${!!plan} (every ${plan?.every_months} months, client ok=${plan?.client_id === client.id}); listed=${listed}; yearly value shown=${worth}; job made=${!!job}; schema errors=${JSON.stringify(log.violations.slice(-3))}`);
+  });
+
+  // 13f5. Schedule: book a job for a time and a technician.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("schedule: book a job for a technician", async () => {
+    const job = H.db.jobs.find(j => j.title === "Sim quarterly service") || H.db.jobs.find(j => !["completed", "cancelled"].includes(j.status));
+    await page.goto(`${H.APP}/?screen=Schedule`, { waitUntil: "load" }); await page.waitForTimeout(3000);
+    if (job.scheduled_date) {
+      await page.getByRole("button", { name: "Week" }).click(); await page.waitForTimeout(300);
+      await page.getByRole("button", { name: "Day" }).click();
+    }
+    const chip = page.getByRole("button", { name: new RegExp(job.title) }).first();
+    const shown = (await chip.count()) > 0;
+    if (!shown) { await shot("schedule"); rec("schedule: book a job for a technician", "FAIL", `job "${job.title}" (${job.scheduled_date}) not on the board`); return; }
+    await chip.click(); await page.waitForTimeout(600);
+    const tech = H.db.team_members.find(m => m.user_id !== H.UID) || H.db.team_members[0];
+    await page.locator('label:has-text("Date") input').fill("2026-10-06");
+    await page.locator('label:has-text("Time") input').fill("09:30");
+    await page.locator('label:has-text("Technician") select').selectOption(tech.user_id);
+    await page.getByRole("button", { name: "Save booking" }).click(); await page.waitForTimeout(2500);
+    const after = H.db.jobs.find(j => j.id === job.id);
+    await page.getByRole("button", { name: "Week" }).click(); await page.waitForTimeout(500);
+    await shot("schedule-week");
+    rec("schedule: book a job for a technician", after.scheduled_date === "2026-10-06" && String(after.scheduled_time).startsWith("09:30") && after.assigned_to_user_id === tech.user_id ? "PASS" : "FAIL",
+      `date=${after.scheduled_date}; time=${after.scheduled_time}; technician ok=${after.assigned_to_user_id === tech.user_id}; schema errors=${JSON.stringify(log.violations.slice(-3))}`);
   });
 
   // 13g. Help: send a message to support; the platform console lists companies.

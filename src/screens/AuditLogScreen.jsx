@@ -16,6 +16,8 @@ const TABLES = {
   jobs: "Job",
   team_members: "Team",
   team_profiles: "Company details",
+  products: "Product",
+  time_entries: "Time entry",
 };
 const ACTION = { insert: "added", update: "changed", delete: "deleted" };
 const short = v => {

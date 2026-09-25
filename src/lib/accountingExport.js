@@ -32,7 +32,9 @@ export function invoiceLines(invoices, { clients = [], quotes = [], profile = {}
         reference: doc.reference || "",
         date: doc.date,
         due: doc.dueDate,
-        description: item.description || "Services",
+        // The part number goes in the description: an item code the accounting
+        // package doesn't know would make the import fail.
+        description: [item.code, item.description || "Services"].filter(Boolean).join(" "),
         qty,
         unitEx: r2(unitEx),
         lineEx,

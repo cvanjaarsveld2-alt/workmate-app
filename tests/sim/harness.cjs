@@ -54,12 +54,23 @@ const email_quotes = [0, 1, 2].map(i => ({ id: uuid(), user_id: UID, gmail_messa
 const team_notifications = real.quotes.slice(0, 2).map((q, i) => ({ id: uuid(), team_id: TEAM, from_user_id: RPC.get_team_member_emails.find(m => m.user_id !== UID)?.user_id, to_user_id: UID, record_type: "quote", record_id: q.id, record_title: q.client_name || "Quote", message: "Please follow up", read: i === 1, created_at: day(i) + "T08:00:00Z", accepted: null, accepted_at: null, copied_record_id: null }));
 const machine_jack_confirmations = [{ id: uuid(), user_id: UID, team_id: TEAM, brand: "Sandvik", model: "LH410", closed_height: 250, jack_overrides: ["J-30T"], jack_stand: "Stand A", note: "", created_at: day(4) + "T08:00:00Z", updated_at: day(4) + "T08:00:00Z" }];
 
+const products = [
+  { id: uuid(), team_id: TEAM, user_id: "431dcb72-ea3f-43ed-9f73-74384e862300", part_number: "HF-100", name: "Hydraulic filter", description: null, category: "Filters", unit: "each", sell_price: 200, cost_price: 120, vat_applicable: true, supplier: "Sim Supplies", supplier_code: "SS-9", barcode: null, track_stock: true, stock_on_hand: 2, reorder_level: 3, active: true, created_at: day(20) + "T08:00:00Z", updated_at: day(20) + "T08:00:00Z" },
+  { id: uuid(), team_id: TEAM, user_id: "431dcb72-ea3f-43ed-9f73-74384e862300", part_number: "LAB-HR", name: "Labour (per hour)", description: null, category: "Labour", unit: "hour", sell_price: 650, cost_price: 0, vat_applicable: true, supplier: null, supplier_code: null, barcode: null, track_stock: false, stock_on_hand: 0, reorder_level: 0, active: true, created_at: day(20) + "T08:00:00Z", updated_at: day(20) + "T08:00:00Z" },
+];
 const db = { ...Object.fromEntries(Object.keys(schema).map(t => [t, []])), ...Object.fromEntries(Object.entries(real).filter(([k]) => k !== "_rpc")),
-  vehicle_checks: vc, expenses, equipment, leads, breakdown_reports, repair_reports, invoices, payments, activities, email_quotes, team_notifications, machine_jack_confirmations, custom_faults: [{ id: uuid(), user_id: UID, team_id: TEAM, label: "Sim fault", fault_group: "Hydraulics", sync_status: "synced", created_at: day(9) + "T08:00:00Z", updated_at: day(9) + "T08:00:00Z" }] };
+  vehicle_checks: vc, expenses, equipment, leads, breakdown_reports, repair_reports, invoices, payments, activities, email_quotes, team_notifications, machine_jack_confirmations, products, stock_movements: [], custom_faults: [{ id: uuid(), user_id: UID, team_id: TEAM, label: "Sim fault", fault_group: "Hydraulics", sync_status: "synced", created_at: day(9) + "T08:00:00Z", updated_at: day(9) + "T08:00:00Z" }] };
 if (!db.team_members.length) db.team_members = RPC.get_team_member_emails.map(m => ({ id: uuid(), team_id: TEAM, user_id: m.user_id, role: m.role, joined_at: m.joined_at }));
 
 // ─── Emulator ────────────────────────────────────────────────────────────────
 const log = { writes: [], violations: [], errors4xx: [], unhandled: [], functions: [], storage: [], reads: [] };
+// Column defaults the real database fills in on insert (only where the app
+// relies on them).
+const DEFAULTS = {
+  products: { unit: "each", sell_price: 0, cost_price: 0, vat_applicable: true, track_stock: false, stock_on_hand: 0, reorder_level: 0, active: true },
+  time_entries: { kind: "work", billable: true },
+  service_plans: { lead_days: 7, value: 0, active: true },
+};
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validate(table, row) {
   const cols = schema[table];
@@ -165,6 +176,34 @@ async function handle(route) {
     if (fn === "create_quote_link") { const q = db.quotes.find(x => x.id === body.p_quote_id); if (!q) return json(route, 400, { code: "P0001", message: "Quote not found" }); q.share_token = q.share_token || "ab".repeat(24); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, q.share_token); }
     if (fn === "get_shared_quote") { const q = db.quotes.find(x => x.share_token && x.share_token === body.p_token); if (!q) return json(route, 200, null); const prof = (db.team_profiles || [])[0] || {}; return json(route, 200, { quote: { number: q.quote_number || "Q-1", description: q.description, line_items: q.line_items, value: q.value, vat_inclusive: q.vat_inclusive, date: q.sent_date || "2026-09-01", expiry_date: q.expiry_date || null, status: q.status, title: q.details?.title || null, intro: q.details?.intro || null, exclusions: q.details?.exclusions || null, accepted_at: q.accepted_at || null, declined_at: q.declined_at || null }, client: q.client_name, company: { name: prof.trading_name, legal_name: prof.legal_name, logo_data: null, brand_color: prof.brand_color, vat_no: prof.vat_no, vat_registered: prof.vat_registered !== false } }); }
     if (fn === "respond_to_shared_quote") { const q = db.quotes.find(x => x.share_token === body.p_token); if (!q) return json(route, 400, { code: "P0001", message: "This link has expired" }); if (q.accepted_at || q.declined_at) return json(route, 400, { code: "P0001", message: "This quote has already been answered" }); if (body.p_accept) Object.assign(q, { status: "Accepted", accepted_at: new Date().toISOString(), accepted_by_name: body.p_name, accepted_signature: body.p_signature, accepted_po: body.p_po || null }); else Object.assign(q, { status: "Rejected", declined_at: new Date().toISOString(), decline_reason: body.p_reason || null }); log.writes.push({ screen: screenTag, kind: "rpc", fn, body: { ...body, p_signature: body.p_signature ? "(png)" : null } }); return json(route, 200, { ok: true, status: q.status }); }
+    if (fn === "adjust_stock") {
+      const pr = db.products.find(x => x.id === body.p_product_id);
+      if (!pr) return json(route, 400, { code: "P0001", message: "Product not found" });
+      if (UID !== OWNER) return json(route, 400, { code: "P0001", message: "Only the master account or an admin can change stock" });
+      const q = Number(body.p_qty), change = body.p_reason === "receive" ? Math.abs(q) : body.p_reason === "count" ? q - Number(pr.stock_on_hand) : q;
+      if (change) { db.stock_movements.push({ id: db.stock_movements.length + 1, team_id: pr.team_id, product_id: pr.id, qty_change: change, reason: body.p_reason, job_id: null, note: body.p_note || null, user_id: UID, created_at: new Date().toISOString() }); pr.stock_on_hand = Number(pr.stock_on_hand) + change; pr.updated_at = new Date().toISOString(); }
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, Number(pr.stock_on_hand));
+    }
+    if (fn === "import_products") {
+      let added = 0, updated = 0, skipped = 0;
+      for (const r of body.p_rows || []) {
+        if (!r.name) { skipped++; continue; }
+        const ex = r.part_number && db.products.find(x => x.team_id === body.p_team_id && String(x.part_number || "").toLowerCase() === String(r.part_number).toLowerCase());
+        if (ex) { Object.assign(ex, { name: r.name, ...(r.sell_price ? { sell_price: Number(r.sell_price) } : {}), ...(r.cost_price ? { cost_price: Number(r.cost_price) } : {}) }); updated++; }
+        else { db.products.push({ id: uuid(), team_id: body.p_team_id, user_id: UID, part_number: r.part_number || null, name: r.name, description: r.description || null, category: r.category || null, unit: r.unit || "each", sell_price: Number(r.sell_price) || 0, cost_price: Number(r.cost_price) || 0, vat_applicable: true, supplier: r.supplier || null, supplier_code: r.supplier_code || null, barcode: null, track_stock: r.stock_on_hand !== undefined, stock_on_hand: Number(r.stock_on_hand) || 0, reorder_level: Number(r.reorder_level) || 0, active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }); added++; }
+      }
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body: { rows: (body.p_rows || []).length } });
+      return json(route, 200, { added, updated, skipped });
+    }
+    if (fn === "create_service_job_now") {
+      const plan = (db.service_plans || []).find(x => x.id === body.p_plan_id);
+      if (!plan) return json(route, 400, { code: "P0001", message: "Only the master account or an admin can do this" });
+      const id = uuid();
+      db.jobs.push({ id, user_id: plan.user_id || UID, team_id: plan.team_id, client_id: plan.client_id, service_plan_id: plan.id, quote_id: null, job_number: `SVC-${plan.next_due.replace(/-/g, "").slice(2)}`, title: plan.title, description: plan.description || "Planned service", status: "scheduled", priority: "normal", scheduled_date: plan.next_due, scheduled_time: null, location: plan.location || "", assigned_to_user_id: plan.assigned_to_user_id, assigned_to: "", technician_notes: "", work_done: "", parts_used: [], photos: [], started_at: null, completed_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sync_status: "synced" });
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, id);
+    }
     if (fn === "accept_terms") { log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "set_my_hidden_screens") { const bad = (body.p_screens || []).some(x => !/^[A-Za-z0-9]{1,40}$/.test(x)); if (bad) return json(route, 400, { code: "P0001", message: "Invalid screen name" }); const me = (db.users || []).find(u => u.id === UID); if (me) me.hidden_screens = [...new Set(body.p_screens)].sort(); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "request_team_view") { db.team_notifications.push({ id: uuid(), team_id: TEAM, from_user_id: UID, to_user_id: OWNER, record_type: "team_view_request", record_id: UID, record_title: "Whole-team view", message: "asked", read: false, accepted: false, created_at: new Date().toISOString() }); log.writes.push({ screen: screenTag, kind: "rpc", fn }); return json(route, 200, null); }
@@ -191,10 +230,17 @@ async function handle(route) {
         const v = validate(table, row);
         if (v) { log.violations.push({ screen: screenTag, table, method: m, ...v }); return json(route, 400, v); }
       }
-      if (m === "PATCH") { const { rows } = query(table, url); rows.forEach(r => { const live = db[table].find(x => x.id === r.id); Object.assign(live, body); }); log.writes.push({ screen: screenTag, kind: "update", table, n: rows.length, keys: Object.keys(body || {}) }); }
-      else for (const row of rowsIn) { const key = url.searchParams.get("on_conflict") || "id"; const i = db[table].findIndex(x => row[key] && x[key] === row[key]); if (i >= 0) db[table][i] = { ...db[table][i], ...row }; else db[table].push({ id: row.id || uuid(), ...row }); log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
+      // Like PostgREST, return the stored rows (with generated ids), and a
+      // single object when the client asked for one (.single()).
+      const stored = [];
+      if (m === "PATCH") { const { rows } = query(table, url); rows.forEach(r => { const live = db[table].find(x => x.id === r.id); Object.assign(live, body); stored.push(live); }); log.writes.push({ screen: screenTag, kind: "update", table, n: rows.length, keys: Object.keys(body || {}) }); }
+      else for (const row of rowsIn) { const key = url.searchParams.get("on_conflict") || "id"; const i = db[table].findIndex(x => row[key] && x[key] === row[key]); if (i >= 0) { db[table][i] = { ...db[table][i], ...row }; stored.push(db[table][i]); } else { const added = { id: row.id || uuid(), ...(DEFAULTS[table] || {}), ...row }; db[table].push(added); stored.push(added); } log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
       const ret = (req.headers()["prefer"] || "").includes("return=representation");
-      return json(route, m === "POST" ? 201 : 200, ret ? rowsIn : undefined);
+      if (ret && (req.headers()["accept"] || "").includes("vnd.pgrst.object")) {
+        if (stored.length !== 1) return json(route, 406, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned" });
+        return json(route, m === "POST" ? 201 : 200, stored[0]);
+      }
+      return json(route, m === "POST" ? 201 : 200, ret ? stored : undefined);
     }
     if (m === "DELETE") { const { rows } = query(table, url); db[table] = db[table].filter(r => !rows.includes(r) && !rows.some(x => x.id === r.id)); log.writes.push({ screen: screenTag, kind: "delete", table, n: rows.length }); return json(route, 204); }
   }

@@ -5,6 +5,7 @@ import { withTeamId } from "./teamId";
 import { genId } from "./helpers";
 import { calculateVat } from "./finance";
 import { readCachedProfile } from "./companyProfile";
+import { partsToLines } from "./products";
 
 const onlineNow = value =>
   value !== undefined ? value : typeof navigator !== "undefined" ? navigator.onLine : true;
@@ -112,6 +113,15 @@ export async function createInvoiceFromJob(
     if (quote?.vat_inclusive !== undefined) quoteVatInclusive = quote.vat_inclusive !== false;
   }
   const vatRegistered = readCachedProfile(teamId || job.team_id).vat_registered !== false;
+  // No quote to bill from: bill the priced catalogue parts used on the job and
+  // its billable timesheet hours (invoice lines are kept excluding VAT).
+  const partLines = total
+    ? []
+    : [...partsToLines(job.parts_used, { vatInclusive: false }), ...(job._labourLines || [])];
+  if (partLines.length) {
+    total = partLines.reduce((s, l) => s + l.qty * l.unitPrice, 0);
+    quoteVatInclusive = false;
+  }
   const money = calculateVat(total, quoteVatInclusive, vatRegistered);
   const item = withTeamId(
     {
@@ -129,7 +139,7 @@ export async function createInvoiceFromJob(
       total: money.total,
       amount_paid: 0,
       balance_due: money.total,
-      line_items: [],
+      line_items: partLines,
       notes: job.work_done || "",
       created_at: new Date().toISOString(),
       sync_status: "pending",

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { MODULES, unavailableScreens } from "../src/lib/modules.js";
+import { MODULES, offeredModules, unavailableScreens } from "../src/lib/modules.js";
 
 const files = dir =>
   fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
@@ -37,4 +37,10 @@ test("modules map to real screens and switch them off", () => {
 test("the database only accepts known modules", () => {
   const sql = fs.readFileSync("supabase/migrations/20260926120000_team_profiles_modules.sql", "utf8");
   for (const m of MODULES) assert.ok(sql.includes(`'${m.key}'`), m.key);
+});
+
+test("Jack Selector is only offered to a company that already has it", () => {
+  assert.ok(offeredModules([]).some(m => m.key === "jack_selector"));
+  assert.ok(!offeredModules(["jack_selector"]).some(m => m.key === "jack_selector"));
+  assert.equal(offeredModules(["jack_selector"]).length, MODULES.length - 1);
 });

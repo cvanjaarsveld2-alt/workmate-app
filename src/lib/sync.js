@@ -25,6 +25,7 @@ const SYNC_TABLES = [
   "invoices",
   "payments",
   "email_quotes",
+  "time_entries",
 ];
 const TEAM_TABLES = new Set([
   "clients",
@@ -42,6 +43,7 @@ const TEAM_TABLES = new Set([
   "jobs",
   "invoices",
   "payments",
+  "time_entries",
 ]);
 const LOCAL_STORE = {
   breakdown_reports: "breakdowns",
@@ -129,6 +131,7 @@ const DEPENDENCIES = {
     { field: "client_id", pending: "sync_pending_client_id", table: "clients" },
   ],
   payments: [{ field: "invoice_id", pending: "sync_pending_invoice_id", table: "invoices" }],
+  time_entries: [{ field: "job_id", pending: "sync_pending_job_id", table: "jobs" }],
 };
 const SYNC_PRIORITY = {
   clients: 10,
@@ -148,6 +151,7 @@ const SYNC_PRIORITY = {
   email_quotes: 35,
   followups: 40,
   jobs: 50,
+  time_entries: 55,
   invoices: 60,
   payments: 70,
 };

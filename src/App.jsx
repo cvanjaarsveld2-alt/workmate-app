@@ -117,6 +117,12 @@ const InvoicesScreen = lazy(() =>
   import("./screens/InvoicesScreen").then(m => ({ default: m.InvoicesScreen })),
 );
 const AuditLogScreen = lazy(() => import("./screens/AuditLogScreen").then(m => ({ default: m.AuditLogScreen })));
+const ProductsScreen = lazy(() => import("./screens/ProductsScreen").then(m => ({ default: m.ProductsScreen })));
+const TimesheetsScreen = lazy(() => import("./screens/TimesheetsScreen").then(m => ({ default: m.TimesheetsScreen })));
+const ServicePlansScreen = lazy(() =>
+  import("./screens/ServicePlansScreen").then(m => ({ default: m.ServicePlansScreen })),
+);
+const ScheduleScreen = lazy(() => import("./screens/ScheduleScreen").then(m => ({ default: m.ScheduleScreen })));
 const HelpScreen = lazy(() => import("./screens/HelpScreen").then(m => ({ default: m.HelpScreen })));
 const PlatformAdminScreen = lazy(() =>
   import("./screens/PlatformAdminScreen").then(m => ({ default: m.PlatformAdminScreen })),
@@ -160,6 +166,10 @@ const SCREEN_TITLES = {
   Help: "Help & support",
   Platform: "Platform",
   AuditLog: "Activity log",
+  Products: "Products & stock",
+  Timesheets: "Timesheets",
+  ServicePlans: "Service plans",
+  Schedule: "Schedule",
 };
 const INITIAL_DATA = {
   clients: [],
@@ -256,6 +266,10 @@ export default function PowerWorksApp() {
         "Help",
         "Platform",
         "AuditLog",
+        "Products",
+        "Timesheets",
+        "ServicePlans",
+        "Schedule",
         "Client360",
         "Calendar",
         "TeamDashboard",
@@ -1112,6 +1126,41 @@ export default function PowerWorksApp() {
       />
     ),
     CompanyProfile: <CompanyProfileScreen teamId={teamId} isOwner={!!teamAccess?.is_owner} />,
+    Schedule: (
+      <ScheduleScreen
+        userId={session.user.id}
+        teamId={teamId}
+        setData={setData}
+        clients={data.clients}
+        teamMembers={teamMembers}
+        canManage={!!teamAccess?.is_owner || userRole === "admin"}
+      />
+    ),
+    ServicePlans: (
+      <ServicePlansScreen
+        teamId={teamId}
+        canManage={!!teamAccess?.is_owner || userRole === "admin"}
+        clients={data.clients}
+        equipment={data.equipment}
+        teamMembers={teamMembers}
+      />
+    ),
+    Timesheets: (
+      <TimesheetsScreen
+        userId={session.user.id}
+        teamId={teamId}
+        setData={setData}
+        teamMembers={teamMembers}
+        isManager={!!teamAccess?.is_owner || userRole === "admin"}
+      />
+    ),
+    Products: (
+      <ProductsScreen
+        teamId={teamId}
+        canManage={!!teamAccess?.is_owner || userRole === "admin"}
+        vatRegistered={companyProfile.vat_registered !== false}
+      />
+    ),
     Help: (
       <HelpScreen userId={session.user.id} userEmail={session.user.email} teamId={teamId} fromScreen={screenContext?.from} />
     ),

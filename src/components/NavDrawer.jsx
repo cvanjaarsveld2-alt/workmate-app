@@ -11,6 +11,10 @@ import {
   Wrench,
   File as FileIcon,
   Receipt,
+  Package,
+  Timer,
+  CalendarClock,
+  CalendarDays,
   Mic,
   Settings,
   LogOut,
@@ -54,6 +58,9 @@ const SECTIONS = [
       { key: "Equipment", label: "Equipment", icon: Wrench },
       { key: "Meeting", label: "Meeting Recorder", icon: Mic },
       { key: "Jobs", label: "Jobs", icon: CheckCircle2 },
+      { key: "Schedule", label: "Schedule", icon: CalendarDays },
+      { key: "Timesheets", label: "Timesheets", icon: Timer },
+      { key: "ServicePlans", label: "Service plans", icon: CalendarClock },
     ],
   },
   {
@@ -62,6 +69,7 @@ const SECTIONS = [
       { key: "Quotes", label: "Quotes", icon: FileIcon, badgeKey: "pendingQ" },
       { key: "Expenses", label: "Expenses", icon: Receipt, badgeKey: "unsubmittedExp" },
       { key: "Invoices", label: "Invoices", icon: Receipt },
+      { key: "Products", label: "Products & stock", icon: Package },
     ],
   },
   {
