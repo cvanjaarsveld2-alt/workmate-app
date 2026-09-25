@@ -418,6 +418,23 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       `job card=${alone}; attach option shown=${hasBox}; invoice ${s1}B → with job card ${s2}B`);
   });
 
+  // 13g. Help: send a message to support; the platform console lists companies.
+  await safe("support: send a message from Help", async () => {
+    await go("Help", 2500);
+    await page.locator('label:text-is("Subject") + input').fill("Invoice PDF question");
+    await page.locator('label:text-is("Message") + textarea').fill("How do I change the invoice prefix?");
+    await page.getByRole("button", { name: /Send/ }).first().click(); await page.waitForTimeout(1500);
+    const row = (H.db.support_tickets || []).find(t => t.subject === "Invoice PDF question");
+    const shown = (await page.getByText("Sent. We'll reply here.").count()) > 0;
+    let consoleOk = true;
+    if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") {
+      await go("Platform", 2500);
+      consoleOk = (await page.getByText("cvanjaarsveld2@icloud.com").count()) > 0;
+    }
+    rec("support: send a message from Help", row && row.user_id === H.UID && row.status === "open" && shown && consoleOk ? "PASS" : "FAIL",
+      `ticket saved=${!!row} (status ${row?.status}); confirmation=${shown}; platform console lists companies=${consoleOk}`);
+  });
+
   // 14. Master account removes a teammate and hands their work over (runs last: it changes the team).
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("team: remove teammate hands over work", async () => {
     const GREG = "f16f3dd1-c87c-4066-8a38-750d7bc31d65";

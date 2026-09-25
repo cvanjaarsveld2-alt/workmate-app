@@ -10,7 +10,7 @@ const ROOT = path.join(__dirname, "..", "..");
 const OUT = path.join(__dirname, "out");
 const DIST = path.join(OUT, "dist");
 const PORT = process.env.SIM_PORT || "4179";
-const SCREENS = "Home,Clients,Contacts,Followups,Notes,Equipment,Quotes,Expenses,More,Planner,ColdCall,JackSelector,Meeting,Breakdown,Repair,Diagnostics,BackfillZAR,Analytics,Leads,Team,VehicleCheck,Notifications,SharedInbox,Jobs,Invoices,CompanyProfile,Client360,Calendar,TeamDashboard";
+const SCREENS = "Home,Clients,Contacts,Followups,Notes,Equipment,Quotes,Expenses,More,Planner,ColdCall,JackSelector,Meeting,Breakdown,Repair,Diagnostics,BackfillZAR,Analytics,Leads,Team,VehicleCheck,Notifications,SharedInbox,Jobs,Invoices,CompanyProfile,Help,Platform,Client360,Calendar,TeamDashboard";
 const ACCOUNTS = [
   { name: "master", uid: "431dcb72-ea3f-43ed-9f73-74384e862300", email: "cvanjaarsveld2@icloud.com", screens: SCREENS },
   { name: "field", uid: "dc4e613a-ef56-472a-b700-66365f67f258", email: "christo@pwrstart.com", screens: "Home" },

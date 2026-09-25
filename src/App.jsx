@@ -56,6 +56,8 @@ import { readHiddenScreens, saveHiddenScreens, syncHiddenScreens } from "./lib/m
 import { setActiveTeamId, loadCompanyProfile, useCompanyProfile } from "./lib/companyProfile";
 import { unavailableScreens } from "./lib/modules";
 import { assuranceLevel, TwoStepChallenge, TwoStepRequired } from "./auth/TwoStep";
+import { useTeamPlan } from "./lib/plan";
+import { PlanBanner, SuspendedScreen } from "./components/PlanBanner";
 import { setMyName } from "./lib/me";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 import { HomeScreen } from "./screens/HomeScreen";
@@ -114,6 +116,10 @@ const JobsScreen = lazy(() => import("./screens/JobsScreen").then(m => ({ defaul
 const InvoicesScreen = lazy(() =>
   import("./screens/InvoicesScreen").then(m => ({ default: m.InvoicesScreen })),
 );
+const HelpScreen = lazy(() => import("./screens/HelpScreen").then(m => ({ default: m.HelpScreen })));
+const PlatformAdminScreen = lazy(() =>
+  import("./screens/PlatformAdminScreen").then(m => ({ default: m.PlatformAdminScreen })),
+);
 const CompanySetup = lazy(() => import("./screens/CompanySetup").then(m => ({ default: m.CompanySetup })));
 const CompanyProfileScreen = lazy(() =>
   import("./screens/CompanyProfileScreen").then(m => ({ default: m.CompanyProfileScreen })),
@@ -150,6 +156,8 @@ const SCREEN_TITLES = {
   TeamDashboard: "Team Dashboard",
   Planner: "Weekly Planner",
   CompanyProfile: "Company Details",
+  Help: "Help & support",
+  Platform: "Platform",
 };
 const INITIAL_DATA = {
   clients: [],
@@ -243,6 +251,8 @@ export default function PowerWorksApp() {
         "Jobs",
         "Invoices",
         "CompanyProfile",
+        "Help",
+        "Platform",
         "Client360",
         "Calendar",
         "TeamDashboard",
@@ -721,6 +731,17 @@ export default function PowerWorksApp() {
   useEffect(() => {
     if (session?.user?.id) recheckTwoStep();
   }, [session?.user?.id, recheckTwoStep]);
+  // The company's plan (trial / read-only / suspended) and whether this person
+  // runs the product itself (platform console).
+  const teamPlan = useTeamPlan(teamId, isOnline);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  useEffect(() => {
+    if (!session?.user?.id || !isOnline) return;
+    supabase.rpc("is_platform_admin").then(
+      ({ data }) => setIsPlatformAdmin(data === true),
+      () => {},
+    );
+  }, [session?.user?.id, isOnline]);
   // Modules the company switched off: their screens leave the menu and can't open.
   const companyProfile = useCompanyProfile(teamId);
   const offScreens = unavailableScreens(companyProfile.disabled_modules);
@@ -891,6 +912,8 @@ export default function PowerWorksApp() {
     return <TwoStepChallenge onDone={recheckTwoStep} onSignOut={logout} />;
   if (isOnline && userRole === "admin" && companyProfile.require_admin_mfa && twoStep.next !== "aal2")
     return <TwoStepRequired onDone={recheckTwoStep} onSignOut={logout} />;
+  if (teamPlan?.access === "suspended" && screen !== "Help")
+    return <SuspendedScreen onHelp={() => navigate("Help")} onSignOut={logout} />;
   // Signed in but not in a company yet: join one, or set up a new company.
   if (teamChecked && !teamId && isOnline)
     return (
@@ -1086,6 +1109,10 @@ export default function PowerWorksApp() {
       />
     ),
     CompanyProfile: <CompanyProfileScreen teamId={teamId} isOwner={!!teamAccess?.is_owner} />,
+    Help: (
+      <HelpScreen userId={session.user.id} userEmail={session.user.email} teamId={teamId} fromScreen={screenContext?.from} />
+    ),
+    Platform: isPlatformAdmin ? <PlatformAdminScreen /> : null,
     More: (
       <MoreScreen
         data={data}
@@ -1102,6 +1129,7 @@ export default function PowerWorksApp() {
         notifPermission={notifPermission}
         onRequestNotif={() => {}}
         setScreen={navigate}
+        isPlatformAdmin={isPlatformAdmin}
       />
     ),
     Diagnostics: (
@@ -1257,6 +1285,7 @@ export default function PowerWorksApp() {
               teamId={teamId}
               setData={setData}
             />
+            <PlanBanner plan={teamPlan} isAdmin={userRole === "admin"} onHelp={() => navigate("Help", { from: screen })} />
             <main className="mx-auto max-w-2xl px-4 pt-4">
               <PullToRefresh
                 onRefresh={async () => {
