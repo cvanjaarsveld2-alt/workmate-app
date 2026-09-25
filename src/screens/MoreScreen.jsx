@@ -3,7 +3,7 @@ import { TwoStepSettings } from "../auth/TwoStep";
 import { PRODUCT_NAME, PRODUCT_VERSION } from "../lib/brand";
 import { companyLegalName } from "../lib/companyProfile";
 import React, { useState, useEffect } from "react";
-import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users, Sun, Moon, Smartphone, Mail, Building2, LifeBuoy, LayoutGrid } from "lucide-react";
+import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users, Sun, Moon, Smartphone, Mail, Building2, LifeBuoy, LayoutGrid, History } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY, PIN_DISABLED_KEY, scopedPinKey } from "../lib/constants";
 import { Card, Btn, Toast, PageHeader, useConfirm } from "../components/ui";
 import { getStoredTheme, applyTheme } from "../lib/theme";
@@ -13,7 +13,7 @@ import { CompanyDocuments } from "../components/CompanyDocuments";
 import { subscribeToPush, pushSupported, iosNeedsInstall } from "../lib/pushManager";
 import { supabase } from "../supabase";
 
-export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen, userId, teamId, isPlatformAdmin = false }) {
+export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, isOnline, notifPermission, onRequestNotif, setScreen, userId, teamId, isPlatformAdmin = false, isCompanyAdmin = false }) {
   const { confirm, dialog } = useConfirm();
   const pendingCount = (data.syncQueue || []).filter(i => i.status === "pending").length;
   const failedCount = (data.syncQueue || []).filter(i => i.status === "failed").length;
@@ -549,6 +549,19 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           </div>
           <ChevronRight size={16} className="text-slate-300" />
         </button>
+        {isCompanyAdmin && (
+          <button onClick={() => setScreen("AuditLog")}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px] border-t border-slate-100">
+            <div className="flex items-center gap-3">
+              <History size={18} className="text-slate-400" />
+              <div>
+                <p className="text-base font-bold text-slate-800">Activity log</p>
+                <p className="text-xs text-slate-400">Who added, changed or deleted what</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-slate-300" />
+          </button>
+        )}
         {isPlatformAdmin && (
           <button onClick={() => setScreen("Platform")}
             className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px] border-t border-slate-100">

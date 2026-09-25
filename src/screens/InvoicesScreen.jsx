@@ -8,6 +8,7 @@ import { useCompanyProfile } from "../lib/companyProfile";
 import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
 import { invoiceToDocument, isTemporaryInvoiceNumber, jobToCard, jobsForInvoice } from "../lib/documentData";
 import { resolveDocumentPhotos } from "../lib/documentPhotos";
+import { FORMATS, accountingCsv } from "../lib/accountingExport";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 const money = v =>
   `R ${Number(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -44,6 +45,22 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
   const profile = useCompanyProfile(teamId);
   const [making, setMaking] = useState(null);
   const [notice, setNotice] = useState("");
+  // Export for accounting packages (Xero / Sage / QuickBooks), by month.
+  const [exportMonth, setExportMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  function exportAccounting(format) {
+    const list = invoices.filter(i => String(i.issue_date || "").startsWith(exportMonth) && i.status !== "cancelled");
+    if (!list.length) return setNotice(`No invoices in ${exportMonth}.`);
+    const csv = accountingCsv(format, list, { clients, quotes, profile });
+    const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Invoices_${exportMonth}_${FORMATS[format].label}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    setNotice(`${list.length} invoice${list.length === 1 ? "" : "s"} exported for ${FORMATS[format].label}.`);
+  }
   // Jobs, to attach their job cards to an invoice or pro forma.
   const [jobs, setJobs] = useState([]);
   const [attach, setAttach] = useState({});
@@ -222,6 +239,28 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
           <p className="text-lg font-black">{money(received)}</p>
         </Card>
       </div>
+      <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+        <summary className="text-sm font-bold text-slate-600 cursor-pointer min-h-[40px] flex items-center">Export for accounting</summary>
+        <div className="stack-y-2 pb-2">
+          <label className="block text-xs font-bold text-slate-500">
+            Month
+            <input
+              type="month"
+              value={exportMonth}
+              onChange={e => setExportMonth(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
+            />
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries(FORMATS).map(([key, f]) => (
+              <Btn key={key} size="sm" variant="secondary" onClick={() => exportAccounting(key)}>
+                {f.label}
+              </Btn>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500">A CSV file for that package's invoice import. Amounts exclude VAT; the VAT type is set per line.</p>
+        </div>
+      </details>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />

@@ -116,6 +116,7 @@ const JobsScreen = lazy(() => import("./screens/JobsScreen").then(m => ({ defaul
 const InvoicesScreen = lazy(() =>
   import("./screens/InvoicesScreen").then(m => ({ default: m.InvoicesScreen })),
 );
+const AuditLogScreen = lazy(() => import("./screens/AuditLogScreen").then(m => ({ default: m.AuditLogScreen })));
 const HelpScreen = lazy(() => import("./screens/HelpScreen").then(m => ({ default: m.HelpScreen })));
 const PlatformAdminScreen = lazy(() =>
   import("./screens/PlatformAdminScreen").then(m => ({ default: m.PlatformAdminScreen })),
@@ -158,6 +159,7 @@ const SCREEN_TITLES = {
   CompanyProfile: "Company Details",
   Help: "Help & support",
   Platform: "Platform",
+  AuditLog: "Activity log",
 };
 const INITIAL_DATA = {
   clients: [],
@@ -253,6 +255,7 @@ export default function PowerWorksApp() {
         "CompanyProfile",
         "Help",
         "Platform",
+        "AuditLog",
         "Client360",
         "Calendar",
         "TeamDashboard",
@@ -1113,6 +1116,7 @@ export default function PowerWorksApp() {
       <HelpScreen userId={session.user.id} userEmail={session.user.email} teamId={teamId} fromScreen={screenContext?.from} />
     ),
     Platform: isPlatformAdmin ? <PlatformAdminScreen /> : null,
+    AuditLog: <AuditLogScreen teamId={teamId} teamMembers={teamMembers} />,
     More: (
       <MoreScreen
         data={data}
@@ -1130,6 +1134,7 @@ export default function PowerWorksApp() {
         onRequestNotif={() => {}}
         setScreen={navigate}
         isPlatformAdmin={isPlatformAdmin}
+        isCompanyAdmin={userRole === "admin"}
       />
     ),
     Diagnostics: (
