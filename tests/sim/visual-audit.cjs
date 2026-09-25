@@ -16,11 +16,30 @@ const themes = (process.env.SIM_THEMES || "light,dark").split(",");
 
 // Runs in the page. Returns issues for everything currently rendered.
 function auditPage() {
+  // Any CSS colour (rgb, oklch, lab, color-mix results...) → RGBA, by
+  // painting it onto a 1px canvas. Tailwind 4 reports oklch(), which a plain
+  // rgb() parser would silently skip.
+  const pixel = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+  const colourCache = new Map();
   const parse = c => {
-    const m = String(c).match(/rgba?\(([^)]+)\)/);
-    if (!m) return null;
-    const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
-    return { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+    const key = String(c);
+    if (!key || key === "none") return null;
+    if (colourCache.has(key)) return colourCache.get(key);
+    let out = null;
+    const m = key.match(/^rgba?\(([^)]+)\)$/);
+    if (m) {
+      const p = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+      out = { r: p[0], g: p[1], b: p[2], a: p.length > 3 ? p[3] : 1 };
+    } else {
+      pixel.clearRect(0, 0, 1, 1);
+      pixel.fillStyle = "rgba(0,0,0,0)";
+      pixel.fillStyle = key;
+      pixel.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = pixel.getImageData(0, 0, 1, 1).data;
+      out = { r, g, b, a: a / 255 };
+    }
+    colourCache.set(key, out);
+    return out;
   };
   const over = (top, bottom) => ({
     r: top.r * top.a + bottom.r * (1 - top.a),
