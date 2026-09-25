@@ -498,11 +498,10 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
   // 13f5. Schedule: book a job for a time and a technician.
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("schedule: book a job for a technician", async () => {
     const job = H.db.jobs.find(j => j.title === "Sim quarterly service") || H.db.jobs.find(j => !["completed", "cancelled"].includes(j.status));
+    // A job still waiting for a date (the dispatcher's usual starting point).
+    Object.assign(job, { scheduled_date: null, scheduled_time: null, assigned_to_user_id: null });
     await page.goto(`${H.APP}/?screen=Schedule`, { waitUntil: "load" }); await page.waitForTimeout(3000);
-    if (job.scheduled_date) {
-      await page.getByRole("button", { name: "Week" }).click(); await page.waitForTimeout(300);
-      await page.getByRole("button", { name: "Day" }).click();
-    }
+    const waiting = (await page.getByText(/Waiting for a date \([1-9]/).count()) > 0;
     const chip = page.getByRole("button", { name: new RegExp(job.title) }).first();
     const shown = (await chip.count()) > 0;
     if (!shown) { await shot("schedule"); rec("schedule: book a job for a technician", "FAIL", `job "${job.title}" (${job.scheduled_date}) not on the board`); return; }
@@ -515,8 +514,26 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     const after = H.db.jobs.find(j => j.id === job.id);
     await page.getByRole("button", { name: "Week" }).click(); await page.waitForTimeout(500);
     await shot("schedule-week");
-    rec("schedule: book a job for a technician", after.scheduled_date === "2026-10-06" && String(after.scheduled_time).startsWith("09:30") && after.assigned_to_user_id === tech.user_id ? "PASS" : "FAIL",
-      `date=${after.scheduled_date}; time=${after.scheduled_time}; technician ok=${after.assigned_to_user_id === tech.user_id}; schema errors=${JSON.stringify(log.violations.slice(-3))}`);
+    rec("schedule: book a job for a technician", waiting && after.scheduled_date === "2026-10-06" && String(after.scheduled_time).startsWith("09:30") && after.assigned_to_user_id === tech.user_id ? "PASS" : "FAIL",
+      `listed as waiting=${waiting}; date=${after.scheduled_date}; time=${after.scheduled_time}; technician ok=${after.assigned_to_user_id === tech.user_id}; schema errors=${JSON.stringify(log.violations.slice(-3))}`);
+  });
+
+  // 13f6. Customer portal: a client's own page with invoices and a statement.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("portal: customer opens their account page", async () => {
+    const inv = H.db.invoices.find(i => i.client_id && i.status !== "draft") || H.db.invoices.find(i => i.client_id);
+    const client = H.db.clients.find(c => c.id === inv?.client_id) || H.db.clients[0];
+    H.db._portal = { ["cd".repeat(24)]: client.id };
+    await page.goto(`${H.APP}/?portal=${"cd".repeat(24)}`, { waitUntil: "load" }); await page.waitForTimeout(2500);
+    const header = (await page.getByText("YOUR ACCOUNT").count()) > 0;
+    const name = (await page.getByText(client.company).count()) > 0;
+    const invShown = inv ? (await page.getByText(inv.invoice_number).count()) > 0 : true;
+    await page.getByRole("button", { name: "Statement" }).click(); await page.waitForTimeout(400);
+    const statement = inv ? (await page.getByText(`Invoice ${inv.invoice_number}`).count()) > 0 : true;
+    await shot("customer-portal");
+    await page.goto(`${H.APP}/?portal=${"ef".repeat(24)}`, { waitUntil: "load" }); await page.waitForTimeout(1500);
+    const bad = (await page.getByText("This link isn't working any more").count()) > 0;
+    rec("portal: customer opens their account page", header && name && invShown && statement && bad ? "PASS" : "FAIL",
+      `header=${header}; client=${name}; invoice listed=${invShown}; statement=${statement}; unknown link refused=${bad}`);
   });
 
   // 13g. Help: send a message to support; the platform console lists companies.

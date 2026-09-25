@@ -3,3 +3,16 @@ verify_jwt = false
 
 [functions.send-reminders]
 verify_jwt = false
+
+[functions.payfast]
+# Called by customers (portal) and by PayFast; checks are inside (portal token,
+# PayFast signature and server confirmation).
+verify_jwt = false
+
+[functions.customer-reminders]
+# Called by pg_cron with x-cron-secret.
+verify_jwt = false
+
+[functions.xero]
+# Xero sign-in callback, "Sync now" (caller checked) and the nightly cron.
+verify_jwt = false

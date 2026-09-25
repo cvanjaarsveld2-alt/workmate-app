@@ -3,7 +3,9 @@ import { offlineGetAll, offlineSave } from "../offline/offlineDb";
 import { saveAndSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { Card, Btn, PageHeader } from "../components/ui";
-import { CreditCard, RefreshCw, Search, CheckCircle2, WifiOff, FileText, FileClock } from "lucide-react";
+import { Bell, CreditCard, RefreshCw, Search, CheckCircle2, WifiOff, FileText, FileClock } from "lucide-react";
+import { daysOverdue, isOverdue, reminderMessage } from "../lib/reminders";
+import { formatPhone } from "../components/WhatsAppButton";
 import { useCompanyProfile } from "../lib/companyProfile";
 import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
 import { invoiceToDocument, isTemporaryInvoiceNumber, jobToCard, jobsForInvoice } from "../lib/documentData";
@@ -72,6 +74,36 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
   }, [invoices.length]);
   // Build and share an invoice or pro forma PDF. Online, the invoice is read
   // back first so it carries the number the server assigned.
+  // A polite reminder with the customer's portal link: WhatsApp if we have
+  // their number, else email, else the share sheet.
+  async function remind(inv) {
+    const client = clients.find(c => c.id === inv.client_id) || {};
+    setMaking(`remind:${inv.id}`);
+    setNotice("");
+    const { data: token } = await supabase.rpc("client_portal_link", { p_client_id: inv.client_id, p_new: false });
+    setMaking(null);
+    const url = token ? `${window.location.origin}/?portal=${token}` : "";
+    const text = reminderMessage({
+      contact: client.contact,
+      company: profile.trading_name || profile.legal_name,
+      invoice: inv,
+      url,
+    });
+    const phone = formatPhone(client.phone || "");
+    if (phone) return window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+    if (client.email)
+      return window.open(
+        `mailto:${client.email}?subject=${encodeURIComponent(`Reminder: invoice ${inv.invoice_number}`)}&body=${encodeURIComponent(text)}`,
+      );
+    try {
+      if (navigator.share) return await navigator.share({ text });
+      await navigator.clipboard.writeText(text);
+      setNotice("Reminder copied. Paste it to the customer.");
+    } catch {
+      // Share sheet closed.
+    }
+  }
+
   async function sharePdf(inv, kind) {
     setMaking(inv.id + kind);
     setNotice("");
@@ -322,6 +354,12 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
                   />
                   Attach job card
                 </label>
+              )}
+              {isOverdue(inv) && inv.client_id && (
+                <Btn size="sm" variant="warning" onClick={() => remind(inv)} disabled={making === `remind:${inv.id}` || !online}>
+                  <Bell size={13} />
+                  {making === `remind:${inv.id}` ? "Preparing…" : `Remind customer · ${daysOverdue(inv)} days overdue`}
+                </Btn>
               )}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Btn size="sm" variant="secondary" onClick={() => sharePdf(inv, "invoice")} disabled={!!making}>

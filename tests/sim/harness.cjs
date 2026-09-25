@@ -204,6 +204,32 @@ async function handle(route) {
       log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
       return json(route, 200, id);
     }
+    if (fn === "client_portal_link") {
+      const c = db.clients.find(x => x.id === body.p_client_id);
+      if (!c) return json(route, 400, { code: "P0001", message: "Client not found" });
+      db._portal = db._portal || {};
+      const token = "cd".repeat(24);
+      db._portal[token] = c.id;
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, token);
+    }
+    if (fn === "get_client_portal") {
+      const cid = (db._portal || {})[body.p_token];
+      const c = cid && db.clients.find(x => x.id === cid);
+      if (!c) return json(route, 200, null);
+      const p = (db.team_profiles || []).find(x => x.team_id === TEAM) || {};
+      const invs = db.invoices.filter(i => i.client_id === c.id && i.status !== "draft");
+      return json(route, 200, {
+        client: { name: c.company, contact: c.contact, email: c.email, phone: c.phone, vat_no: c.vat_number || null, address: c.billing_address || null },
+        company: { trading_name: p.trading_name || "Sim Co", legal_name: p.legal_name, vat_registered: p.vat_registered !== false, brand_color: p.brand_color, bank_name: "Sim Bank", bank_account_no: "123456789", bank_branch_code: "250655", payment_terms_days: 30 },
+        quotes: db.quotes.filter(q => q.client_id === c.id).map(q => ({ id: q.id, number: q.quote_number || q.id.slice(0, 8), title: q.description, value: q.value, status: q.status, date: (q.created_at || "").slice(0, 10), expiry_date: q.expiry_date, accepted_at: q.accepted_at || null, can_accept: !q.accepted_at })),
+        invoices: invs.map(i => ({ id: i.id, invoice_number: i.invoice_number, status: i.status, issue_date: i.issue_date, due_date: i.due_date, subtotal: i.subtotal, vat: i.vat, total: i.total, amount_paid: i.amount_paid, balance_due: i.balance_due, line_items: i.line_items, notes: i.notes })),
+        payments: db.payments.filter(x => invs.some(i => i.id === x.invoice_id)).map(x => ({ invoice_number: invs.find(i => i.id === x.invoice_id).invoice_number, amount: x.amount, payment_date: x.payment_date, method: x.method, reference: x.reference })),
+        jobs: db.jobs.filter(j => j.client_id === c.id).map(j => ({ job_number: j.job_number, title: j.title, status: j.status, scheduled_date: j.scheduled_date, completed_at: j.completed_at, location: j.location, work_done: j.work_done })),
+        equipment: db.equipment.filter(e => e.client_id === c.id).map(e => ({ name: e.name, make: e.make, model: e.model, serial: e.serial, location: e.location, service_due: e.service_due })),
+        service_plans: [],
+      });
+    }
     if (fn === "accept_terms") { log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "set_my_hidden_screens") { const bad = (body.p_screens || []).some(x => !/^[A-Za-z0-9]{1,40}$/.test(x)); if (bad) return json(route, 400, { code: "P0001", message: "Invalid screen name" }); const me = (db.users || []).find(u => u.id === UID); if (me) me.hidden_screens = [...new Set(body.p_screens)].sort(); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "request_team_view") { db.team_notifications.push({ id: uuid(), team_id: TEAM, from_user_id: UID, to_user_id: OWNER, record_type: "team_view_request", record_id: UID, record_title: "Whole-team view", message: "asked", read: false, accepted: false, created_at: new Date().toISOString() }); log.writes.push({ screen: screenTag, kind: "rpc", fn }); return json(route, 200, null); }

@@ -96,6 +96,8 @@ const REMOTE_EXCLUDED_FIELDS = {
     "sync_pending_invoice_id",
   ]),
   followups: new Set(["invoice_id", "job_id"]),
+  // Set only by the Xero sync on the server.
+  invoices: new Set(["xero_invoice_id", "xero_synced_at"]),
   expenses: new Set([
     "assigned_to_user_id",
     "contact_id",

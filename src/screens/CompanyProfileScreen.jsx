@@ -10,6 +10,8 @@ import { offeredModules } from "../lib/modules";
 import { supabase } from "../supabase";
 import { buildCompanyZip } from "../lib/companyExport";
 import { useTeamPlan } from "../lib/plan";
+import { OnlinePayments } from "../components/OnlinePayments";
+import { XeroConnection } from "../components/XeroConnection";
 import { addDays, buildDocumentPDF, documentFilename, shareDocumentPDF } from "../lib/documentPDF";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -320,6 +322,9 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
         <Field label="SWIFT code (optional)" value={form.bank_swift} onChange={set("bank_swift")} maxLength={15} />
       </Section>
 
+      <OnlinePayments teamId={teamId} />
+      <XeroConnection teamId={teamId} isOwner />
+
       <Section title="Documents">
         <div className="grid grid-cols-2 gap-3">
           <Field
@@ -383,6 +388,27 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
             className="h-6 w-6 shrink-0"
           />
         </label>
+      </Section>
+
+      <Section title="Reminders" hint="Sent once a day, so nothing slips through.">
+        {[
+          ["auto_reminders", "Remind my team", "Overdue invoices, quotes with no answer after 3 days, services coming up and low stock."],
+          ["email_customer_reminders", "Email customers about overdue invoices", "A polite reminder with their account link at 1, 7, 14 and 30 days overdue. Needs the customer's email on the client."],
+        ].map(([k, label, hint]) => (
+          <label key={k} className="flex items-center gap-3 min-h-[52px] cursor-pointer">
+            <span className="flex-1">
+              <span className="block text-sm font-bold text-slate-800">{label}</span>
+              <span className="block text-xs text-slate-500">{hint}</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={k === "auto_reminders" ? form[k] !== false : !!form[k]}
+              onChange={e => set(k)(e.target.checked)}
+              aria-label={label}
+              className="h-6 w-6 shrink-0"
+            />
+          </label>
+        ))}
       </Section>
 
       <Section title="Modules" hint="Switch off what your company doesn't use. It disappears for everyone in your company.">

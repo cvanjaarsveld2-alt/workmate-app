@@ -41,6 +41,10 @@ export const DEFAULT_PROFILE = {
   // hour of a technician's time costs it (for job costing).
   labour_rate: 0,
   labour_cost: 0,
+  // Daily reminders to the team (overdue invoices, quotes with no answer,
+  // services due, low stock), and overdue-invoice emails to customers.
+  auto_reminders: true,
+  email_customer_reminders: false,
 };
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
@@ -117,8 +121,10 @@ export function cleanProfile(input) {
       out[k] = Array.isArray(v) ? [...new Set(v.map(String))] : [];
     } else if (k === "vat_registered") {
       out[k] = v !== false;
-    } else if (k === "require_admin_mfa") {
+    } else if (k === "require_admin_mfa" || k === "email_customer_reminders") {
       out[k] = v === true;
+    } else if (k === "auto_reminders") {
+      out[k] = v !== false;
     } else if (k === "logo_data") {
       out[k] = v || null;
     } else {

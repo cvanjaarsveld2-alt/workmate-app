@@ -54,7 +54,19 @@ give to a prospect.
 - **Support**: messages from *Help & support* arrive in the Support tab. Reply
   there; the person sees your answer in the app.
 
-## 3. Checks after any database change
+## 3. Features that need a setting from you
+
+| Feature | What to do | Where |
+|---|---|---|
+| **Customers pay invoices online** (PayFast) | Nothing for you. Each company connects its own PayFast account: Company Details → Online payments (merchant ID, key, passphrase; start in test mode). PayFast notifies `…/functions/v1/payfast`, which checks the payment with PayFast and marks the invoice paid. | In the app, per company |
+| **Overdue-invoice emails to customers** | Create a Resend account, verify your sending domain, then add three secrets: `RESEND_API_KEY`, `REMINDER_FROM_EMAIL` (e.g. `accounts@yourproduct.co.za`) and `APP_URL` (e.g. `https://app.yourproduct.co.za`). Until then the daily run skips emails; everything else works. Companies switch it on under Company Details → Reminders. | Supabase → Edge Functions → Secrets |
+| **Xero** (invoices sent to each company's Xero automatically) | Create an app at developer.xero.com (Web app). Redirect URI: `https://hrqzqyfvbfzrfnuxovvr.supabase.co/functions/v1/xero`. Add secrets `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET` and `APP_URL`. If Xero gives your app the newer granular scopes, set `XERO_SCOPES` to the scopes it lists for invoices and contacts (plus `offline_access`). Companies then tap Company Details → Xero → Connect. Nightly sync at 02:30 (job `powermate-xero-sync`). | developer.xero.com, then Supabase → Edge Functions → Secrets |
+| **Team reminders** (overdue invoices, unanswered quotes, services due, low stock) | Nothing: daily at 07:20 (job `powermate-daily-reminders`). Companies can switch them off under Company Details → Reminders. | Automatic |
+| **Service plans** | Nothing: jobs are made daily at 06:10 (job `powermate-service-plans`). | Automatic |
+
+Daily jobs can be checked in Supabase → Integrations → Cron (`powermate-*`).
+
+## 4. Checks after any database change
 
 - **Two-company isolation test**: in the Supabase SQL editor run
   `select private.tenant_isolation_test();`. The message must start with
@@ -62,7 +74,7 @@ give to a prospect.
   sharing, storage and the team functions from both sides, and always rolls back.
 - **Simulation**: run `npm run test:sim` (the CI does this on every pull request).
 
-## 4. App stores (optional — the app already installs from the browser)
+## 5. App stores (optional — the app already installs from the browser)
 
 The app is a Progressive Web App: people tap **Share → Add to Home Screen**
 (iPhone) or **Install app** (Android/Chrome). Store listings add discoverability.

@@ -9,6 +9,8 @@ import { requestPersistentStorage } from "./offline/offlineDb";
 import { LegalPage, legalPageFromUrl } from "./legal/LegalPage";
 import { QuoteAcceptPage, sharedQuoteTokenFromUrl } from "./legal/QuoteAcceptPage";
 import { captureJoinCode } from "./lib/joinCode";
+import { CustomerPortalPage } from "./legal/CustomerPortalPage";
+import { portalTokenFromUrl } from "./lib/portal";
 
 // Uncaught errors and promise rejections go to the events table (buffered offline).
 installGlobalErrorReporting();
@@ -53,10 +55,20 @@ captureJoinCode();
 const legal = legalPageFromUrl();
 // A customer opening a quote link (/?quote=TOKEN) — no sign-in needed.
 const sharedQuote = sharedQuoteTokenFromUrl();
+// A customer's own account page (/?portal=TOKEN) — no sign-in needed.
+const portal = portalTokenFromUrl();
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {legal ? <LegalPage which={legal} /> : sharedQuote ? <QuoteAcceptPage token={sharedQuote} /> : <PowerMateApp />}
+    {legal ? (
+      <LegalPage which={legal} />
+    ) : sharedQuote ? (
+      <QuoteAcceptPage token={sharedQuote} />
+    ) : portal ? (
+      <CustomerPortalPage token={portal} />
+    ) : (
+      <PowerMateApp />
+    )}
   </React.StrictMode>
 );
 
