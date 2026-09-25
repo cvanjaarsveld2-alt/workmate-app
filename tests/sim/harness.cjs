@@ -59,7 +59,7 @@ const db = { ...Object.fromEntries(Object.keys(schema).map(t => [t, []])), ...Ob
 if (!db.team_members.length) db.team_members = RPC.get_team_member_emails.map(m => ({ id: uuid(), team_id: TEAM, user_id: m.user_id, role: m.role, joined_at: m.joined_at }));
 
 // ─── Emulator ────────────────────────────────────────────────────────────────
-const log = { writes: [], violations: [], errors4xx: [], unhandled: [], functions: [], storage: [] };
+const log = { writes: [], violations: [], errors4xx: [], unhandled: [], functions: [], storage: [], reads: [] };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validate(table, row) {
   const cols = schema[table];
@@ -88,7 +88,11 @@ function matchFilter(row, col, expr) {
     case "neq": r = String(val) !== String(parseVal(raw)); break;
     case "is": r = parseVal(raw) === null ? val === null || val === undefined : val === parseVal(raw); break;
     case "in": r = raw.replace(/^\(|\)$/g, "").split(",").map(s => s.replace(/^"|"$/g, "")).includes(String(val)); break;
-    case "gt": r = val > raw; break; case "gte": r = val >= raw; break; case "lt": r = val < raw; break; case "lte": r = val <= raw; break;
+    case "gt": case "gte": case "lt": case "lte": {
+      const a = Date.parse(val), b = Date.parse(raw), dates = /\d{4}-\d{2}-\d{2}T/.test(String(raw)) && Number.isFinite(a) && Number.isFinite(b);
+      const x = dates ? a : val, y = dates ? b : raw;
+      r = op === "gt" ? x > y : op === "gte" ? x >= y : op === "lt" ? x < y : x <= y; break;
+    }
     case "ilike": case "like": { const re = new RegExp("^" + raw.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/[%*]/g, ".*") + "$", op === "ilike" ? "i" : ""); r = re.test(String(val ?? "")); break; }
     default: log.unhandled.push(`filter op ${op} on ${col}`); r = true;
   }
@@ -123,6 +127,7 @@ let screenTag = "boot";
 async function handle(route) {
   const req = route.request(); const url = new URL(req.url()); const m = req.method(); const p = url.pathname;
   if (process.env.SIM_TRACE) console.log('REQ', screenTag, m, p, url.search.slice(0,120));
+  if (m === "GET" && p.startsWith("/rest/v1/")) log.reads.push({ table: p.split("/").pop(), search: url.search });
   if (m === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (p.startsWith("/auth/v1/")) {
     if (p.endsWith("/user")) return json(route, 200, USER);

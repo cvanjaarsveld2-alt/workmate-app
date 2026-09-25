@@ -181,6 +181,29 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     rec("contacts: unreadable card photo leaves no gap", heading === 0 && broken === 0 ? "PASS" : "FAIL", `card section shown=${heading > 0}; broken images=${broken}`);
     await page.keyboard.press("Escape").catch(() => {});
   });
+  await safe("sync: background pull fetches only changes", async () => {
+    // Another device edits a client; bringing the app back to the foreground
+    // must show it, and the background pull must ask only for changed rows.
+    await go("Clients", 6000);
+    const target = db.clients.find(c => !/SIM/.test(c.company));
+    target.company = "SIM Remote Edit Co";
+    target.updated_at = new Date().toISOString();
+    const from = log.reads.length;
+    await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+    await page.waitForTimeout(4000);
+    // Clients are shown in collapsed groups, so check the device's stored copy.
+    const shown = await page.evaluate(id => new Promise(res => {
+      const uid = JSON.parse(localStorage.getItem("sb-hrqzqyfvbfzrfnuxovvr-auth-token")).user.id;
+      const r = indexedDB.open("powermate_offline_" + uid);
+      r.onsuccess = () => { const g = r.result.transaction("clients").objectStore("clients").get(id); g.onsuccess = () => res(g.result?.company === "SIM Remote Edit Co"); g.onerror = () => res(false); };
+      r.onerror = () => res(false);
+    }), target.id);
+    const clientReads = log.reads.slice(from).filter(r => r.table === "clients");
+    const incremental = clientReads.length > 0 && clientReads.every(r => /updated_at=gt\./.test(r.search));
+    const incTables = ["clients", "followups", "quotes", "contacts", "notes", "equipment", "expenses", "leads", "vehicle_checks", "activities", "breakdown_reports", "repair_reports", "custom_faults", "jobs", "invoices", "payments", "email_quotes"];
+    const full = log.reads.slice(from).filter(r => incTables.includes(r.table) && !/updated_at=gt\./.test(r.search)).length;
+    rec("sync: background pull fetches only changes", shown && incremental && full === 0 ? "PASS" : "FAIL", `remote edit stored on device=${shown}; clients reads=${clientReads.length} incremental=${incremental}; full-table reads=${full}`);
+  });
   await safe("leads: add opportunity", async () => {
     await go("Leads");
     const v0 = log.violations.length, before = db.leads.length;

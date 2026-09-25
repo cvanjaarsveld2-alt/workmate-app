@@ -15,6 +15,7 @@ Status as checked on 2026-09-23 (Supabase project `powermate-app`):
 | Authenticated E2E | Workflow exists, skipped until secrets are added. |
 | Real-device offline test | Not run. |
 | Restore drill | Not run. |
+| Supabase plan | **Free.** No restorable backups, 1 GB file storage (198 MB used by 4 users), 5 GB/month egress. Upgrade before growing the team (section 5). |
 
 ---
 
@@ -138,8 +139,66 @@ order by timestamp desc
 limit 50;
 ```
 
-## 5. Load
+## 5. Scaling to 20–50 people
 
-Low priority for a single-team app. If the team grows past a few dozen active
-users, re-run the Supabase performance advisor and check the slowest queries
-under Database → Query performance.
+### Upgrade Supabase to Pro first (owner, about 5 minutes)
+
+The project is on the Free plan, which is not suitable for a business team:
+no backups you can restore, 1 GB of file storage (receipts and photos
+already use 198 MB with 4 users) and 5 GB of egress a month.
+
+1. supabase.com → the **PowerMate System** organisation → **Billing**.
+2. Change the plan to **Pro**. Check current prices and quotas at
+   supabase.com/pricing; when this was written Pro was about US$25/month
+   with daily backups, 100 GB file storage, 8 GB database and 250 GB egress.
+3. Leave the project's compute size as it is (Micro is fine for 50 users).
+4. Set a **spend cap** under Billing → Cost control so usage can't run up
+   an unexpected bill.
+5. Afterwards: Database → Backups should list daily backups. Then the
+   restore drill in section 3 can use *Restore to a new project*.
+
+### Sync load (done in code)
+
+Phones used to re-download every table in full every 30 seconds. They now
+fetch only rows changed since the last pull, every 60 seconds and whenever
+the app comes back to the foreground, with a full pull on startup and at
+most every 15 minutes (to pick up deletions). Realtime still delivers
+changes instantly. `npm run test:sim` checks the background pull asks only
+for changed rows.
+
+### Grow in steps and watch
+
+Add about 10 people, then check after a week before adding the rest.
+
+Active users and their devices (last 7 days):
+
+```sql
+select count(distinct user_id) as active_users,
+       count(*) filter (where name = 'sync_succeeded') as sync_batches
+from events where timestamp > now() - interval '7 days';
+```
+
+Problems to look at (should be few, and each explainable):
+
+```sql
+select name, count(*) as n, count(distinct user_id) as users,
+       max(timestamp) as latest
+from events
+where timestamp > now() - interval '7 days'
+  and name in ('sync_failed','screen_crashed','app_crashed','window_error',
+               'unhandled_rejection','storage_not_persistent')
+group by name order by n desc;
+```
+
+Storage growth (compare with your plan's file storage quota):
+
+```sql
+select bucket_id, count(*) as files,
+       round(sum((metadata->>'size')::bigint) / 1048576.0) as mb
+from storage.objects group by bucket_id order by mb desc;
+```
+
+Also check **Reports → API** and **Usage** in the Supabase dashboard:
+egress and request counts should grow roughly in line with the number of
+people, not faster. If the team grows past about 50 active users, re-run
+the performance advisor and check Database → Query performance.
