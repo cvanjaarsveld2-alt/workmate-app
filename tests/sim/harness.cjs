@@ -184,7 +184,7 @@ async function handle(route) {
         if (v) { log.violations.push({ screen: screenTag, table, method: m, ...v }); return json(route, 400, v); }
       }
       if (m === "PATCH") { const { rows } = query(table, url); rows.forEach(r => { const live = db[table].find(x => x.id === r.id); Object.assign(live, body); }); log.writes.push({ screen: screenTag, kind: "update", table, n: rows.length, keys: Object.keys(body || {}) }); }
-      else for (const row of rowsIn) { const i = db[table].findIndex(x => x.id === row.id && row.id); if (i >= 0) db[table][i] = { ...db[table][i], ...row }; else db[table].push({ id: row.id || uuid(), ...row }); log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
+      else for (const row of rowsIn) { const key = url.searchParams.get("on_conflict") || "id"; const i = db[table].findIndex(x => row[key] && x[key] === row[key]); if (i >= 0) db[table][i] = { ...db[table][i], ...row }; else db[table].push({ id: row.id || uuid(), ...row }); log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
       const ret = (req.headers()["prefer"] || "").includes("return=representation");
       return json(route, m === "POST" ? 201 : 200, ret ? rowsIn : undefined);
     }

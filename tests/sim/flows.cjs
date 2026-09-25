@@ -322,6 +322,44 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     rec("touch: form fields never trigger iPhone zoom", sizes.length > 0 && small.length === 0 ? "PASS" : "FAIL", `${sizes.length} visible fields; under 16px: ${small.length}`);
   });
 
+  // 13d. Company details: only the master account edits them; documents use them.
+  await safe("documents: company details and invoice PDF", async () => {
+    const isOwner = H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300";
+    await go("CompanyProfile", 3500);
+    if (!isOwner) {
+      const locked = await page.getByText("Only the master account can change these details").count();
+      const inputs = await page.locator("main input:not([type=hidden])").count();
+      await shot("company-profile-member");
+      rec("documents: company details and invoice PDF", locked > 0 && inputs === 0 ? "PASS" : "FAIL", `read-only notice=${locked > 0}; editable fields=${inputs}`);
+      return;
+    }
+    const field = label => page.locator(`label:text-is("${label}") + input, label:text-is("${label}") + textarea`).first();
+    await field("VAT no.").fill("4123456789");
+    await field("Bank").fill("FNB");
+    await field("Account number").fill("62812345678");
+    await field("Quotes valid for (days)").fill("14");
+    await page.getByRole("button", { name: "Save", exact: true }).click(); await page.waitForTimeout(1500);
+    const saved = H.db.team_profiles.find(p => p.team_id === H.TEAM) || {};
+    await shot("company-profile");
+    // Invoice PDF from the Invoices screen.
+    await go("Invoices", 3500);
+    const hasInvoice = (await page.getByRole("button", { name: /Invoice PDF/ }).count()) > 0;
+    let file = "", size = 0;
+    if (hasInvoice) {
+      const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.getByRole("button", { name: /Invoice PDF/ }).first().click()]);
+      file = dl.suggestedFilename();
+      const p = await dl.path(); size = p ? fs.statSync(p).size : 0;
+    }
+    // Quote → pro forma.
+    await go("Quotes", 3000);
+    await page.getByRole("button", { name: "Make a PDF" }).first().click(); await page.waitForTimeout(300);
+    const [dl2] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.getByRole("button", { name: "Pro forma invoice" }).first().click()]);
+    const pf = dl2.suggestedFilename();
+    rec("documents: company details and invoice PDF",
+      saved.vat_no === "4123456789" && saved.bank_name === "FNB" && saved.quote_validity_days === 14 && (!hasInvoice || (/^Tax_Invoice_/.test(file) && size > 2000)) && /^Pro_Forma_Invoice_PF-/.test(pf) ? "PASS" : "FAIL",
+      `saved VAT=${saved.vat_no} bank=${saved.bank_name} validity=${saved.quote_validity_days}; invoice PDF=${hasInvoice ? file + " " + size + "B" : "no invoice seeded"}; pro forma=${pf}`);
+  });
+
   // 14. Master account removes a teammate and hands their work over (runs last: it changes the team).
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("team: remove teammate hands over work", async () => {
     const GREG = "f16f3dd1-c87c-4066-8a38-750d7bc31d65";

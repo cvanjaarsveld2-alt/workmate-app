@@ -110,6 +110,9 @@ const JobsScreen = lazy(() => import("./screens/JobsScreen").then(m => ({ defaul
 const InvoicesScreen = lazy(() =>
   import("./screens/InvoicesScreen").then(m => ({ default: m.InvoicesScreen })),
 );
+const CompanyProfileScreen = lazy(() =>
+  import("./screens/CompanyProfileScreen").then(m => ({ default: m.CompanyProfileScreen })),
+);
 import { Client360Screen } from "./screens/Client360Screen";
 import { CalendarScreen } from "./screens/CalendarScreen";
 const TeamDashboardScreen = lazy(() =>
@@ -141,6 +144,7 @@ const SCREEN_TITLES = {
   Client360: "Client 360",
   TeamDashboard: "Team Dashboard",
   Planner: "Weekly Planner",
+  CompanyProfile: "Company Details",
 };
 const INITIAL_DATA = {
   clients: [],
@@ -233,6 +237,7 @@ export default function PowerWorksApp() {
         "SharedInbox",
         "Jobs",
         "Invoices",
+        "CompanyProfile",
         "Client360",
         "Calendar",
         "TeamDashboard",
@@ -1017,7 +1022,16 @@ export default function PowerWorksApp() {
     Breakdown: <BreakdownScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} />,
     Repair: <RepairScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} />,
     Jobs: <JobsScreen userId={session.user.id} teamId={teamId} setData={setData} />,
-    Invoices: <InvoicesScreen userId={session.user.id} teamId={teamId} setData={setData} />,
+    Invoices: (
+      <InvoicesScreen
+        userId={session.user.id}
+        teamId={teamId}
+        setData={setData}
+        clients={data.clients}
+        quotes={data.quotes}
+      />
+    ),
+    CompanyProfile: <CompanyProfileScreen teamId={teamId} isOwner={!!teamAccess?.is_owner} />,
     More: (
       <MoreScreen
         data={data}

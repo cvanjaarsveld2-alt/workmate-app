@@ -3,7 +3,10 @@ import { offlineGetAll, offlineSave } from "../offline/offlineDb";
 import { saveAndSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { Card, Btn, PageHeader } from "../components/ui";
-import { CreditCard, RefreshCw, Search, CheckCircle2, WifiOff } from "lucide-react";
+import { CreditCard, RefreshCw, Search, CheckCircle2, WifiOff, FileText, FileClock } from "lucide-react";
+import { useCompanyProfile } from "../lib/companyProfile";
+import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
+import { invoiceToDocument, isTemporaryInvoiceNumber } from "../lib/documentData";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 const money = v =>
   `R ${Number(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -29,7 +32,7 @@ function genIdempotencyKey() {
   } catch {}
   return `idem_${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 10)}`;
 }
-export function InvoicesScreen({ userId, teamId, setData }) {
+export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes = [] }) {
   const [invoices, setInvoices] = useState([]),
     [payments, setPayments] = useState([]),
     [loading, setLoading] = useState(true),
@@ -37,6 +40,42 @@ export function InvoicesScreen({ userId, teamId, setData }) {
     [error, setError] = useState(""),
     [query, setQuery] = useState("");
   const online = useOnlineStatus();
+  const profile = useCompanyProfile(teamId);
+  const [making, setMaking] = useState(null);
+  const [notice, setNotice] = useState("");
+  // Build and share an invoice or pro forma PDF. Online, the invoice is read
+  // back first so it carries the number the server assigned.
+  async function sharePdf(inv, kind) {
+    setMaking(inv.id + kind);
+    setNotice("");
+    try {
+      let row = inv;
+      if (online && isTemporaryInvoiceNumber(inv.invoice_number)) {
+        const { data } = await supabase.from("invoices").select("*").eq("id", inv.id).maybeSingle();
+        if (data) {
+          row = { ...inv, ...data };
+          setInvoices(list => list.map(x => (x.id === row.id ? row : x)));
+          offlineSave("invoices", row).catch(() => {});
+        }
+      }
+      const doc = invoiceToDocument(row, kind, { clients, quotes, profile });
+      const blob = await buildDocumentPDF(doc, profile);
+      const r = await shareDocumentPDF(blob, documentFilename(doc, profile), `${documentTitle(kind, profile)} ${doc.number}`);
+      if (r !== "cancelled")
+        setNotice(
+          doc.draft
+            ? "Draft PDF made. It gets its final invoice number once it syncs."
+            : r === "shared"
+              ? "PDF shared"
+              : "PDF downloaded",
+        );
+    } catch (err) {
+      console.error("Invoice PDF failed:", err);
+      setNotice("Couldn't make the PDF. Please try again.");
+    } finally {
+      setMaking(null);
+    }
+  }
   async function load() {
     if (!userId) return;
     setLoading(true);
@@ -150,6 +189,11 @@ export function InvoicesScreen({ userId, teamId, setData }) {
         </div>
       )}
       {error && <div className="rounded-xl bg-slate-50 border p-3 text-sm text-slate-700">{error}</div>}
+      {notice && (
+        <div role="status" className="rounded-xl bg-green-50 border border-green-200 p-3 text-sm text-green-800">
+          {notice}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">
           <p className="text-xs font-bold text-slate-400">Outstanding</p>
@@ -211,6 +255,16 @@ export function InvoicesScreen({ userId, teamId, setData }) {
                   {saving === inv.id ? "Saving…" : "Record payment"}
                 </Btn>
               )}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <Btn size="sm" variant="secondary" onClick={() => sharePdf(inv, "invoice")} disabled={!!making}>
+                  <FileText size={13} />
+                  {making === inv.id + "invoice" ? "Making…" : "Invoice PDF"}
+                </Btn>
+                <Btn size="sm" variant="ghost" onClick={() => sharePdf(inv, "proforma")} disabled={!!making}>
+                  <FileClock size={13} />
+                  {making === inv.id + "proforma" ? "Making…" : "Pro forma"}
+                </Btn>
+              </div>
             </Card>
           );
         })

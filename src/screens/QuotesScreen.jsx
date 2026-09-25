@@ -5,7 +5,9 @@ import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download } from
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, genId } from "../lib/helpers";
 import { QuoteLineItems } from "../components/QuoteLineItems";
-import { shareQuotePDF } from "../lib/quotePDF";
+import { useCompanyProfile } from "../lib/companyProfile";
+import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
+import { quoteToDocument } from "../lib/documentData";
 import { autoCreateChaseFollowup, autoAdvanceOnAccept } from "../lib/quoteAutomation";
 import { offlineSave } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
@@ -65,6 +67,20 @@ export function QuotesScreen({
   searchSeed,
 }) {
   const isMine = useIsMine(userId);
+  const profile = useCompanyProfile(teamId);
+  const [pdfFor, setPdfFor] = useState(null);
+  async function sharePdf(q, kind) {
+    try {
+      const doc = quoteToDocument(q, kind, { clients: data.clients || [], profile });
+      const blob = await buildDocumentPDF(doc, profile);
+      const r = await shareDocumentPDF(blob, documentFilename(doc, profile), `${documentTitle(kind, profile)} ${doc.number}`);
+      if (r !== "cancelled") setToast(r === "shared" ? "PDF shared" : "PDF downloaded");
+      setPdfFor(null);
+    } catch (err) {
+      console.error("Quote PDF failed:", err);
+      setToast("Couldn't generate PDF — try again");
+    }
+  }
   const [showForm, setShowForm] = useState(false),
     [search, setSearch] = useState(""),
     [filterStatus, setFilterStatus] = useState("All"),
@@ -413,37 +429,11 @@ export function QuotesScreen({
                     </button>
                   )}
                   <button
-                    onClick={async () => {
-                      try {
-                        let li;
-                        try {
-                          li = q.line_items ? JSON.parse(q.line_items) : null;
-                        } catch {
-                          li = null;
-                        }
-                        if (!Array.isArray(li) || li.length === 0)
-                          li = [
-                            {
-                              description: q.description || "Quote",
-                              qty: 1,
-                              unitPrice: parseFloat(q.value) || 0,
-                            },
-                          ];
-                        const r = await shareQuotePDF({
-                          clientName: q.client_name,
-                          date: q.sent_date || q.created_at?.slice(0, 10),
-                          lineItems: li,
-                          vatInclusive: q.vat_inclusive !== false,
-                          notes: q.description,
-                        });
-                        setToast(r === "shared" ? "Quote shared" : "Quote PDF downloaded");
-                      } catch (err) {
-                        console.error("Quote PDF failed:", err);
-                        setToast("Couldn't generate PDF — try again");
-                      }
-                    }}
-                    className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-green-600 flex items-center justify-center"
-                    title="Generate PDF"
+                    onClick={() => setPdfFor(pdfFor === q.id ? null : q.id)}
+                    className={`min-h-[44px] rounded-xl flex items-center justify-center ${pdfFor === q.id ? "bg-green-50 text-green-700" : "bg-slate-50 text-slate-400 active:bg-slate-100 active:text-green-600"}`}
+                    title="Make a PDF"
+                    aria-label="Make a PDF"
+                    aria-expanded={pdfFor === q.id}
                   >
                     <Download size={15} />
                   </button>
@@ -460,6 +450,22 @@ export function QuotesScreen({
                     <Trash2 size={15} />
                   </button>
                 </div>
+                {pdfFor === q.id && (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => sharePdf(q, "quote")}
+                      className="min-h-[44px] rounded-xl bg-green-50 text-green-800 text-sm font-bold"
+                    >
+                      Quotation
+                    </button>
+                    <button
+                      onClick={() => sharePdf(q, "proforma")}
+                      className="min-h-[44px] rounded-xl bg-slate-50 text-slate-700 text-sm font-bold border border-slate-200"
+                    >
+                      Pro forma invoice
+                    </button>
+                  </div>
+                )}
               </div>
             </Card>
           );

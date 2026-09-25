@@ -236,3 +236,21 @@ any phone they sign in on (saved as `users.hidden_screens`), and works
 offline (sent once back online). Dashboard and Settings & More can't be
 hidden, and a hidden screen still opens from links and notifications.
 Tick it again to bring it back.
+
+**Company details and documents.** Settings & More → *Company Details*
+(master account only; teammates see it read-only). Set the logo, registered
+name, registration and VAT numbers, address, bank details, brand colour,
+quote validity, payment terms and terms and conditions. Each company that
+uses the app keeps its own (`team_profiles`, one row per team).
+- Quotes → the PDF button → *Quotation* or *Pro forma invoice*.
+- Invoices → *Invoice PDF* or *Pro forma*.
+- Documents are built on the phone (they work offline) and shared through
+  the phone's share sheet, or downloaded on a computer.
+- Invoices are titled *Tax invoice* once a VAT number is set, otherwise
+  *Invoice*.
+- Invoice numbers are handed out by the server in order (prefix + 5 digits,
+  e.g. `INV-00001`) when an invoice syncs. An invoice made offline prints as
+  a *Draft* until then. Only change *Next invoice no.* when carrying on
+  from another system.
+- Customer VAT number and billing address: edit the client → *Invoicing
+  details*. SARS requires these on tax invoices over R5 000.
