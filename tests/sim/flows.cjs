@@ -171,6 +171,16 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     rec("contacts: business card photo shows", shown?.ok && /\/object\/sign\//.test(shown.src) ? "PASS" : "FAIL", `image loaded=${!!shown?.ok}; via fresh signed link=${/\/object\/sign\//.test(shown?.src || "")}`);
     await page.keyboard.press("Escape").catch(() => {});
   });
+  await safe("contacts: unreadable card photo leaves no gap", async () => {
+    // A teammate's scan: storage refuses to sign it, so the section must be left out.
+    await go("Contacts");
+    await page.getByText("Contact 4", { exact: true }).first().click(); await page.waitForTimeout(2500);
+    const heading = await page.getByText(/Business card · tap to enlarge/i).count();
+    const broken = await page.evaluate(() => [...document.images].filter(i => i.complete && i.naturalWidth === 0 && i.getAttribute("src")).length);
+    await shot("contact-card-unavailable");
+    rec("contacts: unreadable card photo leaves no gap", heading === 0 && broken === 0 ? "PASS" : "FAIL", `card section shown=${heading > 0}; broken images=${broken}`);
+    await page.keyboard.press("Escape").catch(() => {});
+  });
   await safe("leads: add opportunity", async () => {
     await go("Leads");
     const v0 = log.violations.length, before = db.leads.length;

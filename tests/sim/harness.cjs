@@ -173,7 +173,7 @@ async function handle(route) {
     if (p.includes("/object/sign/")) {
       const objPath = p.split("/object/sign/")[1];
       if (m === "GET") return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
-      if (/\/no-receipt$|\/undefined$|\/null$/.test(objPath)) { log.errors4xx.push({ screen: screenTag, storage: "sign", path: objPath.split("/").slice(1).join("/"), status: 400 }); return json(route, 400, { statusCode: "400", error: "invalid", message: "Object not found" }); }
+      if (/\/no-receipt$|\/undefined$|\/null$|\/not-mine\//.test(objPath)) { log.errors4xx.push({ screen: screenTag, storage: "sign", path: objPath.split("/").slice(1).join("/"), status: 400 }); return json(route, 400, { statusCode: "400", error: "invalid", message: "Object not found" }); }
       let body = {}; try { body = req.postDataJSON() || {}; } catch {}
       if (body.paths) return json(route, 200, body.paths.map(x => ({ path: x, signedURL: `/object/sign/${objPath}/${x}?token=sim`, error: null })));
       return json(route, 200, { signedURL: `/object/sign/${objPath}?token=sim` });

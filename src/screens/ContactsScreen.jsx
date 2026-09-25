@@ -22,7 +22,7 @@ import { SalesFollowupComposer } from "../lib/industrialSalesEmail.jsx";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { logCrash } from "../components/ErrorBoundary";
-import { StorageImage } from "../components/StorageImage";
+import { useStoredPhoto } from "../lib/useStoredPhoto";
 import {
   Card, Btn, Field, GroupField, SearchBar, FilterPills, CollapsibleFilters,
   Toast, Empty, PageHeader, useConfirm,
@@ -63,6 +63,23 @@ function ExpandableText({ text, limit = 100, className = "" }) {
           {expanded ? "▲ Show less" : "▼ Show more"}
         </button>
       )}
+    </div>
+  );
+}
+
+// Business card photo in the contact detail. Rendered only once the image has
+// actually loaded: if it can't be (a teammate can't read the uploader's files,
+// or there's no signal) the whole section is left out, not an empty box.
+function BusinessCardPhoto({ contact, onOpen }) {
+  const { url, status } = useStoredPhoto(contact.card_photo_url);
+  if (status !== "ready") return null;
+  return (
+    <div>
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Business card · tap to enlarge</p>
+      <button onClick={() => onOpen(url)}
+        className="w-full rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80">
+        <img src={url} alt={`${contact.name} business card`} className="w-full h-48 object-contain bg-slate-50" />
+      </button>
     </div>
   );
 }
@@ -543,16 +560,8 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
               </div>
             )}
 
-            {detailContact.card_photo_url && (
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Business card · tap to enlarge</p>
-                <button onClick={() => setViewerImages({ list: [{ url: detailContact.card_photo_url, caption: detailContact.name }], startIndex: 0 })}
-                  className="w-full rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80">
-                  <StorageImage src={detailContact.card_photo_url} alt={`${detailContact.name} business card`}
-                    className="w-full h-48 object-contain bg-slate-50" fallbackText="Business card photo unavailable" />
-                </button>
-              </div>
-            )}
+            <BusinessCardPhoto contact={detailContact}
+              onOpen={url => setViewerImages({ list: [{ url, caption: detailContact.name }], startIndex: 0 })} />
 
             {((detailContact.status === "lead" || detailContact.status === "active") && detailContact.company?.trim()) && (
               <div className="pt-2 space-y-2 border-t border-slate-100">
