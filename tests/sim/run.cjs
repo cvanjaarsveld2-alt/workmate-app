@@ -60,6 +60,8 @@ function runScript(script, account) {
     }
     console.log("\n=== visual audit: contrast, wrapped numbers, overflow (light + dark) ===");
     if (!(await runScript("visual-audit.cjs", { ...ACCOUNTS[0], name: "visual" }))) ok = false;
+    console.log("\n=== company sign-up (a person with no company) ===");
+    if (!(await runScript("onboarding.cjs", { name: "onboarding", uid: "7d0c1b52-6a55-4d49-9a3f-0f5e2f0a9b11", email: "owner@acme.test", screens: "" }))) ok = false;
     console.log("\n=== offline app shell (service worker on) ===");
     if (!(await runScript("offline-shell.cjs", { ...ACCOUNTS[0], name: "offline" }))) ok = false;
   } finally {

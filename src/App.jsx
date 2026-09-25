@@ -53,7 +53,8 @@ import { ExportProgressProvider } from "./components/ExportProgress";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
 import { readHiddenScreens, saveHiddenScreens, syncHiddenScreens } from "./lib/menuPrefs";
-import { setActiveTeamId, loadCompanyProfile } from "./lib/companyProfile";
+import { setActiveTeamId, loadCompanyProfile, useCompanyProfile } from "./lib/companyProfile";
+import { unavailableScreens } from "./lib/modules";
 import { setMyName } from "./lib/me";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 import { HomeScreen } from "./screens/HomeScreen";
@@ -112,6 +113,7 @@ const JobsScreen = lazy(() => import("./screens/JobsScreen").then(m => ({ defaul
 const InvoicesScreen = lazy(() =>
   import("./screens/InvoicesScreen").then(m => ({ default: m.InvoicesScreen })),
 );
+const CompanySetup = lazy(() => import("./screens/CompanySetup").then(m => ({ default: m.CompanySetup })));
 const CompanyProfileScreen = lazy(() =>
   import("./screens/CompanyProfileScreen").then(m => ({ default: m.CompanyProfileScreen })),
 );
@@ -261,6 +263,8 @@ export default function PowerWorksApp() {
   const [data, setData] = useState(INITIAL_DATA);
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
   const [teamId, setTeamId] = useState(null);
+  // True once we know whether this person belongs to a company.
+  const [teamChecked, setTeamChecked] = useState(false);
   const [teamMembers, setTeamMembers] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [userRole, setUserRole] = useState("member");
@@ -374,24 +378,25 @@ export default function PowerWorksApp() {
       try {
         const { data: authUser } = await supabase.auth.getUser();
         const uid = authUser?.user?.id || session.user.id;
-        const { data: profile } = await supabase.from("users").select("role").eq("id", uid).maybeSingle();
         const { data: membership } = await supabase
           .from("team_members")
           .select("team_id, role")
           .eq("user_id", uid)
           .maybeSingle();
         const { data: effectiveRole } = await supabase.rpc("get_my_effective_role");
-        const isAdmin =
-          effectiveRole === "admin" || profile?.role === "admin" || membership?.role === "admin";
+        // Admin is per company (the old app-wide users.role no longer counts).
+        const isAdmin = effectiveRole === "admin" || membership?.role === "admin";
         const { data: access } = await supabase.rpc("get_my_team_access");
         setTeamAccess(access && typeof access === "object" ? access : null);
         if (!membership?.team_id) {
           setTeamId(null);
           setTeamMembers([]);
           setUserRole(isAdmin ? "admin" : "member");
+          setTeamChecked(true);
           return;
         }
         setTeamId(membership.team_id);
+        setTeamChecked(true);
         setUserRole(isAdmin ? "admin" : "member");
         const { data: rows, error: rpcError } = await supabase.rpc("get_team_member_emails", {
           p_team_id: membership.team_id,
@@ -705,6 +710,9 @@ export default function PowerWorksApp() {
         () => {},
       );
   }, [session?.user?.id]);
+  // Modules the company switched off: their screens leave the menu and can't open.
+  const companyProfile = useCompanyProfile(teamId);
+  const offScreens = unavailableScreens(companyProfile.disabled_modules);
   // The company this person works for: its name and logo brand PDFs and messages.
   useEffect(() => {
     setActiveTeamId(teamId);
@@ -867,6 +875,13 @@ export default function PowerWorksApp() {
   if (loading) return <DataLoadingScreen />;
   if (!session?.user) return <AuthScreen />;
   if (recoveringPassword) return <SetPasswordScreen onDone={() => setRecoveringPassword(false)} />;
+  // Signed in but not in a company yet: join one, or set up a new company.
+  if (teamChecked && !teamId && isOnline)
+    return (
+      <Suspense fallback={<DataLoadingScreen />}>
+        <CompanySetup userId={session.user.id} onDone={() => setTeamRefreshKey(k => k + 1)} onSignOut={logout} />
+      </Suspense>
+    );
   // FIX (Build 8, Phase 3 — CRITICAL) — PINSetupScreen/PINLockScreen were
   // imported and pinState was computed (see the checkPIN effect above) but
   // NEITHER was ever actually rendered here: the component fell straight
@@ -1220,6 +1235,7 @@ export default function PowerWorksApp() {
               userEmail={session.user?.email}
               onLogout={logout}
               hiddenScreens={hiddenScreens}
+              unavailableScreens={offScreens}
               onSaveHidden={onSaveHidden}
               userId={session.user.id}
               teamId={teamId}
@@ -1255,7 +1271,7 @@ export default function PowerWorksApp() {
                           </div>
                         }
                       >
-                        {screens[screen]}
+                        {offScreens.includes(screen) ? screens.Home : screens[screen]}
                       </Suspense>
                     </ScreenErrorBoundary>
                   </motion.div>

@@ -6,6 +6,8 @@ import { initTheme } from "./lib/theme";
 import PowerMateApp from "./App.jsx";
 import { installGlobalErrorReporting, logEvent } from "./lib/helpers";
 import { requestPersistentStorage } from "./offline/offlineDb";
+import { LegalPage, legalPageFromUrl } from "./legal/LegalPage";
+import { captureJoinCode } from "./lib/joinCode";
 
 // Uncaught errors and promise rejections go to the events table (buffered offline).
 installGlobalErrorReporting();
@@ -42,9 +44,16 @@ window.addEventListener("vite:preloadError", (event) => {
 // first paint, so there's no flash of the wrong theme on load.
 initTheme();
 
+// An invite link (/?join=CODE) is remembered until the person has signed in
+// and joined, so it survives signing up and confirming their email.
+captureJoinCode();
+
+// Terms, privacy and data processing pages are public: /?legal=terms etc.
+const legal = legalPageFromUrl();
+
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <PowerMateApp />
+    {legal ? <LegalPage which={legal} /> : <PowerMateApp />}
   </React.StrictMode>
 );
 

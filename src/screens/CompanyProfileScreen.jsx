@@ -6,6 +6,7 @@ import { Building2, Upload, Trash2, FileText, Lock, WifiOff } from "lucide-react
 import { Card, Btn, Field, PageHeader, Toast } from "../components/ui";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { compressLogo, saveCompanyProfile, useCompanyProfile } from "../lib/companyProfile";
+import { MODULES } from "../lib/modules";
 import { addDays, buildDocumentPDF, documentFilename, shareDocumentPDF } from "../lib/documentPDF";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -304,6 +305,33 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           Numbers are handed out in order as invoices sync, so they never repeat. Only change the next number when
           carrying on from another system.
         </p>
+      </Section>
+
+      <Section title="Modules" hint="Switch off what your company doesn't use. It disappears for everyone in your company.">
+        {MODULES.map(m => {
+          const on = !(form.disabled_modules || []).includes(m.key);
+          return (
+            <label key={m.key} className="flex items-center gap-3 min-h-[52px] cursor-pointer">
+              <span className="flex-1">
+                <span className="block text-sm font-bold text-slate-800">{m.label}</span>
+                <span className="block text-xs text-slate-500">{m.hint}</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={on}
+                aria-label={m.label}
+                onChange={e =>
+                  set("disabled_modules")(
+                    e.target.checked
+                      ? (form.disabled_modules || []).filter(k => k !== m.key)
+                      : [...(form.disabled_modules || []), m.key],
+                  )
+                }
+                className="h-6 w-6 shrink-0"
+              />
+            </label>
+          );
+        })}
       </Section>
 
       <Section title="Terms and conditions" hint="Printed at the end of each document. Leave blank to leave them out.">

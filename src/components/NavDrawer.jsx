@@ -84,13 +84,17 @@ export function NavDrawer({
   userEmail,
   onLogout,
   hiddenScreens = [],
+  unavailableScreens = [],
   onSaveHidden,
 }) {
   // Editing the menu: a draft set of hidden screens, saved on Done.
   const [draft, setDraft] = useState(null);
   const editing = draft !== null;
   const hidden = new Set(hiddenScreens);
-  const sections = SECTIONS.map(s => ({
+  // Modules the company switched off aren't offered at all.
+  const off = new Set(unavailableScreens);
+  const available = SECTIONS.map(s => ({ ...s, items: s.items.filter(i => !off.has(i.key)) })).filter(s => s.items.length);
+  const sections = available.map(s => ({
     ...s,
     items: s.items.filter(i => ALWAYS_SHOWN.has(i.key) || !hidden.has(i.key)),
   })).filter(s => s.items.length);
@@ -153,7 +157,7 @@ export function NavDrawer({
                 <p className="px-5 pb-2 text-xs text-slate-500 leading-snug">
                   Only changes your own menu. Hidden screens still open from links and notifications.
                 </p>
-                {SECTIONS.map(section => (
+                {available.map(section => (
                   <div key={section.title} className="mb-0.5">
                     <p className="px-5 pt-4 pb-1 text-[10px] font-black text-slate-400 tracking-widest">
                       {section.title}

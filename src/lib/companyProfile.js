@@ -33,6 +33,9 @@ export const DEFAULT_PROFILE = {
   next_invoice_number: 1,
   brand_color: "#8B1A1A",
   logo_data: null,
+  // Nothing off unless the company chose it (new companies start without
+  // Jack Selector: see CompanySetup).
+  disabled_modules: [],
 };
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
@@ -102,6 +105,8 @@ export function cleanProfile(input) {
     if (["quote_validity_days", "payment_terms_days", "next_invoice_number"].includes(k)) {
       const n = Math.round(Number(v));
       out[k] = Number.isFinite(n) ? n : DEFAULT_PROFILE[k];
+    } else if (k === "disabled_modules") {
+      out[k] = Array.isArray(v) ? [...new Set(v.map(String))] : [];
     } else if (k === "vat_registered") {
       out[k] = v !== false;
     } else if (k === "logo_data") {
