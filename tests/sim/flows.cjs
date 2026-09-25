@@ -395,6 +395,29 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       `saved=${!!row}; cover=${row?.details?.cover}; photo path=${photo?.storage_path ? "yes" : "no"}; caption=${photo?.caption}; base64 on server=${leaked}; expiry=${row?.expiry_date} (want ${expectedExpiry}); pdf=${dl.suggestedFilename()} ${size}B`);
   });
 
+  // 13f. Job cards: on their own from Jobs, and attached to an invoice.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("documents: job card PDFs", async () => {
+    await go("Jobs", 3500);
+    const btn = page.getByRole("button", { name: /Job card PDF/ }).first();
+    if (!(await btn.count())) { rec("documents: job card PDFs", "FAIL", "no Job card PDF button on Jobs"); return; }
+    const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), btn.click()]);
+    const alone = dl.suggestedFilename();
+    await go("Invoices", 3500);
+    const plain = page.getByRole("button", { name: /Invoice PDF/ }).first();
+    const [d1] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), plain.click()]);
+    const s1 = fs.statSync(await d1.path()).size;
+    const box = page.getByLabel("Attach job card").first();
+    const hasBox = (await box.count()) > 0;
+    let s2 = 0;
+    if (hasBox) {
+      await box.check();
+      const [d2] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), plain.click()]);
+      s2 = fs.statSync(await d2.path()).size;
+    }
+    rec("documents: job card PDFs", /^Job_Card_/.test(alone) && hasBox && s2 > s1 ? "PASS" : "FAIL",
+      `job card=${alone}; attach option shown=${hasBox}; invoice ${s1}B → with job card ${s2}B`);
+  });
+
   // 14. Master account removes a teammate and hands their work over (runs last: it changes the team).
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("team: remove teammate hands over work", async () => {
     const GREG = "f16f3dd1-c87c-4066-8a38-750d7bc31d65";

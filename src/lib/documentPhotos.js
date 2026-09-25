@@ -43,13 +43,14 @@ async function photoData(p) {
   }
 }
 
+const resolveList = list =>
+  Promise.all((list || []).map(async p => ({ caption: p.caption, data: await photoData(p) })));
+
+// Fills in image data for quote-section and job-card photos.
 export async function resolveDocumentPhotos(doc) {
-  if (!doc.sections?.length) return doc;
-  const sections = await Promise.all(
-    doc.sections.map(async sec => ({
-      ...sec,
-      photos: await Promise.all((sec.photos || []).map(async p => ({ caption: p.caption, data: await photoData(p) }))),
-    })),
-  );
-  return { ...doc, sections };
+  const [sections, jobCards] = await Promise.all([
+    Promise.all((doc.sections || []).map(async sec => ({ ...sec, photos: await resolveList(sec.photos) }))),
+    Promise.all((doc.jobCards || []).map(async jc => ({ ...jc, photos: await resolveList(jc.photos) }))),
+  ]);
+  return { ...doc, ...(doc.sections ? { sections } : {}), ...(doc.jobCards ? { jobCards } : {}) };
 }

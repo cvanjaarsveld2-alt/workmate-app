@@ -1021,7 +1021,7 @@ export default function PowerWorksApp() {
     ),
     Breakdown: <BreakdownScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} />,
     Repair: <RepairScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} />,
-    Jobs: <JobsScreen userId={session.user.id} teamId={teamId} setData={setData} />,
+    Jobs: <JobsScreen userId={session.user.id} teamId={teamId} setData={setData} clients={data.clients} />,
     Invoices: (
       <InvoicesScreen
         userId={session.user.id}

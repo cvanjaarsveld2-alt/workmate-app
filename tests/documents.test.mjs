@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { buildDocumentPDF, documentFilename, documentTitle, documentTotals, money } from "../src/lib/documentPDF.js";
-import { invoiceToDocument, isTemporaryInvoiceNumber, parseItems, quoteDetails, quoteToDocument } from "../src/lib/documentData.js";
+import { invoiceToDocument, isTemporaryInvoiceNumber, jobToCard, jobsForInvoice, jobsForQuote, parseItems, quoteDetails, quoteToDocument } from "../src/lib/documentData.js";
 import { PW_LOGO_B64 } from "../src/lib/pwLogo.js";
 
 const profile = {
@@ -193,4 +193,36 @@ test("detailed quotes carry their write-up, sections and photos into the PDF", a
   fs.writeFileSync("tests/sim/out/sample-detailed-quote.pdf", buf);
   // Cover + body pages.
   assert.match(buf.toString("latin1"), /\/Type \/Pages[\s\S]*?\/Count [2-9]/);
+});
+
+test("job cards: linked jobs, card content, and pages after the invoice", async () => {
+  const jpeg = PW_LOGO_B64.startsWith("data:") ? PW_LOGO_B64 : "data:image/jpeg;base64," + PW_LOGO_B64;
+  const job = {
+    id: "j1", job_number: "JOB-2026-0012", title: "Service 4 jacks", client_id: "c1", quote_id: "q1",
+    location: "Shaft 2", scheduled_date: "2026-09-20", started_at: "2026-09-20T07:30:00Z", completed_at: "2026-09-20T15:10:00Z",
+    assigned_to: "Greg", status: "completed", description: "Annual service", technician_notes: "Seal worn",
+    work_done: "Replaced seals, load tested", parts_used: ["Seal kit", "Hose"],
+    photos: [{ id: "p1", data: jpeg, caption: "After service" }, "legacy-string-ignored"],
+  };
+  const other = { id: "j2", quote_id: "q2" };
+  assert.deepEqual(jobsForInvoice({ job_id: "j1" }, [job, other]).map(j => j.id), ["j1"]);
+  assert.deepEqual(jobsForInvoice({ quote_id: "q1" }, [job, other]).map(j => j.id), ["j1"]);
+  assert.deepEqual(jobsForQuote({ id: "q2" }, [job, other]).map(j => j.id), ["j2"]);
+  const card = jobToCard(job, { clients: [{ id: "c1", company: "Mine Co" }], quotes: [{ id: "q1", quote_number: "Q-7" }] });
+  assert.equal(card.number, "JOB-2026-0012");
+  assert.equal(card.customer, "Mine Co");
+  assert.equal(card.reference, "Quote Q-7");
+  assert.deepEqual(card.parts, ["Seal kit", "Hose"]);
+  assert.equal(card.photos.length, 1);
+  const inv = invoiceToDocument({ id: "i1", invoice_number: "INV-00003", total: 1150, subtotal: 1000 }, "invoice", { profile });
+  const blob = await buildDocumentPDF({ ...inv, jobCards: [card] }, { ...profile, logo_data: jpeg });
+  const buf = Buffer.from(await blob.arrayBuffer());
+  fs.writeFileSync("tests/sim/out/sample-invoice-jobcard.pdf", buf);
+  assert.match(buf.toString("latin1"), /\/Type \/Pages[\s\S]*?\/Count 2/);
+  // A job card on its own is a single page with no pricing.
+  assert.equal(documentTitle("jobcard"), "JOB CARD");
+  const alone = await buildDocumentPDF({ kind: "jobcard", number: card.number, jobCards: [card] }, profile);
+  const abuf = Buffer.from(await alone.arrayBuffer());
+  fs.writeFileSync("tests/sim/out/sample-jobcard.pdf", abuf);
+  assert.match(abuf.toString("latin1"), /\/Type \/Pages[\s\S]*?\/Count 1/);
 });

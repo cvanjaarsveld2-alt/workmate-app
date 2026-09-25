@@ -13,11 +13,17 @@ import {
   FileText,
   Save,
   WifiOff,
+  ClipboardList,
 } from "lucide-react";
 import { createInvoiceFromJob } from "../lib/jobInvoiceAutomation";
+import { CaptionedPhotos } from "../components/CaptionedPhotos";
+import { useCompanyProfile } from "../lib/companyProfile";
+import { buildDocumentPDF, documentFilename, shareDocumentPDF } from "../lib/documentPDF";
+import { jobToCard } from "../lib/documentData";
+import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
-export function JobsScreen({ userId, teamId, setData }) {
+export function JobsScreen({ userId, teamId, setData, clients = [] }) {
   const [jobs, setJobs] = useState([]),
     [quotes, setQuotes] = useState([]),
     [loading, setLoading] = useState(true),
@@ -27,6 +33,29 @@ export function JobsScreen({ userId, teamId, setData }) {
     [error, setError] = useState(""),
     [drafts, setDrafts] = useState({});
   const online = useOnlineStatus();
+  const profile = useCompanyProfile(teamId);
+  const [making, setMaking] = useState(null);
+  async function shareJobCard(job) {
+    setMaking(job.id);
+    setError("");
+    try {
+      const card = jobToCard({ ...job, photos: draft(job).photos }, { clients, quotes });
+      const doc = await resolveDocumentPhotos({
+        kind: "jobcard",
+        number: card.number,
+        client: { name: card.customer },
+        jobCards: [card],
+      });
+      const blob = await buildDocumentPDF(doc, profile);
+      const r = await shareDocumentPDF(blob, documentFilename(doc, profile), `Job card ${card.number}`);
+      if (r !== "cancelled") setError(r === "shared" ? "Job card shared." : "Job card PDF downloaded.");
+    } catch (err) {
+      console.error("Job card PDF failed:", err);
+      setError("Couldn't make the job card PDF.");
+    } finally {
+      setMaking(null);
+    }
+  }
   const apply = rows => {
     const mine = (rows || []).filter(
       j => j.user_id === userId || j.assigned_to_user_id === userId || (teamId && j.team_id === teamId),
@@ -40,6 +69,7 @@ export function JobsScreen({ userId, teamId, setData }) {
             technician_notes: j.technician_notes || "",
             work_done: j.work_done || "",
             parts_used: Array.isArray(j.parts_used) ? j.parts_used.join(", ") : "",
+            photos: Array.isArray(j.photos) ? j.photos.filter(p => p && typeof p === "object") : [],
           }),
       );
       return n;
@@ -78,7 +108,7 @@ export function JobsScreen({ userId, teamId, setData }) {
   useEffect(() => {
     load();
   }, [userId, teamId, online]);
-  const draft = j => drafts[j.id] || { technician_notes: "", work_done: "", parts_used: "" };
+  const draft = j => drafts[j.id] || { technician_notes: "", work_done: "", parts_used: "", photos: [] };
   async function updateJob(job, patch, key) {
     const updated = { ...job, ...patch, sync_status: "pending" };
     setSaving(key);
@@ -100,6 +130,7 @@ export function JobsScreen({ userId, teamId, setData }) {
           .split(",")
           .map(x => x.trim())
           .filter(Boolean),
+        photos: d.photos || [],
       },
       `save:${job.id}`,
     );
@@ -140,6 +171,7 @@ export function JobsScreen({ userId, teamId, setData }) {
         .split(",")
         .map(x => x.trim())
         .filter(Boolean),
+      photos: d.photos || [],
       sync_status: "pending",
     };
     setJobs(r => r.map(x => (x.id === job.id ? updated : x)));
@@ -269,6 +301,10 @@ export function JobsScreen({ userId, teamId, setData }) {
                     placeholder="Parts used (comma separated)"
                     className="w-full rounded-xl border p-2 text-sm"
                   />
+                  <CaptionedPhotos
+                    photos={d.photos || []}
+                    onChange={photos => setDrafts(x => ({ ...x, [job.id]: { ...draft(job), photos } }))}
+                  />
                   <Btn
                     size="sm"
                     variant="secondary"
@@ -291,6 +327,10 @@ export function JobsScreen({ userId, teamId, setData }) {
                     Open route
                   </a>
                 )}
+                <Btn size="sm" variant="secondary" onClick={() => shareJobCard(job)} disabled={making === job.id}>
+                  <ClipboardList size={13} />
+                  {making === job.id ? "Making…" : "Job card PDF"}
+                </Btn>
                 <Btn
                   size="sm"
                   variant="secondary"

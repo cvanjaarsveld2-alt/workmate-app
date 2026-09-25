@@ -10,7 +10,8 @@ import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { addDays } from "../lib/documentPDF";
 import { useCompanyProfile } from "../lib/companyProfile";
 import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
-import { quoteToDocument } from "../lib/documentData";
+import { jobToCard, jobsForQuote, quoteToDocument } from "../lib/documentData";
+import { offlineGetAll } from "../offline/offlineDb";
 import { autoCreateChaseFollowup, autoAdvanceOnAccept } from "../lib/quoteAutomation";
 import { offlineSave } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
@@ -72,14 +73,28 @@ export function QuotesScreen({
   const isMine = useIsMine(userId);
   const profile = useCompanyProfile(teamId);
   const [pdfFor, setPdfFor] = useState(null);
+  const [jobs, setJobs] = useState([]);
+  const [attachJobs, setAttachJobs] = useState(false);
+  useEffect(() => {
+    if (!pdfFor) return;
+    setAttachJobs(false);
+    offlineGetAll("jobs").then(
+      rows => setJobs(rows || []),
+      () => {},
+    );
+  }, [pdfFor]);
   async function sharePdf(q, kind) {
     try {
       setToast(kind === "quote" && hasDetails(q.details) ? "Preparing PDF…" : "");
       const me = teamMembers.find(m => m.user_id === userId || m.id === userId);
       const preparedBy = me?.full_name || me?.name || userEmail || "";
-      const doc = await resolveDocumentPhotos(
-        quoteToDocument(q, kind, { clients: data.clients || [], profile, preparedBy }),
-      );
+      const linked = attachJobs ? jobsForQuote(q, jobs) : [];
+      const doc = await resolveDocumentPhotos({
+        ...quoteToDocument(q, kind, { clients: data.clients || [], profile, preparedBy }),
+        ...(linked.length
+          ? { jobCards: linked.map(j => jobToCard(j, { clients: data.clients || [], quotes: data.quotes || [] })) }
+          : {}),
+      });
       const blob = await buildDocumentPDF(doc, profile);
       const r = await shareDocumentPDF(blob, documentFilename(doc, profile), `${documentTitle(kind, profile)} ${doc.number}`);
       if (r !== "cancelled") setToast(r === "shared" ? "PDF shared" : "PDF downloaded");
@@ -495,6 +510,17 @@ export function QuotesScreen({
                     <Trash2 size={15} />
                   </button>
                 </div>
+                {pdfFor === q.id && jobsForQuote(q, jobs).length > 0 && (
+                  <label className="mt-2 flex items-center gap-2 text-sm text-slate-600 min-h-[36px] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={attachJobs}
+                      onChange={e => setAttachJobs(e.target.checked)}
+                      className="h-5 w-5"
+                    />
+                    Attach job card{jobsForQuote(q, jobs).length > 1 ? "s" : ""}
+                  </label>
+                )}
                 {pdfFor === q.id && (
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <button

@@ -399,45 +399,57 @@ async function stageMissingDependencies(table, payload) {
   }
   return out;
 }
-// Detailed-quote photos are uploaded as part of pushing the quote, so the
-// server row never lands without them (a later pull would otherwise replace
-// the local copy that still holds the photo). The paths are also written back
-// to the device copy, which keeps its base64 for offline PDFs.
-async function uploadQuotePhotosBeforePush(rawData) {
-  const sections = rawData?.details?.sections;
-  if (!Array.isArray(sections) || !navigator.onLine) return rawData;
-  if (!sections.some(sec => (sec.photos || []).some(p => p?.base64 && !p.storage_path))) return rawData;
+// Photos held inside a record: detailed-quote sections and job-card photos.
+// They're uploaded as part of pushing the record, so the server row never
+// lands without them (a later pull would otherwise replace the local copy
+// that still holds the photo). Paths are written back to the device copy,
+// which keeps its base64 so PDFs still work offline.
+const PHOTO_HOLDERS = {
+  quotes: {
+    list: r => (Array.isArray(r?.details?.sections) ? r.details.sections : []).flatMap(sec => sec?.photos || []),
+    map: (r, fn) => ({
+      ...r,
+      details: { ...r.details, sections: (r.details?.sections || []).map(sec => ({ ...sec, photos: (sec.photos || []).map(fn) })) },
+    }),
+  },
+  jobs: {
+    list: r => (Array.isArray(r?.photos) ? r.photos : []),
+    map: (r, fn) => ({ ...r, photos: (r.photos || []).map(fn) }),
+  },
+};
+const needsUpload = p => p && typeof p === "object" && p.base64 && !p.storage_path;
+async function uploadHeldPhotos(table, row) {
+  const holder = PHOTO_HOLDERS[table];
   const paths = {};
-  for (const sec of sections)
-    for (const p of sec.photos || []) {
-      if (!p?.base64 || p.storage_path) continue;
-      try {
-        const up = await uploadPhotoToSupabaseWithPath(p.base64, `quotes/${rawData.id}/${p.id}`);
-        if (up?.path) paths[p.id] = up.path;
-      } catch (e) {
-        console.warn("[Sync] quote photo upload failed", e);
-      }
+  for (const p of holder.list(row).filter(needsUpload)) {
+    try {
+      const up = await uploadPhotoToSupabaseWithPath(p.base64, `${table}/${row.id}/${p.id}`);
+      if (up?.path) paths[p.id] = up.path;
+    } catch (e) {
+      console.warn(`[Sync] photo upload failed for ${table}/${row.id}/${p.id}`, e);
     }
+  }
+  return paths;
+}
+const withPhotoPaths = (table, row, paths) =>
+  PHOTO_HOLDERS[table].map(row, p => (p && paths[p.id] ? { ...p, storage_path: paths[p.id], uploadStatus: "done" } : p));
+async function uploadPhotosBeforePush(table, rawData) {
+  if (!PHOTO_HOLDERS[table] || !navigator.onLine) return rawData;
+  if (!PHOTO_HOLDERS[table].list(rawData).some(needsUpload)) return rawData;
+  const paths = await uploadHeldPhotos(table, rawData);
   if (!Object.keys(paths).length) return rawData;
-  const withPaths = row => ({
-    ...row,
-    details: {
-      ...row.details,
-      sections: (row.details?.sections || []).map(sec => ({
-        ...sec,
-        photos: (sec.photos || []).map(p => (paths[p?.id] ? { ...p, storage_path: paths[p.id], uploadStatus: "done" } : p)),
-      })),
-    },
-  });
   try {
-    const local = (await offlineGetAll("quotes")).find(r => r.id === rawData.id);
-    if (local) await offlineSave("quotes", withPaths(local));
-    _globalSetData?.(d => ({ ...d, quotes: (d.quotes || []).map(q => (q.id === rawData.id ? withPaths(q) : q)) }));
+    const local = localStoreName(table);
+    const row = (await offlineGetAll(local)).find(r => r.id === rawData.id);
+    if (row) await offlineSave(local, withPhotoPaths(table, row, paths));
+    _globalSetData?.(d =>
+      Array.isArray(d[local]) ? { ...d, [local]: d[local].map(r => (r.id === rawData.id ? withPhotoPaths(table, r, paths) : r)) } : d,
+    );
   } catch {}
-  return withPaths(rawData);
+  return withPhotoPaths(table, rawData, paths);
 }
 async function pushOne(table, action, rawData) {
-  if (table === "quotes") rawData = await uploadQuotePhotosBeforePush(rawData);
+  rawData = await uploadPhotosBeforePush(table, rawData);
   let payload = sanitizeRemotePayload(table, cleanDates(cleanNumerics(cleanUUIDs(rawData))));
   if (table === "vehicle_checks") payload = normalizeVehicleCheckPayload(payload);
   if (payload.media) payload = { ...payload, media: payload.media.map(m => ({ ...m, base64: undefined })) };
@@ -1179,46 +1191,24 @@ function queueMediaCorrection(table, updated, setData) {
   }));
   return offlineSave("syncQueue", queueItem);
 }
-// quotes: photos inside details.sections[].photos (detailed quotes). The local
-// copy keeps its base64 after upload so the quote PDF still works offline;
-// the sync payload never carries it (stripEmbeddedBase64).
-async function retryQuoteMedia(setData) {
+// Detailed-quote and job-card photos still waiting for upload (e.g. the push
+// happened while the upload failed): retried with the other pending media.
+async function retryHeldPhotos(table, setData) {
   let rows;
   try {
-    rows = await offlineGetAll("quotes");
+    rows = await offlineGetAll(localStoreName(table));
   } catch {
     return false;
   }
   let any = false;
   for (const row of rows) {
-    const sections = Array.isArray(row.details?.sections) ? row.details.sections : [];
-    if (!sections.some(sec => (sec.photos || []).some(p => p && p.base64 && !p.storage_path))) continue;
-    let changed = false;
-    const nextSections = [];
-    for (const sec of sections) {
-      const photos = [];
-      for (const p of sec.photos || []) {
-        if (p && p.base64 && !p.storage_path) {
-          try {
-            const uploaded = await uploadPhotoToSupabaseWithPath(p.base64, `quotes/${row.id}/${p.id}`);
-            if (uploaded) {
-              photos.push({ ...p, storage_path: uploaded.path, uploadStatus: "done" });
-              changed = true;
-              continue;
-            }
-          } catch (e) {
-            console.warn(`[Sync] quote photo upload failed for ${row.id}/${p.id}`, e);
-          }
-        }
-        photos.push(p);
-      }
-      nextSections.push({ ...sec, photos });
-    }
-    if (!changed) continue;
+    if (!PHOTO_HOLDERS[table].list(row).some(needsUpload)) continue;
+    const paths = await uploadHeldPhotos(table, row);
+    if (!Object.keys(paths).length) continue;
     any = true;
-    const updated = { ...row, details: { ...row.details, sections: nextSections }, sync_status: "pending" };
-    await offlineSave("quotes", updated);
-    await queueMediaCorrection("quotes", updated, setData);
+    const updated = { ...withPhotoPaths(table, row, paths), sync_status: "pending" };
+    await offlineSave(localStoreName(table), updated);
+    await queueMediaCorrection(table, updated, setData);
   }
   return any;
 }
@@ -1391,7 +1381,8 @@ export async function retryPendingMedia(uid, setData) {
       retryReportMedia("breakdown_reports", uid, setData),
       retryReportMedia("repair_reports", uid, setData),
       retryVehicleCheckMedia(uid, setData),
-      retryQuoteMedia(setData),
+      retryHeldPhotos("quotes", setData),
+      retryHeldPhotos("jobs", setData),
     ]);
     const any = results.some(Boolean);
     if (any) triggerImmediateSync();

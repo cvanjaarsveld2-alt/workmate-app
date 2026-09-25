@@ -268,3 +268,14 @@ uses the app keeps its own (`team_profiles`, one row per team).
   there's signal. PDFs scale them down (a quote with ten photos is about
   1–2 MB). A photo that isn't on the phone can only be included while
   online.
+- **Job cards.** Technicians can add photos with captions to a job's field
+  report. The job card page shows:
+  - customer, site, times and technician;
+  - description, findings and work done;
+  - parts used and photos;
+  - a technician and customer sign-off.
+
+  Where to get one:
+  - Jobs → *Job card PDF* on its own.
+  - Invoices → tick *Attach job card* before *Invoice PDF* or *Pro forma*.
+  - Quotes → the PDF button → *Attach job card* (once the quote has a job).

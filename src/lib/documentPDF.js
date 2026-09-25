@@ -15,6 +15,7 @@ export const chargesVat = profile => profile?.vat_registered !== false;
 export function documentTitle(kind, profile = {}) {
   if (kind === "quote") return "QUOTATION";
   if (kind === "proforma") return "PRO FORMA INVOICE";
+  if (kind === "jobcard") return "JOB CARD";
   return chargesVat(profile) && profile.vat_no ? "TAX INVOICE" : "INVOICE";
 }
 
@@ -70,7 +71,10 @@ export function documentFilename(doc, profile = {}) {
     .toLowerCase()
     .replace(/(^|\s)\w/g, c => c.toUpperCase())
     .replace(/\s+/g, "_");
-  const safe = s => String(s || "").replace(/[^A-Za-z0-9-]+/g, "_").replace(/^_+|_+$/g, "");
+  const safe = s =>
+    String(s || "")
+      .replace(/[^A-Za-z0-9-]+/g, "_")
+      .replace(/^_+|_+$/g, "");
   return [title, safe(doc.number), safe(doc.client?.name)].filter(Boolean).join("_") + ".pdf";
 }
 
@@ -110,7 +114,14 @@ export async function buildDocumentPDF(doc, profile = {}) {
       try {
         const props = pdf.getImageProperties(profile.logo_data);
         const scale = Math.min(110 / props.width, 40 / props.height);
-        pdf.addImage(profile.logo_data, props.fileType || "PNG", M, cy, props.width * scale, props.height * scale);
+        pdf.addImage(
+          profile.logo_data,
+          props.fileType || "PNG",
+          M,
+          cy,
+          props.width * scale,
+          props.height * scale,
+        );
         cy += props.height * scale + 25;
       } catch {
         cy += 10;
@@ -169,172 +180,71 @@ export async function buildDocumentPDF(doc, profile = {}) {
     y = M;
   }
 
-  // ── Header: logo left, company details right ──
-  let logoH = 0;
-  let hasLogo = false;
-  if (profile.logo_data) {
-    try {
-      const props = pdf.getImageProperties(profile.logo_data);
-      const scale = Math.min(70 / props.width, 26 / props.height);
-      const w = props.width * scale,
-        h = props.height * scale;
-      pdf.addImage(profile.logo_data, props.fileType || "PNG", M, y, w, h);
-      logoH = h;
-      hasLogo = true;
-    } catch {
-      logoH = 0;
-    }
-  }
-  if (!logoH) {
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(16);
-    pdf.setTextColor(...brand);
-    const lines = pdf.splitTextToSize(companyName, 90);
-    text(lines, M, y + 6);
-    logoH = 6 + lines.length * 6;
-  }
-  let ry = y + 3;
-  // The name is already the big heading when there's no logo.
-  if (hasLogo) {
-    pdf.setTextColor(...ink);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(10);
-    text(companyName, right, ry, { align: "right" });
-    ry += 4.5;
-  }
-  pdf.setFont("helvetica", "normal");
-  pdf.setFontSize(8);
-  pdf.setTextColor(...grey);
-  const companyLines = [
-    profile.legal_name && profile.legal_name !== companyName ? profile.legal_name : "",
-    profile.registration_no ? `Reg. No: ${profile.registration_no}` : "",
-    chargesVat(profile) && profile.vat_no ? `VAT No: ${profile.vat_no}` : "",
-    ...String(profile.address || "")
-      .split(/\n/)
-      .map(s => s.trim())
-      .filter(Boolean)
-      .flatMap(l => pdf.splitTextToSize(l, 85))
-      .slice(0, 5),
-    [profile.phone, profile.email].filter(Boolean).join("  ·  "),
-    profile.website || "",
-  ].filter(Boolean);
-  for (const l of companyLines) {
-    text(l, right, ry, { align: "right" });
-    ry += 3.8;
-  }
-  y = Math.max(y + logoH, ry) + 3;
-  pdf.setDrawColor(...brand);
-  pdf.setLineWidth(0.8);
-  pdf.line(M, y, right, y);
-  y += 9;
-
-  // ── Title and document details ──
-  pdf.setFont("helvetica", "bold");
-  pdf.setFontSize(18);
-  pdf.setTextColor(...brand);
-  text(title, M, y);
-  if (doc.draft) {
-    pdf.setFontSize(9);
-    pdf.setTextColor(200, 120, 0);
-    text("DRAFT · number is assigned once synced", right, y, { align: "right" });
-  }
-  y += 8;
-  if (doc.title) {
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(12);
-    pdf.setTextColor(...ink);
-    const lines = pdf.splitTextToSize(doc.title, right - M);
-    text(lines, M, y - 1);
-    y += lines.length * 5.5 + 2;
-  }
-
-  const meta = [
-    [kind === "quote" ? "Quote no." : kind === "proforma" ? "Pro forma no." : "Invoice no.", doc.number || "—"],
-    ["Date", fmtDate(doc.date)],
-    kind === "quote" && doc.validUntil ? ["Valid until", fmtDate(doc.validUntil)] : null,
-    kind !== "quote" && doc.dueDate ? ["Payment due", fmtDate(doc.dueDate)] : null,
-    doc.reference ? ["Reference", doc.reference] : null,
-    doc.orderNumber ? ["Order no.", doc.orderNumber] : null,
-    kind === "quote" && doc.preparedBy ? ["Prepared by", doc.preparedBy] : null,
-  ].filter(Boolean);
-
-  const c = doc.client || {};
-  const billTo = [
-    c.name,
-    c.contact ? `Attn: ${c.contact}` : "",
-    ...String(c.address || "")
-      .split(/\n/)
-      .map(s => s.trim())
-      .filter(Boolean),
-    [c.phone, c.email].filter(Boolean).join("  ·  "),
-    c.vat ? `VAT No: ${c.vat}` : "",
-  ].filter(Boolean);
-
-  const colW = (right - M) / 2 - 4;
-  pdf.setFontSize(8);
-  pdf.setFont("helvetica", "bold");
-  pdf.setTextColor(...grey);
-  text(kind === "quote" ? "PREPARED FOR" : "BILL TO", M, y);
-  pdf.setFont("helvetica", "normal");
-  pdf.setTextColor(...ink);
-  pdf.setFontSize(9.5);
-  let ly = y + 5;
-  billTo.forEach((l, i) => {
-    pdf.setFont("helvetica", i === 0 ? "bold" : "normal");
-    const lines = pdf.splitTextToSize(l, colW);
-    text(lines, M, ly);
-    ly += lines.length * 4.4;
-  });
-  let my = y;
-  const mx = M + colW + 8;
-  pdf.setFontSize(9);
-  for (const [k, v] of meta) {
-    pdf.setFont("helvetica", "normal");
-    pdf.setTextColor(...grey);
-    text(k, mx, my);
-    pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(...ink);
-    text(v, right, my, { align: "right" });
-    my += 5;
-  }
-  y = Math.max(ly, my) + 4;
-
-  // ── Introduction / scope (optional) ──
-  if (doc.intro) {
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(9.5);
-    pdf.setTextColor(...ink);
-    for (const line of pdf.splitTextToSize(doc.intro, right - M)) {
-      ensureSpace(5);
-      text(line, M, y);
-      y += 4.4;
-    }
-    y += 3;
-  }
-
-  // ── Write-up sections with photos (detailed quotes) ──
-  const sections = (doc.sections || []).filter(sec => sec && (sec.title || sec.body || sec.photos?.length));
-  for (const sec of sections) {
-    ensureSpace(16);
-    if (sec.title) {
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(11.5);
-      pdf.setTextColor(...brand);
-      text(sec.title, M, y);
-      y += 6;
-    }
-    if (sec.body) {
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9.5);
-      pdf.setTextColor(...ink);
-      for (const line of pdf.splitTextToSize(sec.body, right - M)) {
-        ensureSpace(5);
-        text(line, M, y);
-        y += 4.4;
+  const drawHeader = () => {
+    // ── Header: logo left, company details right ──
+    let logoH = 0;
+    let hasLogo = false;
+    if (profile.logo_data) {
+      try {
+        const props = pdf.getImageProperties(profile.logo_data);
+        const scale = Math.min(70 / props.width, 26 / props.height);
+        const w = props.width * scale,
+          h = props.height * scale;
+        pdf.addImage(profile.logo_data, props.fileType || "PNG", M, y, w, h);
+        logoH = h;
+        hasLogo = true;
+      } catch {
+        logoH = 0;
       }
-      y += 2;
     }
-    const photos = (sec.photos || []).filter(p => p && p.data);
+    if (!logoH) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(16);
+      pdf.setTextColor(...brand);
+      const lines = pdf.splitTextToSize(companyName, 90);
+      text(lines, M, y + 6);
+      logoH = 6 + lines.length * 6;
+    }
+    let ry = y + 3;
+    // The name is already the big heading when there's no logo.
+    if (hasLogo) {
+      pdf.setTextColor(...ink);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      text(companyName, right, ry, { align: "right" });
+      ry += 4.5;
+    }
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(8);
+    pdf.setTextColor(...grey);
+    const companyLines = [
+      profile.legal_name && profile.legal_name !== companyName ? profile.legal_name : "",
+      profile.registration_no ? `Reg. No: ${profile.registration_no}` : "",
+      chargesVat(profile) && profile.vat_no ? `VAT No: ${profile.vat_no}` : "",
+      ...String(profile.address || "")
+        .split(/\n/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .flatMap(l => pdf.splitTextToSize(l, 85))
+        .slice(0, 5),
+      [profile.phone, profile.email].filter(Boolean).join("  ·  "),
+      profile.website || "",
+    ].filter(Boolean);
+    for (const l of companyLines) {
+      text(l, right, ry, { align: "right" });
+      ry += 3.8;
+    }
+    y = Math.max(y + logoH, ry) + 3;
+    pdf.setDrawColor(...brand);
+    pdf.setLineWidth(0.8);
+    pdf.line(M, y, right, y);
+    y += 9;
+  };
+  drawHeader();
+
+  // Photos two per row (one photo: wider), captions underneath.
+  const drawPhotos = all => {
+    const photos = (all || []).filter(p => p && p.data);
     const gap = 6,
       cw = photos.length === 1 ? Math.min(right - M, 125) : (right - M - gap) / 2,
       maxH = photos.length === 1 ? 95 : 68;
@@ -374,76 +284,14 @@ export async function buildDocumentPDF(doc, profile = {}) {
       });
       y += rowH;
     }
-    if (photos.length < (sec.photos || []).length) {
+    if (photos.length < (all || []).length) {
       pdf.setFont("helvetica", "italic");
       pdf.setFontSize(7.5);
       pdf.setTextColor(...grey);
       text("Some photos couldn't be included (not available on this device).", M, y);
       y += 5;
     }
-    y += 3;
-  }
-  if (sections.length) {
-    ensureSpace(24);
-    pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(11.5);
-    pdf.setTextColor(...brand);
-    text("Pricing", M, y);
-    y += 4;
-  }
-
-  // ── Line items ──
-  const items = (doc.items || []).filter(i => i && (i.description || Number(i.unitPrice)));
-  autoTable(pdf, {
-    startY: y,
-    head: [["#", "Description", "Qty", "Unit price", "Amount"]],
-    body: items.map((i, n) => {
-      const qty = Number(i.qty) || 0,
-        price = Number(i.unitPrice) || 0;
-      return [n + 1, i.description || "", qty % 1 ? qty.toFixed(2) : qty, money(price), money(qty * price)];
-    }),
-    margin: { left: M, right: M, bottom: FOOT + 4 },
-    styles: { fontSize: 9, cellPadding: 2.6, textColor: ink, lineColor: [230, 230, 230], lineWidth: 0.1 },
-    headStyles: { fillColor: brand, textColor: [255, 255, 255], fontStyle: "bold" },
-    alternateRowStyles: { fillColor: [248, 248, 248] },
-    columnStyles: {
-      0: { cellWidth: 9, halign: "center" },
-      2: { cellWidth: 14, halign: "center" },
-      3: { cellWidth: 30, halign: "right" },
-      4: { cellWidth: 32, halign: "right" },
-    },
-  });
-  y = pdf.lastAutoTable.finalY + 6;
-
-  // ── Totals ──
-  const vatOn = chargesVat(profile);
-  const t = documentTotals(items, {
-    vatInclusive: doc.vatInclusive !== false,
-    amountPaid: doc.amountPaid,
-    vatRegistered: vatOn,
-  });
-  const rows = vatOn
-    ? [
-        ["Subtotal (excl. VAT)", money(t.subtotal)],
-        [`VAT (${VAT_RATE}%)`, money(t.vat)],
-        ["Total (incl. VAT)", money(t.total), true],
-      ]
-    : [["Total", money(t.total), true]];
-  if (kind === "invoice" && t.paid > 0) {
-    rows.push(["Paid", money(t.paid)]);
-    rows.push(["Balance due", money(t.balance), true]);
-  }
-  ensureSpace(rows.length * 6 + 4);
-  for (const [k, v, bold] of rows) {
-    pdf.setFont("helvetica", bold ? "bold" : "normal");
-    pdf.setFontSize(bold ? 11 : 9.5);
-    pdf.setTextColor(...(bold ? ink : grey));
-    text(k, right - 42, y, { align: "right" });
-    pdf.setTextColor(...ink);
-    text(v, right, y, { align: "right" });
-    y += bold ? 6.5 : 5.2;
-  }
-  y += 3;
+  };
 
   const section = (heading, body, size = 8.5) => {
     if (!body) return;
@@ -465,78 +313,353 @@ export async function buildDocumentPDF(doc, profile = {}) {
     y += 4;
   };
 
-  section("Notes", doc.notes, 9);
-  section("Exclusions", doc.exclusions, 8.5);
-  if (kind === "proforma")
-    section(
-      "Please note",
-      chargesVat(profile)
-        ? "This is a pro forma invoice and not a tax invoice. A tax invoice will be issued once payment is received or the goods or services are supplied."
-        : "This is a pro forma invoice. An invoice will be issued once payment is received or the goods or services are supplied.",
-    );
-
-  // ── Banking details (what the customer pays into) ──
-  const bank = [
-    profile.bank_name ? ["Bank", profile.bank_name] : null,
-    profile.bank_account_name ? ["Account name", profile.bank_account_name] : null,
-    profile.bank_account_no ? ["Account number", profile.bank_account_no] : null,
-    profile.bank_account_type ? ["Account type", profile.bank_account_type] : null,
-    profile.bank_branch_code ? ["Branch code", profile.bank_branch_code] : null,
-    profile.bank_swift ? ["SWIFT", profile.bank_swift] : null,
-    ["Payment reference", doc.number || ""],
-  ].filter(Boolean);
-  if (kind !== "quote" && bank.length > 1) {
-    const boxH = 7 + bank.length * 4.6;
-    ensureSpace(boxH + 4);
-    pdf.setFillColor(248, 246, 246);
-    pdf.setDrawColor(230, 225, 225);
-    pdf.roundedRect(M, y - 4, right - M, boxH, 2, 2, "FD");
+  if (kind !== "jobcard") {
+    // ── Title and document details ──
     pdf.setFont("helvetica", "bold");
-    pdf.setFontSize(9);
+    pdf.setFontSize(18);
     pdf.setTextColor(...brand);
-    text("Banking details", M + 4, y + 1);
-    let by = y + 6;
-    pdf.setFontSize(8.5);
-    for (const [k, v] of bank) {
+    text(title, M, y);
+    if (doc.draft) {
+      pdf.setFontSize(9);
+      pdf.setTextColor(200, 120, 0);
+      text("DRAFT · number is assigned once synced", right, y, { align: "right" });
+    }
+    y += 8;
+    if (doc.title) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.setTextColor(...ink);
+      const lines = pdf.splitTextToSize(doc.title, right - M);
+      text(lines, M, y - 1);
+      y += lines.length * 5.5 + 2;
+    }
+
+    const meta = [
+      [
+        kind === "quote" ? "Quote no." : kind === "proforma" ? "Pro forma no." : "Invoice no.",
+        doc.number || "—",
+      ],
+      ["Date", fmtDate(doc.date)],
+      kind === "quote" && doc.validUntil ? ["Valid until", fmtDate(doc.validUntil)] : null,
+      kind !== "quote" && doc.dueDate ? ["Payment due", fmtDate(doc.dueDate)] : null,
+      doc.reference ? ["Reference", doc.reference] : null,
+      doc.orderNumber ? ["Order no.", doc.orderNumber] : null,
+      kind === "quote" && doc.preparedBy ? ["Prepared by", doc.preparedBy] : null,
+    ].filter(Boolean);
+
+    const c = doc.client || {};
+    const billTo = [
+      c.name,
+      c.contact ? `Attn: ${c.contact}` : "",
+      ...String(c.address || "")
+        .split(/\n/)
+        .map(s => s.trim())
+        .filter(Boolean),
+      [c.phone, c.email].filter(Boolean).join("  ·  "),
+      c.vat ? `VAT No: ${c.vat}` : "",
+    ].filter(Boolean);
+
+    const colW = (right - M) / 2 - 4;
+    pdf.setFontSize(8);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(...grey);
+    text(kind === "quote" ? "PREPARED FOR" : "BILL TO", M, y);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(...ink);
+    pdf.setFontSize(9.5);
+    let ly = y + 5;
+    billTo.forEach((l, i) => {
+      pdf.setFont("helvetica", i === 0 ? "bold" : "normal");
+      const lines = pdf.splitTextToSize(l, colW);
+      text(lines, M, ly);
+      ly += lines.length * 4.4;
+    });
+    let my = y;
+    const mx = M + colW + 8;
+    pdf.setFontSize(9);
+    for (const [k, v] of meta) {
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(...grey);
-      text(k, M + 4, by);
+      text(k, mx, my);
       pdf.setFont("helvetica", "bold");
       pdf.setTextColor(...ink);
-      text(v, M + 40, by);
-      by += 4.6;
+      text(v, right, my, { align: "right" });
+      my += 5;
     }
-    y += boxH + 4;
+    y = Math.max(ly, my) + 4;
+
+    // ── Introduction / scope (optional) ──
+    if (doc.intro) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(...ink);
+      for (const line of pdf.splitTextToSize(doc.intro, right - M)) {
+        ensureSpace(5);
+        text(line, M, y);
+        y += 4.4;
+      }
+      y += 3;
+    }
+
+    // ── Write-up sections with photos (detailed quotes) ──
+    const sections = (doc.sections || []).filter(sec => sec && (sec.title || sec.body || sec.photos?.length));
+    for (const sec of sections) {
+      ensureSpace(16);
+      if (sec.title) {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(11.5);
+        pdf.setTextColor(...brand);
+        text(sec.title, M, y);
+        y += 6;
+      }
+      if (sec.body) {
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(9.5);
+        pdf.setTextColor(...ink);
+        for (const line of pdf.splitTextToSize(sec.body, right - M)) {
+          ensureSpace(5);
+          text(line, M, y);
+          y += 4.4;
+        }
+        y += 2;
+      }
+      drawPhotos(sec.photos || []);
+      y += 3;
+    }
+    if (sections.length) {
+      ensureSpace(24);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(11.5);
+      pdf.setTextColor(...brand);
+      text("Pricing", M, y);
+      y += 4;
+    }
+
+    // ── Line items ──
+    const items = (doc.items || []).filter(i => i && (i.description || Number(i.unitPrice)));
+    autoTable(pdf, {
+      startY: y,
+      head: [["#", "Description", "Qty", "Unit price", "Amount"]],
+      body: items.map((i, n) => {
+        const qty = Number(i.qty) || 0,
+          price = Number(i.unitPrice) || 0;
+        return [n + 1, i.description || "", qty % 1 ? qty.toFixed(2) : qty, money(price), money(qty * price)];
+      }),
+      margin: { left: M, right: M, bottom: FOOT + 4 },
+      styles: { fontSize: 9, cellPadding: 2.6, textColor: ink, lineColor: [230, 230, 230], lineWidth: 0.1 },
+      headStyles: { fillColor: brand, textColor: [255, 255, 255], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 248, 248] },
+      columnStyles: {
+        0: { cellWidth: 9, halign: "center" },
+        2: { cellWidth: 14, halign: "center" },
+        3: { cellWidth: 30, halign: "right" },
+        4: { cellWidth: 32, halign: "right" },
+      },
+    });
+    y = pdf.lastAutoTable.finalY + 6;
+
+    // ── Totals ──
+    const vatOn = chargesVat(profile);
+    const t = documentTotals(items, {
+      vatInclusive: doc.vatInclusive !== false,
+      amountPaid: doc.amountPaid,
+      vatRegistered: vatOn,
+    });
+    const rows = vatOn
+      ? [
+          ["Subtotal (excl. VAT)", money(t.subtotal)],
+          [`VAT (${VAT_RATE}%)`, money(t.vat)],
+          ["Total (incl. VAT)", money(t.total), true],
+        ]
+      : [["Total", money(t.total), true]];
+    if (kind === "invoice" && t.paid > 0) {
+      rows.push(["Paid", money(t.paid)]);
+      rows.push(["Balance due", money(t.balance), true]);
+    }
+    ensureSpace(rows.length * 6 + 4);
+    for (const [k, v, bold] of rows) {
+      pdf.setFont("helvetica", bold ? "bold" : "normal");
+      pdf.setFontSize(bold ? 11 : 9.5);
+      pdf.setTextColor(...(bold ? ink : grey));
+      text(k, right - 42, y, { align: "right" });
+      pdf.setTextColor(...ink);
+      text(v, right, y, { align: "right" });
+      y += bold ? 6.5 : 5.2;
+    }
+    y += 3;
+
+    section("Notes", doc.notes, 9);
+    section("Exclusions", doc.exclusions, 8.5);
+    if (kind === "proforma")
+      section(
+        "Please note",
+        chargesVat(profile)
+          ? "This is a pro forma invoice and not a tax invoice. A tax invoice will be issued once payment is received or the goods or services are supplied."
+          : "This is a pro forma invoice. An invoice will be issued once payment is received or the goods or services are supplied.",
+      );
+
+    // ── Banking details (what the customer pays into) ──
+    const bank = [
+      profile.bank_name ? ["Bank", profile.bank_name] : null,
+      profile.bank_account_name ? ["Account name", profile.bank_account_name] : null,
+      profile.bank_account_no ? ["Account number", profile.bank_account_no] : null,
+      profile.bank_account_type ? ["Account type", profile.bank_account_type] : null,
+      profile.bank_branch_code ? ["Branch code", profile.bank_branch_code] : null,
+      profile.bank_swift ? ["SWIFT", profile.bank_swift] : null,
+      ["Payment reference", doc.number || ""],
+    ].filter(Boolean);
+    if (kind !== "quote" && bank.length > 1) {
+      const boxH = 7 + bank.length * 4.6;
+      ensureSpace(boxH + 4);
+      pdf.setFillColor(248, 246, 246);
+      pdf.setDrawColor(230, 225, 225);
+      pdf.roundedRect(M, y - 4, right - M, boxH, 2, 2, "FD");
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...brand);
+      text("Banking details", M + 4, y + 1);
+      let by = y + 6;
+      pdf.setFontSize(8.5);
+      for (const [k, v] of bank) {
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(...grey);
+        text(k, M + 4, by);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(...ink);
+        text(v, M + 40, by);
+        by += 4.6;
+      }
+      y += boxH + 4;
+    }
+
+    section("Terms and conditions", kind === "invoice" ? profile.invoice_terms : profile.quote_terms, 7.8);
+
+    // ── Acceptance (quotes) ──
+    if (kind === "quote") {
+      ensureSpace(30);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...brand);
+      text("Acceptance", M, y);
+      y += 5;
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(...ink);
+      text("I accept this quotation and its terms and conditions.", M, y);
+      y += 10;
+      pdf.setDrawColor(160, 160, 160);
+      pdf.setLineWidth(0.2);
+      const cols = ["Name", "Signature", "Date", "Order no."];
+      const cw = (right - M - 9) / 4;
+      cols.forEach((label, i) => {
+        const x = M + i * (cw + 3);
+        pdf.line(x, y, x + cw, y);
+        pdf.setTextColor(...grey);
+        pdf.setFontSize(7.5);
+        text(label, x, y + 4);
+      });
+      y += 8;
+    }
   }
 
-  section("Terms and conditions", kind === "invoice" ? profile.invoice_terms : profile.quote_terms, 7.8);
-
-  // ── Acceptance (quotes) ──
-  if (kind === "quote") {
-    ensureSpace(30);
+  // ── Job cards: one per page, after the document (or on their own) ──
+  (doc.jobCards || []).forEach((jc, i) => {
+    if (kind !== "jobcard" || i > 0) {
+      pdf.addPage();
+      y = M;
+      drawHeader();
+    }
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(18);
+    pdf.setTextColor(...brand);
+    text("JOB CARD", M, y);
+    pdf.setFontSize(11);
+    pdf.setTextColor(...ink);
+    text(jc.number || "", right, y, { align: "right" });
+    y += 7;
+    if (jc.title) {
+      pdf.setFontSize(12);
+      const lines = pdf.splitTextToSize(jc.title, right - M);
+      text(lines, M, y);
+      y += lines.length * 5.5 + 1;
+    }
+    const facts = [
+      ["Customer", jc.customer],
+      ["Site / location", jc.location],
+      ["Scheduled", jc.scheduled],
+      ["Started", jc.started],
+      ["Completed", jc.completed],
+      ["Technician", jc.technician],
+      ["Status", jc.status],
+      ["Reference", jc.reference],
+    ].filter(([, v]) => v);
+    if (facts.length) {
+      autoTable(pdf, {
+        startY: y,
+        body: facts,
+        margin: { left: M, right: M, bottom: FOOT + 4 },
+        theme: "plain",
+        styles: { fontSize: 9, cellPadding: 1.8, textColor: ink },
+        columnStyles: { 0: { cellWidth: 38, textColor: grey }, 1: { fontStyle: "bold" } },
+      });
+      y = pdf.lastAutoTable.finalY + 5;
+    }
+    section("Job description", jc.description, 9);
+    section("Findings / technician notes", jc.notes, 9);
+    section("Work done", jc.workDone, 9);
+    if (jc.parts?.length) {
+      ensureSpace(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...brand);
+      text("Parts used", M, y);
+      autoTable(pdf, {
+        startY: y + 2,
+        head: [["#", "Part"]],
+        body: jc.parts.map((part, n) => [n + 1, part]),
+        margin: { left: M, right: M, bottom: FOOT + 4 },
+        styles: { fontSize: 9, cellPadding: 2, textColor: ink },
+        headStyles: { fillColor: brand, textColor: [255, 255, 255] },
+        columnStyles: { 0: { cellWidth: 10, halign: "center" } },
+      });
+      y = pdf.lastAutoTable.finalY + 6;
+    }
+    if (jc.photos?.length) {
+      ensureSpace(12);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...brand);
+      text("Photos", M, y);
+      y += 4;
+      drawPhotos(jc.photos);
+    }
+    // Sign-off
+    ensureSpace(28);
+    y += 4;
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(9);
     pdf.setTextColor(...brand);
-    text("Acceptance", M, y);
-    y += 5;
-    pdf.setFont("helvetica", "normal");
-    pdf.setFontSize(8.5);
-    pdf.setTextColor(...ink);
-    text("I accept this quotation and its terms and conditions.", M, y);
-    y += 10;
+    text("Sign-off", M, y);
+    y += 12;
     pdf.setDrawColor(160, 160, 160);
     pdf.setLineWidth(0.2);
-    const cols = ["Name", "Signature", "Date", "Order no."];
-    const cw = (right - M - 9) / 4;
-    cols.forEach((label, i) => {
-      const x = M + i * (cw + 3);
+    const cw = (right - M - 6) / 2;
+    [
+      ["Technician", "Name / signature / date"],
+      ["Customer", "Name / signature / date"],
+    ].forEach(([who, hint], j) => {
+      const x = M + j * (cw + 6);
       pdf.line(x, y, x + cw, y);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...ink);
+      text(who, x, y + 4);
+      pdf.setFont("helvetica", "normal");
       pdf.setTextColor(...grey);
-      pdf.setFontSize(7.5);
-      text(label, x, y + 4);
+      text(hint, x + 22, y + 4);
     });
-    y += 8;
-  }
+    y += 10;
+  });
 
   // ── Footer on every page ──
   const pages = pdf.getNumberOfPages();

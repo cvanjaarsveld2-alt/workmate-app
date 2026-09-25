@@ -4,11 +4,10 @@
 // Stored on the quote as `details` (see supabase/migrations/*_quote_details.sql)
 // and printed by src/lib/documentPDF.js.
 import React from "react";
-import { ArrowDown, ArrowUp, Plus, Trash2, X, FileText } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Trash2, FileText } from "lucide-react";
 import { Field } from "./ui";
-import { MediaPicker } from "./MediaComponents";
+import { CaptionedPhotos } from "./CaptionedPhotos";
 import { genId } from "../lib/helpers";
-import { useStoredPhoto } from "../lib/useStoredPhoto";
 
 const SUGGESTED = ["Scope of work", "Site findings", "Recommendations", "Timeline", "Warranty"];
 const MAX_PHOTOS_PER_SECTION = 12;
@@ -17,18 +16,6 @@ export const emptyDetails = () => ({ title: "", intro: "", cover: false, exclusi
 
 export function hasDetails(d) {
   return !!(d && (d.title || d.intro || d.exclusions || d.cover || (d.sections || []).length));
-}
-
-function Thumb({ photo }) {
-  const stored = useStoredPhoto(photo.base64 ? null : photo.storage_path);
-  const src = photo.base64 || stored.url;
-  return src ? (
-    <img src={src} alt={photo.caption || "Quote photo"} className="h-24 w-full object-cover rounded-lg" />
-  ) : (
-    <div className="h-24 w-full rounded-lg bg-slate-100 flex items-center justify-center text-[11px] text-slate-500 text-center px-1">
-      {stored.status === "loading" ? "Loading…" : "Photo saved"}
-    </div>
-  );
 }
 
 export function QuoteDetailsEditor({ details, onChange }) {
@@ -123,48 +110,11 @@ export function QuoteDetailsEditor({ details, onChange }) {
               multiline
               maxLength={8000}
             />
-            {(sec.photos || []).length > 0 && (
-              <div className="grid grid-cols-2 gap-2">
-                {sec.photos.map(p => (
-                  <div key={p.id} className="relative">
-                    <Thumb photo={p} />
-                    <button
-                      type="button"
-                      onClick={() => setSection(sec.id, { photos: sec.photos.filter(x => x.id !== p.id) })}
-                      aria-label="Remove photo"
-                      className="absolute top-1 right-1 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center"
-                    >
-                      <X size={14} />
-                    </button>
-                    <input
-                      value={p.caption || ""}
-                      onChange={e =>
-                        setSection(sec.id, {
-                          photos: sec.photos.map(x => (x.id === p.id ? { ...x, caption: e.target.value } : x)),
-                        })
-                      }
-                      placeholder="Caption"
-                      maxLength={200}
-                      aria-label="Photo caption"
-                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-            {(sec.photos || []).length < MAX_PHOTOS_PER_SECTION && (
-              <MediaPicker
-                onAdd={m => {
-                  if (m.isVideo || !m.base64) return;
-                  setSection(sec.id, {
-                    photos: [
-                      ...(sec.photos || []),
-                      { id: m.id || genId(), base64: m.base64, caption: "", uploadStatus: "pending" },
-                    ].slice(0, MAX_PHOTOS_PER_SECTION),
-                  });
-                }}
-              />
-            )}
+            <CaptionedPhotos
+              photos={sec.photos || []}
+              onChange={photos => setSection(sec.id, { photos })}
+              max={MAX_PHOTOS_PER_SECTION}
+            />
           </div>
         ))}
 

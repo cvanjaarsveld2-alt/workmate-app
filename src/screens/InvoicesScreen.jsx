@@ -6,7 +6,8 @@ import { Card, Btn, PageHeader } from "../components/ui";
 import { CreditCard, RefreshCw, Search, CheckCircle2, WifiOff, FileText, FileClock } from "lucide-react";
 import { useCompanyProfile } from "../lib/companyProfile";
 import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
-import { invoiceToDocument, isTemporaryInvoiceNumber } from "../lib/documentData";
+import { invoiceToDocument, isTemporaryInvoiceNumber, jobToCard, jobsForInvoice } from "../lib/documentData";
+import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 const money = v =>
   `R ${Number(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -43,6 +44,15 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
   const profile = useCompanyProfile(teamId);
   const [making, setMaking] = useState(null);
   const [notice, setNotice] = useState("");
+  // Jobs, to attach their job cards to an invoice or pro forma.
+  const [jobs, setJobs] = useState([]);
+  const [attach, setAttach] = useState({});
+  useEffect(() => {
+    offlineGetAll("jobs").then(
+      rows => setJobs(rows || []),
+      () => {},
+    );
+  }, [invoices.length]);
   // Build and share an invoice or pro forma PDF. Online, the invoice is read
   // back first so it carries the number the server assigned.
   async function sharePdf(inv, kind) {
@@ -58,7 +68,15 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
           offlineSave("invoices", row).catch(() => {});
         }
       }
-      const doc = invoiceToDocument(row, kind, { clients, quotes, profile });
+      let doc = invoiceToDocument(row, kind, { clients, quotes, profile });
+      if (attach[inv.id]) {
+        let linked = jobsForInvoice(row, jobs);
+        if (!linked.length && online && row.job_id) {
+          const { data } = await supabase.from("jobs").select("*").eq("id", row.job_id);
+          linked = data || [];
+        }
+        doc = await resolveDocumentPhotos({ ...doc, jobCards: linked.map(j => jobToCard(j, { clients, quotes })) });
+      }
       const blob = await buildDocumentPDF(doc, profile);
       const r = await shareDocumentPDF(blob, documentFilename(doc, profile), `${documentTitle(kind, profile)} ${doc.number}`);
       if (r !== "cancelled")
@@ -254,6 +272,17 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
                   <CreditCard size={13} />
                   {saving === inv.id ? "Saving…" : "Record payment"}
                 </Btn>
+              )}
+              {(inv.job_id || jobsForInvoice(inv, jobs).length > 0) && (
+                <label className="flex items-center gap-2 text-sm text-slate-600 min-h-[36px] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!attach[inv.id]}
+                    onChange={e => setAttach(a => ({ ...a, [inv.id]: e.target.checked }))}
+                    className="h-5 w-5"
+                  />
+                  Attach job card
+                </label>
               )}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Btn size="sm" variant="secondary" onClick={() => sharePdf(inv, "invoice")} disabled={!!making}>
