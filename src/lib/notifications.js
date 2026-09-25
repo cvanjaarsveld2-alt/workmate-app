@@ -1,4 +1,5 @@
 // ─── Notification Helpers ─────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "./brand";
 import { todayISO } from "./helpers";
 
 export async function requestNotificationPermission() {
@@ -58,7 +59,7 @@ export function buildNotificationItems(followups = [], equipment = [], notes = [
     if (fireAt > new Date()) {
       items.push({
         id: "morning_" + todayStr,
-        title: "📋 PowerMate — Today's Follow-ups",
+        title: `📋 ${PRODUCT_NAME} — Today's Follow-ups`,
         body: `You have ${todayFollowups.length} follow-up${todayFollowups.length !== 1 ? "s" : ""} today.`,
         fireAt: fireAt.toISOString(),
         tag: "morning_summary",

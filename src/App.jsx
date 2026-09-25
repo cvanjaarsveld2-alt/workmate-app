@@ -53,6 +53,8 @@ import { ExportProgressProvider } from "./components/ExportProgress";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
 import { readHiddenScreens, saveHiddenScreens, syncHiddenScreens } from "./lib/menuPrefs";
+import { setActiveTeamId, loadCompanyProfile } from "./lib/companyProfile";
+import { setMyName } from "./lib/me";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 import { HomeScreen } from "./screens/HomeScreen";
 const EquipmentScreen = lazy(() =>
@@ -687,6 +689,27 @@ export default function PowerWorksApp() {
       return;
     subscribeToPush(session.user.id).catch(() => {});
   }, [session?.user?.id, isOnline]);
+  // Their own name, for signing off emails and messages.
+  useEffect(() => {
+    const u = session?.user;
+    if (!u?.id) return;
+    const fallback = (u.email || "").split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    setMyName(u.user_metadata?.full_name || fallback);
+    supabase
+      .from("users")
+      .select("full_name")
+      .eq("id", u.id)
+      .maybeSingle()
+      .then(
+        ({ data }) => data?.full_name && setMyName(data.full_name),
+        () => {},
+      );
+  }, [session?.user?.id]);
+  // The company this person works for: its name and logo brand PDFs and messages.
+  useEffect(() => {
+    setActiveTeamId(teamId);
+    if (teamId) loadCompanyProfile(teamId).catch(() => {});
+  }, [teamId]);
   // Each teammate's own menu: screens they chose to hide. Instant from this
   // device, then reconciled with their user record (and any offline change sent).
   const [hiddenScreens, setHiddenScreens] = useState([]);

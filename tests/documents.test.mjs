@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { buildDocumentPDF, documentFilename, documentTitle, documentTotals, money } from "../src/lib/documentPDF.js";
 import { invoiceToDocument, isTemporaryInvoiceNumber, jobToCard, jobsForInvoice, jobsForQuote, parseItems, quoteDetails, quoteToDocument } from "../src/lib/documentData.js";
-import { PW_LOGO_B64 } from "../src/lib/pwLogo.js";
+import { PW_LOGO_B64 } from "./fixtures/sample-logo.js";
 
 const profile = {
   trading_name: "Acme Hydraulics",

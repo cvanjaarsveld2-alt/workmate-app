@@ -127,6 +127,7 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           <ReadOnly label="Address" value={profile.address} />
           <ReadOnly label="Phone" value={profile.phone} />
           <ReadOnly label="Email" value={profile.email} />
+          <ReadOnly label="Finance email" value={profile.finance_email} />
           <ReadOnly label="Bank" value={profile.bank_name} />
           <ReadOnly label="Quotes valid for" value={`${profile.quote_validity_days} days`} />
           <ReadOnly label="Payment terms" value={`${profile.payment_terms_days} days`} />
@@ -237,6 +238,22 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           <Field label="Email" value={form.email} onChange={set("email")} type="email" maxLength={120} />
         </div>
         <Field label="Website" value={form.website} onChange={set("website")} maxLength={120} />
+        <Field
+          label="What you offer (one line)"
+          value={form.offering}
+          onChange={set("offering")}
+          placeholder="e.g. jacks, tyre handlers and industrial equipment"
+          maxLength={200}
+        />
+        <p className="text-xs text-slate-500 -mt-1">Used in sales emails and WhatsApp messages: "our …".</p>
+        <Field
+          label="Finance email (expense claims)"
+          value={form.finance_email}
+          onChange={set("finance_email")}
+          type="email"
+          placeholder="accounts@yourcompany.co.za"
+          maxLength={120}
+        />
       </Section>
 
       <Section title="Banking details" hint="Shown on pro formas and invoices so customers know where to pay.">

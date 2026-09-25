@@ -1,6 +1,7 @@
 // ─── Onboarding ──────────────────────────────────────────────────────────────
 // Four-slide first-run intro. Shows once per user.
 // ─────────────────────────────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "../lib/brand";
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Users, Camera, Mic, Bell, ChevronRight, Check } from "lucide-react";
@@ -8,10 +9,10 @@ import { COLORS } from "../lib/tokens";
 import { haptic } from "../lib/haptics";
 
 const SLIDES = [
-  { icon: Users,  title: "Welcome to PowerMate", body: "Your field CRM for Power Works. Clients, quotes, follow-ups and vehicle checks — all in one place, even offline on site.", color: COLORS.primary },
-  { icon: Camera, title: "Snap a receipt, done", body: "Photograph any slip and PowerMate reads the vendor, amount and VAT automatically. Your expense claim builds itself.", color: COLORS.warning },
+  { icon: Users,  title: `Welcome to ${PRODUCT_NAME}`, body: "Your field CRM. Clients, quotes, follow-ups and vehicle checks — all in one place, even offline on site.", color: COLORS.primary },
+  { icon: Camera, title: "Snap a receipt, done", body: `Photograph any slip and ${PRODUCT_NAME} reads the vendor, amount and VAT automatically. Your expense claim builds itself.`, color: COLORS.warning },
   { icon: Mic,    title: "Talk instead of type", body: "Add notes by voice in English or Afrikaans. Record a site meeting and get structured minutes with action items.", color: COLORS.success },
-  { icon: Bell,   title: "Never drop a client", body: "PowerMate warns you when a client goes quiet, reminds you of follow-ups, and keeps the whole team in sync.", color: COLORS.accent },
+  { icon: Bell,   title: "Never drop a client", body: `${PRODUCT_NAME} warns you when a client goes quiet, reminds you of follow-ups, and keeps the whole team in sync.`, color: COLORS.accent },
 ];
 
 export function Onboarding({ userId, onDone }) {

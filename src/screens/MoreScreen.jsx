@@ -1,4 +1,6 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
+import { PRODUCT_NAME, PRODUCT_VERSION } from "../lib/brand";
+import { companyLegalName } from "../lib/companyProfile";
 import React, { useState, useEffect } from "react";
 import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users, Sun, Moon, Smartphone, Mail, Building2 } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY, PIN_DISABLED_KEY, scopedPinKey } from "../lib/constants";
@@ -79,8 +81,8 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
     const { data: result, error } = await supabase.functions.invoke("send-notifications", {
       body: {
         to_user_id: userId,
-        title: "PowerMate test ✓",
-        body: "Push notifications are connected. This is a live test from PowerMate.",
+        title: `${PRODUCT_NAME} test ✓`,
+        body: `Push notifications are connected. This is a live test from ${PRODUCT_NAME}.`,
         url: "/?screen=Notifications",
       },
     });
@@ -111,7 +113,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
   }
 
   async function handleLogout() {
-    const ok = await confirm("Sign out of PowerMate?", { confirmLabel: "Sign Out", confirmVariant: "danger" });
+    const ok = await confirm(`Sign out of ${PRODUCT_NAME}?`, { confirmLabel: "Sign Out", confirmVariant: "danger" });
     if (ok) onLogout();
   }
 
@@ -304,8 +306,8 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
             <p className="text-xs font-bold text-amber-800 mb-1">📱 iPhone/iPad — one-time setup</p>
             <p className="text-xs text-amber-700 leading-relaxed">
-              Apple only allows notifications after you add PowerMate to your Home Screen:
-              tap the <strong>Share</strong> button &rarr; <strong>Add to Home Screen</strong> &rarr; open PowerMate
+              Apple only allows notifications after you add {PRODUCT_NAME} to your Home Screen:
+              tap the <strong>Share</strong> button &rarr; <strong>Add to Home Screen</strong> &rarr; open {PRODUCT_NAME}
               from the new icon &rarr; then tap Enable here. This is an Apple requirement for all web apps.
             </p>
           </div>
@@ -339,7 +341,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
             onClick={() => {
               if (pinEnabled) {
                 const sure = window.confirm(
-                  "Disable PIN lock?\n\nAnyone with access to your phone will be able to open PowerMate and see all your client data.\n\nWe recommend keeping PIN lock on."
+                  `Disable PIN lock?\n\nAnyone with access to your phone will be able to open ${PRODUCT_NAME} and see all your client data.\n\nWe recommend keeping PIN lock on.`
                 );
                 if (!sure) return;
                 localStorage.removeItem(scopedPinKey(PIN_KEY, userId));
@@ -372,7 +374,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 stack-y-2">
             <p className="text-sm font-bold text-amber-700">⚠️ PIN lock is off</p>
             <p className="text-xs text-amber-600 leading-relaxed">
-              Anyone who picks up your phone can open PowerMate and see all client data, field notes, quotes, and expenses — including your team's records.
+              Anyone who picks up your phone can open {PRODUCT_NAME} and see all client data, field notes, quotes, and expenses — including your team's records.
             </p>
             <div className="pt-1 stack-y-1.5">
               <p className="text-xs font-black text-amber-700">If you choose not to use PIN lock:</p>
@@ -380,7 +382,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
                 <li>• Enable your phone's own screen lock (Face ID, fingerprint, or phone PIN) — this is your minimum protection</li>
                 <li>• Never leave your phone unattended at client sites</li>
                 <li>• Enable auto-lock (screen timeout) set to 30 seconds or less</li>
-                <li>• If your phone is lost or stolen, sign out of PowerMate from another device immediately</li>
+                <li>• If your phone is lost or stolen, sign out of {PRODUCT_NAME} from another device immediately</li>
               </ul>
             </div>
             <button
@@ -569,7 +571,7 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
       <Btn variant="danger" className="w-full" size="lg" onClick={handleLogout}>
         <LogOut size={16} />Sign Out
       </Btn>
-      <p className="text-center text-xs text-slate-300">PowerMate v2.4 · Power Works (Pty) Ltd</p>
+      <p className="text-center text-xs text-slate-300">{[`${PRODUCT_NAME} v${PRODUCT_VERSION}`, companyLegalName()].filter(Boolean).join(" · ")}</p>
       {toast && <Toast message={toast} onDone={() => setToast("")} />}
     </div>
   );

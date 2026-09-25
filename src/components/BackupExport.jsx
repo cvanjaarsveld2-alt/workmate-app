@@ -2,6 +2,8 @@
 // Exports all PowerMate data as a ZIP containing per-entity CSVs + a JSON master.
 // Use this regularly — your data lives in Supabase but a local backup is safer.
 // ─────────────────────────────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "../lib/brand";
+import { companyLegalName } from "../lib/companyProfile";
 import React, { useState, useEffect } from "react";
 import { Download, Database, CheckCircle2, AlertTriangle, Share2 } from "lucide-react";
 import { Card, Btn } from "./ui";
@@ -109,8 +111,8 @@ async function generateBackup(data, onProgress = () => {}) {
   // Add a JSON master with everything (perfect for restore)
   const master = {
     exported_at: new Date().toISOString(),
-    app: "PowerMate",
-    company: "Power Works (Pty) Ltd",
+    app: PRODUCT_NAME,
+    company: companyLegalName(),
     version: 2,
     counts: {
       clients:   (data.clients   || []).length,
@@ -162,7 +164,7 @@ async function generateBackup(data, onProgress = () => {}) {
   }, null, 2));
   zip.file("DATA_SAFETY.txt", [
     "This backup is additive only.",
-    "It does not delete, overwrite, move or modify any PowerMate database row or Storage object.",
+    `It does not delete, overwrite, move or modify any ${PRODUCT_NAME} database row or Storage object.`,
     "It contains full serializable app state plus accessible Storage objects.",
     "Each Storage file has a SHA-256 checksum in storage_manifest.json.",
     "Supabase database backups do not include Storage binaries, so the actual files are included here.",
@@ -172,7 +174,7 @@ async function generateBackup(data, onProgress = () => {}) {
   const readme = `POWERMATE BACKUP
 ================
 Exported: ${new Date().toLocaleString("en-GB")}
-Company:  Power Works (Pty) Ltd
+Company:  ${companyLegalName()}
 
 WHAT'S IN THIS ZIP
 ------------------
@@ -196,7 +198,7 @@ HOW TO USE
 
 SUPPORT
 -------
-If you need to restore from this backup, contact your PowerMate admin.
+If you need to restore from this backup, contact your ${PRODUCT_NAME} admin.
 The JSON file is human-readable and can be re-imported into the system.
 `;
   zip.file("README.txt", readme);
@@ -208,7 +210,7 @@ The JSON file is human-readable and can be re-imported into the system.
     compressionOptions: { level: 6 },
   });
 
-  const filename = `PowerMate_Backup_${stamp}.zip`;
+  const filename = `${PRODUCT_NAME}_Backup_${stamp}.zip`;
 
   return { blob, filename, counts: master.counts };
 }
@@ -253,8 +255,8 @@ export function BackupExport({ data }) {
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           try {
             await navigator.share({
-              title: "PowerMate Backup",
-              text: `PowerMate backup — ${new Date().toLocaleDateString("en-GB")}`,
+              title: `${PRODUCT_NAME} Backup`,
+              text: `${PRODUCT_NAME} backup — ${new Date().toLocaleDateString("en-GB")}`,
               files: [file],
             });
             delivered = true;
@@ -308,7 +310,7 @@ export function BackupExport({ data }) {
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Data Backup</p>
       </div>
       <p className="text-sm text-slate-500">
-        Create a protected ZIP containing your PowerMate data plus the actual accessible photos, receipts and company documents. <strong>Nothing is deleted or moved.</strong>
+        Create a protected ZIP containing your {PRODUCT_NAME} data plus the actual accessible photos, receipts and company documents. <strong>Nothing is deleted or moved.</strong>
       </p>
 
       {/* Status indicator */}

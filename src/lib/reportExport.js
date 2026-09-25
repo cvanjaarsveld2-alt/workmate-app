@@ -10,7 +10,8 @@
 // embedded images. No extra npm dependency required.
 // ─────────────────────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
-import { PW_LOGO_B64 } from "./pwLogo";
+import { drawBandLogo, htmlBandLogo } from "./pdfBrand";
+import { companyLegalName } from "./companyProfile";
 
 const BRAND_RED = "#8B1A1A";
 const RED_RGB   = [139, 26, 26];
@@ -112,12 +113,7 @@ export async function buildReportPDF({ report, mode = "breakdown", company = {} 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(20);
     doc.text(title, margin, 50);
-    try {
-      doc.addImage(PW_LOGO_B64, "JPEG", pageWidth - margin - 110, 10, 110, 23);
-    } catch {
-      doc.setFontSize(11); doc.setFont("helvetica", "normal");
-      doc.text("Power Works (Pty) Ltd", pageWidth - margin - 140, 30);
-    }
+    drawBandLogo(doc, { right: pageWidth - margin, top: 12, maxW: 110, maxH: 23 });
   }
 
   const headerTitle = isRepair ? "REPAIR REPORT" : "BREAKDOWN REPORT";
@@ -334,7 +330,7 @@ export async function buildReportPDF({ report, mode = "breakdown", company = {} 
     doc.setTextColor(150, 150, 150);
     doc.setFont("helvetica", "normal");
     doc.text(
-      `Power Works (Pty) Ltd  ·  ${reportRef}  ·  Generated ${shortDate(new Date().toISOString().slice(0, 10))}`,
+      `${companyLegalName()}  ·  ${reportRef}  ·  Generated ${shortDate(new Date().toISOString().slice(0, 10))}`,
       margin, pageHeight - 20
     );
     doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin - 60, pageHeight - 20);
@@ -451,7 +447,7 @@ export async function buildReportWord({ report, mode = "breakdown", company = {}
         <span style="color:#ffffff;font-size:20pt;font-weight:bold;letter-spacing:1px;">${headerTitle}</span>
       </td>
       <td style="padding:12px 20px;text-align:right;">
-        <img src="${PW_LOGO_B64}" style="height:34px;" />
+        ${htmlBandLogo()}
       </td>
     </tr>
   </table>
@@ -478,7 +474,7 @@ export async function buildReportWord({ report, mode = "breakdown", company = {}
   </table>
 
   <p style="margin-top:30px;color:#969696;font-size:7.5pt;">
-    Power Works (Pty) Ltd &nbsp;·&nbsp; ${reportRef} &nbsp;·&nbsp; Generated ${shortDate(new Date().toISOString().slice(0, 10))}
+    ${companyLegalName()} &nbsp;·&nbsp; ${reportRef} &nbsp;·&nbsp; Generated ${shortDate(new Date().toISOString().slice(0, 10))}
   </p>
 </body>
 </html>`;

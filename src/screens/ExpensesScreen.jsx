@@ -1,4 +1,6 @@
 // ─── Expenses Screen ──────────────────────────────────────────────────────────
+import { activeProfile } from "../lib/companyProfile";
+import { emailSignature } from "../lib/me";
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -81,8 +83,8 @@ const STATUS_COLORS = {
   reimbursed:  { bg: "#DCFCE7", text: "#166534", label: "Reimbursed" },
 };
 
-// ⚠️ SET YOUR FINANCE DEPARTMENT EMAIL HERE
-const FINANCE_EMAIL = "vicky@pwrstart.com";
+// Where expense claims go: set per company in Company Details → Finance email.
+const financeEmail = () => activeProfile().finance_email || "";
 
 // ─── Calendar month grouping ─────────────────────────────────────────────────
 // Groups expenses by calendar month (1st → last day). Returns:
@@ -114,7 +116,7 @@ function currentCalendarMonth() {
 
 // ─── End-of-month push notification reminder ─────────────────────────────────
 // Shows an in-app banner in the last 3 days of each calendar month,
-// reminding the user to submit their expenses to Vicky.
+// reminding the user to submit their expenses to finance.
 // Uses localStorage to avoid showing more than once per month.
 function useEndOfMonthReminder() {
   const [showBanner, setShowBanner] = useState(false);
@@ -779,11 +781,11 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
     const a = document.createElement("a");
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    const body = `Hi Vicky,\n\nPlease find attached my expense claim ${ref}.\n\nSummary:\n  • ${count} item${count !== 1 ? "s" : ""}\n  • Period: ${periodLabel}\n  • Total claim: ${fmtMoney(totalZAR, "ZAR")}\n\nThe attached PDF (${filename}) contains the full breakdown, totals by category, and all receipt images.\n\nKind regards`;
+    const body = `Hi,\n\nPlease find attached my expense claim ${ref}.\n\nSummary:\n  • ${count} item${count !== 1 ? "s" : ""}\n  • Period: ${periodLabel}\n  • Total claim: ${fmtMoney(totalZAR, "ZAR")}\n\nThe attached PDF (${filename}) contains the full breakdown, totals by category, and all receipt images.\n\n${emailSignature("Kind regards,")}`;
     const subject = encodeURIComponent(`Expense Claim ${ref} — ${fmtMoney(totalZAR, "ZAR")}`);
     setToast("PDF downloaded — attach it to the email that just opened");
     setTimeout(() => {
-      window.open(`mailto:${encodeURIComponent(FINANCE_EMAIL)}?subject=${subject}&body=${encodeURIComponent(body)}`, "_blank");
+      window.open(`mailto:${encodeURIComponent(financeEmail())}?subject=${subject}&body=${encodeURIComponent(body)}`, "_blank");
       markPackSubmitted();
     }, 500);
   }
@@ -1182,7 +1184,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                   </button>
                   <button onClick={emailFinancePack}
                     className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
-                    <Mail size={14} /> Email to Vicky
+                    <Mail size={14} /> Email to finance
                   </button>
                 </div>
               </div>
@@ -1204,7 +1206,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             <div className="flex-1 min-w-0">
               <p className="text-sm font-black text-amber-800">Submit your expenses</p>
               <p className="text-xs text-amber-700 mt-0.5">
-                End of month is coming — {unsubmittedCount} unsubmitted expense{unsubmittedCount !== 1 ? "s" : ""}. Send your pack to Vicky before month-end.
+                End of month is coming — {unsubmittedCount} unsubmitted expense{unsubmittedCount !== 1 ? "s" : ""}. Send your pack to finance before month-end.
               </p>
             </div>
             <button onClick={dismissReminder} className="w-11 h-11 flex items-center justify-center rounded-lg text-amber-500 hover:bg-amber-100 shrink-0">

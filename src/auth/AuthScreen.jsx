@@ -1,4 +1,5 @@
 // ─── Auth Screen ──────────────────────────────────────────────────────────────
+import { PRODUCT_NAME, PRODUCT_TAGLINE } from "../lib/brand";
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
@@ -38,7 +39,7 @@ export function AuthScreen() {
           : code === "email_not_confirmed"
           ? "This account has not been confirmed yet. Please confirm the email address first."
           : code === "user_banned"
-          ? "This account is currently disabled. Please contact your PowerMate administrator."
+          ? `This account is currently disabled. Please contact your ${PRODUCT_NAME} administrator.`
           : code === "over_request_rate_limit"
           ? "Too many sign-in attempts. Please wait a moment and try again."
           : message.includes("network") || message.includes("fetch")
@@ -111,7 +112,7 @@ export function AuthScreen() {
       setMsg({ text: "Too many requests. Please wait a few minutes and try again.", type: "error" });
       return;
     }
-    setMsg({ text: "If that email has a PowerMate account, a link to set your password is on its way. Open it on this device.", type: "success" });
+    setMsg({ text: `If that email has a ${PRODUCT_NAME} account, a link to set your password is on its way. Open it on this device.`, type: "success" });
   }
 
   function switchMode(newMode) {
@@ -125,9 +126,9 @@ export function AuthScreen() {
     <div className="flex min-h-screen flex-col items-center justify-center px-4" style={{ background: BRAND.light }}>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <img src={BRAND.logo} alt="PW" className="mb-4 h-16 object-contain" onError={e => e.target.style.display = "none"} />
-          <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>PowerMate</h1>
-          <p className="mt-1 text-sm text-slate-400">Power Works Field Service CRM</p>
+          <img src="/icon.svg" alt="" className="mb-4 h-16 w-16 rounded-2xl" />
+          <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>{PRODUCT_NAME}</h1>
+          <p className="mt-1 text-sm text-slate-400">{PRODUCT_TAGLINE}</p>
         </div>
 
         <Card className="p-6 stack-y-4">
@@ -205,7 +206,7 @@ export function AuthScreen() {
           )}
         </Card>
 
-        <p className="mt-6 text-center text-xs text-slate-400">© 2026 Power Works (Pty) Ltd</p>
+        <p className="mt-6 text-center text-xs text-slate-400">© 2026 {PRODUCT_NAME}</p>
       </motion.div>
     </div>
   );
@@ -240,9 +241,9 @@ export function SetPasswordScreen({ onDone }) {
     <div className="flex min-h-screen flex-col items-center justify-center px-4" style={{ background: BRAND.light }}>
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <img src={BRAND.logo} alt="PW" className="mb-4 h-16 object-contain" onError={e => e.target.style.display = "none"} />
+          <img src="/icon.svg" alt="" className="mb-4 h-16 w-16 rounded-2xl" />
           <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>Set your password</h1>
-          <p className="mt-1 text-sm text-slate-400">Choose a password for signing in to PowerMate</p>
+          <p className="mt-1 text-sm text-slate-400">Choose a password for signing in to {PRODUCT_NAME}</p>
         </div>
         <Card className="p-6 stack-y-4">
           <div className="relative">

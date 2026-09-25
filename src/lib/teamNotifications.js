@@ -1,6 +1,7 @@
 // ─── Team Notifications ───────────────────────────────────────────────────────
 // Handles sharing, assignment, and response notifications.
 // ─────────────────────────────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "./brand";
 import { supabase } from "../supabase";
 
 async function sendPush({ toUserId, title, body, url }) {
@@ -56,7 +57,7 @@ export async function sendAssignmentNotification({
     // diagnostics/console can now show why the push did not arrive.
     await sendPush({
       toUserId,
-      title: `PowerMate — ${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} shared with you`,
+      title: `${PRODUCT_NAME} — ${typeLabel.charAt(0).toUpperCase() + typeLabel.slice(1)} shared with you`,
       body: message,
       url: "/?screen=SharedInbox",
     });
@@ -98,7 +99,7 @@ export async function sendResponseNotification({
 
     await sendPush({
       toUserId: fromUserId,
-      title: "PowerMate — Share response",
+      title: `${PRODUCT_NAME} — Share response`,
       body: message,
       url: "/?screen=Notifications",
     });

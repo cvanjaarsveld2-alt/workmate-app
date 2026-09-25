@@ -1,4 +1,5 @@
 // ─── Notes Screen ─────────────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "../lib/brand";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Check, Trash2, Clipboard, Paperclip, Edit2, Save, FileDown, CheckSquare, Square, Users, ChevronRight, ChevronDown, Send, Mail, Share2, FolderPlus, Tag, Calendar } from "lucide-react";
@@ -276,7 +277,7 @@ export function NotesScreen({ data, setData, userId, userEmail, teamId, teamMemb
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({
-          title: "PowerMate Field Notes Report",
+          title: `${PRODUCT_NAME} Field Notes Report`,
           text: `Field notes report — ${count} note${count !== 1 ? "s" : ""}.`,
           files: [file],
         });

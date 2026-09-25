@@ -5,6 +5,7 @@
 //            and the teammate gets a notification. The record now shows on
 //            their personal dashboard.
 // ─────────────────────────────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "../lib/brand";
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -126,7 +127,7 @@ export function ShareToTeamModal({
           await supabase.functions.invoke("send-notifications", {
             body: {
               subscription: { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-              title: `PowerMate — ${typeMeta.label} ${actionVerb} to you`,
+              title: `${PRODUCT_NAME} — ${typeMeta.label} ${actionVerb} to you`,
               body: fullMessage,
               url: "/?screen=SharedInbox",
             },

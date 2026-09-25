@@ -7,6 +7,8 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, X } from "lucide-react";
 import { SalesFollowupComposer } from "../lib/industrialSalesEmail.jsx";
+import { companyName, companyOffering } from "../lib/companyProfile";
+import { emailSignature } from "../lib/me";
 
 // ─── Email message templates ───────────────────────────────────────────────────
 export const EMAIL_TEMPLATES = [
@@ -15,7 +17,7 @@ export const EMAIL_TEMPLATES = [
     label: "Gap-Selling Follow-Up",
     emoji: "✨",
     kind: "gap",
-    subject: () => "Following up — Power Works",
+    subject: () => ["Following up", companyName()].filter(Boolean).join(" — "),
     body: () => "Build a problem → impact → desired outcome follow-up",
   },
   {
@@ -32,9 +34,7 @@ If you've had a chance to look at it, I'd be happy to run through anything you'd
 
 Please let me know what works for you.
 
-Regards,
-Renita
-Power Works (Pty) Ltd`,
+${emailSignature("Regards,")}`,
   },
   {
     id: "meeting_request",
@@ -48,9 +48,7 @@ I'd like to set up a short meeting to understand what ${client || "your team"} i
 
 If you're open to it, send me a time that suits you and I'll work around it.
 
-Regards,
-Renita
-Power Works (Pty) Ltd`,
+${emailSignature("Regards,")}`,
   },
   {
     id: "general_checkin",
@@ -62,29 +60,23 @@ Power Works (Pty) Ltd`,
 
 Just checking in to see how things are going at ${client || "your side"}.
 
-If there's anything you're dealing with at the moment where Power Works could help, feel free to send it my way.
+If there's anything you're dealing with at the moment where ${companyName() || "we"} could help, feel free to send it my way.
 
-Regards,
-Renita
-Power Works (Pty) Ltd`,
+${emailSignature("Regards,")}`,
   },
   {
     id: "product_intro",
     label: "Product Introduction",
     emoji: "🔧",
-    subject: () => "Power Works",
+    subject: () => companyName() || "Introduction",
     body: (contact, client) =>
       `Hi ${contact || "there"},
 
-I wanted to introduce Power Works and the industrial equipment and services we provide.
-
-We work with businesses on areas such as jacks, tyre handlers, load testing and industrial repairs.
+I wanted to introduce ${companyName() || "our company"} and ${companyOffering()}.
 
 If any of these are relevant to ${client || "your operation"}, I'm happy to send through some information or have a quick chat.
 
-Regards,
-Renita
-Power Works (Pty) Ltd`,
+${emailSignature("Regards,")}`,
   },
   {
     id: "after_visit",
@@ -100,9 +92,7 @@ It was good to meet you and get a better understanding of what you're working wi
 
 If anything comes up in the meantime, just let me know.
 
-Regards,
-Renita
-Power Works (Pty) Ltd`,
+${emailSignature("Regards,")}`,
   },
   {
     id: "urgent_followup",
@@ -116,9 +106,7 @@ I'm following up on ${client || "the matter we discussed"}.
 
 When you get a chance, please let me know where things stand and whether there's anything you need from my side.
 
-Thanks,
-Renita
-Power Works (Pty) Ltd`,
+${emailSignature("Thanks,")}`,
   },
 ];
 

@@ -2,6 +2,8 @@
 // PINSetupScreen: first-time 6-digit PIN creation
 // PINLockScreen:  lock screen with PIN + biometric (Face ID / fingerprint)
 // ─────────────────────────────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "../lib/brand";
+import { activeProfile, companyName } from "../lib/companyProfile";
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Delete, Fingerprint, ScanFace } from "lucide-react";
@@ -155,11 +157,11 @@ async function registerBiometric(userId) {
   const cred = await navigator.credentials.create({
     publicKey: {
       challenge,
-      rp: { name: "PowerMate" },
+      rp: { name: PRODUCT_NAME },
       user: {
         id: crypto.getRandomValues(new Uint8Array(16)),
         name: "powermate-user",
-        displayName: "PowerMate User",
+        displayName: `${PRODUCT_NAME} user`,
       },
       pubKeyCredParams: [
         { type: "public-key", alg: -7   },
@@ -424,14 +426,10 @@ export function PINLockScreen({ userId, onUnlock, onForgot }) {
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-between overflow-auto" style={{ background: LIGHT }}>
       <div className="flex flex-col items-center pt-16 pb-4 px-6">
-        <img src="/logo.png" alt="Power Works" className="h-14 object-contain mb-6"
-          onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }} />
-        <div className="hidden items-center justify-center rounded-2xl px-5 py-3 mb-6" style={{ background: RED }}>
-          <span className="text-white text-lg font-black tracking-wide">POWER<span style={{ color: "#FCA5A5" }}>MATE</span></span>
-        </div>
+        <BrandMark />
         <h1 className="text-2xl font-black text-slate-900 tracking-tight text-center">Welcome back</h1>
         <p className="mt-1.5 text-sm text-slate-400 text-center leading-snug">
-          {biometricRegistered ? "Use biometric or enter your PIN" : "Enter your PIN to open PowerMate"}
+          {biometricRegistered ? "Use biometric or enter your PIN" : `Enter your PIN to open ${PRODUCT_NAME}`}
         </p>
       </div>
 
@@ -544,17 +542,13 @@ export function PINSetupScreen({ userId, onComplete }) {
 
   const title    = stage === "create" ? "Create your PIN" : "Confirm your PIN";
   const subtitle = stage === "create"
-    ? "Choose 6 digits to secure PowerMate"
+    ? `Choose 6 digits to secure ${PRODUCT_NAME}`
     : "Enter the same PIN again to confirm";
 
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-between overflow-auto" style={{ background: LIGHT }}>
       <div className="flex flex-col items-center pt-16 pb-4 px-6">
-        <img src="/logo.png" alt="Power Works" className="h-14 object-contain mb-6"
-          onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }} />
-        <div className="hidden items-center justify-center rounded-2xl px-5 py-3 mb-6" style={{ background: RED }}>
-          <span className="text-white text-lg font-black tracking-wide">POWER<span style={{ color: "#FCA5A5" }}>MATE</span></span>
-        </div>
+        <BrandMark />
         <h1 className="text-2xl font-black text-slate-900 tracking-tight text-center">{title}</h1>
         <p className="mt-1.5 text-sm text-slate-400 text-center leading-snug">{subtitle}</p>
       </div>
@@ -586,6 +580,18 @@ export function PINSetupScreen({ userId, onComplete }) {
           <BackspaceKey onPress={del} />
         </div>
       </div>
+    </div>
+  );
+}
+
+// The company's logo (from its company profile, kept on the device) or,
+// before one is set, the product name.
+function BrandMark() {
+  const p = activeProfile();
+  if (p.logo_data) return <img src={p.logo_data} alt={companyName(p)} className="h-14 max-w-[220px] object-contain mb-6" />;
+  return (
+    <div className="flex items-center justify-center rounded-2xl px-5 py-3 mb-6" style={{ background: RED }}>
+      <span className="text-white text-lg font-black tracking-wide">{companyName(p) || PRODUCT_NAME}</span>
     </div>
   );
 }

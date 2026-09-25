@@ -1,4 +1,5 @@
 // ─── Clients Screen ───────────────────────────────────────────────────────────
+import { companyName } from "../lib/companyProfile";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -525,7 +526,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
         {!isEdit && (
           <div className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5">
             <p className="text-xs text-blue-700 leading-snug">
-              <span className="font-black">New to Power Works?</span> Add them here — stage starts as "New Lead" and moves forward as you work the deal. For a new opportunity at an existing client, use the <span className="font-bold">Leads</span> screen instead.
+              <span className="font-black">New to {companyName() || "us"}?</span> Add them here — stage starts as "New Lead" and moves forward as you work the deal. For a new opportunity at an existing client, use the <span className="font-bold">Leads</span> screen instead.
             </p>
           </div>
         )}

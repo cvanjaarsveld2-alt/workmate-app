@@ -255,7 +255,7 @@ async function run() {
     const r = cur();
     r.boundary = (await page.getByText("Something went wrong").count()) > 0;
     r.text = (await page.evaluate(() => document.body.innerText.length));
-    r.loginShown = (await page.getByText("Power Works Field Service CRM").count()) > 0;
+    r.loginShown = (await page.getByText("Field service CRM").count()) > 0;
     await page.screenshot({ path: path.join(OUT, `${s}.png`) });
   }
   fs.writeFileSync(path.join(OUT, "screens.json"), JSON.stringify(perScreen, null, 1));

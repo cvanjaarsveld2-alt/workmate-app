@@ -8,7 +8,11 @@
 // Nothing here sends anything — it only returns text the user copies and sends
 // themselves.
 
-const SENDER = "Power Works"; // could later come from the user's profile
+import { companyName } from "./companyProfile";
+import { myName } from "./me";
+
+// Who the message is from: the person, and their company.
+const sender = () => [myName(), companyName()].filter(Boolean).join("\n") || "Kind regards";
 
 // Pick the recipient's first name if we have a contact, else a neutral greeting.
 function greeting(client) {
@@ -48,7 +52,7 @@ Is there anything you'd like me to clarify, adjust, or talk through? Happy to ju
 Looking forward to hearing from you.
 
 Best regards,
-${SENDER}`,
+${sender()}`,
       };
     }
     return {
@@ -61,7 +65,7 @@ ${SENDER}`,
   if (item.kind === "reachout") {
     if (email) {
       return {
-        subject: `Checking in from ${SENDER}`,
+        subject: `Checking in from ${sender()}`,
         body:
 `${hi},
 
@@ -70,7 +74,7 @@ It's been a little while since we last connected, so I thought I'd check in. Is 
 Even if it's just to catch up, I'd be glad to hear how things are going on your side.
 
 Best regards,
-${SENDER}`,
+${sender()}`,
       };
     }
     return {
@@ -93,7 +97,7 @@ Just confirming our meeting ${when}. Please let me know if that still works for 
 Looking forward to it.
 
 Best regards,
-${SENDER}`,
+${sender()}`,
       };
     }
     return {
@@ -112,7 +116,7 @@ ${SENDER}`,
 Just following up regarding ${title.toLowerCase()}. Let me know if there's anything you need from my side.
 
 Best regards,
-${SENDER}`,
+${sender()}`,
     };
   }
   return { body: `${hi}, just following up regarding ${title.toLowerCase()}. Let me know if you need anything from my side. Thanks!` };

@@ -17,6 +17,8 @@ export const DEFAULT_PROFILE = {
   phone: "",
   email: "",
   website: "",
+  offering: "",
+  finance_email: "",
   bank_name: "",
   bank_account_name: "",
   bank_account_no: "",
@@ -35,6 +37,30 @@ export const DEFAULT_PROFILE = {
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
 const cacheKey = teamId => `pm_company_profile__${teamId}`;
+const ACTIVE_TEAM_KEY = "pm_active_team";
+
+// The company the signed-in person works for, so code outside React (PDFs,
+// message templates) can use its name and logo. Set by App when the team loads.
+export function setActiveTeamId(teamId) {
+  try {
+    if (teamId) localStorage.setItem(ACTIVE_TEAM_KEY, teamId);
+    else localStorage.removeItem(ACTIVE_TEAM_KEY);
+  } catch {}
+}
+export function activeTeamId() {
+  try {
+    return localStorage.getItem(ACTIVE_TEAM_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+export const activeProfile = () => readCachedProfile(activeTeamId());
+// "Acme Hydraulics"; falls back to the registered name, then "".
+export const companyName = (p = activeProfile()) => p.trading_name || p.legal_name || "";
+// "Acme Hydraulics (Pty) Ltd" for sign-offs and documents.
+export const companyLegalName = (p = activeProfile()) => p.legal_name || p.trading_name || "";
+// "our jacks, tyre handlers and industrial equipment" / "our products and services".
+export const companyOffering = (p = activeProfile()) => (p.offering ? `our ${p.offering}` : "our products and services");
 
 export function readCachedProfile(teamId) {
   if (!teamId) return { ...DEFAULT_PROFILE };
@@ -60,7 +86,10 @@ export async function loadCompanyProfile(teamId) {
   const profile = { ...DEFAULT_PROFILE };
   for (const k of EDITABLE_FIELDS) if (data[k] !== null && data[k] !== undefined) profile[k] = data[k];
   profile.logo_data = data.logo_data || null;
+  const changed = JSON.stringify(profile) !== JSON.stringify(cached);
   writeCache(teamId, profile);
+  if (changed && typeof window !== "undefined")
+    window.dispatchEvent(new CustomEvent("pm:company-profile", { detail: { teamId, profile } }));
   return profile;
 }
 
@@ -92,6 +121,7 @@ export function validateProfile(p) {
   if (!/^[A-Za-z0-9/_-]{0,12}$/.test(p.invoice_prefix || "")) return "Invoice prefix: up to 12 letters, digits, - / or _.";
   if (!/^#[0-9A-Fa-f]{6}$/.test(p.brand_color || "")) return "Brand colour must look like #8B1A1A.";
   if (p.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email)) return "The email address doesn't look right.";
+  if (p.finance_email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.finance_email)) return "The finance email doesn't look right.";
   return "";
 }
 
