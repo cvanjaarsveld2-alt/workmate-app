@@ -5,7 +5,7 @@ import { Home, Calendar, Settings, Search, Menu, Plus, Bell } from "lucide-react
 import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import { offlineGetAll, offlineSave, offlineReplaceAll, setOfflineUser, getCurrentOfflineUser } from "./offline/offlineDb";
-import { todayISO, logEvent, genId } from "./lib/helpers";
+import { todayISO, reportError, genId } from "./lib/helpers";
 import {
   localStorageKey,
   URGENCY_ESCALATION,
@@ -155,7 +155,7 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(e, i) {
     console.error("PowerMate:", e, i);
     try {
-      logEvent("app_crashed", { message: e?.message, stack: (e?.stack || "").slice(0, 500) });
+      reportError("app_crashed", e, { componentStack: (i?.componentStack || "").slice(0, 1000) });
     } catch (_) {}
   }
   render() {

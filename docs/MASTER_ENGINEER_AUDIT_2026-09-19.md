@@ -45,6 +45,8 @@ All six configured buckets are private. Active buckets have explicit limits wher
 - Sustained load testing.
 - Disaster-recovery restore exercise.
 
+Step-by-step instructions for each of these: `docs/GO_LIVE_GATES.md`.
+
 ## Release position
 
 PowerMate has passed the direct authorization and storage isolation simulations performed in this audit.

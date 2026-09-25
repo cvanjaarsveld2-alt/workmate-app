@@ -494,7 +494,7 @@ export function HomeScreen({ data, setData, userId, teamId, user, onQuickAdd, on
             <p className="text-xs font-bold text-slate-400">{targetProgress}%</p>
           </div>
           <div className="flex items-end justify-between gap-2 mb-2">
-            <p className="text-xl font-black" style={{ color: targetProgress >= 100 ? "#16A34A" : BRAND.primary }}>
+            <p className="text-xl font-black whitespace-nowrap tabular-nums" style={{ color: targetProgress >= 100 ? "#16A34A" : BRAND.primary }}>
               {money(wonRev).replace("R", "R ")}
             </p>
             <p className="text-sm text-slate-400 mb-0.5">of {money(monthlyTarget).replace("R", "R ")}</p>

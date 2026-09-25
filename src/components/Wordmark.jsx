@@ -17,7 +17,10 @@ export function Wordmark({ variant = "dark", size = "md", className = "" }) {
   // it uses a CSS variable (--pm-wordmark, defined in darkMode.css) rather than
   // a hardcoded near-black that would vanish on a dark background.
   const powerColor = onDark ? "#FFFFFF" : "var(--pm-wordmark, #111111)";
-  const worksColor = BRAND.primary; // brand red
+  // Brand red on light backgrounds. On the red drawer header a pale red keeps
+  // the two-tone look while staying readable; in dark mode --pm-wordmark-works
+  // lifts the red so it doesn't disappear into the black.
+  const worksColor = onDark ? "#FFC9C9" : `var(--pm-wordmark-works, ${BRAND.primary})`;
   const tagColor = onDark ? "rgba(255,255,255,0.75)" : "var(--pm-wordmark-tag, #6B7280)";
 
   const sizes = {

@@ -116,3 +116,19 @@ export async function clearAllStores() {
   try { const db=await openDB(); return new Promise((resolve,reject)=>{const tx=db.transaction(STORES,"readwrite");STORES.forEach(s=>tx.objectStore(s).clear());tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);}); }
   catch(e){ console.warn("[offline] clearAllStores failed",e); }
 }
+
+// Ask the browser to keep this origin's IndexedDB instead of evicting it under
+// storage pressure or (Safari) after a stretch without use. Without this, an
+// unsynced offline queue on a rarely opened phone can be silently cleared.
+// Installed PWAs are usually granted automatically; the result is returned so
+// callers can report devices where it was refused.
+export async function requestPersistentStorage() {
+  try {
+    if (!navigator.storage?.persist) return { supported: false, persisted: false };
+    const persisted = (await navigator.storage.persisted?.()) || (await navigator.storage.persist());
+    const { usage, quota } = (await navigator.storage.estimate?.()) || {};
+    return { supported: true, persisted: !!persisted, usage: usage ?? null, quota: quota ?? null };
+  } catch {
+    return { supported: false, persisted: false };
+  }
+}

@@ -520,7 +520,7 @@ export function Gauge({ value = 0, size = 88, label, color }) {
         {/* Track */}
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
-          fill="none" stroke="#EEF2F6" strokeWidth="9" strokeLinecap="round" />
+          fill="none" style={{ stroke: "var(--pm-chart-track)" }} strokeWidth="9" strokeLinecap="round" />
         {/* Value arc */}
         <path
           d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
@@ -533,6 +533,16 @@ export function Gauge({ value = 0, size = 88, label, color }) {
       </div>
     </div>
   );
+}
+
+// ─── Stat values ──────────────────────────────────────────────────────────────
+// Big numbers in half-width tiles: shrink long values (e.g. "R 1 248 584")
+// instead of letting them wrap mid-number, and never break inside a value.
+// `sizes` lists the class to use for short, medium and long values.
+export function statValueClass(value, sizes = ["text-2xl", "text-xl", "text-lg"]) {
+  const len = String(value ?? "").length;
+  const size = len <= 7 ? sizes[0] : len <= 10 ? sizes[1] : sizes[2];
+  return `${size} whitespace-nowrap tabular-nums`;
 }
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
@@ -555,7 +565,7 @@ export function StatCard({ label, value, sub, color, icon: Icon, trend, invertTr
         )}
       </div>
       {/* Big confident hero number — colour lives in the icon chip so the row reads clean */}
-      <p className="text-[28px] font-black leading-none tracking-tight text-slate-900">{value}</p>
+      <p className={`${statValueClass(value, ["text-[28px]", "text-2xl", "text-xl"])} font-black leading-none tracking-tight text-slate-900`}>{value}</p>
       <p className="mt-2 text-[11px] font-bold text-slate-400 leading-tight">{label}</p>
       {sub && <p className="mt-0.5 text-[11px] text-slate-400 leading-snug">{sub}</p>}
       {trend && (
@@ -563,7 +573,7 @@ export function StatCard({ label, value, sub, color, icon: Icon, trend, invertTr
           className="mt-2 inline-flex max-w-full items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-black leading-tight"
           style={{
             background: isGood ? "rgba(22,163,74,0.10)" : "rgba(220,38,38,0.10)",
-            color: isGood ? "#16A34A" : "#DC2626",
+            color: isGood ? "#15803D" : "#B91C1C",
           }}>
           {rising ? "↑" : "↓"} {trend.text}
         </span>
@@ -580,7 +590,7 @@ export function NavTab({ icon: Icon, label, active, onClick, badge }) {
     <button
       onClick={onClick ? (e) => { haptic.light(); onClick(e); } : undefined}
       className="relative flex flex-col items-center justify-center gap-1 flex-1 transition-all"
-      style={{ minHeight: 72, color: active ? BRAND.primary : "#94A3B8" }}>
+      style={{ minHeight: 72, color: active ? BRAND.primary : "#737F92" }}>
       <div className={`rounded-2xl px-3 py-1.5 transition-all ${active ? "bg-red-50" : ""}`}>
         <Icon size={22} />
       </div>

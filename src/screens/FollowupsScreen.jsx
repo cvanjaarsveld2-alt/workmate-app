@@ -83,7 +83,7 @@ function FollowupCard({ f, today, onToggle, onEdit, onDelete, onSendInfo, onShar
             <p className="text-xs text-slate-400 mt-1 break-words whitespace-pre-wrap">{f.notes}</p>
           )}
           {reminder && reminder.value !== "none" && !f.completed && (
-            <p className="text-xs text-blue-400 mt-0.5">🔔 {reminder.label}</p>
+            <p className="text-xs text-blue-600 mt-0.5">🔔 {reminder.label}</p>
           )}
           {f.clientPhone && !f.completed && (
             <div className="mt-2">

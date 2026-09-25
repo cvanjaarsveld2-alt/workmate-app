@@ -278,7 +278,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
                 className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-bold transition-all min-h-[40px]"
                 style={listMode === m.key
                   ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
-                  : { background: "transparent", color: "#94A3B8" }}>
+                  : { background: "transparent", color: "#737F92" }}>
                 <m.icon size={15} /> {m.label}
               </button>
             ))}
@@ -326,7 +326,7 @@ export function BreakdownScreen({ data, setData, userId, userEmail, teamId, team
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           {isRepair
-                            ? <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: "#16A34A18", color: "#16A34A" }}>Repaired</span>
+                            ? <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: "#15803D18", color: "#15803D" }}>Repaired</span>
                             : <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${st.color}18`, color: st.color }}>{st.label}</span>}
                           {!isRepair && <span className="text-[10px] font-black px-2 py-0.5 rounded-full" style={{ background: `${sev.color}18`, color: sev.color }}>{sev.label}</span>}
                           {r.linked_breakdown_id && <span className="flex items-center gap-0.5 text-[10px] font-black text-slate-400"><Link2 size={10} /> linked</span>}

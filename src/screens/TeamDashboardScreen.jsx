@@ -13,7 +13,7 @@ import {
 import { BRAND, PIPELINE_STAGES, STAGE_COLORS } from "../lib/constants";
 import { todayISO, smartDate } from "../lib/helpers";
 import { CompanyDocuments } from "../components/CompanyDocuments";
-import { Card, StagePill } from "../components/ui";
+import { Card, StagePill, statValueClass } from "../components/ui";
 import { ShareToTeamModal } from "../components/ShareToTeamModal";
 import { supabase } from "../supabase";
 
@@ -41,7 +41,7 @@ function MemberChip({ email, userId, fullName, color }) {
 function MiniStat({ label, value, sub, color }) {
   return (
     <div className="flex-1 min-w-0 bg-white rounded-2xl p-3.5 border border-slate-100">
-      <p className="text-2xl font-black" style={{ color }}>{value}</p>
+      <p className={`${statValueClass(value)} font-black`} style={{ color }}>{value}</p>
       <p className="text-xs font-bold text-slate-500 mt-0.5">{label}</p>
       {sub && <p className="text-[10px] text-slate-400 mt-0.5">{sub}</p>}
     </div>

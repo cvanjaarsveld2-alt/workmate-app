@@ -256,7 +256,7 @@ export function WeeklyPlannerScreen({ data, setData, userId, teamId, onNavigate 
               <span className="text-xs font-bold text-slate-400">{items.length ? `${items.length}` : "—"}</span>
             </div>
             {items.length === 0
-              ? <p className="text-xs text-slate-300 py-1">Nothing scheduled</p>
+              ? <p className="text-xs text-slate-400 py-1">Nothing scheduled</p>
               : <div className="space-y-1.5">
                   {items.map(it => <PlanItem key={it.id} item={it} onMove={() => setMoving(it)} onDone={() => completeFollowup(it)} onOpen={onNavigate} onDraft={() => setDrafting({ item: it, client: clientForItem(it) })} />)}
                 </div>}

@@ -186,7 +186,7 @@ function InlineNoteForm({ client, userId, teamId, setData, onDone }) {
           {Object.keys(NOTE_URGENCY).map(u => (
             <button key={u} type="button" onClick={() => setForm(f => ({ ...f, urgency: u }))}
               className="flex-1 rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px]"
-              style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+              style={form.urgency === u ? { background: NOTE_URGENCY[u].bg, color: NOTE_URGENCY[u].text, borderColor: NOTE_URGENCY[u].dot } : { background: "#F8FAFC", color: "#737F92", borderColor: "#E2E8F0" }}>
               {u}
             </button>
           ))}
@@ -559,7 +559,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
                   className="rounded-full px-3 py-1.5 text-xs font-bold border-2 transition-all min-h-[36px]"
                   style={selected
                     ? { background: cat.bg, color: cat.color, borderColor: cat.color }
-                    : { background: "white", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                    : { background: "white", color: "#737F92", borderColor: "#E2E8F0" }}>
                   {cat.label}
                 </button>
               );

@@ -32,3 +32,9 @@ test("email quote RLS is not exposed to the public role", () => {
   assert.match(migration, /to authenticated using \(\(select auth\.uid\(\)\) = user_id\)/);
   assert.doesNotMatch(migration, /email_quotes_.*to public/);
 });
+
+test("every top-level test file is picked up by `node --test`", () => {
+  // node --test only runs *.test.mjs here; anything else silently never runs.
+  const stray = fs.readdirSync("tests").filter(f => f.endsWith(".mjs") && !f.endsWith(".test.mjs"));
+  assert.deepEqual(stray, []);
+});

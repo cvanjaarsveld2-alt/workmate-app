@@ -67,7 +67,7 @@ export function PullToRefresh({ onRefresh, children }) {
             boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
             opacity: Math.max(0.3, progress),
           }}>
-          <RefreshCw size={18} style={{ color: progress >= 1 ? BRAND.primary : "#94A3B8" }} />
+          <RefreshCw size={18} style={{ color: progress >= 1 ? BRAND.primary : "#737F92" }} />
         </motion.div>
       </div>
       {children}

@@ -59,7 +59,7 @@ const db = { ...Object.fromEntries(Object.keys(schema).map(t => [t, []])), ...Ob
 if (!db.team_members.length) db.team_members = RPC.get_team_member_emails.map(m => ({ id: uuid(), team_id: TEAM, user_id: m.user_id, role: m.role, joined_at: m.joined_at }));
 
 // ─── Emulator ────────────────────────────────────────────────────────────────
-const log = { writes: [], violations: [], errors4xx: [], unhandled: [], functions: [], storage: [] };
+const log = { writes: [], violations: [], errors4xx: [], unhandled: [], functions: [], storage: [], reads: [] };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validate(table, row) {
   const cols = schema[table];
@@ -88,7 +88,11 @@ function matchFilter(row, col, expr) {
     case "neq": r = String(val) !== String(parseVal(raw)); break;
     case "is": r = parseVal(raw) === null ? val === null || val === undefined : val === parseVal(raw); break;
     case "in": r = raw.replace(/^\(|\)$/g, "").split(",").map(s => s.replace(/^"|"$/g, "")).includes(String(val)); break;
-    case "gt": r = val > raw; break; case "gte": r = val >= raw; break; case "lt": r = val < raw; break; case "lte": r = val <= raw; break;
+    case "gt": case "gte": case "lt": case "lte": {
+      const a = Date.parse(val), b = Date.parse(raw), dates = /\d{4}-\d{2}-\d{2}T/.test(String(raw)) && Number.isFinite(a) && Number.isFinite(b);
+      const x = dates ? a : val, y = dates ? b : raw;
+      r = op === "gt" ? x > y : op === "gte" ? x >= y : op === "lt" ? x < y : x <= y; break;
+    }
     case "ilike": case "like": { const re = new RegExp("^" + raw.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/[%*]/g, ".*") + "$", op === "ilike" ? "i" : ""); r = re.test(String(val ?? "")); break; }
     default: log.unhandled.push(`filter op ${op} on ${col}`); r = true;
   }
@@ -123,6 +127,7 @@ let screenTag = "boot";
 async function handle(route) {
   const req = route.request(); const url = new URL(req.url()); const m = req.method(); const p = url.pathname;
   if (process.env.SIM_TRACE) console.log('REQ', screenTag, m, p, url.search.slice(0,120));
+  if (m === "GET" && p.startsWith("/rest/v1/")) log.reads.push({ table: p.split("/").pop(), search: url.search });
   if (m === "OPTIONS") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
   if (p.startsWith("/auth/v1/")) {
     if (p.endsWith("/user")) return json(route, 200, USER);
@@ -173,12 +178,14 @@ async function handle(route) {
     if (p.includes("/object/sign/")) {
       const objPath = p.split("/object/sign/")[1];
       if (m === "GET") return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
-      if (/\/no-receipt$|\/undefined$|\/null$/.test(objPath)) { log.errors4xx.push({ screen: screenTag, storage: "sign", path: objPath.split("/").slice(1).join("/"), status: 400 }); return json(route, 400, { statusCode: "400", error: "invalid", message: "Object not found" }); }
+      if (/\/no-receipt$|\/undefined$|\/null$|\/not-mine\//.test(objPath)) { log.errors4xx.push({ screen: screenTag, storage: "sign", path: objPath.split("/").slice(1).join("/"), status: 400 }); return json(route, 400, { statusCode: "400", error: "invalid", message: "Object not found" }); }
       let body = {}; try { body = req.postDataJSON() || {}; } catch {}
       if (body.paths) return json(route, 200, body.paths.map(x => ({ path: x, signedURL: `/object/sign/${objPath}/${x}?token=sim`, error: null })));
       return json(route, 200, { signedURL: `/object/sign/${objPath}?token=sim` });
     }
-    if (p.includes("/object/public/") || m === "GET") return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
+    // Every PowerMate bucket is private: like production, public links are refused.
+    if (p.includes("/object/public/")) { log.storage.push({ screen: screenTag, refusedPublic: true }); return json(route, 400, { statusCode: "400", error: "Bucket not found", message: "Bucket not found" }); }
+    if (m === "GET") return route.fulfill({ status: 200, contentType: "image/png", body: PNG });
     if (m === "POST" || m === "PUT") return json(route, 200, { Key: p.split("/object/")[1], Id: uuid() });
     if (m === "DELETE") return json(route, 200, []);
     return json(route, 200, {});
@@ -192,9 +199,8 @@ async function handle(route) {
   log.unhandled.push(`${m} ${p}`); return json(route, 404, {});
 }
 
-async function run() {
-  const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: "block", colorScheme: process.env.SIM_DARK ? "dark" : "light" });
+async function newSimContext(browser, { serviceWorkers = "block" } = {}) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers, colorScheme: process.env.SIM_DARK ? "dark" : "light" });
   await context.route(`${SUPA}/**`, handle);
   await context.route("https://api.frankfurter.app/**", r => json(r, 200, { amount: 1, base: "GHS", date: day(1), rates: { ZAR: 1.62 } }));
   await context.route(/^https:\/\/(?!localhost)/, r => { if (r.request().url().startsWith(SUPA)) return handle(r); log.unhandled.push("external " + new URL(r.request().url()).host); return r.abort(); });
@@ -208,6 +214,12 @@ async function run() {
       }
     } catch {}
   }, { UID, session: { access_token: JWT, refresh_token: "sim", expires_at: exp, expires_in: 86400, token_type: "bearer", user: USER } });
+  return context;
+}
+
+async function run() {
+  const browser = await chromium.launch();
+  const context = await newSimContext(browser);
 
   const page = await context.newPage();
   const perScreen = {};
@@ -234,5 +246,5 @@ async function run() {
   // hand the live objects to the flows script
   return { browser, context, page, perScreen, log, db, setTag: t => { screenTag = t; } };
 }
-module.exports = { run, db, log, UID, TEAM, APP };
+module.exports = { run, newSimContext, db, log, UID, TEAM, APP };
 if (require.main === module) run().then(async ({ browser }) => { await browser.close(); console.log("done"); }).catch(e => { console.error(e); process.exit(1); });

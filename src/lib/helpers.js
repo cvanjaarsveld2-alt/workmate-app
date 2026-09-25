@@ -166,7 +166,9 @@ export function storagePathFromSignedUrl(value, bucket = "powermate-media") {
   if (!value || typeof value !== "string" || !value.includes("/storage/v1/object/")) return null;
   try {
     const u = new URL(value);
-    for (const kind of ["sign", "authenticated"]) {
+    // "public" covers links saved before the bucket was made private (e.g.
+    // business-card photos): the file is still there, only the link is refused.
+    for (const kind of ["sign", "authenticated", "public"]) {
       const marker = `/storage/v1/object/${kind}/${bucket}/`;
       const i = u.pathname.indexOf(marker);
       if (i >= 0) return decodeURIComponent(u.pathname.slice(i + marker.length));
@@ -200,21 +202,130 @@ export async function uploadPhotoToSupabaseWithPath(base64OrFile, path) {
 }
 
 // ─── Telemetry ────────────────────────────────────────────────────────────────
+// Events that can't be sent (offline, network error) are kept in a small
+// localStorage buffer and flushed on the next successful send or when the
+// device comes back online, so crashes in the field still reach the events
+// table. Each buffered event remembers its user and is only sent under that
+// user's session, because the insert trigger stamps user_id from auth.uid().
+const EVENT_BUFFER_KEY = "powermate_event_buffer";
+const EVENT_BUFFER_MAX = 50;
+const EVENT_DATA_MAX = 15000; // events_set_owner_and_validate rejects > 20000
+
+function readEventBuffer() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(EVENT_BUFFER_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function writeEventBuffer(list) {
+  try {
+    if (list.length) localStorage.setItem(EVENT_BUFFER_KEY, JSON.stringify(list.slice(-EVENT_BUFFER_MAX)));
+    else localStorage.removeItem(EVENT_BUFFER_KEY);
+  } catch {}
+}
+
+function buildEventRow(name, data, userId) {
+  let payload = { ...data, build: import.meta.env.VITE_BUILD_SHA || "dev" };
+  if (JSON.stringify(payload).length > EVENT_DATA_MAX)
+    payload = { truncated: true, build: payload.build, message: String(data?.message || "").slice(0, 1000) };
+  return {
+    name: String(name).slice(0, 200),
+    data: payload,
+    timestamp: new Date().toISOString(),
+    user_agent: navigator.userAgent,
+    user_id: userId || null,
+  };
+}
+
+// A PostgREST/Postgres rejection carries a code (e.g. 42501, P0001) and will
+// fail the same way on every retry; only network failures are worth keeping.
+function isRetryableEventError(error) {
+  return !error?.code;
+}
+
+async function currentUserId() {
+  const { data: { session } = {} } = await supabase.auth.getSession();
+  return session?.user?.id || null;
+}
+
+let flushing = false;
+export async function flushEventBuffer() {
+  if (flushing || !navigator.onLine) return;
+  const buffered = readEventBuffer();
+  if (!buffered.length) return;
+  flushing = true;
+  try {
+    const userId = await currentUserId();
+    if (!userId) return;
+    const mine = buffered.filter(e => e.user_id === userId);
+    if (!mine.length) return;
+    const { error } = await supabase.from("events").insert(mine);
+    // A rejected batch would be rejected forever and block everything behind
+    // it, so it's dropped; a network failure keeps it for the next attempt.
+    if (error && isRetryableEventError(error)) return;
+    const sentKeys = new Set(mine.map(e => `${e.timestamp}|${e.name}`));
+    writeEventBuffer(readEventBuffer().filter(e => !sentKeys.has(`${e.timestamp}|${e.name}`)));
+  } catch {
+    // stays buffered for the next attempt
+  } finally {
+    flushing = false;
+  }
+}
+
 export async function logEvent(name, data = {}) {
   if (import.meta.env.DEV) console.log("[PowerMate]", name, data);
-  if (!navigator.onLine) return;
+  let row = null;
   try {
-    const { data: { session } = {} } = await supabase.auth.getSession();
-    const userId = session?.user?.id;
+    const userId = await currentUserId();
     if (!userId) return;
-    await supabase.from("events").insert({
-      name,
-      data,
-      timestamp: new Date().toISOString(),
-      user_agent: navigator.userAgent,
-      user_id: userId,
-    });
+    row = buildEventRow(name, data, userId);
+    if (!navigator.onLine) throw new Error("offline");
+    const { error } = await supabase.from("events").insert(row);
+    if (error) throw error;
+    flushEventBuffer();
   } catch (e) {
-    console.warn("[PowerMate] Telemetry failed:", e?.message);
+    if (row && isRetryableEventError(e)) writeEventBuffer([...readEventBuffer(), row]);
+    if (e?.message !== "offline") console.warn("[PowerMate] Telemetry failed:", e?.message);
   }
+}
+
+// Error reporting: same pipeline as logEvent, deduplicated and capped per page
+// load so a render loop or a repeating rejection can't flood the table.
+const reportedErrors = new Set();
+const MAX_ERROR_REPORTS = 20;
+export function reportError(name, error, extra = {}) {
+  try {
+    const message = String(error?.message || error || "unknown").slice(0, 1000);
+    const signature = `${name}|${message}`;
+    if (reportedErrors.has(signature) || reportedErrors.size >= MAX_ERROR_REPORTS) return;
+    reportedErrors.add(signature);
+    logEvent(name, {
+      message,
+      stack: String(error?.stack || "").slice(0, 2000),
+      path: typeof location !== "undefined" ? location.pathname + location.hash : "",
+      online: navigator.onLine,
+      ...extra,
+    });
+  } catch {}
+}
+
+let globalHandlersInstalled = false;
+export function installGlobalErrorReporting() {
+  if (globalHandlersInstalled || typeof window === "undefined") return;
+  globalHandlersInstalled = true;
+  window.addEventListener("error", event => {
+    // Resource load failures (img/script) have no error object; skip those.
+    if (!event.error && !event.message) return;
+    reportError("window_error", event.error || event.message, {
+      source: event.filename ? `${event.filename}:${event.lineno}:${event.colno}` : undefined,
+    });
+  });
+  window.addEventListener("unhandledrejection", event => {
+    reportError("unhandled_rejection", event.reason);
+  });
+  window.addEventListener("online", () => flushEventBuffer());
+  // Send anything captured during the previous session.
+  setTimeout(() => flushEventBuffer(), 5000);
 }

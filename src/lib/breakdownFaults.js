@@ -101,14 +101,14 @@ export const FAULT_GROUPS = [
 export const ALL_FAULTS = FAULT_GROUPS.flatMap(g => g.faults);
 
 export const SEVERITY_OPTIONS = [
-  { value: "low",      label: "Low",      color: "#16A34A" },
-  { value: "medium",   label: "Medium",   color: "#D97706" },
+  { value: "low",      label: "Low",      color: "#15803D" },
+  { value: "medium",   label: "Medium",   color: "#B45309" },
   { value: "high",     label: "High",     color: "#DC2626" },
   { value: "critical", label: "Critical", color: "#7F1D1D" },
 ];
 
 export const STATUS_OPTIONS = [
   { value: "open",        label: "Open",        color: "#DC2626" },
-  { value: "in_progress", label: "In progress", color: "#D97706" },
-  { value: "resolved",    label: "Resolved",    color: "#16A34A" },
+  { value: "in_progress", label: "In progress", color: "#B45309" },
+  { value: "resolved",    label: "Resolved",    color: "#15803D" },
 ];

@@ -53,7 +53,18 @@ const LOCAL_STORE = {
 const localStoreName = table => LOCAL_STORE[table] || table;
 const MAX_SYNC_ATTEMPTS = 8,
   PAGE_SIZE = 1000,
-  RECONCILE_MS = 30000;
+  // Background reconcile: a cheap "what changed" pull every minute, and a full
+  // pull at most every 15 minutes (or on reopening the app after that long).
+  // Realtime already delivers changes live; these are the safety net.
+  RECONCILE_MS = 60000,
+  FULL_PULL_MS = 15 * 60 * 1000,
+  // Incremental pulls re-read rows changed in this window before the newest
+  // updated_at already seen, so commits that land late or phones whose clock
+  // is a little off (inserts carry the client's time) are still picked up.
+  INCREMENTAL_OVERLAP_MS = 10 * 60 * 1000;
+// Pulled in full every time: team_notifications has no updated_at column and
+// service_reports has no trigger that stamps it on update.
+const FULL_ONLY_TABLES = new Set(["team_notifications", "service_reports"]);
 const REVIVABLE_CODES = new Set(["PGRST204", "PWR_ARRAY_CONFLICT", "SCHEMA_ERROR"]);
 // _syncInProgress is a simple mutex so two overlapping sync passes never race each other.
 // _syncRerunRequested remembers that *something* asked for another pass while one was
@@ -825,7 +836,14 @@ export async function pushSyncQueue(syncQueue, setData) {
       offlineSave(key, result.canonical).catch(() => {});
     }
     if (failed.length) {
-      logEvent("sync_failed", { count: failed.length });
+      logEvent("sync_failed", {
+        count: failed.length,
+        items: failed.slice(0, 10).map(f => ({
+          table: f.table,
+          code: f.error?.syncErrorCode || f.error?.code || null,
+          message: String(f.error?.message || "").slice(0, 300),
+        })),
+      });
       window.dispatchEvent(
         new CustomEvent("powermate:sync_failed", {
           detail: {
@@ -933,14 +951,34 @@ async function pullAll(makeQuery) {
     if (batch.length < PAGE_SIZE) return { data: rows, error: null };
   }
 }
-async function pullTable(table, uid) {
+async function pullTable(table, uid, since = null) {
   const makeQuery = () => {
     let query = supabase.from(table).select("*");
     if (table === "team_notifications") query = query.eq("to_user_id", uid);
     else if (!TEAM_TABLES.has(table)) query = query.eq("user_id", uid);
+    if (since) return query.gt("updated_at", since).order("updated_at", { ascending: true });
     return query.order("created_at", { ascending: false });
   };
   return pullAll(makeQuery);
+}
+
+// ─── Incremental pull state ──────────────────────────────────────────────────
+// Per user+table: the newest server updated_at seen. Set by every full pull,
+// advanced by incremental ones. In memory only: a fresh app start always does
+// a full pull first, which re-establishes it.
+const _watermarks = new Map();
+let _lastFullPullAt = 0;
+let _pullInProgress = false;
+const newestUpdatedAt = (rows, current = null) => {
+  let best = current ? Date.parse(current) : 0;
+  for (const r of rows || []) {
+    const t = r?.updated_at ? Date.parse(r.updated_at) : NaN;
+    if (Number.isFinite(t) && t > best) best = t;
+  }
+  return best ? new Date(best).toISOString() : null;
+};
+export function timeSinceFullPull() {
+  return _lastFullPullAt ? Date.now() - _lastFullPullAt : Infinity;
 }
 function dirtyQueueForTable(table) {
   return (_globalQueueRef?.current || []).filter(
@@ -949,6 +987,7 @@ function dirtyQueueForTable(table) {
 }
 export async function pullFromSupabase(uid, setData) {
   if (!uid) return false;
+  _pullInProgress = true;
   try {
     // Pull protection uses the durable queue, not only the React ref. This
     // closes the race where a server pull happens between a local save and
@@ -977,12 +1016,85 @@ export async function pullFromSupabase(uid, setData) {
       next[local] = serverRows;
       if (table === "vehicle_checks") next.vehicleChecks = vehicleChecksMap(serverRows);
       await offlineReplaceAll(local, serverRows);
+      _watermarks.set(`${uid}:${table}`, newestUpdatedAt(result.data));
     }
     setData(current => ({ ...current, ...next }));
+    if (results.every(r => !r.error)) _lastFullPullAt = Date.now();
     return true;
   } catch (e) {
     console.warn("[Sync] pull failed", e);
     return false;
+  } finally {
+    _pullInProgress = false;
+  }
+}
+
+// Incremental pull: only rows changed since the last pull, merged into the
+// local copy. Falls back to a full pull when there's no baseline yet or the
+// last full pull is older than FULL_PULL_MS (deletions and rows that stopped
+// being shared are only noticed by a full pull; realtime covers them live).
+export async function pullChangesFromSupabase(uid, setData) {
+  if (!uid) return false;
+  if (_pullInProgress) return false;
+  const hasBaseline = SYNC_TABLES.every(t => FULL_ONLY_TABLES.has(t) || _watermarks.has(`${uid}:${t}`));
+  if (!hasBaseline || timeSinceFullPull() >= FULL_PULL_MS) return pullFromSupabase(uid, setData);
+  _pullInProgress = true;
+  try {
+    const durableQueue = await offlineGetAll("syncQueue");
+    const sinceFor = table => {
+      if (FULL_ONLY_TABLES.has(table)) return null;
+      const mark = _watermarks.get(`${uid}:${table}`);
+      // Empty table so far: nothing to anchor on, so re-read it (it's empty or tiny).
+      return mark ? new Date(Date.parse(mark) - INCREMENTAL_OVERLAP_MS).toISOString() : null;
+    };
+    const results = await Promise.all(SYNC_TABLES.map(table => pullTable(table, uid, sinceFor(table))));
+    const next = {};
+    for (let i = 0; i < SYNC_TABLES.length; i++) {
+      const table = SYNC_TABLES[i],
+        result = results[i];
+      if (result.error) {
+        console.warn(`[Sync] incremental pull failed: ${table}`, result.error);
+        continue;
+      }
+      const local = localStoreName(table);
+      const since = sinceFor(table);
+      const dirtyIds = new Set(
+        (durableQueue || [])
+          .filter(q => (q.status === "pending" || q.status === "failed") && q.table === table)
+          .map(q => q.data?.id),
+      );
+      if (!since) {
+        // Full re-read of a small table: same merge rules as a full pull.
+        const localRows = await offlineGetAll(local);
+        const serverRows = (result.data || []).filter(r => !dirtyIds.has(r.id));
+        for (const row of localRows) if (dirtyIds.has(row.id)) serverRows.push(row);
+        next[local] = serverRows;
+        await offlineReplaceAll(local, serverRows);
+      } else {
+        // Rows with local edits waiting to upload keep the local version,
+        // exactly as realtime updates do.
+        const changed = (result.data || []).filter(r => r?.id && !dirtyIds.has(r.id));
+        if (!changed.length) {
+          _watermarks.set(`${uid}:${table}`, newestUpdatedAt(result.data, _watermarks.get(`${uid}:${table}`)));
+          continue;
+        }
+        const byId = new Map((await offlineGetAll(local)).map(r => [r.id, r]));
+        for (const row of changed) byId.set(row.id, row);
+        const merged = [...byId.values()].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+        next[local] = merged;
+        await Promise.all(changed.map(row => offlineSave(local, row)));
+      }
+      if (table === "vehicle_checks") next.vehicleChecks = vehicleChecksMap(next[local]);
+      if (!FULL_ONLY_TABLES.has(table))
+        _watermarks.set(`${uid}:${table}`, newestUpdatedAt(result.data, _watermarks.get(`${uid}:${table}`)));
+    }
+    if (Object.keys(next).length) setData(current => ({ ...current, ...next }));
+    return true;
+  } catch (e) {
+    console.warn("[Sync] incremental pull failed", e);
+    return false;
+  } finally {
+    _pullInProgress = false;
   }
 }
 export function registerSyncHandlers(setData, queueRef) {
@@ -1259,19 +1371,28 @@ export function setupRealtimeSync(uid, setData) {
     });
   };
   start().catch(() => {});
-  const timer = setInterval(() => {
+  const reconcile = () => {
     if (document.visibilityState !== "hidden" && navigator.onLine) {
       // Upload anything still queued (including changes from a previous session)
       // before pulling, so a restart never leaves local edits stuck on the device.
       pushSyncQueue(_globalQueueRef?.current || [], setData)
         .catch(() => {})
-        .finally(() => pullFromSupabase(uid, setData).catch(() => {}));
+        .finally(() => pullChangesFromSupabase(uid, setData).catch(() => {}));
       retryPendingMedia(uid, setData).catch(() => {});
     }
-  }, RECONCILE_MS);
+  };
+  const timer = setInterval(reconcile, RECONCILE_MS);
+  // Phones suspend backgrounded web apps and their realtime connection, so
+  // catch up straight away when the app is brought back rather than waiting
+  // for the next tick. (Incremental unless the last full pull is stale.)
+  const onVisible = () => {
+    if (document.visibilityState === "visible") reconcile();
+  };
+  document.addEventListener("visibilitychange", onVisible);
   return () => {
     stopped = true;
     clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVisible);
     channels.forEach(c => supabase.removeChannel(c));
   };
 }

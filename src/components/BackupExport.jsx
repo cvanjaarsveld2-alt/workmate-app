@@ -4,7 +4,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { Download, Database, CheckCircle2, AlertTriangle, Share2 } from "lucide-react";
-import JSZip from "jszip";
 import { Card, Btn } from "./ui";
 import { supabase } from "../supabase";
 import { neutralizeFormula } from "../lib/csv";
@@ -96,6 +95,8 @@ async function sha256(blob) {
 }
 
 async function generateBackup(data, onProgress = () => {}) {
+  // Loaded on demand so the More screen doesn't carry the ZIP library.
+  const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   const stamp = nowStamp();
 

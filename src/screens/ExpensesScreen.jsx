@@ -980,7 +980,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 className="rounded-xl py-2.5 text-sm font-bold border-2 transition-all min-h-[44px]"
                 style={form.payment_method === m
                   ? { background: "#F7F3F3", color: "#8B1A1A", borderColor: "#8B1A1A" }
-                  : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  : { background: "#F8FAFC", color: "#737F92", borderColor: "#E2E8F0" }}>
                 {m}
               </button>
             ))}
@@ -1321,7 +1321,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               className="flex-1 py-1.5 rounded-md text-xs font-bold transition-all"
               style={sortBy === o.k
                 ? { background: "#fff", color: "#0F172A", boxShadow: "0 1px 2px rgba(0,0,0,0.06)" }
-                : { background: "transparent", color: "#94A3B8" }}>
+                : { background: "transparent", color: "#737F92" }}>
               {o.label}
             </button>
           ))}

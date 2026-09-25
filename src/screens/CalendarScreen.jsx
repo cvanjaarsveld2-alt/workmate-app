@@ -612,7 +612,7 @@ export function CalendarScreen({ data, setData, userId, teamId, onNavigate }) {
               {DAY_NAMES.map((day, index) => (
                 <div
                   key={day}
-                  className={`text-center text-[10px] font-black uppercase py-2 ${index > 4 ? "text-red-400" : "text-slate-400"}`}
+                  className={`text-center text-[10px] font-black uppercase py-2 ${index > 4 ? "text-red-500" : "text-slate-400"}`}
                 >
                   {day}
                 </div>

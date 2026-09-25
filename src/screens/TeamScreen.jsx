@@ -21,7 +21,7 @@ import {
   Eye, EyeOff, ShieldCheck,
 } from "lucide-react";
 import { supabase } from "../supabase";
-import { Card, Btn, Field, Toast, PageHeader, useConfirm } from "../components/ui";
+import { Card, Btn, Field, Toast, PageHeader, useConfirm, statValueClass } from "../components/ui";
 import { MemberSelector } from "../components/MemberSelector";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { BRAND } from "../lib/constants";
@@ -301,7 +301,7 @@ function MemberDashboard({ member, data, setData, members, currentUserId, userEm
             className={`text-left ${stat.wide ? "col-span-2" : ""}`}>
             <Card className="p-4 active:bg-slate-50 transition-colors">
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
-              <p className="text-2xl font-black mt-1 leading-none" style={{ color: stat.color }}>{stat.value}</p>
+              <p className={`${statValueClass(stat.value)} font-black mt-1 leading-none`} style={{ color: stat.color }}>{stat.value}</p>
               <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
                 Tap to view <ChevronRight size={11} className="text-slate-300" />
               </p>
@@ -466,7 +466,7 @@ function SharedWithMe({ userId, data, setData, onRefresh }) {
                 <div className="grid grid-cols-2 gap-2">
                   <button onClick={() => acceptItem(notif)} disabled={isAccepting}
                     className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px] disabled:opacity-60"
-                    style={{ background: isAccepting ? "#94A3B8" : "#16A34A" }}>
+                    style={{ background: isAccepting ? "#737F92" : "#16A34A" }}>
                     {isAccepting ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
                     {isAccepting ? "Adding…" : "Add to my dashboard"}
                   </button>
@@ -890,7 +890,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
         </Card>
         <Card className="p-4">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Won Revenue</p>
-          <p className="text-xl font-black mt-1 leading-tight" style={{ color: "#16A34A" }}>{money(teamStats.wonRevenue)}</p>
+          <p className={`${statValueClass(money(teamStats.wonRevenue), ["text-xl", "text-xl", "text-lg"])} font-black mt-1 leading-tight`} style={{ color: "#16A34A" }}>{money(teamStats.wonRevenue)}</p>
           <p className="text-xs text-slate-400 mt-0.5">accepted quotes</p>
         </Card>
       </div>

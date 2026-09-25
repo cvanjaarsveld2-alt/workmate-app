@@ -22,6 +22,7 @@ import { SalesFollowupComposer } from "../lib/industrialSalesEmail.jsx";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { logCrash } from "../components/ErrorBoundary";
+import { useStoredPhoto } from "../lib/useStoredPhoto";
 import {
   Card, Btn, Field, GroupField, SearchBar, FilterPills, CollapsibleFilters,
   Toast, Empty, PageHeader, useConfirm,
@@ -32,7 +33,7 @@ const STATUS_COLORS = {
   lead:      { bg: "#FEF3C7", text: "#92400E", dot: "#F59E0B" },
   active:    { bg: "#DBEAFE", text: "#1E40AF", dot: "#3B82F6" },
   converted: { bg: "#DCFCE7", text: "#166534", dot: "#16A34A" },
-  archived:  { bg: "#F1F5F9", text: "#64748B", dot: "#94A3B8" },
+  archived:  { bg: "#F1F5F9", text: "#64748B", dot: "#737F92" },
 };
 
 function StatusPill({ status }) {
@@ -62,6 +63,23 @@ function ExpandableText({ text, limit = 100, className = "" }) {
           {expanded ? "▲ Show less" : "▼ Show more"}
         </button>
       )}
+    </div>
+  );
+}
+
+// Business card photo in the contact detail. Rendered only once the image has
+// actually loaded: if it can't be (a teammate can't read the uploader's files,
+// or there's no signal) the whole section is left out, not an empty box.
+function BusinessCardPhoto({ contact, onOpen }) {
+  const { url, status } = useStoredPhoto(contact.card_photo_url);
+  if (status !== "ready") return null;
+  return (
+    <div>
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Business card · tap to enlarge</p>
+      <button onClick={() => onOpen(url)}
+        className="w-full rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80">
+        <img src={url} alt={`${contact.name} business card`} className="w-full h-48 object-contain bg-slate-50" />
+      </button>
     </div>
   );
 }
@@ -406,7 +424,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
                 className="rounded-xl py-2.5 text-xs font-bold border-2 transition-all min-h-[44px] capitalize"
                 style={form.status === s
                   ? { background: STATUS_COLORS[s].bg, color: STATUS_COLORS[s].text, borderColor: STATUS_COLORS[s].dot }
-                  : { background: "#F8FAFC", color: "#94A3B8", borderColor: "#E2E8F0" }}>
+                  : { background: "#F8FAFC", color: "#737F92", borderColor: "#E2E8F0" }}>
                 {s}
               </button>
             ))}
@@ -489,7 +507,7 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
             {detailContact.phone ? (
               <a href={`https://wa.me/${detailContact.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noreferrer"
                 className="flex flex-col items-center justify-center gap-1 rounded-xl py-3 text-white min-h-[64px]"
-                style={{ background: "#25D366" }}>
+                style={{ background: "#128C7E" }}>
                 <Send size={18} />
                 <span className="text-xs font-bold">WhatsApp</span>
               </a>
@@ -542,15 +560,8 @@ export function ContactsScreen({ data, setData, userId, userEmail, teamId, teamM
               </div>
             )}
 
-            {detailContact.card_photo_url && (
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Business card · tap to enlarge</p>
-                <button onClick={() => setViewerImages({ list: [{ url: detailContact.card_photo_url, caption: detailContact.name }], startIndex: 0 })}
-                  className="w-full rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 active:opacity-80">
-                  <img src={detailContact.card_photo_url} alt="" className="w-full h-48 object-contain bg-slate-50" />
-                </button>
-              </div>
-            )}
+            <BusinessCardPhoto contact={detailContact}
+              onOpen={url => setViewerImages({ list: [{ url, caption: detailContact.name }], startIndex: 0 })} />
 
             {((detailContact.status === "lead" || detailContact.status === "active") && detailContact.company?.trim()) && (
               <div className="pt-2 space-y-2 border-t border-slate-100">

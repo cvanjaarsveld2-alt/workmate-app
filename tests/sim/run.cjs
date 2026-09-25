@@ -23,8 +23,11 @@ async function waitFor(url, ms = 30000) {
   throw new Error(`preview server did not start at ${url}`);
 }
 function runFlows(account) {
+  return runScript("flows.cjs", account);
+}
+function runScript(script, account) {
   return new Promise(resolve => {
-    const child = spawn(process.execPath, [path.join(__dirname, "flows.cjs")], {
+    const child = spawn(process.execPath, [path.join(__dirname, script)], {
       cwd: ROOT, stdio: "inherit",
       env: { ...process.env, SIM_UID: account.uid, SIM_EMAIL: account.email, SIM_OUT: account.name, SIM_SCREENS: account.screens, SIM_APP_URL: `http://localhost:${PORT}` },
     });
@@ -55,6 +58,10 @@ function runFlows(account) {
       const flows = JSON.parse(fs.readFileSync(path.join(OUT, account.name, "flows.json"), "utf8"));
       if (flows.violations.length) { ok = false; console.error("FAIL schema violations:", JSON.stringify(flows.violations.slice(0, 5))); }
     }
+    console.log("\n=== visual audit: contrast, wrapped numbers, overflow (light + dark) ===");
+    if (!(await runScript("visual-audit.cjs", { ...ACCOUNTS[0], name: "visual" }))) ok = false;
+    console.log("\n=== offline app shell (service worker on) ===");
+    if (!(await runScript("offline-shell.cjs", { ...ACCOUNTS[0], name: "offline" }))) ok = false;
   } finally {
     try { process.kill(-server.pid); } catch {}
   }

@@ -45,7 +45,7 @@ function Section({ icon: Icon, title, subtitle, filled, children, defaultOpen = 
         className="w-full flex items-center gap-3 p-4 text-left active:bg-slate-50 transition-colors">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
           style={{ background: filled ? "#FEF2F2" : "#F1F5F9" }}>
-          <Icon size={17} style={{ color: filled ? BRAND_PRIMARY : "#94A3B8" }} />
+          <Icon size={17} style={{ color: filled ? BRAND_PRIMARY : "#737F92" }} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-black text-slate-900">{title}</p>
