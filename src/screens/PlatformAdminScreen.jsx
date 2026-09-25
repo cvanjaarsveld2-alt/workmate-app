@@ -36,7 +36,7 @@ function Select({ label, value, options, onChange }) {
   );
 }
 
-function CompanyCard({ c, onSave }) {
+function CompanyCard({ c, onSave, onDelete }) {
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState({ plan: c.plan, status: c.status, paid_until: c.paid_until || "", notes: c.notes || "" });
   const set = k => v => setEdit(e => ({ ...e, [k]: v }));
@@ -55,6 +55,9 @@ function CompanyCard({ c, onSave }) {
           {c.plan === "trial" && c.trial_ends_at ? ` · trial ends ${fmt(c.trial_ends_at)}` : ""}
           {c.paid_until ? ` · paid until ${fmt(c.paid_until)}` : ""}
         </p>
+        {c.deletion_requested_at && (
+          <p className="mt-1 text-xs font-bold text-red-700">Asked for its data to be deleted on {fmt(c.deletion_requested_at)}</p>
+        )}
       </button>
       {open && (
         <div className="stack-y-2 pt-2 border-t border-slate-100">
@@ -75,6 +78,11 @@ function CompanyCard({ c, onSave }) {
           <Btn size="sm" onClick={() => onSave(c.id, { ...edit, paid_until: edit.paid_until || null })}>
             Save
           </Btn>
+          {c.deletion_requested_at && (
+            <Btn size="sm" variant="danger" onClick={() => onDelete(c)}>
+              Delete this company's data
+            </Btn>
+          )}
         </div>
       )}
     </Card>
@@ -110,6 +118,14 @@ export function PlatformAdminScreen() {
     const { error: e } = await supabase.rpc("admin_update_plan", { p_team_id: teamId, p_patch: patch });
     if (e) return setToast(e.message);
     setToast("Saved");
+    load();
+  }
+  async function deleteCompany(c) {
+    const typed = window.prompt(`This permanently deletes every record of ${c.name}. Type the company name to confirm:`);
+    if (typed === null) return;
+    const { data, error: e } = await supabase.rpc("admin_delete_company", { p_team_id: c.id, p_confirm_name: typed });
+    if (e) return setToast(e.message);
+    setToast(`Deleted ${data?.records_deleted ?? 0} records. Remove its files in Storage next.`);
     load();
   }
   async function saveSetting(key, value) {
@@ -154,7 +170,7 @@ export function PlatformAdminScreen() {
       </div>
       {error && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
 
-      {tab === "companies" && companies.map(c => <CompanyCard key={c.id} c={c} onSave={savePlan} />)}
+      {tab === "companies" && companies.map(c => <CompanyCard key={c.id} c={c} onSave={savePlan} onDelete={deleteCompany} />)}
 
       {tab === "signup" && settings && (
         <Card className="p-4 stack-y-3">

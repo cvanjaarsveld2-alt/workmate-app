@@ -7,6 +7,9 @@ import { Card, Btn, Field, PageHeader, Toast } from "../components/ui";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { compressLogo, saveCompanyProfile, useCompanyProfile } from "../lib/companyProfile";
 import { MODULES } from "../lib/modules";
+import { supabase } from "../supabase";
+import { buildCompanyZip } from "../lib/companyExport";
+import { useTeamPlan } from "../lib/plan";
 import { addDays, buildDocumentPDF, documentFilename, shareDocumentPDF } from "../lib/documentPDF";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -44,6 +47,46 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
   const fileRef = useRef(null);
+  const plan = useTeamPlan(teamId, online);
+  const [deletionAsked, setDeletionAsked] = useState(null);
+  useEffect(() => {
+    if (!online || !teamId) return;
+    supabase
+      .from("team_plans")
+      .select("deletion_requested_at")
+      .eq("team_id", teamId)
+      .maybeSingle()
+      .then(
+        ({ data }) => setDeletionAsked(data?.deletion_requested_at || null),
+        () => {},
+      );
+  }, [teamId, online, plan]);
+
+  async function downloadAll() {
+    setError("");
+    setToast("Preparing your data…");
+    const { data, error: e } = await supabase.rpc("export_company_data", { p_team_id: teamId });
+    if (e) return setError(e.message);
+    const blob = await buildCompanyZip(data);
+    const name = `${(form.trading_name || "company").replace(/[^A-Za-z0-9]+/g, "_")}_data_${new Date().toISOString().slice(0, 10)}.zip`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    setToast("Company data downloaded");
+  }
+  async function askDeletion(cancel) {
+    if (!cancel && !window.confirm("Ask us to delete ALL of your company's data? Download a copy first. We delete it after the notice period in the terms, and it can't be undone after that."))
+      return;
+    const { error: e } = await supabase.rpc("request_company_deletion", { p_team_id: teamId, p_cancel: !!cancel });
+    if (e) return setError(e.message);
+    setDeletionAsked(cancel ? null : new Date().toISOString());
+    setToast(cancel ? "Deletion request cancelled" : "Deletion requested");
+  }
 
   useEffect(() => {
     if (!dirty) setForm(profile);
@@ -359,6 +402,24 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           multiline
           maxLength={6000}
         />
+      </Section>
+
+      <Section title="Your company's data" hint="Download everything your company has stored, or ask us to delete it (POPIA).">
+        <Btn variant="secondary" onClick={downloadAll} disabled={!online}>
+          Download all company data
+        </Btn>
+        {deletionAsked ? (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm text-amber-900 stack-y-2">
+            <p>Deletion requested on {new Date(deletionAsked).toLocaleDateString("en-ZA")}. We'll delete your data after the notice period.</p>
+            <Btn size="sm" variant="ghost" onClick={() => askDeletion(true)}>
+              Cancel the request
+            </Btn>
+          </div>
+        ) : (
+          <Btn variant="ghost" onClick={() => askDeletion(false)} disabled={!online}>
+            Ask us to delete your company's data
+          </Btn>
+        )}
       </Section>
 
       {error && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
