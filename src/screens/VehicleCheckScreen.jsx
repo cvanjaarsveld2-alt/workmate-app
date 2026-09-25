@@ -459,7 +459,7 @@ export function VehicleCheckScreen({ data, setData, userId, teamId }) {
     const photos = Array.isArray(dayData.photos) ? dayData.photos : [];
     const id = genId();
     // Compress and store a local base64 preview immediately; upload in background
-    let base64 = null;
+    let base64;
     try {
       base64 = await compressImage(file, 1600, 0.75);
     } catch { base64 = null; }

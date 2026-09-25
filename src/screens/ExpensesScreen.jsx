@@ -534,7 +534,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   async function saveExpense() {
     if (!form.amount || parseFloat(form.amount) <= 0) { setToast("Enter a valid amount"); return; }
 
-    let zarInfo = null;
+    let zarInfo;
     const manualZARNum = parseFloat(manualZAR);
     if (!form.currency || form.currency === "ZAR") {
       zarInfo = { amount_zar: parseFloat(form.amount), exchange_rate: 1, rate_date: todayISO(), rate_source: "ZAR" };

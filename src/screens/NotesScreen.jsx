@@ -332,7 +332,7 @@ Kind regards`;
     if (editId && !existing) { setToast("Note not found"); return; }
 
     const noteId = editId || genId();
-    let uploadedMedia = [];
+    let uploadedMedia;
     if (isOnline && pendingMedia.length > 0) {
       uploadedMedia = await Promise.all(pendingMedia.map(async m => {
         const path = "notes/" + noteId + "/" + m.id;

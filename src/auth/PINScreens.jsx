@@ -79,7 +79,7 @@ async function verifyPIN(pin, userId) {
     return ok;
   }
   // Everything below is a pre-v3 format: verify it once, then upgrade to v3.
-  let ok = false;
+  let ok;
   if (stored.startsWith("v2$")) {
     const [, salt, hash] = stored.split("$");
     ok = !!salt && !!hash && _safeEqual(await _hashPINLegacy(pin, salt), hash);

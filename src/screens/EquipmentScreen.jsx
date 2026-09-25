@@ -72,7 +72,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
     if (editId) {
       const existing = equipment.find(e => e.id === editId);
       const cleanForm = { ...form, service_due: form.service_due || null };
-      let newUploaded = [];
+      let newUploaded;
       if (isOnline && pendingMedia.length > 0) {
         newUploaded = await Promise.all(pendingMedia.map(async m => {
           const path = `equipment/${editId}/${m.id}`;
@@ -98,7 +98,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
       const cleanForm = { ...form, service_due: form.service_due || null };
       const itemId = genId();
 
-      let uploadedMedia = [];
+      let uploadedMedia;
       if (isOnline && pendingMedia.length > 0) {
         uploadedMedia = await Promise.all(pendingMedia.map(async m => {
           const path = `equipment/${itemId}/${m.id}`;
