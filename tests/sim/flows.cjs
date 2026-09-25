@@ -435,6 +435,27 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       `ticket saved=${!!row} (status ${row?.status}); confirmation=${shown}; platform console lists companies=${consoleOk}`);
   });
 
+  // 13h. A customer accepts a quote online: link → page → name, signature, order no.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("quotes: customer accepts online", async () => {
+    await go("Quotes", 3000);
+    await page.getByRole("button", { name: "Make a PDF" }).first().click(); await page.waitForTimeout(300);
+    await page.evaluate(() => { try { navigator.share = undefined; } catch {} try { Object.defineProperty(navigator, "clipboard", { value: { writeText: async () => {} }, configurable: true }); } catch {} });
+    await page.getByRole("button", { name: "Send link to accept online" }).first().click(); await page.waitForTimeout(1200);
+    const q = H.db.quotes.find(x => x.share_token);
+    await page.goto(`${H.APP}/?quote=${q.share_token}`, { waitUntil: "load" }); await page.waitForTimeout(2500);
+    const shown = (await page.getByText(/QUOTATION/).count()) > 0;
+    await page.getByLabel("Your full name").fill("Jan Buyer");
+    await page.getByLabel("Order number").fill("PO-778");
+    const pad = page.getByLabel("Sign here"); const box = await pad.boundingBox();
+    await page.mouse.move(box.x + 20, box.y + 40); await page.mouse.down();
+    await page.mouse.move(box.x + 120, box.y + 80, { steps: 8 }); await page.mouse.move(box.x + 220, box.y + 30, { steps: 8 }); await page.mouse.up();
+    await page.getByRole("button", { name: "Accept quote" }).click(); await page.waitForTimeout(1500);
+    const thanks = (await page.getByText("Quote accepted — thank you!").count()) > 0;
+    await shot("quote-accepted-online");
+    rec("quotes: customer accepts online", shown && thanks && q.status === "Accepted" && q.accepted_by_name === "Jan Buyer" && q.accepted_po === "PO-778" && /^data:image\/png;base64,/.test(q.accepted_signature || "") ? "PASS" : "FAIL",
+      `page shown=${shown}; thanks=${thanks}; status=${q.status}; by=${q.accepted_by_name}; po=${q.accepted_po}; signature=${(q.accepted_signature || "").slice(0, 22)}`);
+  });
+
   // 14. Master account removes a teammate and hands their work over (runs last: it changes the team).
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("team: remove teammate hands over work", async () => {
     const GREG = "f16f3dd1-c87c-4066-8a38-750d7bc31d65";

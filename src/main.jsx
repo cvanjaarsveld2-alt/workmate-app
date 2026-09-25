@@ -7,6 +7,7 @@ import PowerMateApp from "./App.jsx";
 import { installGlobalErrorReporting, logEvent } from "./lib/helpers";
 import { requestPersistentStorage } from "./offline/offlineDb";
 import { LegalPage, legalPageFromUrl } from "./legal/LegalPage";
+import { QuoteAcceptPage, sharedQuoteTokenFromUrl } from "./legal/QuoteAcceptPage";
 import { captureJoinCode } from "./lib/joinCode";
 
 // Uncaught errors and promise rejections go to the events table (buffered offline).
@@ -50,10 +51,12 @@ captureJoinCode();
 
 // Terms, privacy and data processing pages are public: /?legal=terms etc.
 const legal = legalPageFromUrl();
+// A customer opening a quote link (/?quote=TOKEN) — no sign-in needed.
+const sharedQuote = sharedQuoteTokenFromUrl();
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {legal ? <LegalPage which={legal} /> : <PowerMateApp />}
+    {legal ? <LegalPage which={legal} /> : sharedQuote ? <QuoteAcceptPage token={sharedQuote} /> : <PowerMateApp />}
   </React.StrictMode>
 );
 

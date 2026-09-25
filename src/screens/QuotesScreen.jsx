@@ -83,6 +83,22 @@ export function QuotesScreen({
       () => {},
     );
   }, [pdfFor]);
+  // A link the customer opens to accept (with a signature) or decline online.
+  async function shareAcceptLink(q) {
+    if (q.sync_status === "pending") return setToast("Sync this quote first, then share the link");
+    const { data: token, error } = await supabase.rpc("create_quote_link", { p_quote_id: q.id });
+    if (error || !token) return setToast(error?.message || "Couldn't create the link");
+    const url = `${window.location.origin}/?quote=${token}`;
+    const text = `Please review and accept our quotation${q.quote_number ? ` ${q.quote_number}` : ""}: ${url}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "Quotation", text });
+      else {
+        await navigator.clipboard.writeText(url);
+        setToast("Link copied");
+      }
+    } catch {}
+    setPdfFor(null);
+  }
   async function sharePdf(q, kind) {
     try {
       setToast(kind === "quote" && hasDetails(q.details) ? "Preparing PDF…" : "");
@@ -470,6 +486,17 @@ export function QuotesScreen({
                   {q.sent_date && (
                     <p className="text-xs text-slate-400 mt-0.5">Sent {smartDate(q.sent_date)}</p>
                   )}
+                  {q.accepted_at && (
+                    <p className="text-xs font-bold text-green-700 mt-0.5">
+                      Accepted online by {q.accepted_by_name} · {smartDate(String(q.accepted_at).slice(0, 10))}
+                      {q.accepted_po ? ` · order ${q.accepted_po}` : ""}
+                    </p>
+                  )}
+                  {q.declined_at && (
+                    <p className="text-xs font-bold text-red-700 mt-0.5">
+                      Declined online{q.decline_reason ? `: ${q.decline_reason}` : ""}
+                    </p>
+                  )}
                   {q.sync_status === "pending" && (
                     <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
                       Not synced
@@ -534,6 +561,12 @@ export function QuotesScreen({
                       className="min-h-[44px] rounded-xl bg-slate-50 text-slate-700 text-sm font-bold border border-slate-200"
                     >
                       Pro forma invoice
+                    </button>
+                    <button
+                      onClick={() => shareAcceptLink(q)}
+                      className="col-span-2 min-h-[44px] rounded-xl bg-blue-50 text-blue-800 text-sm font-bold"
+                    >
+                      Send link to accept online
                     </button>
                   </div>
                 )}
