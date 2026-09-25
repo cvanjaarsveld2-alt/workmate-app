@@ -55,6 +55,7 @@ import { NavDrawer } from "./components/NavDrawer";
 import { readHiddenScreens, saveHiddenScreens, syncHiddenScreens } from "./lib/menuPrefs";
 import { setActiveTeamId, loadCompanyProfile, useCompanyProfile } from "./lib/companyProfile";
 import { unavailableScreens } from "./lib/modules";
+import { assuranceLevel, TwoStepChallenge, TwoStepRequired } from "./auth/TwoStep";
 import { setMyName } from "./lib/me";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 import { HomeScreen } from "./screens/HomeScreen";
@@ -710,6 +711,16 @@ export default function PowerWorksApp() {
         () => {},
       );
   }, [session?.user?.id]);
+  // Two-step login: ask for the code after the password when it's set up, and
+  // make owners/admins set it up when their company requires it.
+  const [twoStep, setTwoStep] = useState({ checked: false, current: "aal1", next: "aal1" });
+  const recheckTwoStep = useCallback(
+    () => assuranceLevel().then(l => setTwoStep({ checked: true, ...l })),
+    [],
+  );
+  useEffect(() => {
+    if (session?.user?.id) recheckTwoStep();
+  }, [session?.user?.id, recheckTwoStep]);
   // Modules the company switched off: their screens leave the menu and can't open.
   const companyProfile = useCompanyProfile(teamId);
   const offScreens = unavailableScreens(companyProfile.disabled_modules);
@@ -875,6 +886,11 @@ export default function PowerWorksApp() {
   if (loading) return <DataLoadingScreen />;
   if (!session?.user) return <AuthScreen />;
   if (recoveringPassword) return <SetPasswordScreen onDone={() => setRecoveringPassword(false)} />;
+  if (!twoStep.checked) return <DataLoadingScreen />;
+  if (twoStep.next === "aal2" && twoStep.current !== "aal2")
+    return <TwoStepChallenge onDone={recheckTwoStep} onSignOut={logout} />;
+  if (isOnline && userRole === "admin" && companyProfile.require_admin_mfa && twoStep.next !== "aal2")
+    return <TwoStepRequired onDone={recheckTwoStep} onSignOut={logout} />;
   // Signed in but not in a company yet: join one, or set up a new company.
   if (teamChecked && !teamId && isOnline)
     return (

@@ -36,6 +36,7 @@ export const DEFAULT_PROFILE = {
   // Nothing off unless the company chose it (new companies start without
   // Jack Selector: see CompanySetup).
   disabled_modules: [],
+  require_admin_mfa: false,
 };
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
@@ -109,6 +110,8 @@ export function cleanProfile(input) {
       out[k] = Array.isArray(v) ? [...new Set(v.map(String))] : [];
     } else if (k === "vat_registered") {
       out[k] = v !== false;
+    } else if (k === "require_admin_mfa") {
+      out[k] = v === true;
     } else if (k === "logo_data") {
       out[k] = v || null;
     } else {

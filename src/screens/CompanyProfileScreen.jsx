@@ -307,6 +307,22 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
         </p>
       </Section>
 
+      <Section title="Security">
+        <label className="flex items-center gap-3 min-h-[52px] cursor-pointer">
+          <span className="flex-1">
+            <span className="block text-sm font-bold text-slate-800">Require two-step login for owners and admins</span>
+            <span className="block text-xs text-slate-500">They'll be asked to set up an authenticator app before they can continue.</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={!!form.require_admin_mfa}
+            onChange={e => set("require_admin_mfa")(e.target.checked)}
+            aria-label="Require two-step login for owners and admins"
+            className="h-6 w-6 shrink-0"
+          />
+        </label>
+      </Section>
+
       <Section title="Modules" hint="Switch off what your company doesn't use. It disappears for everyone in your company.">
         {MODULES.map(m => {
           const on = !(form.disabled_modules || []).includes(m.key);

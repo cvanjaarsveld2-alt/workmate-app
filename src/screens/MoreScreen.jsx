@@ -1,4 +1,5 @@
 // ─── More / Settings Screen ───────────────────────────────────────────────────
+import { TwoStepSettings } from "../auth/TwoStep";
 import { PRODUCT_NAME, PRODUCT_VERSION } from "../lib/brand";
 import { companyLegalName } from "../lib/companyProfile";
 import React, { useState, useEffect } from "react";
@@ -325,6 +326,8 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           </div>
         )}
       </Card>
+
+      <TwoStepSettings />
 
       <Card className="p-4 stack-y-3">
         <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Security</p>
