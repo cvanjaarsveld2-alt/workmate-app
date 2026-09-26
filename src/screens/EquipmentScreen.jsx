@@ -1,7 +1,7 @@
 // ─── Equipment Screen ─────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip, ChevronRight, Share2 } from "lucide-react";
+import { Plus, X, Save, Edit2, Trash2, Wrench, MapPin, Users, Hash, Paperclip, ChevronRight, Share2, QrCode, ClipboardCheck, AlertTriangle } from "lucide-react";
 import { smartDate, genId, uploadPhotoToSupabaseWithPath, daysDiff } from "../lib/helpers";
 import { offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
@@ -13,6 +13,12 @@ import { MediaPicker, MediaGallery } from "../components/MediaComponents";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { useIsMine } from "../lib/teamView";
+import { supabase } from "../supabase";
+import { buildQrLabelsPDF } from "../lib/qrLabels";
+import { shareDocumentPDF } from "../lib/documentPDF";
+import { activeProfile } from "../lib/companyProfile";
+import { failedChecks } from "../lib/forms";
+import { FillForm } from "../components/FillForm";
 
 // ─── Show-more text (full info on tap, no silent clipping) ──────────────────
 function ExpandableText({ text, limit = 110, className = "" }) {
@@ -35,7 +41,7 @@ function ExpandableText({ text, limit = 110, className = "" }) {
   );
 }
 
-export function EquipmentScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], isOnline, quickAddTrigger, searchSeed }) {
+export function EquipmentScreen({ data, setData, userId, userEmail, teamId, teamMembers = [], isOnline, quickAddTrigger, searchSeed, openId = null, onNavigate, canForms = true }) {
   const isMine = useIsMine(userId);
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch]     = useState("");
@@ -47,6 +53,35 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
   const [toast, setToast]       = useState("");
   const [form, setForm] = useState({ name: "", type: "", make: "", model: "", serial: "", location: "", client: "", client_id: null, service_due: "", notes: "" });
   const [pendingMedia, setPendingMedia] = useState([]);
+  const [formFor, setFormFor] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [labels, setLabels] = useState(false);
+  // Opened from a machine's QR label (/?equipment=ID): show that machine.
+  useEffect(() => {
+    if (!openId) return;
+    const eq = (data.equipment || []).find(e => e.id === openId);
+    if (eq) setDetailEq(eq);
+  }, [openId, data.equipment]);
+  // The machine's filled-in forms.
+  useEffect(() => {
+    if (!detailEq || !isOnline) return setHistory([]);
+    let live = true;
+    supabase.from("form_submissions").select("id, template_name, filled_at, fields, answers").eq("equipment_id", detailEq.id)
+      .order("filled_at", { ascending: false }).limit(20)
+      .then(({ data: rows }) => live && setHistory(rows || []), () => {});
+    return () => { live = false; };
+  }, [detailEq, isOnline]);
+  async function printLabels(list) {
+    if (!list.length) return;
+    setLabels(true);
+    try {
+      const blob = await buildQrLabelsPDF(list, { origin: window.location.origin, profile: activeProfile() });
+      await shareDocumentPDF(blob, list.length === 1 ? `QR_label_${(list[0].name || "machine").replace(/\W+/g, "_")}.pdf` : "QR_labels.pdf", "QR labels");
+    } catch (e) {
+      setToast(e.message || "Couldn't make the labels");
+    }
+    setLabels(false);
+  }
   const { confirm, dialog } = useConfirm();
   const equipment = (data.equipment || []).filter(isMine);
 
@@ -256,6 +291,22 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
         )}
         secondaryActions={detailEq && (
           <>
+            <button onClick={() => printLabels([detailEq])} disabled={labels}
+              className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+              <QrCode size={14} /> QR label
+            </button>
+            {canForms && (
+              <button onClick={() => setFormFor(detailEq)}
+                className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
+                <ClipboardCheck size={14} /> Fill in a form
+              </button>
+            )}
+            {onNavigate && (
+              <button onClick={() => { setDetailEq(null); onNavigate("Breakdown"); }}
+                className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-amber-200 bg-white text-amber-800 min-h-[48px]">
+                <AlertTriangle size={14} /> Report a breakdown
+              </button>
+            )}
             <button onClick={() => { const e = detailEq; setDetailEq(null); startEdit(e); }}
               className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
               <Edit2 size={14} /> Edit
@@ -276,6 +327,23 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
               {detailEq.service_due && <DetailRow label="Service due" value={smartDate(detailEq.service_due)} />}
               {detailEq.installed_date && <DetailRow label="Installed" value={smartDate(detailEq.installed_date)} />}
             </div>
+
+            {history.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Forms & inspections</p>
+                <div className="stack-y-1">
+                  {history.map(h => {
+                    const fails = failedChecks(h.fields, h.answers).length;
+                    return (
+                      <div key={h.id} className="flex justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm">
+                        <span className="text-slate-700">{h.template_name}</span>
+                        <span className={fails ? "text-red-700 font-bold" : "text-slate-500"}>{smartDate(h.filled_at)}{fails ? ` · ${fails} No` : ""}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {detailEq.notes && (
               <div>
@@ -315,8 +383,17 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
           />
         )}
       </AnimatePresence>
+      {formFor && (
+        <FillForm open onClose={() => setFormFor(null)} teamId={teamId} userId={userId} appliesTo="equipment" equipment={formFor}
+          client={(data.clients || []).find(c => c.id === formFor.client_id)} onDone={msg => { setToast(msg); setFormFor(null); setDetailEq(null); }} />
+      )}
       <div className="flex items-center justify-between">
         <PageHeader title="Equipment" subtitle={`${equipment.length} registered · ${overdueCount} overdue`} />
+        {equipment.length > 0 && (
+          <Btn size="sm" variant="secondary" onClick={() => printLabels(equipment)} disabled={labels}>
+            <QrCode size={15} />{labels ? "Making…" : "QR labels"}
+          </Btn>
+        )}
         <Btn size="sm" onClick={() => { if (showForm || editId) resetForm(); else setShowForm(true); }}>
           {(showForm || editId) ? <X size={15} /> : <Plus size={15} />}{(showForm || editId) ? "Cancel" : "Add"}
         </Btn>

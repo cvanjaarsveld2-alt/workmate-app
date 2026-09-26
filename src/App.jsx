@@ -57,6 +57,8 @@ import { setActiveTeamId, loadCompanyProfile, useCompanyProfile } from "./lib/co
 import { unavailableScreens } from "./lib/modules";
 import { assuranceLevel, TwoStepChallenge, TwoStepRequired } from "./auth/TwoStep";
 import { featureForScreen, hasFeature, lockedScreens, useTeamPlan } from "./lib/plan";
+import { flushForms } from "./lib/forms";
+import { equipmentIdFromUrl } from "./lib/qrLabels";
 import { LockedFeature, PlanBanner, SuspendedScreen } from "./components/PlanBanner";
 import { setMyName } from "./lib/me";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
@@ -125,6 +127,7 @@ const ServicePlansScreen = lazy(() =>
 const ScheduleScreen = lazy(() => import("./screens/ScheduleScreen").then(m => ({ default: m.ScheduleScreen })));
 const PlanScreen = lazy(() => import("./screens/PlanScreen").then(m => ({ default: m.PlanScreen })));
 const PurchasingScreen = lazy(() => import("./screens/PurchasingScreen").then(m => ({ default: m.PurchasingScreen })));
+const FormsScreen = lazy(() => import("./screens/FormsScreen").then(m => ({ default: m.FormsScreen })));
 const JobProfitScreen = lazy(() => import("./screens/JobProfitScreen").then(m => ({ default: m.JobProfitScreen })));
 const HelpScreen = lazy(() => import("./screens/HelpScreen").then(m => ({ default: m.HelpScreen })));
 const PlatformAdminScreen = lazy(() =>
@@ -242,6 +245,8 @@ export default function PowerWorksApp() {
   const [teamAccess, setTeamAccess] = useState(null);
   const [teamViewOn, setTeamViewOn] = useState(readTeamViewPref);
   const [screen, setScreen] = useState(() => {
+    // A machine's QR label opens that machine.
+    if (equipmentIdFromUrl()) return "Equipment";
     try {
       const p = new URLSearchParams(window.location.search).get("screen");
       const valid = [
@@ -310,7 +315,10 @@ export default function PowerWorksApp() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [userRole, setUserRole] = useState("member");
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [screenContext, setScreenContext] = useState({});
+  const [screenContext, setScreenContext] = useState(() => {
+    const equipmentId = equipmentIdFromUrl();
+    return equipmentId ? { equipmentId } : {};
+  });
   const [teamRefreshKey, setTeamRefreshKey] = useState(0);
   const syncQueueRef = useRef(data.syncQueue);
   const persistedQueueIds = useRef(new Set());
@@ -870,6 +878,8 @@ export default function PowerWorksApp() {
         if (cancelled) return;
         await pushSyncQueue(syncQueueRef.current || [], setData);
         await retryPendingMedia(uid, setData);
+        // Forms filled in without signal.
+        await flushForms(supabase).catch(() => {});
         await pullFromSupabase(uid, setData);
       } finally {
         if (!cancelled) setSyncing(false);
@@ -1040,6 +1050,9 @@ export default function PowerWorksApp() {
         isOnline={isOnline}
         quickAddTrigger={quickAddTrigger}
         searchSeed={searchSeed}
+        openId={screenContext?.equipmentId || null}
+        onNavigate={navigate}
+        canForms={hasFeature(teamPlan, "forms")}
       />
     ),
     Quotes: (
@@ -1140,6 +1153,7 @@ export default function PowerWorksApp() {
         clients={data.clients}
         canClock={hasFeature(teamPlan, "timesheets")}
         canMessage={hasFeature(teamPlan, "messages")}
+        canForms={hasFeature(teamPlan, "forms")}
       />
     ),
     Invoices: (
@@ -1192,6 +1206,16 @@ export default function PowerWorksApp() {
         teamId={teamId}
         canManage={!!teamAccess?.is_owner || userRole === "admin"}
         vatRegistered={companyProfile.vat_registered !== false}
+      />
+    ),
+    Forms: (
+      <FormsScreen
+        teamId={teamId}
+        userId={session.user.id}
+        canManage={!!teamAccess?.is_owner || userRole === "admin"}
+        clients={data.clients}
+        equipment={data.equipment}
+        teamMembers={teamMembers}
       />
     ),
     Purchasing: <PurchasingScreen teamId={teamId} canManage={!!teamAccess?.is_owner || userRole === "admin"} />,

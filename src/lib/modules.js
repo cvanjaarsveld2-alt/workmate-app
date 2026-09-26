@@ -12,6 +12,7 @@ export const MODULES = [
   { key: "equipment", label: "Equipment register", hint: "Client machines and service dates", screens: ["Equipment"] },
   // Built for Power Works only: offered just to companies that already have it.
   { key: "jack_selector", label: "Jack selector", hint: "Mining machine jacking guide", screens: ["JackSelector"], privateTo: "enabled" },
+  { key: "forms", label: "Forms & checklists", hint: "Safety sign-offs, inspections and checklists", screens: ["Forms"] },
   { key: "meetings", label: "Meeting recorder", hint: "Record and summarise meetings", screens: ["Meeting"] },
   { key: "expenses", label: "Expenses", hint: "Receipts and expense claims", screens: ["Expenses", "BackfillZAR"] },
 ];

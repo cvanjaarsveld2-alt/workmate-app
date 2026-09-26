@@ -31,6 +31,7 @@ import {
   Lock,
   LayoutGrid,
   ShoppingCart,
+  ClipboardCheck,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { ALWAYS_SHOWN } from "../lib/menuPrefs";
@@ -64,6 +65,7 @@ const SECTIONS = [
       { key: "Schedule", label: "Schedule", icon: CalendarDays },
       { key: "Timesheets", label: "Timesheets", icon: Timer },
       { key: "ServicePlans", label: "Service plans", icon: CalendarClock },
+      { key: "Forms", label: "Forms & checklists", icon: ClipboardCheck },
     ],
   },
   {

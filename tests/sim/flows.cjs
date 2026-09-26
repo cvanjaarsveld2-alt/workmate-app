@@ -591,16 +591,41 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     const card = page.locator("div", { hasText: job.title }).filter({ has: page.getByRole("button", { name: "Message customer" }) }).last();
     await card.getByRole("button", { name: "Message customer" }).click(); await page.waitForTimeout(800);
     const text = await page.getByLabel("Message").inputValue();
-    const popup = context.waitForEvent("page", { timeout: 3000 }).catch(() => null);
+    // The sim can't reach WhatsApp: record the link the app opens instead.
+    await page.evaluate(() => { window.__opened = []; window.open = u => { window.__opened.push(String(u)); return null; }; });
     await page.getByRole("button", { name: "WhatsApp" }).click();
-    const wa = await popup; const waUrl = wa ? wa.url() : ""; if (wa) await wa.close();
+    const waUrl = (await page.evaluate(() => window.__opened[0] || "")) || "";
     await page.waitForTimeout(800);
     await card.getByRole("button", { name: "Message customer" }).click(); await page.waitForTimeout(800);
     await page.getByRole("button", { name: "SMS", exact: true }).click(); await page.waitForTimeout(1200);
     const logged = (H.db.customer_messages || []).filter(m => m.job_id === job.id);
     await shot("messages-job");
-    rec("messages: WhatsApp and SMS from a job", /Hi \w+, .* has booked your job/.test(text) && /wa\.me\/27821234567\?text=/.test(waUrl) && logged.some(m => m.channel === "whatsapp" && m.status === "opened") && logged.some(m => m.channel === "sms" && m.status === "queued" && m.to_phone === "+27821234567") ? "PASS" : "FAIL",
+    rec("messages: WhatsApp and SMS from a job", /^Hi \w+, .*(has booked your job|is on the way|has finished the job)/.test(text) && /wa\.me\/27821234567\?text=/.test(waUrl) && logged.some(m => m.channel === "whatsapp" && m.status === "opened") && logged.some(m => m.channel === "sms" && m.status === "queued" && m.to_phone === "+27821234567") ? "PASS" : "FAIL",
       `message="${text.slice(0, 80)}"; whatsapp url=${waUrl.slice(0, 50)}; logged=${JSON.stringify(logged.map(m => [m.channel, m.status, m.to_phone]))}`);
+  });
+
+  // 13k. Forms: make one from the example, fill it in with a signature.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("forms: build, fill in and sign", async () => {
+    await go("Forms", 2500);
+    await page.getByRole("button", { name: /^Forms \(/ }).click(); await page.waitForTimeout(500);
+    await page.getByRole("button", { name: "Job completion sign-off" }).click(); await page.waitForTimeout(600);
+    await page.getByRole("button", { name: "Save form" }).click(); await page.waitForTimeout(1200);
+    const tpl = (H.db.form_templates || []).find(t => t.name === "Job completion sign-off");
+    await page.getByRole("button", { name: /^Filled in \(/ }).click(); await page.waitForTimeout(400);
+    await page.getByRole("button", { name: "Fill in a form" }).click(); await page.waitForTimeout(800);
+    // Save too early: the form says what's missing.
+    await page.getByRole("button", { name: "Save form" }).click(); await page.waitForTimeout(300);
+    const nagged = (await page.getByText(/Still to answer/).count()) > 0;
+    for (const b of await page.getByRole("button", { name: "Yes", exact: true }).all()) await b.click();
+    await page.locator('label:has-text("Customer\'s name") input').fill("Jan Buyer");
+    const pad = page.getByLabel("Sign here"); const box = await pad.boundingBox();
+    await page.mouse.move(box.x + 20, box.y + 40); await page.mouse.down();
+    await page.mouse.move(box.x + 140, box.y + 70, { steps: 8 }); await page.mouse.up();
+    await page.getByRole("button", { name: "Save form" }).click(); await page.waitForTimeout(1500);
+    const sub = (H.db.form_submissions || []).find(x => x.template_name === "Job completion sign-off");
+    await shot("forms-filled");
+    rec("forms: build, fill in and sign", !!tpl && nagged && !!sub && /^data:image\/png;base64,/.test(sub.signature || "") && Object.values(sub.answers || {}).includes("Jan Buyer") ? "PASS" : "FAIL",
+      `template saved=${!!tpl} (${(tpl?.fields || []).length} questions); nagged when incomplete=${nagged}; submission=${!!sub}; signature=${(sub?.signature || "").slice(0, 22)}; answers=${JSON.stringify(sub?.answers || {}).slice(0, 80)}`);
   });
 
   // 13i. Plans: a Starter company sees Products locked, the master account can pick a plan.

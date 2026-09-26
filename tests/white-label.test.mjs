@@ -35,7 +35,10 @@ test("modules map to real screens and switch them off", () => {
 });
 
 test("the database only accepts known modules", () => {
-  const sql = fs.readFileSync("supabase/migrations/20260926120000_team_profiles_modules.sql", "utf8");
+  // The newest migration that sets the list wins.
+  const file = fs.readdirSync("supabase/migrations").filter(f => f.endsWith(".sql")).sort()
+    .filter(f => fs.readFileSync(`supabase/migrations/${f}`, "utf8").includes("team_profiles_disabled_modules_valid")).pop();
+  const sql = fs.readFileSync(`supabase/migrations/${file}`, "utf8");
   for (const m of MODULES) assert.ok(sql.includes(`'${m.key}'`), m.key);
 });
 

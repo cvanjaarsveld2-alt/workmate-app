@@ -18,6 +18,7 @@ import {
   Car,
   Square,
   MessageCircle,
+  ClipboardCheck,
 } from "lucide-react";
 import { createInvoiceFromJob } from "../lib/jobInvoiceAutomation";
 import { CaptionedPhotos } from "../components/CaptionedPhotos";
@@ -31,9 +32,12 @@ import { jobToCard } from "../lib/documentData";
 import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { MessageCustomer } from "../components/MessageCustomer";
+import { FillForm } from "../components/FillForm";
 
-export function JobsScreen({ userId, teamId, setData, clients = [], canClock = true, canMessage = true }) {
+export function JobsScreen({ userId, teamId, setData, clients = [], canClock = true, canMessage = true, canForms = true }) {
   const [messaging, setMessaging] = useState(null);
+  const [formFor, setFormFor] = useState(null);
+  const [formNote, setFormNote] = useState("");
   const [jobs, setJobs] = useState([]),
     [quotes, setQuotes] = useState([]),
     [loading, setLoading] = useState(true),
@@ -381,6 +385,12 @@ export function JobsScreen({ userId, teamId, setData, clients = [], canClock = t
                     Open route
                   </a>
                 )}
+                {canForms && (
+                  <Btn size="sm" variant="secondary" onClick={() => setFormFor(job)}>
+                    <ClipboardCheck size={13} />
+                    Fill in a form
+                  </Btn>
+                )}
                 {canMessage && job.client_id && (
                   <Btn size="sm" variant="secondary" onClick={() => setMessaging(job)}>
                     <MessageCircle size={13} />
@@ -449,6 +459,23 @@ export function JobsScreen({ userId, teamId, setData, clients = [], canClock = t
             </Card>
           );
         })
+      )}
+      {formNote && (
+        <div role="status" className="rounded-xl bg-green-50 border border-green-200 p-3 text-sm text-green-900">
+          {formNote}
+        </div>
+      )}
+      {formFor && (
+        <FillForm
+          open
+          onClose={() => setFormFor(null)}
+          teamId={teamId}
+          userId={userId}
+          appliesTo="job"
+          job={formFor}
+          client={clients.find(c => c.id === formFor.client_id)}
+          onDone={setFormNote}
+        />
       )}
       {messaging && (
         <MessageCustomer
