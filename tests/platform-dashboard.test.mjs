@@ -55,3 +55,14 @@ test("the console gives full access in one tap, and the list has what the dashbo
   for (const f of ["billing_status", "seat_limit", "paid_total", "last_payment_at", "as jobs"]) assert.ok(sql.includes(f), f);
   assert.match(sql, /if not private\.is_platform_admin\(\) then raise exception 'Not authorized'/);
 });
+
+test("a company can read its own plan, but not your notes or its PayFast token", () => {
+  const sql = fs.readFileSync(new URL("../supabase/migrations/20260927190100_hide_platform_notes.sql", import.meta.url), "utf8");
+  assert.match(sql, /revoke select, insert, update on public\.team_plans from anon, authenticated/);
+  const cols = sql.match(/grant select \(([^)]+)\)/)[1].split(",").map(s => s.trim());
+  assert.ok(!cols.includes("notes") && !cols.includes("billing_token"));
+  for (const c of ["plan", "status", "trial_ends_at", "paid_until", "deletion_requested_at"]) assert.ok(cols.includes(c), c);
+  // The app never reads team_plans directly except the deletion-request date.
+  const profile = fs.readFileSync(new URL("../src/screens/CompanyProfileScreen.jsx", import.meta.url), "utf8");
+  assert.match(profile, /from\("team_plans"\)\s*\.select\("deletion_requested_at"\)/);
+});
