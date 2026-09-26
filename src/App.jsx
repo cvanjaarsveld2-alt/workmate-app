@@ -56,8 +56,8 @@ import { readHiddenScreens, saveHiddenScreens, syncHiddenScreens } from "./lib/m
 import { setActiveTeamId, loadCompanyProfile, useCompanyProfile } from "./lib/companyProfile";
 import { unavailableScreens } from "./lib/modules";
 import { assuranceLevel, TwoStepChallenge, TwoStepRequired } from "./auth/TwoStep";
-import { useTeamPlan } from "./lib/plan";
-import { PlanBanner, SuspendedScreen } from "./components/PlanBanner";
+import { featureForScreen, hasFeature, lockedScreens, useTeamPlan } from "./lib/plan";
+import { LockedFeature, PlanBanner, SuspendedScreen } from "./components/PlanBanner";
 import { setMyName } from "./lib/me";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 import { HomeScreen } from "./screens/HomeScreen";
@@ -123,6 +123,7 @@ const ServicePlansScreen = lazy(() =>
   import("./screens/ServicePlansScreen").then(m => ({ default: m.ServicePlansScreen })),
 );
 const ScheduleScreen = lazy(() => import("./screens/ScheduleScreen").then(m => ({ default: m.ScheduleScreen })));
+const PlanScreen = lazy(() => import("./screens/PlanScreen").then(m => ({ default: m.PlanScreen })));
 const HelpScreen = lazy(() => import("./screens/HelpScreen").then(m => ({ default: m.HelpScreen })));
 const PlatformAdminScreen = lazy(() =>
   import("./screens/PlatformAdminScreen").then(m => ({ default: m.PlatformAdminScreen })),
@@ -170,6 +171,7 @@ const SCREEN_TITLES = {
   Timesheets: "Timesheets",
   ServicePlans: "Service plans",
   Schedule: "Schedule",
+  Plan: "Plan & billing",
 };
 const INITIAL_DATA = {
   clients: [],
@@ -270,6 +272,7 @@ export default function PowerWorksApp() {
         "Timesheets",
         "ServicePlans",
         "Schedule",
+        "Plan",
         "Client360",
         "Calendar",
         "TeamDashboard",
@@ -750,7 +753,11 @@ export default function PowerWorksApp() {
   }, [session?.user?.id, recheckTwoStep]);
   // The company's plan (trial / read-only / suspended) and whether this person
   // runs the product itself (platform console).
-  const teamPlan = useTeamPlan(teamId, isOnline);
+  const [planRefresh, setPlanRefresh] = useState(0);
+  const teamPlan = useTeamPlan(teamId, isOnline, planRefresh);
+  const refreshPlan = useCallback(() => setPlanRefresh(k => k + 1), []);
+  // Screens the company's plan doesn't include show an upgrade page instead.
+  const planLocked = lockedScreens(teamPlan);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   useEffect(() => {
     if (!session?.user?.id || !isOnline) return;
@@ -1115,7 +1122,15 @@ export default function PowerWorksApp() {
     ),
     Breakdown: <BreakdownScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} />,
     Repair: <RepairScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} />,
-    Jobs: <JobsScreen userId={session.user.id} teamId={teamId} setData={setData} clients={data.clients} />,
+    Jobs: (
+      <JobsScreen
+        userId={session.user.id}
+        teamId={teamId}
+        setData={setData}
+        clients={data.clients}
+        canClock={hasFeature(teamPlan, "timesheets")}
+      />
+    ),
     Invoices: (
       <InvoicesScreen
         userId={session.user.id}
@@ -1125,7 +1140,13 @@ export default function PowerWorksApp() {
         quotes={data.quotes}
       />
     ),
-    CompanyProfile: <CompanyProfileScreen teamId={teamId} isOwner={!!teamAccess?.is_owner} />,
+    CompanyProfile: (
+      <CompanyProfileScreen
+        teamId={teamId}
+        isOwner={!!teamAccess?.is_owner}
+        onPlan={() => navigate("Plan")}
+      />
+    ),
     Schedule: (
       <ScheduleScreen
         userId={session.user.id}
@@ -1159,6 +1180,15 @@ export default function PowerWorksApp() {
         teamId={teamId}
         canManage={!!teamAccess?.is_owner || userRole === "admin"}
         vatRegistered={companyProfile.vat_registered !== false}
+      />
+    ),
+    Plan: (
+      <PlanScreen
+        teamId={teamId}
+        plan={teamPlan}
+        isOwner={!!teamAccess?.is_owner}
+        onHelp={() => navigate("Help", { from: "Plan" })}
+        onChanged={refreshPlan}
       />
     ),
     Help: (
@@ -1334,12 +1364,18 @@ export default function PowerWorksApp() {
               onLogout={logout}
               hiddenScreens={hiddenScreens}
               unavailableScreens={offScreens}
+              lockedScreens={planLocked}
               onSaveHidden={onSaveHidden}
               userId={session.user.id}
               teamId={teamId}
               setData={setData}
             />
-            <PlanBanner plan={teamPlan} isAdmin={userRole === "admin"} onHelp={() => navigate("Help", { from: screen })} />
+            <PlanBanner
+              plan={teamPlan}
+              isAdmin={userRole === "admin"}
+              onHelp={() => navigate("Help", { from: screen })}
+              onPlan={() => navigate("Plan")}
+            />
             <main className="mx-auto max-w-2xl px-4 pt-4">
               <PullToRefresh
                 onRefresh={async () => {
@@ -1370,7 +1406,17 @@ export default function PowerWorksApp() {
                           </div>
                         }
                       >
-                        {offScreens.includes(screen) ? screens.Home : screens[screen]}
+                        {offScreens.includes(screen) ? (
+                          screens.Home
+                        ) : planLocked.includes(screen) ? (
+                          <LockedFeature
+                            feature={featureForScreen(screen)}
+                            canUpgrade={!!teamAccess?.is_owner}
+                            onPlan={() => navigate("Plan")}
+                          />
+                        ) : (
+                          screens[screen]
+                        )}
                       </Suspense>
                     </ScreenErrorBoundary>
                   </motion.div>

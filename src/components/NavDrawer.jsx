@@ -28,6 +28,7 @@ import {
   PhoneCall,
   CheckCircle2,
   SlidersHorizontal,
+  Lock,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { ALWAYS_SHOWN } from "../lib/menuPrefs";
@@ -93,6 +94,7 @@ export function NavDrawer({
   onLogout,
   hiddenScreens = [],
   unavailableScreens = [],
+  lockedScreens = [],
   onSaveHidden,
 }) {
   // Editing the menu: a draft set of hidden screens, saved on Done.
@@ -101,6 +103,8 @@ export function NavDrawer({
   const hidden = new Set(hiddenScreens);
   // Modules the company switched off aren't offered at all.
   const off = new Set(unavailableScreens);
+  // Not in the company's plan: still listed, with a lock (opens the upgrade page).
+  const locked = new Set(lockedScreens);
   const available = SECTIONS.map(s => ({ ...s, items: s.items.filter(i => !off.has(i.key)) })).filter(s => s.items.length);
   const sections = available.map(s => ({
     ...s,
@@ -230,6 +234,9 @@ export function NavDrawer({
                           >
                             {item.label}
                           </span>
+                          {locked.has(item.key) && (
+                            <Lock size={13} className="text-slate-400 shrink-0" aria-label="Not in your plan" />
+                          )}
                           {badge > 0 && (
                             <span className="min-w-5 h-5 px-1 rounded-full bg-red-100 text-red-600 text-[10px] font-black flex items-center justify-center">
                               {badge > 99 ? "99+" : badge}

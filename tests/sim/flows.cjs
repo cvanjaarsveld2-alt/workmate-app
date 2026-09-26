@@ -574,6 +574,30 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       `page shown=${shown}; thanks=${thanks}; status=${q.status}; by=${q.accepted_by_name}; po=${q.accepted_po}; signature=${(q.accepted_signature || "").slice(0, 22)}`);
   });
 
+  // 13i. Plans: a Starter company sees Products locked, the master account can pick a plan.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("plans: starter locks products, plan screen offers upgrade", async () => {
+    const before = H.SIM.plan;
+    H.SIM.plan = { ...before, plan: "starter", features: [], seats: 3, seats_used: 3, paid_until: "2099-01-01" };
+    try {
+      await go("Products", 2500);
+      const locked = (await page.getByText("Products & stock isn't in your plan").count()) > 0;
+      await page.getByRole("button", { name: "See plans" }).click(); await page.waitForTimeout(1500);
+      const onPlan = (await page.getByText("Choose Pro").count()) > 0 && (await page.getByText("3 users of 3").count()) > 0;
+      await go("Jobs", 2500);
+      const noClock = (await page.getByRole("button", { name: /Clock in/ }).count()) === 0;
+      await go("CompanyProfile", 2500);
+      const xeroLocked = (await page.getByText("Xero sync").count()) > 0 && (await page.getByText("isn't in your plan").count()) >= 3;
+      await go("Plan", 2000);
+      await page.getByRole("button", { name: "Choose Pro" }).click(); await page.waitForTimeout(800);
+      const called = log.functions.some(f => f.fn === "billing");
+      await shot("plans-starter");
+      rec("plans: starter locks products, plan screen offers upgrade", locked && onPlan && noClock && xeroLocked && called ? "PASS" : "FAIL",
+        `products locked=${locked}; plan screen with Choose Pro + seats=${onPlan}; no clock-in on jobs=${noClock}; PayFast/Xero/reminders locked=${xeroLocked}; billing checkout called=${called}`);
+    } finally {
+      H.SIM.plan = before;
+    }
+  });
+
   // 14. Master account removes a teammate and hands their work over (runs last: it changes the team).
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("team: remove teammate hands over work", async () => {
     const GREG = "f16f3dd1-c87c-4066-8a38-750d7bc31d65";

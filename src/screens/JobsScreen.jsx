@@ -30,7 +30,7 @@ import { jobToCard } from "../lib/documentData";
 import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
-export function JobsScreen({ userId, teamId, setData, clients = [] }) {
+export function JobsScreen({ userId, teamId, setData, clients = [], canClock = true }) {
   const [jobs, setJobs] = useState([]),
     [quotes, setQuotes] = useState([]),
     [loading, setLoading] = useState(true),
@@ -296,7 +296,8 @@ export function JobsScreen({ userId, teamId, setData, clients = [] }) {
                 const t = jobTime(job);
                 const here = time.running?.job_id === job.id ? time.running : null;
                 const open = job.status === "scheduled" || job.status === "in_progress";
-                if (!open && !t.all) return null;
+                // Without timesheets in the plan, only time already recorded shows.
+                if (!(open && canClock) && !t.all) return null;
                 return (
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-slate-500 flex items-center gap-1 mr-auto">
@@ -304,6 +305,7 @@ export function JobsScreen({ userId, teamId, setData, clients = [] }) {
                       {t.all ? `Time on job ${fmtMinutes(t.work)}${t.travel ? ` · travel ${fmtMinutes(t.travel)}` : ""}` : "No time recorded"}
                     </span>
                     {open &&
+                      canClock &&
                       (here ? (
                         <Btn size="sm" variant="warning" onClick={() => time.clockOut()}>
                           <Square size={13} />
@@ -395,7 +397,7 @@ export function JobsScreen({ userId, teamId, setData, clients = [] }) {
                     onClick={async () => {
                       await status(job, "in_progress");
                       // Starting a job starts the clock on it.
-                      if (time.running?.job_id !== job.id || time.running?.kind !== "work") await time.clockIn({ job });
+                      if (canClock && (time.running?.job_id !== job.id || time.running?.kind !== "work")) await time.clockIn({ job });
                     }}
                     disabled={saving === job.id}
                   >

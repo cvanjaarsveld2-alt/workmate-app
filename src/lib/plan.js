@@ -19,7 +19,7 @@ export function trialDaysLeft(plan, now = Date.now()) {
   return Math.max(0, Math.ceil((new Date(plan.trial_ends_at).getTime() - now) / 86400000));
 }
 
-export function useTeamPlan(teamId, online) {
+export function useTeamPlan(teamId, online, refreshKey = 0) {
   const [plan, setPlan] = useState(() => (teamId ? read(teamId) : null));
   useEffect(() => {
     if (!teamId) return setPlan(null);
@@ -39,6 +39,9 @@ export function useTeamPlan(teamId, online) {
     return () => {
       live = false;
     };
-  }, [teamId, online]);
+  }, [teamId, online, refreshKey]);
   return plan;
 }
+
+
+export { FEATURES, PAID_PLANS, cheapestPlanWith, featureForScreen, fmtRand, hasFeature, lockedScreens } from "./planFeatures.js";

@@ -64,6 +64,14 @@ if (!db.team_members.length) db.team_members = RPC.get_team_member_emails.map(m 
 
 // ─── Emulator ────────────────────────────────────────────────────────────────
 const log = { writes: [], violations: [], errors4xx: [], unhandled: [], functions: [], storage: [], reads: [] };
+// The company's plan (flows change it to check what a smaller plan locks).
+const ALL_FEATURES = ["products", "schedule", "service_plans", "timesheets", "reminders", "online_payments", "xero"];
+const SIM = { plan: { plan: "free", status: "active", trial_ends_at: null, paid_until: null, access: "full", features: ALL_FEATURES, seats: null, seats_used: 3, billing_status: null } };
+const SIM_CATALOGUE = {
+  starter: { name: "Starter", price: 499, seats: 3, features: [] },
+  pro: { name: "Pro", price: 1299, seats: 10, features: ALL_FEATURES.filter(f => f !== "xero") },
+  enterprise: { name: "Enterprise", price: 2999, seats: null, features: ALL_FEATURES },
+};
 // Column defaults the real database fills in on insert (only where the app
 // relies on them).
 const DEFAULTS = {
@@ -233,7 +241,7 @@ async function handle(route) {
     if (fn === "accept_terms") { log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "set_my_hidden_screens") { const bad = (body.p_screens || []).some(x => !/^[A-Za-z0-9]{1,40}$/.test(x)); if (bad) return json(route, 400, { code: "P0001", message: "Invalid screen name" }); const me = (db.users || []).find(u => u.id === UID); if (me) me.hidden_screens = [...new Set(body.p_screens)].sort(); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "request_team_view") { db.team_notifications.push({ id: uuid(), team_id: TEAM, from_user_id: UID, to_user_id: OWNER, record_type: "team_view_request", record_id: UID, record_title: "Whole-team view", message: "asked", read: false, accepted: false, created_at: new Date().toISOString() }); log.writes.push({ screen: screenTag, kind: "rpc", fn }); return json(route, 200, null); }
-    const map = { current_team_id: TEAM, get_my_effective_role: RPC.get_my_effective_role, get_team_member_emails: RPC.get_team_member_emails, get_my_team_access: access, set_my_timezone: null, regenerate_invite_code: "SIMNEWCODE234", my_team_plan: { plan: "free", status: "active", trial_ends_at: null, paid_until: null, access: "full" }, is_platform_admin: UID === OWNER, admin_list_companies: UID === OWNER ? [{ id: TEAM, name: "Power Works", created_at: day(90) + "T08:00:00Z", owner_email: "cvanjaarsveld2@icloud.com", members: 3, last_active: new Date().toISOString(), clients: 40, quotes: 12, invoices: 1, plan: "free", status: "active", trial_ends_at: null, paid_until: null, seats: null, notes: null, access: "full" }] : null, get_platform_settings: UID === OWNER ? { signup_mode: "restricted", allowed_domains: ["pwrstart.com"], signup_codes: [] } : null, admin_update_plan: null, set_platform_setting: null, admin_answer_ticket: null };
+    const map = { current_team_id: TEAM, get_my_effective_role: RPC.get_my_effective_role, get_team_member_emails: RPC.get_team_member_emails, get_my_team_access: access, set_my_timezone: null, regenerate_invite_code: "SIMNEWCODE234", my_team_plan: SIM.plan, plan_catalogue: SIM_CATALOGUE, billing_available: true, admin_get_billing: UID === OWNER ? { enabled: false, sandbox: true, merchant_id: null, has_key: false, has_passphrase: false } : null, admin_set_plans: null, admin_set_billing: null, is_platform_admin: UID === OWNER, admin_list_companies: UID === OWNER ? [{ id: TEAM, name: "Power Works", created_at: day(90) + "T08:00:00Z", owner_email: "cvanjaarsveld2@icloud.com", members: 3, last_active: new Date().toISOString(), clients: 40, quotes: 12, invoices: 1, plan: "free", status: "active", trial_ends_at: null, paid_until: null, seats: null, notes: null, access: "full" }] : null, get_platform_settings: UID === OWNER ? { signup_mode: "restricted", allowed_domains: ["pwrstart.com"], signup_codes: [] } : null, admin_update_plan: null, set_platform_setting: null, admin_answer_ticket: null };
     if (!(fn in map)) log.writes.push({ screen: screenTag, kind: "rpc", fn, body: req.postDataJSON?.() });
     return json(route, 200, fn in map ? map[fn] : null);
   }
@@ -289,7 +297,7 @@ async function handle(route) {
   }
   if (p.startsWith("/functions/v1/")) {
     const fn = p.split("/").pop(); log.functions.push({ screen: screenTag, fn });
-    const canned = { "technician-assist": { mode: "fallback", advice: { diagnosis: "Check hydraulic pressure", checks: ["Inspect hoses"], safety: "Isolate machine" } }, "polish-sales-email": { ok: true, mode: "fallback", email: { subject: "Sim", body: "Sim body" } }, "historical-rate": { rate: 1.62, date: day(1), source: "sim" }, "send-notifications": { ok: true, sent: 0 } };
+    const canned = { "technician-assist": { mode: "fallback", advice: { diagnosis: "Check hydraulic pressure", checks: ["Inspect hoses"], safety: "Isolate machine" } }, "polish-sales-email": { ok: true, mode: "fallback", email: { subject: "Sim", body: "Sim body" } }, "historical-rate": { rate: 1.62, date: day(1), source: "sim" }, "send-notifications": { ok: true, sent: 0 }, billing: { url: `${APP}/?screen=Plan`, fields: [] } };
     return json(route, 200, canned[fn] || { ok: true });
   }
   if (p.startsWith("/realtime/")) return route.abort();
@@ -343,5 +351,5 @@ async function run() {
   // hand the live objects to the flows script
   return { browser, context, page, perScreen, log, db, setTag: t => { screenTag = t; } };
 }
-module.exports = { run, newSimContext, db, log, UID, TEAM, APP };
+module.exports = { run, newSimContext, db, log, UID, TEAM, APP, SIM };
 if (require.main === module) run().then(async ({ browser }) => { await browser.close(); console.log("done"); }).catch(e => { console.error(e); process.exit(1); });

@@ -16,3 +16,7 @@ verify_jwt = false
 [functions.xero]
 # Xero sign-in callback, "Sync now" (caller checked) and the nightly cron.
 verify_jwt = false
+
+[functions.billing]
+# Called by PayFast (notifications) and by the app (checks the sign-in itself).
+verify_jwt = false

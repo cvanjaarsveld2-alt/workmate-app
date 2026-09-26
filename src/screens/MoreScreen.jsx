@@ -3,7 +3,7 @@ import { TwoStepSettings } from "../auth/TwoStep";
 import { PRODUCT_NAME, PRODUCT_VERSION } from "../lib/brand";
 import { companyLegalName } from "../lib/companyProfile";
 import React, { useState, useEffect } from "react";
-import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users, Sun, Moon, Smartphone, Mail, Building2, LifeBuoy, LayoutGrid, History } from "lucide-react";
+import { RefreshCw, Shield, Bell, LogOut, File as FileIcon, ChevronRight, Receipt, Users, Sun, Moon, Smartphone, Mail, Building2, LifeBuoy, LayoutGrid, History, CreditCard } from "lucide-react";
 import { BRAND, PIN_KEY, PIN_UNLOCKED_KEY, PIN_DISABLED_KEY, scopedPinKey } from "../lib/constants";
 import { Card, Btn, Toast, PageHeader, useConfirm } from "../components/ui";
 import { getStoredTheme, applyTheme } from "../lib/theme";
@@ -576,6 +576,23 @@ export function MoreScreen({ data, onLogout, onSyncNow, onClearQueue, syncing, i
           </button>
         )}
       </Card>
+
+      {/* The company's plan: what's included, users, paying for it */}
+      {teamId && (
+        <Card className="p-0 overflow-hidden">
+          <button onClick={() => setScreen("Plan")}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors text-left min-h-[60px]">
+            <div className="flex items-center gap-3">
+              <CreditCard size={18} className="text-slate-400" />
+              <div>
+                <p className="text-base font-bold text-slate-800">Plan & billing</p>
+                <p className="text-xs text-slate-400">Your plan, users and what's included</p>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-slate-300" />
+          </button>
+        </Card>
+      )}
 
       {/* Company details printed on quotes, pro formas and invoices */}
       <Card className="p-0 overflow-hidden">

@@ -43,12 +43,16 @@ give to a prospect.
   the console (plan, status *active*, *paid until*). Every morning the app tells
   a company's master account when its trial is about to end or its payment is
   due, and makes it read-only 7 days after *paid until* (job `powermate-plan-checks`).
-- **Card / debit-order billing later** (PayFast, Paystack or Peach Payments):
-  1. Open a merchant account.
-  2. Add their keys as Supabase secrets.
-  3. Ask for a `billing-webhook` edge function that verifies the gateway's
-     signature and updates `team_plans` (plan, status, paid_until). The console
-     and the enforcement already use those fields.
+- **Card / debit-order billing** is built: companies subscribe in
+  **Plan & billing** through your PayFast account.
+  1. Open your own PayFast merchant account, with recurring billing switched on.
+  2. Set a passphrase in PayFast.
+  3. Enter the merchant ID, key and passphrase in Platform → **Billing**.
+  4. Test in sandbox, then switch it on for real.
+  5. Set prices and features in Platform → **Plans**.
+
+  The `billing` edge function (deployed) checks every PayFast notification and
+  extends *paid until* a month per payment. See `ACCOUNTS_AND_MEMBERSHIPS.md`.
 - **Deletion requests**: a company's master account can ask for its data to be
   deleted (Company Details → Your company's data). The console marks it.
   1. After the notice period in your terms, tap **Delete this company's data**

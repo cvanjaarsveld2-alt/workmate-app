@@ -9,7 +9,7 @@ import { compressLogo, saveCompanyProfile, useCompanyProfile } from "../lib/comp
 import { offeredModules } from "../lib/modules";
 import { supabase } from "../supabase";
 import { buildCompanyZip } from "../lib/companyExport";
-import { useTeamPlan } from "../lib/plan";
+import { FEATURES, hasFeature, useTeamPlan } from "../lib/plan";
 import { OnlinePayments } from "../components/OnlinePayments";
 import { XeroConnection } from "../components/XeroConnection";
 import { CATEGORIES, CATEGORY_META } from "../lib/expenseAccounting";
@@ -41,7 +41,24 @@ function ReadOnly({ label, value }) {
   );
 }
 
-export function CompanyProfileScreen({ teamId, isOwner }) {
+// A section the company's plan doesn't include.
+function NotInPlan({ feature, onPlan }) {
+  return (
+    <Card className="p-4 flex items-center gap-3">
+      <Lock size={16} className="text-slate-400 shrink-0" />
+      <span className="flex-1 text-sm text-slate-600">
+        <b className="text-slate-800">{FEATURES[feature].label}</b> isn't in your plan.
+      </span>
+      {onPlan && (
+        <button type="button" onClick={onPlan} className="text-sm font-bold underline min-h-[44px]">
+          Upgrade
+        </button>
+      )}
+    </Card>
+  );
+}
+
+export function CompanyProfileScreen({ teamId, isOwner, onPlan }) {
   const profile = useCompanyProfile(teamId);
   const online = useOnlineStatus();
   const [form, setForm] = useState(profile);
@@ -323,8 +340,8 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
         <Field label="SWIFT code (optional)" value={form.bank_swift} onChange={set("bank_swift")} maxLength={15} />
       </Section>
 
-      <OnlinePayments teamId={teamId} />
-      <XeroConnection teamId={teamId} isOwner />
+      {hasFeature(plan, "online_payments") ? <OnlinePayments teamId={teamId} /> : <NotInPlan feature="online_payments" onPlan={onPlan} />}
+      {hasFeature(plan, "xero") ? <XeroConnection teamId={teamId} isOwner /> : <NotInPlan feature="xero" onPlan={onPlan} />}
 
       <Section title="Documents">
         <div className="grid grid-cols-2 gap-3">
@@ -409,6 +426,9 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
         </div>
       </Section>
 
+      {!hasFeature(plan, "reminders") ? (
+        <NotInPlan feature="reminders" onPlan={onPlan} />
+      ) : (
       <Section title="Reminders" hint="Sent once a day, so nothing slips through.">
         {[
           ["auto_reminders", "Remind my team", "Overdue invoices, quotes with no answer after 3 days, services coming up and low stock."],
@@ -429,6 +449,7 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
           </label>
         ))}
       </Section>
+      )}
 
       <Section title="Modules" hint="Switch off what your company doesn't use. It disappears for everyone in your company.">
         {offeredModules(profile.disabled_modules).map(m => {

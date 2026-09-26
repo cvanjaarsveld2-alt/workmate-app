@@ -1,11 +1,13 @@
 // ─── Platform console (product owner only) ────────────────────────────────────
-// Companies using the product (usage, plan, trial, suspend), who may sign up,
-// and the support inbox. Everything goes through admin-only database
+// Companies using the product (usage, plan, trial, suspend), the price list
+// and what each plan includes, the PayFast account companies pay into, who
+// may sign up, and the support inbox. Everything goes through admin-only database
 // functions; nobody else can call them.
 import React, { useEffect, useState } from "react";
-import { Building2, KeyRound, LifeBuoy, RefreshCw } from "lucide-react";
+import { Building2, CreditCard, KeyRound, LifeBuoy, RefreshCw, Tags } from "lucide-react";
 import { supabase } from "../supabase";
 import { Btn, Card, Field, PageHeader, Toast } from "../components/ui";
+import { FEATURES, PAID_PLANS } from "../lib/plan";
 
 const PLANS = ["trial", "starter", "pro", "enterprise", "free"];
 const STATUSES = ["active", "past_due", "suspended", "cancelled"];
@@ -38,7 +40,7 @@ function Select({ label, value, options, onChange }) {
 
 function CompanyCard({ c, onSave, onDelete }) {
   const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState({ plan: c.plan, status: c.status, paid_until: c.paid_until || "", notes: c.notes || "" });
+  const [edit, setEdit] = useState({ plan: c.plan, status: c.status, paid_until: c.paid_until || "", seats: c.seats ?? "", notes: c.notes || "" });
   const set = k => v => setEdit(e => ({ ...e, [k]: v }));
   return (
     <Card className="p-4 stack-y-2">
@@ -65,7 +67,10 @@ function CompanyCard({ c, onSave, onDelete }) {
             <Select label="Plan" value={edit.plan} options={PLANS} onChange={set("plan")} />
             <Select label="Status" value={edit.status} options={STATUSES} onChange={set("status")} />
           </div>
-          <Field label="Paid until" type="date" value={edit.paid_until} onChange={set("paid_until")} />
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Paid until" type="date" value={edit.paid_until} onChange={set("paid_until")} />
+            <Field label="Users (empty = plan's)" type="number" value={edit.seats} onChange={v => set("seats")(v.replace(/\D/g, "").slice(0, 5))} />
+          </div>
           <Field label="Notes (only you see these)" value={edit.notes} onChange={set("notes")} multiline maxLength={2000} />
           <div className="grid grid-cols-2 gap-2">
             <Btn size="sm" variant="secondary" onClick={() => onSave(c.id, { trial_ends_at: new Date(Math.max(Date.now(), new Date(c.trial_ends_at || 0).getTime()) + 14 * 86400000).toISOString(), plan: "trial" })}>
@@ -75,7 +80,7 @@ function CompanyCard({ c, onSave, onDelete }) {
               {c.status === "suspended" ? "Reactivate" : "Suspend"}
             </Btn>
           </div>
-          <Btn size="sm" onClick={() => onSave(c.id, { ...edit, paid_until: edit.paid_until || null })}>
+          <Btn size="sm" onClick={() => onSave(c.id, { ...edit, paid_until: edit.paid_until || null, seats: edit.seats === "" ? null : Number(edit.seats) })}>
             Save
           </Btn>
           {c.deletion_requested_at && (
@@ -85,6 +90,127 @@ function CompanyCard({ c, onSave, onDelete }) {
           )}
         </div>
       )}
+    </Card>
+  );
+}
+
+// The price list: name, monthly price, users and features per paid plan.
+function PlansEditor({ onToast }) {
+  const [plans, setPlans] = useState(null);
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    supabase.rpc("plan_catalogue").then(({ data }) => setPlans(data || {}), () => setPlans({}));
+  }, []);
+  if (!plans) return null;
+  const set = (key, k, v) => setPlans(p => ({ ...p, [key]: { ...p[key], [k]: v } }));
+  const toggle = (key, f) => {
+    const has = (plans[key].features || []).includes(f);
+    set(key, "features", has ? plans[key].features.filter(x => x !== f) : [...(plans[key].features || []), f]);
+  };
+  async function save() {
+    setSaving(true);
+    const clean = Object.fromEntries(
+      PAID_PLANS.filter(k => plans[k]).map(k => [
+        k,
+        { ...plans[k], price: Number(plans[k].price), seats: plans[k].seats === "" || plans[k].seats == null ? null : Number(plans[k].seats) },
+      ]),
+    );
+    const { error } = await supabase.rpc("admin_set_plans", { p_plans: clean });
+    setSaving(false);
+    onToast(error ? error.message : "Prices saved. New subscriptions use them; existing ones keep their price.");
+  }
+  return (
+    <div className="stack-y-3">
+      <p className="text-xs text-slate-500 px-1">
+        Trial and Free include everything. A company's own user limit (Companies tab) overrides its plan's. Existing PayFast subscriptions keep the
+        price they started on.
+      </p>
+      {PAID_PLANS.filter(k => plans[k]).map(key => (
+        <Card key={key} className="p-4 stack-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            <Field label="Name" value={plans[key].name} onChange={v => set(key, "name", v)} maxLength={40} />
+            <Field label="R / month" type="number" value={plans[key].price} onChange={v => set(key, "price", v)} />
+            <Field label="Users (empty = no limit)" type="number" value={plans[key].seats ?? ""} onChange={v => set(key, "seats", v.replace(/\D/g, "").slice(0, 5))} />
+          </div>
+          {Object.entries(FEATURES).map(([f, x]) => (
+            <label key={f} className="flex items-center gap-3 min-h-[40px] cursor-pointer">
+              <input type="checkbox" checked={(plans[key].features || []).includes(f)} onChange={() => toggle(key, f)} className="h-5 w-5" />
+              <span className="text-sm text-slate-700">{x.label}</span>
+            </label>
+          ))}
+        </Card>
+      ))}
+      <Btn onClick={save} disabled={saving}>
+        {saving ? "Saving…" : "Save prices and plans"}
+      </Btn>
+    </div>
+  );
+}
+
+// The PayFast account companies pay their subscriptions into.
+function BillingSettings({ onToast }) {
+  const [b, setB] = useState(null);
+  const [form, setForm] = useState({ merchant_id: "", merchant_key: "", passphrase: "" });
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    supabase.rpc("admin_get_billing").then(({ data }) => {
+      setB(data || {});
+      setForm(f => ({ ...f, merchant_id: data?.merchant_id || "" }));
+    });
+  }, []);
+  if (!b) return null;
+  async function save(patch = {}) {
+    setSaving(true);
+    const next = { sandbox: b.sandbox, enabled: b.enabled, ...patch };
+    const { data, error } = await supabase.rpc("admin_set_billing", {
+      p_merchant_id: form.merchant_id,
+      p_merchant_key: form.merchant_key,
+      p_passphrase: form.passphrase,
+      p_sandbox: next.sandbox,
+      p_enabled: next.enabled,
+    });
+    setSaving(false);
+    if (error) return onToast(error.message);
+    setB(data);
+    setForm(f => ({ ...f, merchant_key: "", passphrase: "" }));
+    onToast("Saved");
+  }
+  return (
+    <Card className="p-4 stack-y-3">
+      <p className="text-base font-black text-slate-800">Your PayFast account</p>
+      <p className="text-xs text-slate-500">
+        Companies pay their plan monthly into this account (card or debit order). Find these in PayFast under Settings → Integration. Subscriptions need
+        a passphrase set there, and "Recurring billing" switched on for your account.
+      </p>
+      <Field label="Merchant ID" value={form.merchant_id} onChange={v => setForm(f => ({ ...f, merchant_id: v.trim() }))} maxLength={12} />
+      <Field
+        label={b.has_key ? "Merchant key (saved; type to replace)" : "Merchant key"}
+        value={form.merchant_key}
+        onChange={v => setForm(f => ({ ...f, merchant_key: v.trim() }))}
+        maxLength={40}
+      />
+      <Field
+        label={b.has_passphrase ? "Passphrase (saved; type to replace)" : "Passphrase"}
+        type="password"
+        value={form.passphrase}
+        onChange={v => setForm(f => ({ ...f, passphrase: v }))}
+        maxLength={100}
+      />
+      <label className="flex items-center gap-3 min-h-[44px] cursor-pointer">
+        <input type="checkbox" checked={!!b.sandbox} onChange={e => save({ sandbox: e.target.checked })} className="h-5 w-5" />
+        <span className="text-sm text-slate-700">Test mode (PayFast sandbox; no real money)</span>
+      </label>
+      <Btn size="sm" variant="secondary" onClick={() => save()} disabled={saving}>
+        Save details
+      </Btn>
+      <Btn size="sm" variant={b.enabled ? "danger" : "solid"} onClick={() => save({ enabled: !b.enabled })} disabled={saving}>
+        {b.enabled ? "Switch paying in the app off" : "Switch paying in the app on"}
+      </Btn>
+      <p className="text-xs text-slate-500">
+        {b.enabled
+          ? `On${b.sandbox ? " (test mode)" : ""}: master accounts can choose and pay for a plan in Plan & billing.`
+          : "Off: Plan & billing shows the prices and a \"contact us\" button instead."}
+      </p>
     </Card>
   );
 }
@@ -144,6 +270,8 @@ export function PlatformAdminScreen() {
   const openTickets = tickets.filter(t => t.status === "open").length;
   const tabs = [
     ["companies", Building2, `Companies (${companies.length})`],
+    ["plans", Tags, "Plans"],
+    ["billing", CreditCard, "Billing"],
     ["signup", KeyRound, "Sign-up"],
     ["support", LifeBuoy, `Support${openTickets ? ` (${openTickets})` : ""}`],
   ];
@@ -151,7 +279,7 @@ export function PlatformAdminScreen() {
   return (
     <div className="stack-y-4">
       <div className="flex items-start gap-2">
-        <PageHeader title="Platform" subtitle="Companies, sign-up and support — only you see this" />
+        <PageHeader title="Platform" subtitle="Companies, plans, billing, sign-up and support — only you see this" />
         <Btn size="sm" variant="secondary" onClick={load}>
           <RefreshCw size={14} />
         </Btn>
@@ -171,6 +299,9 @@ export function PlatformAdminScreen() {
       {error && <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">{error}</div>}
 
       {tab === "companies" && companies.map(c => <CompanyCard key={c.id} c={c} onSave={savePlan} onDelete={deleteCompany} />)}
+
+      {tab === "plans" && <PlansEditor onToast={setToast} />}
+      {tab === "billing" && <BillingSettings onToast={setToast} />}
 
       {tab === "signup" && settings && (
         <Card className="p-4 stack-y-3">

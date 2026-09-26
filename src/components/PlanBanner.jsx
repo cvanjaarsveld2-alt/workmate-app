@@ -3,12 +3,12 @@
 // and the suspended screen. Contact goes through Help (support inbox).
 import React from "react";
 import { Clock, Lock } from "lucide-react";
-import { trialDaysLeft } from "../lib/plan";
+import { FEATURES, trialDaysLeft } from "../lib/plan";
 import { PRODUCT_NAME } from "../lib/brand";
 import { BRAND } from "../lib/constants";
 import { Btn, Card } from "./ui";
 
-export function PlanBanner({ plan, isAdmin, onHelp }) {
+export function PlanBanner({ plan, isAdmin, onHelp, onPlan = onHelp }) {
   if (!plan) return null;
   if (plan.access === "read_only")
     return (
@@ -17,8 +17,8 @@ export function PlanBanner({ plan, isAdmin, onHelp }) {
         <span className="flex-1">
           {plan.status === "past_due" ? "Your account is overdue." : "Your free trial has ended."} You can still view and export your data, but not add or change
           anything.{" "}
-          <button type="button" onClick={onHelp} className="font-bold underline">
-            Contact us
+          <button type="button" onClick={isAdmin ? onPlan : onHelp} className="font-bold underline">
+            {isAdmin ? "Choose a plan" : "Contact us"}
           </button>
         </span>
       </div>
@@ -31,7 +31,7 @@ export function PlanBanner({ plan, isAdmin, onHelp }) {
         <span className="flex-1">
           Free trial: <b>{days} day{days === 1 ? "" : "s"} left</b>.
         </span>
-        <button type="button" onClick={onHelp} className="font-bold underline shrink-0">
+        <button type="button" onClick={onPlan} className="font-bold underline shrink-0">
           Choose a plan
         </button>
       </div>
@@ -56,5 +56,22 @@ export function SuspendedScreen({ onHelp, onSignOut }) {
         </button>
       </Card>
     </div>
+  );
+}
+
+// A screen the company's plan doesn't include.
+export function LockedFeature({ feature, canUpgrade, onPlan }) {
+  const label = FEATURES[feature]?.label || "This feature";
+  return (
+    <Card className="p-6 stack-y-3 text-center">
+      <Lock size={28} className="mx-auto" style={{ color: BRAND.primary }} />
+      <p className="text-lg font-black text-slate-900">{label} isn't in your plan</p>
+      <p className="text-sm text-slate-500">
+        {canUpgrade ? "Upgrade your company's plan to use it. Your data stays as it is." : "Ask your company's master account to upgrade the plan."}
+      </p>
+      <Btn className="w-full" onClick={onPlan}>
+        {canUpgrade ? "See plans" : "See what's included"}
+      </Btn>
+    </Card>
   );
 }
