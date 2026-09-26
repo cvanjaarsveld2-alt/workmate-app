@@ -5,7 +5,7 @@
 // from the menu and can't be opened.
 export const MODULES = [
   { key: "sales", label: "Sales pipeline", hint: "Opportunities, call log, analytics", screens: ["Leads", "ColdCall", "Analytics"] },
-  { key: "quotes_invoicing", label: "Quotes, jobs & invoices", hint: "Quotes, jobs, schedule, service plans, timesheets, invoices, products & stock", screens: ["Quotes", "Jobs", "Invoices", "Products", "Timesheets", "ServicePlans", "Schedule"] },
+  { key: "quotes_invoicing", label: "Quotes, jobs & invoices", hint: "Quotes, jobs, schedule, service plans, timesheets, invoices, products & stock, purchasing, job profit", screens: ["Quotes", "Jobs", "Invoices", "Products", "Timesheets", "ServicePlans", "Schedule", "JobProfit", "Purchasing"] },
   { key: "field_notes", label: "Field notes", hint: "Site notes with photos and voice", screens: ["Notes"] },
   { key: "vehicle_checks", label: "Vehicle checks", hint: "Daily vehicle inspection", screens: ["VehicleCheck"] },
   { key: "reports", label: "Breakdown & repair reports", hint: "Engineering reports", screens: ["Breakdown", "Repair"] },

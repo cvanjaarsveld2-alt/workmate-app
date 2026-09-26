@@ -30,6 +30,7 @@ import {
   SlidersHorizontal,
   Lock,
   LayoutGrid,
+  ShoppingCart,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { ALWAYS_SHOWN } from "../lib/menuPrefs";
@@ -72,6 +73,8 @@ const SECTIONS = [
       { key: "Expenses", label: "Expenses", icon: Receipt, badgeKey: "unsubmittedExp" },
       { key: "Invoices", label: "Invoices", icon: Receipt },
       { key: "Products", label: "Products & stock", icon: Package },
+      { key: "Purchasing", label: "Suppliers & orders", icon: ShoppingCart, managerOnly: true },
+      { key: "JobProfit", label: "Job profit", icon: TrendingUp, managerOnly: true },
     ],
   },
   {
@@ -98,6 +101,7 @@ export function NavDrawer({
   unavailableScreens = [],
   lockedScreens = [],
   isPlatformAdmin = false,
+  isManager = true,
   onSaveHidden,
 }) {
   // Editing the menu: a draft set of hidden screens, saved on Done.
@@ -110,7 +114,7 @@ export function NavDrawer({
   const locked = new Set(lockedScreens);
   const available = SECTIONS.map(s => ({
     ...s,
-    items: s.items.filter(i => !off.has(i.key) && (!i.platformOnly || isPlatformAdmin)),
+    items: s.items.filter(i => !off.has(i.key) && (!i.platformOnly || isPlatformAdmin) && (!i.managerOnly || isManager)),
   })).filter(s => s.items.length);
   const sections = available.map(s => ({
     ...s,

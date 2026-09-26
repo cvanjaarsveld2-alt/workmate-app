@@ -65,7 +65,7 @@ if (!db.team_members.length) db.team_members = RPC.get_team_member_emails.map(m 
 // ─── Emulator ────────────────────────────────────────────────────────────────
 const log = { writes: [], violations: [], errors4xx: [], unhandled: [], functions: [], storage: [], reads: [] };
 // The company's plan (flows change it to check what a smaller plan locks).
-const ALL_FEATURES = ["products", "schedule", "service_plans", "timesheets", "reminders", "online_payments", "xero"];
+const ALL_FEATURES = ["products", "schedule", "service_plans", "timesheets", "reminders", "online_payments", "xero", "job_profit", "purchase_orders", "messages", "forms", "tech_location"];
 const SIM = { plan: { plan: "free", status: "active", trial_ends_at: null, paid_until: null, access: "full", features: ALL_FEATURES, seats: null, seats_used: 3, billing_status: null } };
 const SIM_CATALOGUE = {
   starter: { name: "Starter", price: 499, seats: 3, features: [] },
@@ -78,6 +78,8 @@ const DEFAULTS = {
   products: { unit: "each", sell_price: 0, cost_price: 0, vat_applicable: true, track_stock: false, stock_on_hand: 0, reorder_level: 0, active: true },
   time_entries: { kind: "work", billable: true },
   service_plans: { lead_days: 7, value: 0, active: true },
+  suppliers: { active: true },
+  purchase_orders: { status: "draft", lines: [], subtotal: 0, vat: 0, total: 0 },
 };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validate(table, row) {
@@ -237,6 +239,28 @@ async function handle(route) {
         equipment: db.equipment.filter(e => e.client_id === c.id).map(e => ({ name: e.name, make: e.make, model: e.model, serial: e.serial, location: e.location, service_due: e.service_due })),
         service_plans: [],
       });
+    }
+    // Job profit: raw numbers per job, like the database's job_costs().
+    if (fn === "job_costs") {
+      const mins = (j, kind) => (db.time_entries || []).filter(t => t.job_id === j.id && (kind === "travel" ? t.kind === "travel" : t.kind !== "travel") && t.ended_at).reduce((m, t) => m + Math.round((new Date(t.ended_at) - new Date(t.started_at)) / 60000), 0);
+      const rows = db.jobs.filter(j => j.team_id === TEAM && j.status !== "cancelled").map(j => ({
+        id: j.id, job_number: j.job_number, title: j.title, status: j.status, client_id: j.client_id, assigned_to_user_id: j.assigned_to_user_id, quote_id: j.quote_id,
+        job_date: (j.completed_at || j.scheduled_date || j.created_at || "").slice(0, 10),
+        invoiced: db.invoices.filter(i => i.job_id === j.id && i.status !== "cancelled").reduce((s, i) => s + Number(i.subtotal || 0), 0),
+        quoted: (db.quotes.find(q => q.id === j.quote_id) || {}).value ?? null,
+        work_minutes: mins(j, "work"), travel_minutes: mins(j, "travel"),
+        parts_cost: (Array.isArray(j.parts_used) ? j.parts_used : []).filter(p => p && typeof p === "object").reduce((s, p) => s + Number(p.quantity || 1) * Number(p.cost_price || 0), 0),
+        po_cost: 0, expense_cost: 0,
+      }));
+      return json(route, 200, rows);
+    }
+    if (fn === "receive_purchase_order") {
+      const po = (db.purchase_orders || []).find(x => x.id === body.p_po_id);
+      if (!po) return json(route, 400, { code: "P0001", message: "Purchase order not found" });
+      po.lines = (po.lines || []).map(l => ({ ...l, received_qty: Number(l.qty || 0) }));
+      po.status = "received"; po.received_at = new Date().toISOString();
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, { status: "received", stock_lines: po.lines.filter(l => l.product_id).length });
     }
     if (fn === "accept_terms") { log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "set_my_hidden_screens") { const bad = (body.p_screens || []).some(x => !/^[A-Za-z0-9]{1,40}$/.test(x)); if (bad) return json(route, 400, { code: "P0001", message: "Invalid screen name" }); const me = (db.users || []).find(u => u.id === UID); if (me) me.hidden_screens = [...new Set(body.p_screens)].sort(); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }

@@ -10,12 +10,15 @@ const read = f => fs.readFileSync(new URL(f, import.meta.url), "utf8");
 
 const CATALOGUE = {
   starter: { name: "Starter", price: 499, seats: 3, features: [] },
-  pro: { name: "Pro", price: 1299, seats: 10, features: ["products", "schedule", "service_plans", "timesheets", "reminders", "online_payments"] },
+  pro: { name: "Pro", price: 1299, seats: 10, features: ["products", "schedule", "service_plans", "timesheets", "reminders", "online_payments", "job_profit", "purchase_orders", "messages", "forms", "tech_location"] },
   enterprise: { name: "Enterprise", price: 2999, seats: null, features: Object.keys(FEATURES) },
 };
 
 test("features match the database's list", () => {
-  const sql = read("../supabase/migrations/20260927180000_plan_features_and_seats.sql");
+  // The newest migration that defines the list wins.
+  const dir = new URL("../supabase/migrations/", import.meta.url);
+  const file = fs.readdirSync(dir).filter(f => f.endsWith(".sql")).sort().filter(f => fs.readFileSync(new URL(f, dir), "utf8").includes("function private.all_features()")).pop();
+  const sql = fs.readFileSync(new URL(file, dir), "utf8");
   const list = sql.match(/all_features\(\)[\s\S]*?array\[([^\]]+)\]/)[1].match(/'([a-z_]+)'/g).map(x => x.slice(1, -1));
   assert.deepEqual(Object.keys(FEATURES).sort(), list.sort());
 });
@@ -24,7 +27,7 @@ test("no feature list (older cached plan) locks nothing; a list locks what's mis
   assert.equal(hasFeature(null, "products"), true);
   assert.equal(hasFeature({ plan: "trial" }, "xero"), true);
   assert.deepEqual(lockedScreens({ features: Object.keys(FEATURES) }), []);
-  assert.deepEqual(lockedScreens({ features: [] }).sort(), ["Products", "Schedule", "ServicePlans", "Timesheets"]);
+  assert.deepEqual(lockedScreens({ features: [] }).sort(), ["Forms", "JobProfit", "Products", "Purchasing", "Schedule", "ServicePlans", "TeamMap", "Timesheets"]);
   assert.deepEqual(lockedScreens({ features: CATALOGUE.pro.features }), []);
   assert.equal(hasFeature({ features: CATALOGUE.pro.features }, "xero"), false);
   assert.equal(featureForScreen("ServicePlans"), "service_plans");

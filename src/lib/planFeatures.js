@@ -11,6 +11,11 @@ export const FEATURES = {
   reminders: { label: "Automatic reminders", screens: [] },
   online_payments: { label: "Pay online (PayFast)", screens: [] },
   xero: { label: "Xero sync", screens: [] },
+  job_profit: { label: "Job profit", screens: ["JobProfit"] },
+  purchase_orders: { label: "Suppliers & purchase orders", screens: ["Purchasing"] },
+  messages: { label: "WhatsApp & SMS to customers", screens: [] },
+  forms: { label: "Custom forms & checklists", screens: ["Forms"] },
+  tech_location: { label: "Technician locations", screens: ["TeamMap"] },
 };
 
 export function hasFeature(plan, feature) {

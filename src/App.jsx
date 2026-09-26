@@ -124,6 +124,7 @@ const ServicePlansScreen = lazy(() =>
 );
 const ScheduleScreen = lazy(() => import("./screens/ScheduleScreen").then(m => ({ default: m.ScheduleScreen })));
 const PlanScreen = lazy(() => import("./screens/PlanScreen").then(m => ({ default: m.PlanScreen })));
+const JobProfitScreen = lazy(() => import("./screens/JobProfitScreen").then(m => ({ default: m.JobProfitScreen })));
 const HelpScreen = lazy(() => import("./screens/HelpScreen").then(m => ({ default: m.HelpScreen })));
 const PlatformAdminScreen = lazy(() =>
   import("./screens/PlatformAdminScreen").then(m => ({ default: m.PlatformAdminScreen })),
@@ -172,6 +173,10 @@ const SCREEN_TITLES = {
   ServicePlans: "Service plans",
   Schedule: "Schedule",
   Plan: "Plan & billing",
+  JobProfit: "Job profit",
+  Purchasing: "Suppliers & orders",
+  Forms: "Forms & checklists",
+  TeamMap: "Technician map",
 };
 const INITIAL_DATA = {
   clients: [],
@@ -273,6 +278,10 @@ export default function PowerWorksApp() {
         "ServicePlans",
         "Schedule",
         "Plan",
+        "JobProfit",
+        "Purchasing",
+        "Forms",
+        "TeamMap",
         "Client360",
         "Calendar",
         "TeamDashboard",
@@ -1182,6 +1191,15 @@ export default function PowerWorksApp() {
         vatRegistered={companyProfile.vat_registered !== false}
       />
     ),
+    JobProfit: (
+      <JobProfitScreen
+        teamId={teamId}
+        clients={data.clients}
+        teamMembers={teamMembers}
+        isManager={!!teamAccess?.is_owner || userRole === "admin"}
+        onOpenCompany={() => navigate("CompanyProfile")}
+      />
+    ),
     Plan: (
       <PlanScreen
         teamId={teamId}
@@ -1366,6 +1384,7 @@ export default function PowerWorksApp() {
               unavailableScreens={offScreens}
               lockedScreens={planLocked}
               isPlatformAdmin={isPlatformAdmin}
+              isManager={!!teamAccess?.is_owner || userRole === "admin"}
               onSaveHidden={onSaveHidden}
               userId={session.user.id}
               teamId={teamId}
