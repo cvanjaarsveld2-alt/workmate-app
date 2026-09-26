@@ -1,0 +1,14 @@
+{
+  "appId": "com.powermate.fieldservice",
+  "appName": "PowerMate",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "automatic"
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

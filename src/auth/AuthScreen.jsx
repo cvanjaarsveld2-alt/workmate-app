@@ -9,6 +9,7 @@ import { Card, Btn, Field } from "../components/ui";
 
 import { TERMS_VERSION, legalHref } from "../legal/LegalPage";
 import { pendingJoinCode, normaliseCode } from "../lib/joinCode";
+import { publicUrl } from "../lib/appUrl";
 
 export function AuthScreen() {
   const [mode, setMode]       = useState("signin"); // 'signin' | 'signup'
@@ -82,7 +83,7 @@ export function AuthScreen() {
       email: emailLower,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: publicUrl(),
         data: { full_name: fullName.trim(), invite_code: invite, terms_version: TERMS_VERSION },
       },
     });
@@ -119,7 +120,7 @@ export function AuthScreen() {
     }
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(emailLower, {
-      redirectTo: window.location.origin,
+      redirectTo: publicUrl(),
     });
     setLoading(false);
     if (error && /rate|too many/i.test(error.message || "")) {

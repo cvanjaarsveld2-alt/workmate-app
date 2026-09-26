@@ -13,6 +13,7 @@ import { PRODUCT_NAME } from "../lib/brand";
 import { DEFAULT_PROFILE, compressLogo, loadCompanyProfile, saveCompanyProfile } from "../lib/companyProfile";
 import { clearJoinCode, normaliseCode, pendingJoinCode } from "../lib/joinCode";
 import { TERMS_VERSION, legalHref } from "../legal/LegalPage";
+import { publicUrl } from "../lib/appUrl";
 
 const STEPS = ["Company", "Logo", "Contact", "Banking", "Documents", "Team"];
 
@@ -135,7 +136,7 @@ export function CompanySetup({ userId, onDone, onSignOut }) {
     }
   }
 
-  const link = inviteCode ? `${window.location.origin}/?join=${inviteCode}` : "";
+  const link = inviteCode ? `${publicUrl()}/?join=${inviteCode}` : "";
   async function shareInvite() {
     const text = `Join ${form.trading_name || name} on ${PRODUCT_NAME}: ${link}`;
     try {

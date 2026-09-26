@@ -19,6 +19,7 @@ import { shareDocumentPDF } from "../lib/documentPDF";
 import { activeProfile } from "../lib/companyProfile";
 import { failedChecks } from "../lib/forms";
 import { FillForm } from "../components/FillForm";
+import { publicUrl } from "../lib/appUrl";
 
 // ─── Show-more text (full info on tap, no silent clipping) ──────────────────
 function ExpandableText({ text, limit = 110, className = "" }) {
@@ -75,7 +76,7 @@ export function EquipmentScreen({ data, setData, userId, userEmail, teamId, team
     if (!list.length) return;
     setLabels(true);
     try {
-      const blob = await buildQrLabelsPDF(list, { origin: window.location.origin, profile: activeProfile() });
+      const blob = await buildQrLabelsPDF(list, { origin: publicUrl(), profile: activeProfile() });
       await shareDocumentPDF(blob, list.length === 1 ? `QR_label_${(list[0].name || "machine").replace(/\W+/g, "_")}.pdf` : "QR_labels.pdf", "QR labels");
     } catch (e) {
       setToast(e.message || "Couldn't make the labels");

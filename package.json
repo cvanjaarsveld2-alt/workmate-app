@@ -13,9 +13,14 @@
     "check:security": "node --test tests/security-readiness.test.mjs",
     "lint": "eslint src public/service-worker.js",
     "format": "prettier --write",
-    "test:sim": "node tests/sim/run.cjs"
+    "test:sim": "node tests/sim/run.cjs",
+    "build:native": "node scripts/check-native-env.cjs && vite build && cap sync",
+    "native:assets": "node scripts/native-assets.cjs"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/core": "^7.6.9",
+    "@capacitor/ios": "^7.6.9",
     "@supabase/supabase-js": "^2.43.4",
     "@vitejs/plugin-react": "^6.1.1",
     "exceljs": "^4.4.0",
@@ -31,6 +36,7 @@
     "vite": "^8.3.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.6.9",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/postcss": "^4.3.3",
     "eslint": "^10.11.0",

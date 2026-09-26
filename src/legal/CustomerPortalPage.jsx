@@ -9,6 +9,7 @@ import { buildDocumentPDF, documentFilename, money, shareDocumentPDF } from "../
 import { invoiceToDocument } from "../lib/documentData";
 import { owing, statementRows } from "../lib/portal";
 import { frequencyLabel } from "../lib/servicePlans";
+import { publicUrl } from "../lib/appUrl";
 
 const d = v => (v ? new Date(String(v).length <= 10 ? v + "T12:00:00" : v).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "");
 const TABS = ["Invoices", "Statement", "Quotes", "Jobs", "Machines"];
@@ -71,7 +72,7 @@ export function CustomerPortalPage({ token }) {
     setBusy(`pay:${inv.id}`);
     setError("");
     const { data: r, error: e } = await supabase.functions.invoke("payfast", {
-      body: { action: "checkout", token, invoice_id: inv.id, return_url: `${window.location.origin}/?portal=${token}` },
+      body: { action: "checkout", token, invoice_id: inv.id, return_url: `${publicUrl()}/?portal=${token}` },
     });
     if (e || !r?.url) {
       setBusy("");

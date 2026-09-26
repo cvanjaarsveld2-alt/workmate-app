@@ -33,6 +33,7 @@ import {
   ClientSelector,
 } from "../components/ui";
 import { useIsMine } from "../lib/teamView";
+import { publicUrl } from "../lib/appUrl";
 
 function ExpandableText({ text, limit = 110, className = "" }) {
   const [expanded, setExpanded] = useState(false);
@@ -88,7 +89,7 @@ export function QuotesScreen({
     if (q.sync_status === "pending") return setToast("Sync this quote first, then share the link");
     const { data: token, error } = await supabase.rpc("create_quote_link", { p_quote_id: q.id });
     if (error || !token) return setToast(error?.message || "Couldn't create the link");
-    const url = `${window.location.origin}/?quote=${token}`;
+    const url = `${publicUrl()}/?quote=${token}`;
     const text = `Please review and accept our quotation${q.quote_number ? ` ${q.quote_number}` : ""}: ${url}`;
     try {
       if (navigator.share) await navigator.share({ title: "Quotation", text });

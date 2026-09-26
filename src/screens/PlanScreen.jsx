@@ -8,6 +8,7 @@ import { Check, CreditCard, Lock, Users } from "lucide-react";
 import { supabase } from "../supabase";
 import { FEATURES, PAID_PLANS, fmtRand, trialDaysLeft } from "../lib/plan";
 import { Btn, Card, PageHeader, Toast } from "../components/ui";
+import { publicUrl } from "../lib/appUrl";
 
 const fmtDate = d => (d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "");
 const PLAN_NAMES = { trial: "Free trial", free: "Free" };
@@ -81,7 +82,7 @@ export function PlanScreen({ teamId, plan, isOwner, onHelp, onChanged }) {
 
   async function choose(key) {
     setBusy(key);
-    const back = `${window.location.origin}${window.location.pathname}?screen=Plan`;
+    const back = `${publicUrl()}/?screen=Plan`;
     const { data, error } = await supabase.functions.invoke("billing", { body: { action: "checkout", plan: key, return_url: back } });
     if (error || !data?.url) {
       setBusy("");

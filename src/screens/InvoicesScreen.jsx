@@ -13,6 +13,7 @@ import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { FORMATS, accountingCsv } from "../lib/accountingExport";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { MessageCustomer } from "../components/MessageCustomer";
+import { publicUrl } from "../lib/appUrl";
 const money = v =>
   `R ${Number(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const labels = {
@@ -84,7 +85,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
     setNotice("");
     const { data: token } = await supabase.rpc("client_portal_link", { p_client_id: inv.client_id, p_new: false });
     setMaking(null);
-    const url = token ? `${window.location.origin}/?portal=${token}` : "";
+    const url = token ? `${publicUrl()}/?portal=${token}` : "";
     const text = reminderMessage({
       contact: client.contact,
       company: profile.trading_name || profile.legal_name,
@@ -394,7 +395,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
           invoice={messaging}
           getLink={async () => {
             const { data } = await supabase.rpc("client_portal_link", { p_client_id: messaging.client_id, p_new: false });
-            return data ? `${window.location.origin}/?portal=${data}` : "";
+            return data ? `${publicUrl()}/?portal=${data}` : "";
           }}
           onSent={setNotice}
         />

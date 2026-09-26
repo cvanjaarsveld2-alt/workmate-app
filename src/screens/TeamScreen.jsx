@@ -29,6 +29,7 @@ import { BRAND } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
 import { triggerImmediateSync } from "../lib/sync";
 import { readTeamViewPref, writeTeamViewPref } from "../lib/teamView";
+import { publicUrl } from "../lib/appUrl";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function money(n) {
@@ -745,7 +746,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
 
   async function shareInviteLink() {
     if (!team) return;
-    const link = `${window.location.origin}/?join=${team.invite_code}`;
+    const link = `${publicUrl()}/?join=${team.invite_code}`;
     const text = `Join the ${team.name} team on ${PRODUCT_NAME}.\n\nInvite code: ${team.invite_code}\nOr open: ${link}`;
     if (navigator.share) {
       try { await navigator.share({ title: `Join ${team.name} on ${PRODUCT_NAME}`, text }); } catch {}

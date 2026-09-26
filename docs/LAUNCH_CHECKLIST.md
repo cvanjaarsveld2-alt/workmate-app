@@ -82,33 +82,10 @@ Daily jobs can be checked in Supabase → Integrations → Cron (`powermate-*`).
   sharing, storage and the team functions from both sides, and always rolls back.
 - **Simulation**: run `npm run test:sim` (the CI does this on every pull request).
 
-## 5. App stores (optional — the app already installs from the browser)
+## 5. App stores
 
-The app is a Progressive Web App: people tap **Share → Add to Home Screen**
-(iPhone) or **Install app** (Android/Chrome). Store listings add discoverability.
-
-### Google Play (easiest, about a day)
-
-1. Create a Google Play developer account (once-off US$25).
-2. On pwabuilder.com, enter your app URL and choose **Android**. It generates a
-   Trusted Web Activity package and an `assetlinks.json` file.
-3. Put `assetlinks.json` in `public/.well-known/` and deploy. It must be served
-   at `https://<your domain>/.well-known/assetlinks.json`.
-4. Upload the package in Play Console with:
-   - screenshots;
-   - the privacy policy URL `https://<your domain>/?legal=privacy`;
-   - the data-safety form (account info, business contacts, photos; encrypted
-     in transit; deletion on request).
-
-### Apple App Store (more work)
-
-1. Join the Apple Developer Program (US$99/year).
-2. Wrap the app with pwabuilder.com (iOS) or Capacitor.
-3. Apple rejects apps that are "just a website" (guideline 4.2). Stress what
-   works like an app: offline use, camera, push notifications and PIN / Face ID
-   lock.
-4. You need screenshots for 6.7" and 5.5" iPhones, the privacy policy URL, and
-   the App Privacy questionnaire.
-
-The icons are in `public/icons/` (192 and 512 px, plus a maskable version for
-Android and an Apple touch icon). The manifest is `public/manifest.webmanifest`.
+The app installs from the browser (**Share → Add to Home Screen** on iPhone,
+**Install app** on Android). The iPhone and Android store apps are built from
+the same code with Capacitor (`android/`, `ios/`). The steps, accounts and
+review tips are in `docs/APP_STORES.md`. A test Android app is built on GitHub
+on every change to the Android project.

@@ -33,6 +33,7 @@ import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { MessageCustomer } from "../components/MessageCustomer";
 import { FillForm } from "../components/FillForm";
+import { publicUrl } from "../lib/appUrl";
 
 export function JobsScreen({ userId, teamId, setData, clients = [], canClock = true, canMessage = true, canForms = true }) {
   const [messaging, setMessaging] = useState(null);
@@ -498,6 +499,6 @@ export function JobsScreen({ userId, teamId, setData, clients = [], canClock = t
 function portalLinkFor(clientId) {
   return async () => {
     const { data } = await supabase.rpc("client_portal_link", { p_client_id: clientId, p_new: false });
-    return data ? `${window.location.origin}/?portal=${data}` : "";
+    return data ? `${publicUrl()}/?portal=${data}` : "";
   };
 }

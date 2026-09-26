@@ -2,6 +2,7 @@
 // One private link per client (/?portal=TOKEN): quotes, invoices, statement,
 // jobs and machines, no sign-in. See supabase/migrations/*_customer_portal.sql.
 import { money } from "./documentPDF.js";
+import { publicUrl } from "./appUrl.js";
 
 export function portalTokenFromUrl() {
   try {
@@ -16,7 +17,7 @@ export function portalTokenFromUrl() {
 export async function shareClientPortal(supabase, client, { renew = false } = {}) {
   const { data: token, error } = await supabase.rpc("client_portal_link", { p_client_id: client.id, p_new: renew });
   if (error || !token) return error?.message || "Couldn't make the link.";
-  const url = `${window.location.origin}/?portal=${token}`;
+  const url = `${publicUrl()}/?portal=${token}`;
   const text = `Your account with us: quotes, invoices, statements and service history.`;
   try {
     if (navigator.share) {

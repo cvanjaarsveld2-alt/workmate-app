@@ -11,6 +11,7 @@ import { QuoteAcceptPage, sharedQuoteTokenFromUrl } from "./legal/QuoteAcceptPag
 import { captureJoinCode } from "./lib/joinCode";
 import { CustomerPortalPage } from "./legal/CustomerPortalPage";
 import { portalTokenFromUrl } from "./lib/portal";
+import { isNativeApp } from "./lib/appUrl";
 
 // Uncaught errors and promise rejections go to the events table (buffered offline).
 installGlobalErrorReporting();
@@ -72,7 +73,9 @@ createRoot(document.getElementById("root")).render(
   </React.StrictMode>
 );
 
-if ("serviceWorker" in navigator) {
+// Inside the iPhone/Android app the app is already on the phone (offline);
+// the service worker is for the website.
+if ("serviceWorker" in navigator && !isNativeApp()) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js", {
       updateViaCache: "none",
