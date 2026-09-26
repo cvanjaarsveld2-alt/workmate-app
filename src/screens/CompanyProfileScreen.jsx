@@ -497,6 +497,31 @@ export function CompanyProfileScreen({ teamId, isOwner, onPlan }) {
         </Section>
       )}
 
+      {!hasFeature(plan, "tech_location") ? (
+        <NotInPlan feature="tech_location" onPlan={onPlan} />
+      ) : (
+        <Section
+          title="Technician locations"
+          hint="See on a map where your technicians are, to send the closest one. Only shared while someone is clocked in on a job, only the master account and admins can see it, and it's deleted after 30 days."
+        >
+          <label className="flex items-center gap-3 min-h-[52px] cursor-pointer">
+            <span className="flex-1">
+              <span className="block text-sm font-bold text-slate-800">Share technicians' locations while they're clocked in</span>
+              <span className="block text-xs text-slate-500">
+                Tell your team before you switch this on: the app shows them a notice whenever their location is being shared.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={!!form.share_location}
+              onChange={e => set("share_location")(e.target.checked)}
+              aria-label="Share technicians' locations"
+              className="h-6 w-6 shrink-0"
+            />
+          </label>
+        </Section>
+      )}
+
       <Section title="Modules" hint="Switch off what your company doesn't use. It disappears for everyone in your company.">
         {offeredModules(profile.disabled_modules).map(m => {
           const on = !(form.disabled_modules || []).includes(m.key);

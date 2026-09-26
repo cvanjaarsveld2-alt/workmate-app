@@ -8,6 +8,7 @@ import { saveAndSync } from "./sync";
 import { genId } from "./helpers";
 import { deleteRecord } from "./deleteHelpers";
 import { newEntry, runningEntry, stopEntry } from "./timesheets";
+import { publishClock } from "./location";
 
 export function useTimeEntries({ userId, teamId, online, setData }) {
   const [entries, setEntries] = useState([]);
@@ -51,6 +52,13 @@ export function useTimeEntries({ userId, teamId, online, setData }) {
   );
 
   const running = runningEntry(entries, userId);
+  // The running clock, for the rest of the app (location sharing while clocked in).
+  const runningKey = running ? `${running.id}:${running.job_id || ""}` : "";
+  useEffect(() => {
+    if (loading) return;
+    publishClock(running);
+    // runningKey stands for running.
+  }, [runningKey, loading]);
 
   // Starting a new clock stops the one that's running (one at a time).
   const clockIn = useCallback(

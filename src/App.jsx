@@ -1,7 +1,7 @@
 // ─── PowerMate App ────────────────────────────────────────────────────────────
 import React, { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Calendar, Settings, Search, Menu, Plus, Bell } from "lucide-react";
+import { Home, Calendar, Settings, Search, Menu, Plus, Bell, MapPin } from "lucide-react";
 import { supabase } from "./supabase";
 import { useOnlineStatus } from "./hooks/useOnlineStatus";
 import {
@@ -59,6 +59,7 @@ import { assuranceLevel, TwoStepChallenge, TwoStepRequired } from "./auth/TwoSte
 import { featureForScreen, hasFeature, lockedScreens, useTeamPlan } from "./lib/plan";
 import { flushForms } from "./lib/forms";
 import { equipmentIdFromUrl } from "./lib/qrLabels";
+import { useLocationSharing } from "./lib/location";
 import { LockedFeature, PlanBanner, SuspendedScreen } from "./components/PlanBanner";
 import { setMyName } from "./lib/me";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
@@ -127,6 +128,7 @@ const ServicePlansScreen = lazy(() =>
 const ScheduleScreen = lazy(() => import("./screens/ScheduleScreen").then(m => ({ default: m.ScheduleScreen })));
 const PlanScreen = lazy(() => import("./screens/PlanScreen").then(m => ({ default: m.PlanScreen })));
 const PurchasingScreen = lazy(() => import("./screens/PurchasingScreen").then(m => ({ default: m.PurchasingScreen })));
+const TeamMapScreen = lazy(() => import("./screens/TeamMapScreen").then(m => ({ default: m.TeamMapScreen })));
 const FormsScreen = lazy(() => import("./screens/FormsScreen").then(m => ({ default: m.FormsScreen })));
 const JobProfitScreen = lazy(() => import("./screens/JobProfitScreen").then(m => ({ default: m.JobProfitScreen })));
 const HelpScreen = lazy(() => import("./screens/HelpScreen").then(m => ({ default: m.HelpScreen })));
@@ -786,6 +788,12 @@ export default function PowerWorksApp() {
   }, [session?.user?.id, isOnline]);
   // Modules the company switched off: their screens leave the menu and can't open.
   const companyProfile = useCompanyProfile(teamId);
+  // Technicians' locations while clocked in, if the company switched it on.
+  const locationStatus = useLocationSharing(supabase, {
+    teamId,
+    userId: session?.user?.id,
+    allowed: hasFeature(teamPlan, "tech_location") && companyProfile.share_location === true,
+  });
   const offScreens = unavailableScreens(companyProfile.disabled_modules);
   // The company this person works for: its name and logo brand PDFs and messages.
   useEffect(() => {
@@ -1208,6 +1216,15 @@ export default function PowerWorksApp() {
         vatRegistered={companyProfile.vat_registered !== false}
       />
     ),
+    TeamMap: (
+      <TeamMapScreen
+        teamId={teamId}
+        teamMembers={teamMembers}
+        isManager={!!teamAccess?.is_owner || userRole === "admin"}
+        isOwner={!!teamAccess?.is_owner}
+        onOpenCompany={() => navigate("CompanyProfile")}
+      />
+    ),
     Forms: (
       <FormsScreen
         teamId={teamId}
@@ -1424,6 +1441,14 @@ export default function PowerWorksApp() {
               onHelp={() => navigate("Help", { from: screen })}
               onPlan={() => navigate("Plan")}
             />
+            {locationStatus !== "off" && (
+              <p role="status" className="mx-auto max-w-2xl px-4 mt-2 text-xs text-slate-500 flex items-center gap-1">
+                <MapPin size={12} />
+                {locationStatus === "denied"
+                  ? "Your company shares locations while clocked in, but this phone hasn't allowed location."
+                  : "Your location is shared with the office while you're clocked in."}
+              </p>
+            )}
             <main className="mx-auto max-w-2xl px-4 pt-4">
               <PullToRefresh
                 onRefresh={async () => {

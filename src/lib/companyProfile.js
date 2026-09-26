@@ -52,6 +52,8 @@ export const DEFAULT_PROFILE = {
   // app's), and which ones go out by SMS automatically ({ booking, done }).
   message_templates: {},
   auto_sms: {},
+  // Technicians' locations shared with the office while they're clocked in.
+  share_location: false,
 };
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
@@ -146,7 +148,7 @@ export function cleanProfile(input) {
       out[k] = Array.isArray(v) ? [...new Set(v.map(String))] : [];
     } else if (k === "vat_registered") {
       out[k] = v !== false;
-    } else if (k === "require_admin_mfa" || k === "email_customer_reminders") {
+    } else if (k === "require_admin_mfa" || k === "email_customer_reminders" || k === "share_location") {
       out[k] = v === true;
     } else if (k === "auto_reminders") {
       out[k] = v !== false;

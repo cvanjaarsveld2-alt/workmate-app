@@ -32,6 +32,7 @@ import {
   LayoutGrid,
   ShoppingCart,
   ClipboardCheck,
+  MapPin,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { ALWAYS_SHOWN } from "../lib/menuPrefs";
@@ -85,6 +86,7 @@ const SECTIONS = [
       { key: "Notifications", label: "Notifications", icon: Bell, badgeKey: "unread" },
       { key: "SharedInbox", label: "Shared with me", icon: Inbox, badgeKey: "sharedInbox" },
       { key: "TeamDashboard", label: "Team Overview", icon: LayoutDashboard },
+      { key: "TeamMap", label: "Technician map", icon: MapPin, managerOnly: true },
       { key: "Platform", label: "Platform: all companies", icon: LayoutGrid, platformOnly: true },
       { key: "More", label: "Settings & More", icon: Settings, badgeKey: "pending" },
     ],
