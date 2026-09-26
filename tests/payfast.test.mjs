@@ -55,3 +55,11 @@ test("the edge function confirms with PayFast and records payments once", () => 
   assert.match(sql, /grant execute on function public\.payfast_checkout_data\(text, uuid\) to service_role/);
   assert.match(sql, /idempotency_key = v_key/);
 });
+
+test("the site's security policy lets the checkout form reach PayFast (live and sandbox)", () => {
+  const headers = JSON.parse(fs.readFileSync(new URL("../vercel.json", import.meta.url), "utf8")).headers.flatMap(h => h.headers);
+  const csp = headers.find(h => h.key === "Content-Security-Policy").value;
+  const formAction = csp.split(";").map(s => s.trim()).find(s => s.startsWith("form-action"));
+  assert.match(formAction, /https:\/\/www\.payfast\.co\.za/);
+  assert.match(formAction, /https:\/\/sandbox\.payfast\.co\.za/);
+});
