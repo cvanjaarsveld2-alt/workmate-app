@@ -8,12 +8,13 @@
 //     onCancel={() => setShowNamePrompt(false)}
 //   />
 // ─────────────────────────────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "../lib/brand";
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Download } from "lucide-react";
 import { BRAND } from "../lib/constants";
 
-export function PDFNamePrompt({ open, defaultName = "PowerMate-Export", ext = "pdf", onConfirm, onCancel }) {
+export function PDFNamePrompt({ open, defaultName = `${PRODUCT_NAME}-Export`, ext = "pdf", onConfirm, onCancel }) {
   const extRe = new RegExp(`\\.${ext}$`, "i");
   const [name, setName] = useState(defaultName.replace(extRe, ""));
   const inputRef = useRef(null);

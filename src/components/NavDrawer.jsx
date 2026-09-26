@@ -11,6 +11,10 @@ import {
   Wrench,
   File as FileIcon,
   Receipt,
+  Package,
+  Timer,
+  CalendarClock,
+  CalendarDays,
   Mic,
   Settings,
   LogOut,
@@ -24,6 +28,8 @@ import {
   PhoneCall,
   CheckCircle2,
   SlidersHorizontal,
+  Lock,
+  LayoutGrid,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { ALWAYS_SHOWN } from "../lib/menuPrefs";
@@ -54,6 +60,9 @@ const SECTIONS = [
       { key: "Equipment", label: "Equipment", icon: Wrench },
       { key: "Meeting", label: "Meeting Recorder", icon: Mic },
       { key: "Jobs", label: "Jobs", icon: CheckCircle2 },
+      { key: "Schedule", label: "Schedule", icon: CalendarDays },
+      { key: "Timesheets", label: "Timesheets", icon: Timer },
+      { key: "ServicePlans", label: "Service plans", icon: CalendarClock },
     ],
   },
   {
@@ -62,6 +71,7 @@ const SECTIONS = [
       { key: "Quotes", label: "Quotes", icon: FileIcon, badgeKey: "pendingQ" },
       { key: "Expenses", label: "Expenses", icon: Receipt, badgeKey: "unsubmittedExp" },
       { key: "Invoices", label: "Invoices", icon: Receipt },
+      { key: "Products", label: "Products & stock", icon: Package },
     ],
   },
   {
@@ -70,6 +80,7 @@ const SECTIONS = [
       { key: "Notifications", label: "Notifications", icon: Bell, badgeKey: "unread" },
       { key: "SharedInbox", label: "Shared with me", icon: Inbox, badgeKey: "sharedInbox" },
       { key: "TeamDashboard", label: "Team Overview", icon: LayoutDashboard },
+      { key: "Platform", label: "Platform: all companies", icon: LayoutGrid, platformOnly: true },
       { key: "More", label: "Settings & More", icon: Settings, badgeKey: "pending" },
     ],
   },
@@ -84,13 +95,24 @@ export function NavDrawer({
   userEmail,
   onLogout,
   hiddenScreens = [],
+  unavailableScreens = [],
+  lockedScreens = [],
+  isPlatformAdmin = false,
   onSaveHidden,
 }) {
   // Editing the menu: a draft set of hidden screens, saved on Done.
   const [draft, setDraft] = useState(null);
   const editing = draft !== null;
   const hidden = new Set(hiddenScreens);
-  const sections = SECTIONS.map(s => ({
+  // Modules the company switched off aren't offered at all.
+  const off = new Set(unavailableScreens);
+  // Not in the company's plan: still listed, with a lock (opens the upgrade page).
+  const locked = new Set(lockedScreens);
+  const available = SECTIONS.map(s => ({
+    ...s,
+    items: s.items.filter(i => !off.has(i.key) && (!i.platformOnly || isPlatformAdmin)),
+  })).filter(s => s.items.length);
+  const sections = available.map(s => ({
     ...s,
     items: s.items.filter(i => ALWAYS_SHOWN.has(i.key) || !hidden.has(i.key)),
   })).filter(s => s.items.length);
@@ -153,7 +175,7 @@ export function NavDrawer({
                 <p className="px-5 pb-2 text-xs text-slate-500 leading-snug">
                   Only changes your own menu. Hidden screens still open from links and notifications.
                 </p>
-                {SECTIONS.map(section => (
+                {available.map(section => (
                   <div key={section.title} className="mb-0.5">
                     <p className="px-5 pt-4 pb-1 text-[10px] font-black text-slate-400 tracking-widest">
                       {section.title}
@@ -218,6 +240,9 @@ export function NavDrawer({
                           >
                             {item.label}
                           </span>
+                          {locked.has(item.key) && (
+                            <Lock size={13} className="text-slate-400 shrink-0" aria-label="Not in your plan" />
+                          )}
                           {badge > 0 && (
                             <span className="min-w-5 h-5 px-1 rounded-full bg-red-100 text-red-600 text-[10px] font-black flex items-center justify-center">
                               {badge > 99 ? "99+" : badge}

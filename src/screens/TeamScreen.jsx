@@ -11,6 +11,7 @@
 //   - Members list (read-only)
 //   - Team settings (invite code to share with others)
 // ─────────────────────────────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "../lib/brand";
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -499,7 +500,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
   const [copied, setCopied]           = useState(false);
   const [showCreate, setShowCreate]   = useState(false);
   const [showJoin, setShowJoin]       = useState(false);
-  const [teamName, setTeamName]       = useState("Power Works (Pty) Ltd");
+  const [teamName, setTeamName]       = useState("");
   const [inviteInput, setInviteInput] = useState("");
   const [saving, setSaving]           = useState(false);
   const [viewingMember, setViewingMember] = useState(null);
@@ -643,17 +644,10 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
     if (myRole !== "admin") return;
     const ok = await confirm("Generate a new invite code? The old one will stop working.", { confirmLabel: "Regenerate" });
     if (!ok) return;
-    // Cryptographically secure invite code — crypto.getRandomValues is
-    // unpredictable, unlike Math.random which can be reverse-engineered from
-    // prior outputs. Produces an 8-char uppercase alphanumeric code.
-    const newCode = (() => {
-      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-      const bytes = new Uint8Array(8);
-      (crypto || window.crypto).getRandomValues(bytes);
-      return Array.from(bytes, b => alphabet[b % alphabet.length]).join("");
-    })();
-    const { error } = await supabase.from("teams").update({ invite_code: newCode }).eq("id", team.id);
-    if (error) { setToast("Failed to regenerate"); return; }
+    // The server makes the code (12 characters, cryptographically random)
+    // and only lets the master account change it.
+    const { data: newCode, error } = await supabase.rpc("regenerate_invite_code", { p_team_id: team.id });
+    if (error || !newCode) { setToast("Failed to regenerate"); return; }
     setTeam(t => ({ ...t, invite_code: newCode }));
     setToast("New invite code generated");
   }
@@ -752,9 +746,9 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
   async function shareInviteLink() {
     if (!team) return;
     const link = `${window.location.origin}/?join=${team.invite_code}`;
-    const text = `Join the ${team.name} team on PowerMate.\n\nInvite code: ${team.invite_code}\nOr open: ${link}`;
+    const text = `Join the ${team.name} team on ${PRODUCT_NAME}.\n\nInvite code: ${team.invite_code}\nOr open: ${link}`;
     if (navigator.share) {
-      try { await navigator.share({ title: "Join PowerMate team", text }); } catch {}
+      try { await navigator.share({ title: `Join ${team.name} on ${PRODUCT_NAME}`, text }); } catch {}
     } else {
       navigator.clipboard?.writeText(text).catch(() => {});
       setToast("Invite text copied to clipboard");
@@ -823,7 +817,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
       <div className="stack-y-4">
         {dialog}
         <AnimatePresence>{toast && <Toast message={toast} onDone={() => setToast("")} />}</AnimatePresence>
-        <PageHeader title="Team" subtitle="Set up team sharing for Power Works" />
+        <PageHeader title="Team" subtitle="Set up team sharing for your company" />
         <Card className="p-5 text-center stack-y-3">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: "#F7F3F3" }}>
             <Users size={28} style={{ color: BRAND.primary }} />
@@ -850,7 +844,7 @@ export function TeamScreen({ userId, userEmail, data, setData, onTeamChange, use
                   <p className="text-base font-black text-slate-800">Create team</p>
                   <button onClick={() => setShowCreate(false)}><X size={18} className="text-slate-400" /></button>
                 </div>
-                <Field label="Team name" value={teamName} onChange={setTeamName} placeholder="Power Works (Pty) Ltd" />
+                <Field label="Team name" value={teamName} onChange={setTeamName} placeholder="e.g. Acme Hydraulics (Pty) Ltd" />
                 <Btn className="w-full" onClick={createTeam} disabled={saving}>
                   {saving ? <RefreshCw size={15} className="animate-spin" /> : <Plus size={15} />}
                   {saving ? "Creating…" : "Create team"}

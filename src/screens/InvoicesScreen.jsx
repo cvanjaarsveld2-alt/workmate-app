@@ -3,7 +3,14 @@ import { offlineGetAll, offlineSave } from "../offline/offlineDb";
 import { saveAndSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { Card, Btn, PageHeader } from "../components/ui";
-import { CreditCard, RefreshCw, Search, CheckCircle2, WifiOff } from "lucide-react";
+import { Bell, CreditCard, RefreshCw, Search, CheckCircle2, WifiOff, FileText, FileClock } from "lucide-react";
+import { daysOverdue, isOverdue, reminderMessage } from "../lib/reminders";
+import { formatPhone } from "../components/WhatsAppButton";
+import { useCompanyProfile } from "../lib/companyProfile";
+import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
+import { invoiceToDocument, isTemporaryInvoiceNumber, jobToCard, jobsForInvoice } from "../lib/documentData";
+import { resolveDocumentPhotos } from "../lib/documentPhotos";
+import { FORMATS, accountingCsv } from "../lib/accountingExport";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 const money = v =>
   `R ${Number(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -29,7 +36,7 @@ function genIdempotencyKey() {
   } catch {}
   return `idem_${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 10)}`;
 }
-export function InvoicesScreen({ userId, teamId, setData }) {
+export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes = [] }) {
   const [invoices, setInvoices] = useState([]),
     [payments, setPayments] = useState([]),
     [loading, setLoading] = useState(true),
@@ -37,6 +44,105 @@ export function InvoicesScreen({ userId, teamId, setData }) {
     [error, setError] = useState(""),
     [query, setQuery] = useState("");
   const online = useOnlineStatus();
+  const profile = useCompanyProfile(teamId);
+  const [making, setMaking] = useState(null);
+  const [notice, setNotice] = useState("");
+  // Export for accounting packages (Xero / Sage / QuickBooks), by month.
+  const [exportMonth, setExportMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  function exportAccounting(format) {
+    const list = invoices.filter(i => String(i.issue_date || "").startsWith(exportMonth) && i.status !== "cancelled");
+    if (!list.length) return setNotice(`No invoices in ${exportMonth}.`);
+    const csv = accountingCsv(format, list, { clients, quotes, profile });
+    const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Invoices_${exportMonth}_${FORMATS[format].label}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    setNotice(`${list.length} invoice${list.length === 1 ? "" : "s"} exported for ${FORMATS[format].label}.`);
+  }
+  // Jobs, to attach their job cards to an invoice or pro forma.
+  const [jobs, setJobs] = useState([]);
+  const [attach, setAttach] = useState({});
+  useEffect(() => {
+    offlineGetAll("jobs").then(
+      rows => setJobs(rows || []),
+      () => {},
+    );
+  }, [invoices.length]);
+  // Build and share an invoice or pro forma PDF. Online, the invoice is read
+  // back first so it carries the number the server assigned.
+  // A polite reminder with the customer's portal link: WhatsApp if we have
+  // their number, else email, else the share sheet.
+  async function remind(inv) {
+    const client = clients.find(c => c.id === inv.client_id) || {};
+    setMaking(`remind:${inv.id}`);
+    setNotice("");
+    const { data: token } = await supabase.rpc("client_portal_link", { p_client_id: inv.client_id, p_new: false });
+    setMaking(null);
+    const url = token ? `${window.location.origin}/?portal=${token}` : "";
+    const text = reminderMessage({
+      contact: client.contact,
+      company: profile.trading_name || profile.legal_name,
+      invoice: inv,
+      url,
+    });
+    const phone = formatPhone(client.phone || "");
+    if (phone) return window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+    if (client.email)
+      return window.open(
+        `mailto:${client.email}?subject=${encodeURIComponent(`Reminder: invoice ${inv.invoice_number}`)}&body=${encodeURIComponent(text)}`,
+      );
+    try {
+      if (navigator.share) return await navigator.share({ text });
+      await navigator.clipboard.writeText(text);
+      setNotice("Reminder copied. Paste it to the customer.");
+    } catch {
+      // Share sheet closed.
+    }
+  }
+
+  async function sharePdf(inv, kind) {
+    setMaking(inv.id + kind);
+    setNotice("");
+    try {
+      let row = inv;
+      if (online && isTemporaryInvoiceNumber(inv.invoice_number)) {
+        const { data } = await supabase.from("invoices").select("*").eq("id", inv.id).maybeSingle();
+        if (data) {
+          row = { ...inv, ...data };
+          setInvoices(list => list.map(x => (x.id === row.id ? row : x)));
+          offlineSave("invoices", row).catch(() => {});
+        }
+      }
+      let doc = invoiceToDocument(row, kind, { clients, quotes, profile });
+      if (attach[inv.id]) {
+        let linked = jobsForInvoice(row, jobs);
+        if (!linked.length && online && row.job_id) {
+          const { data } = await supabase.from("jobs").select("*").eq("id", row.job_id);
+          linked = data || [];
+        }
+        doc = await resolveDocumentPhotos({ ...doc, jobCards: linked.map(j => jobToCard(j, { clients, quotes })) });
+      }
+      const blob = await buildDocumentPDF(doc, profile);
+      const r = await shareDocumentPDF(blob, documentFilename(doc, profile), `${documentTitle(kind, profile)} ${doc.number}`);
+      if (r !== "cancelled")
+        setNotice(
+          doc.draft
+            ? "Draft PDF made. It gets its final invoice number once it syncs."
+            : r === "shared"
+              ? "PDF shared"
+              : "PDF downloaded",
+        );
+    } catch (err) {
+      console.error("Invoice PDF failed:", err);
+      setNotice("Couldn't make the PDF. Please try again.");
+    } finally {
+      setMaking(null);
+    }
+  }
   async function load() {
     if (!userId) return;
     setLoading(true);
@@ -150,6 +256,11 @@ export function InvoicesScreen({ userId, teamId, setData }) {
         </div>
       )}
       {error && <div className="rounded-xl bg-slate-50 border p-3 text-sm text-slate-700">{error}</div>}
+      {notice && (
+        <div role="status" className="rounded-xl bg-green-50 border border-green-200 p-3 text-sm text-green-800">
+          {notice}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-4">
           <p className="text-xs font-bold text-slate-400">Outstanding</p>
@@ -160,6 +271,28 @@ export function InvoicesScreen({ userId, teamId, setData }) {
           <p className="text-lg font-black">{money(received)}</p>
         </Card>
       </div>
+      <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+        <summary className="text-sm font-bold text-slate-600 cursor-pointer min-h-[40px] flex items-center">Export for accounting</summary>
+        <div className="stack-y-2 pb-2">
+          <label className="block text-xs font-bold text-slate-500">
+            Month
+            <input
+              type="month"
+              value={exportMonth}
+              onChange={e => setExportMonth(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-base"
+            />
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries(FORMATS).map(([key, f]) => (
+              <Btn key={key} size="sm" variant="secondary" onClick={() => exportAccounting(key)}>
+                {f.label}
+              </Btn>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500">A CSV file for that package's invoice import. Amounts exclude VAT; the VAT type is set per line.</p>
+        </div>
+      </details>
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -211,6 +344,33 @@ export function InvoicesScreen({ userId, teamId, setData }) {
                   {saving === inv.id ? "Saving…" : "Record payment"}
                 </Btn>
               )}
+              {(inv.job_id || jobsForInvoice(inv, jobs).length > 0) && (
+                <label className="flex items-center gap-2 text-sm text-slate-600 min-h-[36px] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!attach[inv.id]}
+                    onChange={e => setAttach(a => ({ ...a, [inv.id]: e.target.checked }))}
+                    className="h-5 w-5"
+                  />
+                  Attach job card
+                </label>
+              )}
+              {isOverdue(inv) && inv.client_id && (
+                <Btn size="sm" variant="warning" onClick={() => remind(inv)} disabled={making === `remind:${inv.id}` || !online}>
+                  <Bell size={13} />
+                  {making === `remind:${inv.id}` ? "Preparing…" : `Remind customer · ${daysOverdue(inv)} days overdue`}
+                </Btn>
+              )}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <Btn size="sm" variant="secondary" onClick={() => sharePdf(inv, "invoice")} disabled={!!making}>
+                  <FileText size={13} />
+                  {making === inv.id + "invoice" ? "Making…" : "Invoice PDF"}
+                </Btn>
+                <Btn size="sm" variant="ghost" onClick={() => sharePdf(inv, "proforma")} disabled={!!making}>
+                  <FileClock size={13} />
+                  {making === inv.id + "proforma" ? "Making…" : "Pro forma"}
+                </Btn>
+              </div>
             </Card>
           );
         })

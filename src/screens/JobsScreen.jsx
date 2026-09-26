@@ -13,11 +13,24 @@ import {
   FileText,
   Save,
   WifiOff,
+  ClipboardList,
+  Timer,
+  Car,
+  Square,
 } from "lucide-react";
 import { createInvoiceFromJob } from "../lib/jobInvoiceAutomation";
+import { CaptionedPhotos } from "../components/CaptionedPhotos";
+import { PartsEditor } from "../components/PartsEditor";
+import { normaliseParts, partsForSave, useProducts } from "../lib/products";
+import { useTimeEntries } from "../lib/useTimeEntries";
+import { entryMinutes, fmtMinutes, labourLines, totals } from "../lib/timesheets";
+import { useCompanyProfile } from "../lib/companyProfile";
+import { buildDocumentPDF, documentFilename, shareDocumentPDF } from "../lib/documentPDF";
+import { jobToCard } from "../lib/documentData";
+import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
-export function JobsScreen({ userId, teamId, setData }) {
+export function JobsScreen({ userId, teamId, setData, clients = [], canClock = true }) {
   const [jobs, setJobs] = useState([]),
     [quotes, setQuotes] = useState([]),
     [loading, setLoading] = useState(true),
@@ -27,6 +40,39 @@ export function JobsScreen({ userId, teamId, setData }) {
     [error, setError] = useState(""),
     [drafts, setDrafts] = useState({});
   const online = useOnlineStatus();
+  const profile = useCompanyProfile(teamId);
+  const [making, setMaking] = useState(null);
+  const time = useTimeEntries({ userId, teamId, online, setData });
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!time.running) return;
+    const t = setInterval(() => setTick(x => x + 1), 30000);
+    return () => clearInterval(t);
+  }, [time.running]);
+  const jobTime = job => totals(time.entries.filter(e => e.job_id === job.id));
+  // Billable timesheet hours on a job, at the company's labour rate.
+  const labourFor = job => labourLines(time.entries, job.id, profile.labour_rate);
+  async function shareJobCard(job) {
+    setMaking(job.id);
+    setError("");
+    try {
+      const card = jobToCard({ ...job, photos: draft(job).photos }, { clients, quotes });
+      const doc = await resolveDocumentPhotos({
+        kind: "jobcard",
+        number: card.number,
+        client: { name: card.customer },
+        jobCards: [card],
+      });
+      const blob = await buildDocumentPDF(doc, profile);
+      const r = await shareDocumentPDF(blob, documentFilename(doc, profile), `Job card ${card.number}`);
+      if (r !== "cancelled") setError(r === "shared" ? "Job card shared." : "Job card PDF downloaded.");
+    } catch (err) {
+      console.error("Job card PDF failed:", err);
+      setError("Couldn't make the job card PDF.");
+    } finally {
+      setMaking(null);
+    }
+  }
   const apply = rows => {
     const mine = (rows || []).filter(
       j => j.user_id === userId || j.assigned_to_user_id === userId || (teamId && j.team_id === teamId),
@@ -39,7 +85,8 @@ export function JobsScreen({ userId, teamId, setData }) {
           (n[j.id] = {
             technician_notes: j.technician_notes || "",
             work_done: j.work_done || "",
-            parts_used: Array.isArray(j.parts_used) ? j.parts_used.join(", ") : "",
+            parts_used: normaliseParts(j.parts_used),
+            photos: Array.isArray(j.photos) ? j.photos.filter(p => p && typeof p === "object") : [],
           }),
       );
       return n;
@@ -78,7 +125,8 @@ export function JobsScreen({ userId, teamId, setData }) {
   useEffect(() => {
     load();
   }, [userId, teamId, online]);
-  const draft = j => drafts[j.id] || { technician_notes: "", work_done: "", parts_used: "" };
+  const products = useProducts(supabase, teamId);
+  const draft = j => drafts[j.id] || { technician_notes: "", work_done: "", parts_used: [], photos: [] };
   async function updateJob(job, patch, key) {
     const updated = { ...job, ...patch, sync_status: "pending" };
     setSaving(key);
@@ -96,10 +144,8 @@ export function JobsScreen({ userId, teamId, setData }) {
       {
         technician_notes: d.technician_notes,
         work_done: d.work_done,
-        parts_used: d.parts_used
-          .split(",")
-          .map(x => x.trim())
-          .filter(Boolean),
+        parts_used: partsForSave(d.parts_used),
+        photos: d.photos || [],
       },
       `save:${job.id}`,
     );
@@ -109,7 +155,7 @@ export function JobsScreen({ userId, teamId, setData }) {
     setError("");
     const q = quotes.find(x => x.id === job.quote_id);
     const r = await createInvoiceFromJob(
-      { ...job, _quoteValue: q?.value || 0 },
+      { ...job, _quoteValue: q?.value || 0, _labourLines: labourFor(job) },
       userId,
       teamId,
       setData,
@@ -129,6 +175,8 @@ export function JobsScreen({ userId, teamId, setData }) {
     const d = draft(job);
     setSaving(`complete:${job.id}`);
     setError("");
+    // Finishing the job stops the clock on it.
+    const stopped = time.running?.job_id === job.id ? await time.clockOut() : null;
     const q = quotes.find(x => x.id === job.quote_id);
     const updated = {
       ...job,
@@ -136,16 +184,22 @@ export function JobsScreen({ userId, teamId, setData }) {
       completed_at: new Date().toISOString(),
       technician_notes: d.technician_notes,
       work_done: d.work_done,
-      parts_used: d.parts_used
-        .split(",")
-        .map(x => x.trim())
-        .filter(Boolean),
+      parts_used: partsForSave(d.parts_used),
+      photos: d.photos || [],
       sync_status: "pending",
     };
     setJobs(r => r.map(x => (x.id === job.id ? updated : x)));
     const saved = await saveAndSync(updated, "jobs", "update", setData || (() => {}), online);
     const r = await createInvoiceFromJob(
-      { ...(saved || updated), _quoteValue: q?.value || 0 },
+      {
+        ...(saved || updated),
+        _quoteValue: q?.value || 0,
+        _labourLines: labourLines(
+          stopped ? [stopped, ...time.entries.filter(e => e.id !== stopped.id)] : time.entries,
+          job.id,
+          profile.labour_rate,
+        ),
+      },
       userId,
       teamId,
       setData,
@@ -238,6 +292,38 @@ export function JobsScreen({ userId, teamId, setData }) {
                   {job.location || "No location"}
                 </span>
               </div>
+              {(() => {
+                const t = jobTime(job);
+                const here = time.running?.job_id === job.id ? time.running : null;
+                const open = job.status === "scheduled" || job.status === "in_progress";
+                // Without timesheets in the plan, only time already recorded shows.
+                if (!(open && canClock) && !t.all) return null;
+                return (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-slate-500 flex items-center gap-1 mr-auto">
+                      <Timer size={13} />
+                      {t.all ? `Time on job ${fmtMinutes(t.work)}${t.travel ? ` · travel ${fmtMinutes(t.travel)}` : ""}` : "No time recorded"}
+                    </span>
+                    {open &&
+                      canClock &&
+                      (here ? (
+                        <Btn size="sm" variant="warning" onClick={() => time.clockOut()}>
+                          <Square size={13} />
+                          {here.kind === "travel" ? "Stop travel" : "Clock out"} · {fmtMinutes(entryMinutes(here))}
+                        </Btn>
+                      ) : (
+                        <>
+                          <Btn size="sm" variant="ghost" onClick={() => time.clockIn({ job, kind: "travel" })}>
+                            <Car size={13} /> Travel
+                          </Btn>
+                          <Btn size="sm" variant="secondary" onClick={() => time.clockIn({ job })}>
+                            <Timer size={13} /> Clock in
+                          </Btn>
+                        </>
+                      ))}
+                  </div>
+                );
+              })()}
               {(job.status === "scheduled" || job.status === "in_progress") && (
                 <div className="stack-y-2 rounded-xl bg-slate-50 p-3">
                   <textarea
@@ -261,13 +347,14 @@ export function JobsScreen({ userId, teamId, setData }) {
                     rows={2}
                     className="w-full rounded-xl border p-2 text-sm"
                   />
-                  <input
-                    value={d.parts_used}
-                    onChange={e =>
-                      setDrafts(x => ({ ...x, [job.id]: { ...draft(job), parts_used: e.target.value } }))
-                    }
-                    placeholder="Parts used (comma separated)"
-                    className="w-full rounded-xl border p-2 text-sm"
+                  <PartsEditor
+                    parts={d.parts_used}
+                    products={products}
+                    onChange={parts => setDrafts(x => ({ ...x, [job.id]: { ...draft(job), parts_used: parts } }))}
+                  />
+                  <CaptionedPhotos
+                    photos={d.photos || []}
+                    onChange={photos => setDrafts(x => ({ ...x, [job.id]: { ...draft(job), photos } }))}
                   />
                   <Btn
                     size="sm"
@@ -291,6 +378,10 @@ export function JobsScreen({ userId, teamId, setData }) {
                     Open route
                   </a>
                 )}
+                <Btn size="sm" variant="secondary" onClick={() => shareJobCard(job)} disabled={making === job.id}>
+                  <ClipboardList size={13} />
+                  {making === job.id ? "Making…" : "Job card PDF"}
+                </Btn>
                 <Btn
                   size="sm"
                   variant="secondary"
@@ -301,7 +392,15 @@ export function JobsScreen({ userId, teamId, setData }) {
                   {assistantLoading === job.id ? "Thinking…" : "Technician assist"}
                 </Btn>
                 {job.status === "scheduled" && (
-                  <Btn size="sm" onClick={() => status(job, "in_progress")} disabled={saving === job.id}>
+                  <Btn
+                    size="sm"
+                    onClick={async () => {
+                      await status(job, "in_progress");
+                      // Starting a job starts the clock on it.
+                      if (canClock && (time.running?.job_id !== job.id || time.running?.kind !== "work")) await time.clockIn({ job });
+                    }}
+                    disabled={saving === job.id}
+                  >
                     <Play size={13} />
                     Start job
                   </Btn>

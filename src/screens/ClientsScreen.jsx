@@ -1,4 +1,5 @@
 // ─── Clients Screen ───────────────────────────────────────────────────────────
+import { companyName } from "../lib/companyProfile";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -407,7 +408,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
     setRenamingGroup(null);
   }
   const [shareSheet, setShareSheet]     = useState(null);
-  const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], category: "", assigned_to_user_id: null, assigned_to: "" });
+  const [form, setForm] = useState({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], category: "", vat_number: "", billing_address: "", assigned_to_user_id: null, assigned_to: "" });
   const { confirm, dialog } = useConfirm();
 
   const clients   = (data.clients || []).filter(isMine);
@@ -432,7 +433,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
 
 
   function resetForm() {
-    setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], category: "", assigned_to_user_id: null, assigned_to: "" });
+    setForm({ company: "", branch: "", contact: "", phone: "", email: "", stage: "New Lead", notes: "", categories: [], category: "", vat_number: "", billing_address: "", assigned_to_user_id: null, assigned_to: "" });
     setEditId(null);
     setShowForm(false);
   }
@@ -498,7 +499,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
 
   // ── Edit-in-place: the edit form renders where the branch row is. ──
   function startEdit(c) {
-    setForm({ company: c.company || "", branch: c.branch || "", contact: c.contact || "", phone: c.phone || "", email: c.email || "", stage: c.stage || "New Lead", notes: c.notes || "", categories: parseCats(c.division), category: c.category || "", assigned_to_user_id: c.assigned_to_user_id || null, assigned_to: c.assigned_to || "" });
+    setForm({ company: c.company || "", branch: c.branch || "", contact: c.contact || "", phone: c.phone || "", email: c.email || "", stage: c.stage || "New Lead", notes: c.notes || "", categories: parseCats(c.division), category: c.category || "", vat_number: c.vat_number || "", billing_address: c.billing_address || "", assigned_to_user_id: c.assigned_to_user_id || null, assigned_to: c.assigned_to || "" });
     setEditId(c.id);
     setShowForm(false);
   }
@@ -525,7 +526,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
         {!isEdit && (
           <div className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5">
             <p className="text-xs text-blue-700 leading-snug">
-              <span className="font-black">New to Power Works?</span> Add them here — stage starts as "New Lead" and moves forward as you work the deal. For a new opportunity at an existing client, use the <span className="font-bold">Leads</span> screen instead.
+              <span className="font-black">New to {companyName() || "us"}?</span> Add them here — stage starts as "New Lead" and moves forward as you work the deal. For a new opportunity at an existing client, use the <span className="font-bold">Leads</span> screen instead.
             </p>
           </div>
         )}
@@ -568,6 +569,15 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
         </div>
 
         <Field label="Notes" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="Notes about this client…" multiline />
+
+        {/* Shown on tax invoices (SARS requires the customer's details above R5 000). */}
+        <details className="rounded-xl border border-slate-100 px-3 py-2" open={!!(form.vat_number || form.billing_address)}>
+          <summary className="text-sm font-bold text-slate-500 cursor-pointer min-h-[36px] flex items-center">Invoicing details (optional)</summary>
+          <div className="stack-y-3 pt-2">
+            <Field label="Customer VAT number" value={form.vat_number} onChange={v => setForm(f => ({ ...f, vat_number: v }))} placeholder="e.g. 4123456789" />
+            <Field label="Billing address" value={form.billing_address} onChange={v => setForm(f => ({ ...f, billing_address: v }))} placeholder="Street, town, postal code" multiline />
+          </div>
+        </details>
 
         {/* Assign to team member */}
         {teamMembers.length > 0 && (

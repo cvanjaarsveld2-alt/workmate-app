@@ -53,6 +53,12 @@ import { ExportProgressProvider } from "./components/ExportProgress";
 import { GlobalSearch } from "./components/GlobalSearch";
 import { NavDrawer } from "./components/NavDrawer";
 import { readHiddenScreens, saveHiddenScreens, syncHiddenScreens } from "./lib/menuPrefs";
+import { setActiveTeamId, loadCompanyProfile, useCompanyProfile } from "./lib/companyProfile";
+import { unavailableScreens } from "./lib/modules";
+import { assuranceLevel, TwoStepChallenge, TwoStepRequired } from "./auth/TwoStep";
+import { featureForScreen, hasFeature, lockedScreens, useTeamPlan } from "./lib/plan";
+import { LockedFeature, PlanBanner, SuspendedScreen } from "./components/PlanBanner";
+import { setMyName } from "./lib/me";
 import { DailyVehiclePrompt } from "./components/DailyVehiclePrompt";
 import { HomeScreen } from "./screens/HomeScreen";
 const EquipmentScreen = lazy(() =>
@@ -110,6 +116,22 @@ const JobsScreen = lazy(() => import("./screens/JobsScreen").then(m => ({ defaul
 const InvoicesScreen = lazy(() =>
   import("./screens/InvoicesScreen").then(m => ({ default: m.InvoicesScreen })),
 );
+const AuditLogScreen = lazy(() => import("./screens/AuditLogScreen").then(m => ({ default: m.AuditLogScreen })));
+const ProductsScreen = lazy(() => import("./screens/ProductsScreen").then(m => ({ default: m.ProductsScreen })));
+const TimesheetsScreen = lazy(() => import("./screens/TimesheetsScreen").then(m => ({ default: m.TimesheetsScreen })));
+const ServicePlansScreen = lazy(() =>
+  import("./screens/ServicePlansScreen").then(m => ({ default: m.ServicePlansScreen })),
+);
+const ScheduleScreen = lazy(() => import("./screens/ScheduleScreen").then(m => ({ default: m.ScheduleScreen })));
+const PlanScreen = lazy(() => import("./screens/PlanScreen").then(m => ({ default: m.PlanScreen })));
+const HelpScreen = lazy(() => import("./screens/HelpScreen").then(m => ({ default: m.HelpScreen })));
+const PlatformAdminScreen = lazy(() =>
+  import("./screens/PlatformAdminScreen").then(m => ({ default: m.PlatformAdminScreen })),
+);
+const CompanySetup = lazy(() => import("./screens/CompanySetup").then(m => ({ default: m.CompanySetup })));
+const CompanyProfileScreen = lazy(() =>
+  import("./screens/CompanyProfileScreen").then(m => ({ default: m.CompanyProfileScreen })),
+);
 import { Client360Screen } from "./screens/Client360Screen";
 import { CalendarScreen } from "./screens/CalendarScreen";
 const TeamDashboardScreen = lazy(() =>
@@ -141,6 +163,15 @@ const SCREEN_TITLES = {
   Client360: "Client 360",
   TeamDashboard: "Team Dashboard",
   Planner: "Weekly Planner",
+  CompanyProfile: "Company Details",
+  Help: "Help & support",
+  Platform: "Platform",
+  AuditLog: "Activity log",
+  Products: "Products & stock",
+  Timesheets: "Timesheets",
+  ServicePlans: "Service plans",
+  Schedule: "Schedule",
+  Plan: "Plan & billing",
 };
 const INITIAL_DATA = {
   clients: [],
@@ -233,6 +264,15 @@ export default function PowerWorksApp() {
         "SharedInbox",
         "Jobs",
         "Invoices",
+        "CompanyProfile",
+        "Help",
+        "Platform",
+        "AuditLog",
+        "Products",
+        "Timesheets",
+        "ServicePlans",
+        "Schedule",
+        "Plan",
         "Client360",
         "Calendar",
         "TeamDashboard",
@@ -254,6 +294,8 @@ export default function PowerWorksApp() {
   const [data, setData] = useState(INITIAL_DATA);
   const [quickAddTrigger, setQuickAddTrigger] = useState(null);
   const [teamId, setTeamId] = useState(null);
+  // True once we know whether this person belongs to a company.
+  const [teamChecked, setTeamChecked] = useState(false);
   const [teamMembers, setTeamMembers] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [userRole, setUserRole] = useState("member");
@@ -367,24 +409,25 @@ export default function PowerWorksApp() {
       try {
         const { data: authUser } = await supabase.auth.getUser();
         const uid = authUser?.user?.id || session.user.id;
-        const { data: profile } = await supabase.from("users").select("role").eq("id", uid).maybeSingle();
         const { data: membership } = await supabase
           .from("team_members")
           .select("team_id, role")
           .eq("user_id", uid)
           .maybeSingle();
         const { data: effectiveRole } = await supabase.rpc("get_my_effective_role");
-        const isAdmin =
-          effectiveRole === "admin" || profile?.role === "admin" || membership?.role === "admin";
+        // Admin is per company (the old app-wide users.role no longer counts).
+        const isAdmin = effectiveRole === "admin" || membership?.role === "admin";
         const { data: access } = await supabase.rpc("get_my_team_access");
         setTeamAccess(access && typeof access === "object" ? access : null);
         if (!membership?.team_id) {
           setTeamId(null);
           setTeamMembers([]);
           setUserRole(isAdmin ? "admin" : "member");
+          setTeamChecked(true);
           return;
         }
         setTeamId(membership.team_id);
+        setTeamChecked(true);
         setUserRole(isAdmin ? "admin" : "member");
         const { data: rows, error: rpcError } = await supabase.rpc("get_team_member_emails", {
           p_team_id: membership.team_id,
@@ -682,6 +725,55 @@ export default function PowerWorksApp() {
       return;
     subscribeToPush(session.user.id).catch(() => {});
   }, [session?.user?.id, isOnline]);
+  // Their own name, for signing off emails and messages.
+  useEffect(() => {
+    const u = session?.user;
+    if (!u?.id) return;
+    const fallback = (u.email || "").split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    setMyName(u.user_metadata?.full_name || fallback);
+    supabase
+      .from("users")
+      .select("full_name")
+      .eq("id", u.id)
+      .maybeSingle()
+      .then(
+        ({ data }) => data?.full_name && setMyName(data.full_name),
+        () => {},
+      );
+  }, [session?.user?.id]);
+  // Two-step login: ask for the code after the password when it's set up, and
+  // make owners/admins set it up when their company requires it.
+  const [twoStep, setTwoStep] = useState({ checked: false, current: "aal1", next: "aal1" });
+  const recheckTwoStep = useCallback(
+    () => assuranceLevel().then(l => setTwoStep({ checked: true, ...l })),
+    [],
+  );
+  useEffect(() => {
+    if (session?.user?.id) recheckTwoStep();
+  }, [session?.user?.id, recheckTwoStep]);
+  // The company's plan (trial / read-only / suspended) and whether this person
+  // runs the product itself (platform console).
+  const [planRefresh, setPlanRefresh] = useState(0);
+  const teamPlan = useTeamPlan(teamId, isOnline, planRefresh);
+  const refreshPlan = useCallback(() => setPlanRefresh(k => k + 1), []);
+  // Screens the company's plan doesn't include show an upgrade page instead.
+  const planLocked = lockedScreens(teamPlan);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  useEffect(() => {
+    if (!session?.user?.id || !isOnline) return;
+    supabase.rpc("is_platform_admin").then(
+      ({ data }) => setIsPlatformAdmin(data === true),
+      () => {},
+    );
+  }, [session?.user?.id, isOnline]);
+  // Modules the company switched off: their screens leave the menu and can't open.
+  const companyProfile = useCompanyProfile(teamId);
+  const offScreens = unavailableScreens(companyProfile.disabled_modules);
+  // The company this person works for: its name and logo brand PDFs and messages.
+  useEffect(() => {
+    setActiveTeamId(teamId);
+    if (teamId) loadCompanyProfile(teamId).catch(() => {});
+  }, [teamId]);
   // Each teammate's own menu: screens they chose to hide. Instant from this
   // device, then reconciled with their user record (and any offline change sent).
   const [hiddenScreens, setHiddenScreens] = useState([]);
@@ -839,6 +931,20 @@ export default function PowerWorksApp() {
   if (loading) return <DataLoadingScreen />;
   if (!session?.user) return <AuthScreen />;
   if (recoveringPassword) return <SetPasswordScreen onDone={() => setRecoveringPassword(false)} />;
+  if (!twoStep.checked) return <DataLoadingScreen />;
+  if (twoStep.next === "aal2" && twoStep.current !== "aal2")
+    return <TwoStepChallenge onDone={recheckTwoStep} onSignOut={logout} />;
+  if (isOnline && userRole === "admin" && companyProfile.require_admin_mfa && twoStep.next !== "aal2")
+    return <TwoStepRequired onDone={recheckTwoStep} onSignOut={logout} />;
+  if (teamPlan?.access === "suspended" && screen !== "Help")
+    return <SuspendedScreen onHelp={() => navigate("Help")} onSignOut={logout} />;
+  // Signed in but not in a company yet: join one, or set up a new company.
+  if (teamChecked && !teamId && isOnline)
+    return (
+      <Suspense fallback={<DataLoadingScreen />}>
+        <CompanySetup userId={session.user.id} onDone={() => setTeamRefreshKey(k => k + 1)} onSignOut={logout} />
+      </Suspense>
+    );
   // FIX (Build 8, Phase 3 — CRITICAL) — PINSetupScreen/PINLockScreen were
   // imported and pinState was computed (see the checkPIN effect above) but
   // NEITHER was ever actually rendered here: the component fell straight
@@ -1016,8 +1122,80 @@ export default function PowerWorksApp() {
     ),
     Breakdown: <BreakdownScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} />,
     Repair: <RepairScreen data={data} setData={setData} userId={session.user.id} teamId={teamId} />,
-    Jobs: <JobsScreen userId={session.user.id} teamId={teamId} setData={setData} />,
-    Invoices: <InvoicesScreen userId={session.user.id} teamId={teamId} setData={setData} />,
+    Jobs: (
+      <JobsScreen
+        userId={session.user.id}
+        teamId={teamId}
+        setData={setData}
+        clients={data.clients}
+        canClock={hasFeature(teamPlan, "timesheets")}
+      />
+    ),
+    Invoices: (
+      <InvoicesScreen
+        userId={session.user.id}
+        teamId={teamId}
+        setData={setData}
+        clients={data.clients}
+        quotes={data.quotes}
+      />
+    ),
+    CompanyProfile: (
+      <CompanyProfileScreen
+        teamId={teamId}
+        isOwner={!!teamAccess?.is_owner}
+        onPlan={() => navigate("Plan")}
+      />
+    ),
+    Schedule: (
+      <ScheduleScreen
+        userId={session.user.id}
+        teamId={teamId}
+        setData={setData}
+        clients={data.clients}
+        teamMembers={teamMembers}
+        canManage={!!teamAccess?.is_owner || userRole === "admin"}
+      />
+    ),
+    ServicePlans: (
+      <ServicePlansScreen
+        teamId={teamId}
+        canManage={!!teamAccess?.is_owner || userRole === "admin"}
+        clients={data.clients}
+        equipment={data.equipment}
+        teamMembers={teamMembers}
+      />
+    ),
+    Timesheets: (
+      <TimesheetsScreen
+        userId={session.user.id}
+        teamId={teamId}
+        setData={setData}
+        teamMembers={teamMembers}
+        isManager={!!teamAccess?.is_owner || userRole === "admin"}
+      />
+    ),
+    Products: (
+      <ProductsScreen
+        teamId={teamId}
+        canManage={!!teamAccess?.is_owner || userRole === "admin"}
+        vatRegistered={companyProfile.vat_registered !== false}
+      />
+    ),
+    Plan: (
+      <PlanScreen
+        teamId={teamId}
+        plan={teamPlan}
+        isOwner={!!teamAccess?.is_owner}
+        onHelp={() => navigate("Help", { from: "Plan" })}
+        onChanged={refreshPlan}
+      />
+    ),
+    Help: (
+      <HelpScreen userId={session.user.id} userEmail={session.user.email} teamId={teamId} fromScreen={screenContext?.from} />
+    ),
+    Platform: isPlatformAdmin ? <PlatformAdminScreen /> : null,
+    AuditLog: <AuditLogScreen teamId={teamId} teamMembers={teamMembers} />,
     More: (
       <MoreScreen
         data={data}
@@ -1034,6 +1212,8 @@ export default function PowerWorksApp() {
         notifPermission={notifPermission}
         onRequestNotif={() => {}}
         setScreen={navigate}
+        isPlatformAdmin={isPlatformAdmin}
+        isCompanyAdmin={userRole === "admin"}
       />
     ),
     Diagnostics: (
@@ -1183,10 +1363,19 @@ export default function PowerWorksApp() {
               userEmail={session.user?.email}
               onLogout={logout}
               hiddenScreens={hiddenScreens}
+              unavailableScreens={offScreens}
+              lockedScreens={planLocked}
+              isPlatformAdmin={isPlatformAdmin}
               onSaveHidden={onSaveHidden}
               userId={session.user.id}
               teamId={teamId}
               setData={setData}
+            />
+            <PlanBanner
+              plan={teamPlan}
+              isAdmin={userRole === "admin"}
+              onHelp={() => navigate("Help", { from: screen })}
+              onPlan={() => navigate("Plan")}
             />
             <main className="mx-auto max-w-2xl px-4 pt-4">
               <PullToRefresh
@@ -1218,7 +1407,17 @@ export default function PowerWorksApp() {
                           </div>
                         }
                       >
-                        {screens[screen]}
+                        {offScreens.includes(screen) ? (
+                          screens.Home
+                        ) : planLocked.includes(screen) ? (
+                          <LockedFeature
+                            feature={featureForScreen(screen)}
+                            canUpgrade={!!teamAccess?.is_owner}
+                            onPlan={() => navigate("Plan")}
+                          />
+                        ) : (
+                          screens[screen]
+                        )}
                       </Suspense>
                     </ScreenErrorBoundary>
                   </motion.div>

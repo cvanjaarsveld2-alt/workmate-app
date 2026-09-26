@@ -5,6 +5,7 @@
 //   - Bottom nav NavTab is 72px tall, full-width column tap zone
 //   - Form fields 56px min height
 //   - Buttons sized for thumb use
+import { PRODUCT_NAME } from "../../lib/brand";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, X, ChevronDown, ChevronUp, ChevronRight, Check, Tag, SlidersHorizontal, Camera } from "lucide-react";
@@ -636,7 +637,7 @@ export function Spinner() {
     <div className="flex min-h-screen items-center justify-center" style={{ background: BRAND.light }}>
       <div className="flex flex-col items-center gap-3">
         <div className="w-10 h-10 rounded-full border-4 border-slate-200 animate-spin" style={{ borderTopColor: BRAND.primary }} />
-        <p className="text-sm font-bold text-slate-400">Loading PowerMate…</p>
+        <p className="text-sm font-bold text-slate-400">Loading {PRODUCT_NAME}…</p>
       </div>
     </div>
   );

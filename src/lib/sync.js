@@ -25,6 +25,7 @@ const SYNC_TABLES = [
   "invoices",
   "payments",
   "email_quotes",
+  "time_entries",
 ];
 const TEAM_TABLES = new Set([
   "clients",
@@ -42,6 +43,7 @@ const TEAM_TABLES = new Set([
   "jobs",
   "invoices",
   "payments",
+  "time_entries",
 ]);
 const LOCAL_STORE = {
   breakdown_reports: "breakdowns",
@@ -94,6 +96,8 @@ const REMOTE_EXCLUDED_FIELDS = {
     "sync_pending_invoice_id",
   ]),
   followups: new Set(["invoice_id", "job_id"]),
+  // Set only by the Xero sync on the server.
+  invoices: new Set(["xero_invoice_id", "xero_synced_at"]),
   expenses: new Set([
     "assigned_to_user_id",
     "contact_id",
@@ -129,6 +133,7 @@ const DEPENDENCIES = {
     { field: "client_id", pending: "sync_pending_client_id", table: "clients" },
   ],
   payments: [{ field: "invoice_id", pending: "sync_pending_invoice_id", table: "invoices" }],
+  time_entries: [{ field: "job_id", pending: "sync_pending_job_id", table: "jobs" }],
 };
 const SYNC_PRIORITY = {
   clients: 10,
@@ -148,6 +153,7 @@ const SYNC_PRIORITY = {
   email_quotes: 35,
   followups: 40,
   jobs: 50,
+  time_entries: 55,
   invoices: 60,
   payments: 70,
 };
@@ -399,7 +405,57 @@ async function stageMissingDependencies(table, payload) {
   }
   return out;
 }
+// Photos held inside a record: detailed-quote sections and job-card photos.
+// They're uploaded as part of pushing the record, so the server row never
+// lands without them (a later pull would otherwise replace the local copy
+// that still holds the photo). Paths are written back to the device copy,
+// which keeps its base64 so PDFs still work offline.
+const PHOTO_HOLDERS = {
+  quotes: {
+    list: r => (Array.isArray(r?.details?.sections) ? r.details.sections : []).flatMap(sec => sec?.photos || []),
+    map: (r, fn) => ({
+      ...r,
+      details: { ...r.details, sections: (r.details?.sections || []).map(sec => ({ ...sec, photos: (sec.photos || []).map(fn) })) },
+    }),
+  },
+  jobs: {
+    list: r => (Array.isArray(r?.photos) ? r.photos : []),
+    map: (r, fn) => ({ ...r, photos: (r.photos || []).map(fn) }),
+  },
+};
+const needsUpload = p => p && typeof p === "object" && p.base64 && !p.storage_path;
+async function uploadHeldPhotos(table, row) {
+  const holder = PHOTO_HOLDERS[table];
+  const paths = {};
+  for (const p of holder.list(row).filter(needsUpload)) {
+    try {
+      const up = await uploadPhotoToSupabaseWithPath(p.base64, `${table}/${row.id}/${p.id}`);
+      if (up?.path) paths[p.id] = up.path;
+    } catch (e) {
+      console.warn(`[Sync] photo upload failed for ${table}/${row.id}/${p.id}`, e);
+    }
+  }
+  return paths;
+}
+const withPhotoPaths = (table, row, paths) =>
+  PHOTO_HOLDERS[table].map(row, p => (p && paths[p.id] ? { ...p, storage_path: paths[p.id], uploadStatus: "done" } : p));
+async function uploadPhotosBeforePush(table, rawData) {
+  if (!PHOTO_HOLDERS[table] || !navigator.onLine) return rawData;
+  if (!PHOTO_HOLDERS[table].list(rawData).some(needsUpload)) return rawData;
+  const paths = await uploadHeldPhotos(table, rawData);
+  if (!Object.keys(paths).length) return rawData;
+  try {
+    const local = localStoreName(table);
+    const row = (await offlineGetAll(local)).find(r => r.id === rawData.id);
+    if (row) await offlineSave(local, withPhotoPaths(table, row, paths));
+    _globalSetData?.(d =>
+      Array.isArray(d[local]) ? { ...d, [local]: d[local].map(r => (r.id === rawData.id ? withPhotoPaths(table, r, paths) : r)) } : d,
+    );
+  } catch {}
+  return withPhotoPaths(table, rawData, paths);
+}
 async function pushOne(table, action, rawData) {
+  rawData = await uploadPhotosBeforePush(table, rawData);
   let payload = sanitizeRemotePayload(table, cleanDates(cleanNumerics(cleanUUIDs(rawData))));
   if (table === "vehicle_checks") payload = normalizeVehicleCheckPayload(payload);
   if (payload.media) payload = { ...payload, media: payload.media.map(m => ({ ...m, base64: undefined })) };
@@ -1141,6 +1197,27 @@ function queueMediaCorrection(table, updated, setData) {
   }));
   return offlineSave("syncQueue", queueItem);
 }
+// Detailed-quote and job-card photos still waiting for upload (e.g. the push
+// happened while the upload failed): retried with the other pending media.
+async function retryHeldPhotos(table, setData) {
+  let rows;
+  try {
+    rows = await offlineGetAll(localStoreName(table));
+  } catch {
+    return false;
+  }
+  let any = false;
+  for (const row of rows) {
+    if (!PHOTO_HOLDERS[table].list(row).some(needsUpload)) continue;
+    const paths = await uploadHeldPhotos(table, row);
+    if (!Object.keys(paths).length) continue;
+    any = true;
+    const updated = { ...withPhotoPaths(table, row, paths), sync_status: "pending" };
+    await offlineSave(localStoreName(table), updated);
+    await queueMediaCorrection(table, updated, setData);
+  }
+  return any;
+}
 // notes / equipment: a flat media:[{id,base64,url,uploadStatus}] array on the record.
 async function retryFlatMedia(table, setData) {
   const local = localStoreName(table);
@@ -1310,6 +1387,8 @@ export async function retryPendingMedia(uid, setData) {
       retryReportMedia("breakdown_reports", uid, setData),
       retryReportMedia("repair_reports", uid, setData),
       retryVehicleCheckMedia(uid, setData),
+      retryHeldPhotos("quotes", setData),
+      retryHeldPhotos("jobs", setData),
     ]);
     const any = results.some(Boolean);
     if (any) triggerImmediateSync();

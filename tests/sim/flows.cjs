@@ -123,9 +123,10 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
   await safe("jobs: save field report with parts", async () => {
     await go("Jobs");
     const job = db.jobs[0]; const v0 = log.violations.length;
-    const parts = page.getByPlaceholder("Parts used (comma separated)");
+    const parts = page.getByPlaceholder("Other parts (comma separated)");
     if (!(await parts.count())) { rec("jobs: save field report with parts", "INFO", `job status is "${job?.status}", field report only editable when scheduled/in progress`); await shot("jobs"); return; }
-    await parts.first().fill("Hose, Clamp"); await page.getByText("Save field report").first().click(); await page.waitForTimeout(3000);
+    await parts.first().fill("Hose, Clamp"); await parts.first().press("Enter");
+    await page.getByText("Save field report").first().click(); await page.waitForTimeout(3000);
     const after = db.jobs.find(x => x.id === job.id);
     const err = await page.locator("text=/changed on another device|could not sync|failed/i").count();
     rec("jobs: save field report with parts", JSON.stringify(after?.parts_used) === JSON.stringify(["Hose", "Clamp"]) && !err ? "PASS" : "FAIL", `server parts_used=${JSON.stringify(after?.parts_used)}; error banner=${err > 0}; schema errors=${JSON.stringify(errsSince(v0))}`);
@@ -320,6 +321,285 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     const sizes = await page.evaluate(() => [...document.querySelectorAll("input:not([type=checkbox]):not([type=radio]), select, textarea")].filter(e => e.getBoundingClientRect().width > 0).map(e => parseFloat(getComputedStyle(e).fontSize)));
     const small = sizes.filter(x => x < 16);
     rec("touch: form fields never trigger iPhone zoom", sizes.length > 0 && small.length === 0 ? "PASS" : "FAIL", `${sizes.length} visible fields; under 16px: ${small.length}`);
+  });
+
+  // 13d. Company details: only the master account edits them; documents use them.
+  await safe("documents: company details and invoice PDF", async () => {
+    const isOwner = H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300";
+    await go("CompanyProfile", 3500);
+    if (!isOwner) {
+      const locked = await page.getByText("Only the master account can change these details").count();
+      const inputs = await page.locator("main input:not([type=hidden])").count();
+      await shot("company-profile-member");
+      rec("documents: company details and invoice PDF", locked > 0 && inputs === 0 ? "PASS" : "FAIL", `read-only notice=${locked > 0}; editable fields=${inputs}`);
+      return;
+    }
+    const field = label => page.locator(`label:text-is("${label}") + input, label:text-is("${label}") + textarea`).first();
+    await field("VAT no.").fill("4123456789");
+    await field("Bank").fill("FNB");
+    await field("Account number").fill("62812345678");
+    await field("Quotes valid for (days)").fill("14");
+    await page.getByRole("button", { name: "Save", exact: true }).click(); await page.waitForTimeout(1500);
+    const saved = H.db.team_profiles.find(p => p.team_id === H.TEAM) || {};
+    await shot("company-profile");
+    // Invoice PDF from the Invoices screen.
+    await go("Invoices", 3500);
+    const hasInvoice = (await page.getByRole("button", { name: /Invoice PDF/ }).count()) > 0;
+    let file = "", size = 0;
+    if (hasInvoice) {
+      const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.getByRole("button", { name: /Invoice PDF/ }).first().click()]);
+      file = dl.suggestedFilename();
+      const p = await dl.path(); size = p ? fs.statSync(p).size : 0;
+    }
+    // Quote → pro forma.
+    await go("Quotes", 3000);
+    await page.getByRole("button", { name: "Make a PDF" }).first().click(); await page.waitForTimeout(300);
+    const [dl2] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), page.getByRole("button", { name: "Pro forma invoice" }).first().click()]);
+    const pf = dl2.suggestedFilename();
+    rec("documents: company details and invoice PDF",
+      saved.vat_no === "4123456789" && saved.bank_name === "FNB" && saved.quote_validity_days === 14 && (!hasInvoice || (/^Tax_Invoice_/.test(file) && size > 2000)) && /^Pro_Forma_Invoice_PF-/.test(pf) ? "PASS" : "FAIL",
+      `saved VAT=${saved.vat_no} bank=${saved.bank_name} validity=${saved.quote_validity_days}; invoice PDF=${hasInvoice ? file + " " + size + "B" : "no invoice seeded"}; pro forma=${pf}`);
+  });
+
+  // 13e. Detailed quote: write-up, a section with a photo, cover page, validity.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("quotes: detailed quote with photo and PDF", async () => {
+    await go("Quotes", 3000);
+    const edit = page.locator("button:has(svg[class*='lucide-pen']), button:has(svg[class*='lucide-edit']), button:has(svg[class*='square-pen'])").first();
+    await edit.click(); await page.waitForTimeout(800);
+    const panel = page.getByTestId("quote-details");
+    await panel.locator("summary").click(); await page.waitForTimeout(300);
+    await page.getByLabel("Include a cover page").check();
+    await page.locator('label:text-is("Quote title") + input').fill("Shaft 2 jack service");
+    await page.locator('label:text-is("Introduction") + textarea').fill("Following our site visit we propose the work below.");
+    await page.getByRole("button", { name: "+ Site findings" }).click(); await page.waitForTimeout(300);
+    const section = page.getByTestId("quote-section").first();
+    await section.locator('label:text-is("Text") + textarea').fill("Two cylinders leak at the gland seal.");
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    await section.locator("input[type=file][multiple]").setInputFiles({ name: "leak.png", mimeType: "image/png", buffer: png });
+    await page.waitForTimeout(800);
+    await section.getByLabel("Photo caption").first().fill("Leaking gland seal");
+    await page.locator('label:text-is("Valid for (days)") + input').fill("21");
+    await page.getByRole("button", { name: "Update", exact: true }).last().click(); await page.waitForTimeout(5000);
+    const row = H.db.quotes.find(q => q.details && q.details.title === "Shaft 2 jack service");
+    const photo = row?.details?.sections?.[0]?.photos?.[0];
+    const leaked = JSON.stringify(row?.details || {}).includes("data:image");
+    const expectedExpiry = row?.sent_date ? new Date(new Date(row.sent_date + "T12:00:00").getTime() + 21 * 86400000).toISOString().slice(0, 10) : null;
+    await shot("quote-detailed");
+    // Quotation PDF of that quote.
+    await go("Quotes", 3000);
+    const card = page.locator("div.rounded-2xl, div[class*='rounded']", { hasText: row?.client_name || "" }).filter({ has: page.getByRole("button", { name: "Make a PDF" }) }).last();
+    await card.getByRole("button", { name: "Make a PDF" }).first().click(); await page.waitForTimeout(300);
+    const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 20000 }), page.getByRole("button", { name: "Quotation", exact: true }).first().click()]);
+    const pth = await dl.path(); const size = pth ? fs.statSync(pth).size : 0;
+    rec("quotes: detailed quote with photo and PDF",
+      row && row.details.cover === true && photo?.storage_path && photo.caption === "Leaking gland seal" && !leaked && row.expiry_date === expectedExpiry && /^Quotation_/.test(dl.suggestedFilename()) && size > 5000 ? "PASS" : "FAIL",
+      `saved=${!!row}; cover=${row?.details?.cover}; photo path=${photo?.storage_path ? "yes" : "no"}; caption=${photo?.caption}; base64 on server=${leaked}; expiry=${row?.expiry_date} (want ${expectedExpiry}); pdf=${dl.suggestedFilename()} ${size}B`);
+  });
+
+  // 13f. Job cards: on their own from Jobs, and attached to an invoice.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("documents: job card PDFs", async () => {
+    await go("Jobs", 3500);
+    const btn = page.getByRole("button", { name: /Job card PDF/ }).first();
+    if (!(await btn.count())) { rec("documents: job card PDFs", "FAIL", "no Job card PDF button on Jobs"); return; }
+    const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), btn.click()]);
+    const alone = dl.suggestedFilename();
+    await go("Invoices", 3500);
+    const plain = page.getByRole("button", { name: /Invoice PDF/ }).first();
+    const [d1] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), plain.click()]);
+    const s1 = fs.statSync(await d1.path()).size;
+    const box = page.getByLabel("Attach job card").first();
+    const hasBox = (await box.count()) > 0;
+    let s2 = 0;
+    if (hasBox) {
+      await box.check();
+      const [d2] = await Promise.all([page.waitForEvent("download", { timeout: 15000 }), plain.click()]);
+      s2 = fs.statSync(await d2.path()).size;
+    }
+    rec("documents: job card PDFs", /^Job_Card_/.test(alone) && hasBox && s2 > s1 ? "PASS" : "FAIL",
+      `job card=${alone}; attach option shown=${hasBox}; invoice ${s1}B → with job card ${s2}B`);
+  });
+
+  // 13f2. Products & stock: add an item, receive stock, pick it on a job.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("products: add item, receive stock, use on job", async () => {
+    await go("Products", 3000);
+    const lowShown = (await page.getByText(/at or below the reorder level/).count()) > 0;
+    await page.getByRole("button", { name: "Add", exact: true }).first().click(); await page.waitForTimeout(600);
+    await page.locator('label:text-is("Part number") + input').fill("SIM-77");
+    await page.locator('label:has-text("Name") + input').first().fill("Sim grease cartridge");
+    await page.locator('label:text-is("Cost price (R)") + input').fill("40");
+    await page.locator('label:text-is("Sell price excl. VAT (R)") + input').fill("65");
+    const marginShown = (await page.getByText(/Margin R 25\.00 \(38\.5%\)/).count()) > 0;
+    await page.getByText("Keep track of stock").click();
+    await page.getByRole("button", { name: "Save", exact: true }).last().click(); await page.waitForTimeout(1500);
+    const row = H.db.products.find(p => p.part_number === "SIM-77");
+    await page.getByRole("button", { name: /0 each in stock/ }).first().click(); await page.waitForTimeout(800);
+    await page.locator('label:text-is("Quantity") + input').fill("12");
+    await page.getByRole("button", { name: "Update stock" }).click(); await page.waitForTimeout(1500);
+    await shot("products-stock");
+    const stocked = row && Number(row.stock_on_hand) === 12 && H.db.stock_movements.some(m => m.product_id === row.id && m.reason === "receive");
+    await go("Jobs", 3500);
+    const pick = page.getByRole("button", { name: "Add from catalogue" }).first();
+    let saved = null;
+    if (await pick.count()) {
+      await pick.click(); await page.waitForTimeout(600);
+      await page.getByPlaceholder("Part number, name or supplier code").fill("SIM-77");
+      await page.getByRole("button", { name: /Sim grease cartridge/ }).first().click(); await page.waitForTimeout(400);
+      await page.getByText("Save field report").first().click(); await page.waitForTimeout(3000);
+      saved = H.db.jobs.flatMap(j => (Array.isArray(j.parts_used) ? j.parts_used : [])).find(p => p && p.product_id === row?.id);
+    }
+    rec("products: add item, receive stock, use on job", lowShown && marginShown && stocked && saved?.part_number === "SIM-77" && saved?.unit_price === 65 ? "PASS" : "FAIL",
+      `low-stock banner=${lowShown}; margin shown=${marginShown}; saved=${!!row}; stock=${row?.stock_on_hand}; job part=${JSON.stringify(saved)}`);
+  });
+
+  // 13f3. Timesheets: clock in on a job, see it running, clock out.
+  await safe("timesheets: clock in on a job and out", async () => {
+    await go("Jobs", 3500);
+    const clockIn = page.getByRole("button", { name: "Clock in", exact: true }).first();
+    if (!(await clockIn.count())) { rec("timesheets: clock in on a job and out", "FAIL", "no Clock in button on an open job"); return; }
+    await clockIn.click(); await page.waitForTimeout(2500);
+    const row = (H.db.time_entries || []).find(e => e.user_id === H.UID && !e.ended_at);
+    const onJob = !!row?.job_id && H.db.jobs.some(j => j.id === row.job_id);
+    const outBtn = (await page.getByRole("button", { name: /Clock out/ }).count()) > 0;
+    await go("Timesheets", 3000);
+    const running = (await page.getByText(/Clocked in · /).count()) > 0;
+    await shot("timesheets-running");
+    await page.getByRole("button", { name: /Clock out/ }).first().click(); await page.waitForTimeout(2500);
+    const after = (H.db.time_entries || []).find(e => e.id === row?.id);
+    const listed = (await page.getByText(/ – \d\d:\d\d/).count()) > 0;
+    rec("timesheets: clock in on a job and out", onJob && outBtn && running && !!after?.ended_at && listed ? "PASS" : "FAIL",
+      `entry on job=${onJob}; clock-out button on job=${outBtn}; running shown=${running}; ended=${after?.ended_at || null}; listed in week=${listed}; schema errors=${JSON.stringify(log.violations.slice(-3))}`);
+  });
+
+  // 13f4. Service plans: add a quarterly plan, then make its job now.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("service plans: add plan and make its job", async () => {
+    await go("ServicePlans", 3000);
+    await page.getByRole("button", { name: /New service plan/ }).click(); await page.waitForTimeout(600);
+    await page.locator('label:has-text("Name") + input').first().fill("Sim quarterly service");
+    const client = H.db.clients.find(c => c.team_id === H.TEAM && c.company) || H.db.clients[0];
+    await page.getByRole("button", { name: "Select client…" }).click(); await page.waitForTimeout(300);
+    await page.getByPlaceholder("Search clients…").fill(client.company.slice(0, 12));
+    await page.getByRole("button", { name: new RegExp(client.company.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).first().click();
+    await page.locator('label:text-is("Price per visit (R, excl. VAT)") + input').fill("4500");
+    await page.getByRole("button", { name: "Save", exact: true }).last().click(); await page.waitForTimeout(2000);
+    const plan = (H.db.service_plans || []).find(p => p.title === "Sim quarterly service");
+    const listed = (await page.getByText("Sim quarterly service").count()) > 0;
+    const worth = (await page.getByText(/R 18.000\.00/).count()) > 0;
+    await shot("service-plans");
+    let job = null;
+    if (listed) {
+      await page.getByText("Sim quarterly service").first().click(); await page.waitForTimeout(600);
+      await page.getByRole("button", { name: "Make the job now" }).click(); await page.waitForTimeout(1500);
+      job = H.db.jobs.find(j => j.service_plan_id === plan?.id);
+    }
+    rec("service plans: add plan and make its job", plan?.every_months === 3 && plan?.client_id === client.id && Number(plan?.value) === 4500 && listed && worth && !!job ? "PASS" : "FAIL",
+      `saved=${!!plan} (every ${plan?.every_months} months, client ok=${plan?.client_id === client.id}); listed=${listed}; yearly value shown=${worth}; job made=${!!job}; schema errors=${JSON.stringify(log.violations.slice(-3))}`);
+  });
+
+  // 13f5. Schedule: book a job for a time and a technician.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("schedule: book a job for a technician", async () => {
+    const job = H.db.jobs.find(j => j.title === "Sim quarterly service") || H.db.jobs.find(j => !["completed", "cancelled"].includes(j.status));
+    // A job still waiting for a date (the dispatcher's usual starting point).
+    Object.assign(job, { scheduled_date: null, scheduled_time: null, assigned_to_user_id: null });
+    await page.goto(`${H.APP}/?screen=Schedule`, { waitUntil: "load" }); await page.waitForTimeout(3000);
+    const waiting = (await page.getByText(/Waiting for a date \([1-9]/).count()) > 0;
+    const chip = page.getByRole("button", { name: new RegExp(job.title) }).first();
+    const shown = (await chip.count()) > 0;
+    if (!shown) { await shot("schedule"); rec("schedule: book a job for a technician", "FAIL", `job "${job.title}" (${job.scheduled_date}) not on the board`); return; }
+    await chip.click(); await page.waitForTimeout(600);
+    const tech = H.db.team_members.find(m => m.user_id !== H.UID) || H.db.team_members[0];
+    await page.locator('label:has-text("Date") input').fill("2026-10-06");
+    await page.locator('label:has-text("Time") input').fill("09:30");
+    await page.locator('label:has-text("Technician") select').selectOption(tech.user_id);
+    await page.getByRole("button", { name: "Save booking" }).click(); await page.waitForTimeout(2500);
+    const after = H.db.jobs.find(j => j.id === job.id);
+    await page.getByRole("button", { name: "Week" }).click(); await page.waitForTimeout(500);
+    await shot("schedule-week");
+    rec("schedule: book a job for a technician", waiting && after.scheduled_date === "2026-10-06" && String(after.scheduled_time).startsWith("09:30") && after.assigned_to_user_id === tech.user_id ? "PASS" : "FAIL",
+      `listed as waiting=${waiting}; date=${after.scheduled_date}; time=${after.scheduled_time}; technician ok=${after.assigned_to_user_id === tech.user_id}; schema errors=${JSON.stringify(log.violations.slice(-3))}`);
+  });
+
+  // 13f6. Customer portal: a client's own page with invoices and a statement.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("portal: customer opens their account page", async () => {
+    const inv = H.db.invoices.find(i => i.client_id && i.status !== "draft") || H.db.invoices.find(i => i.client_id);
+    const client = H.db.clients.find(c => c.id === inv?.client_id) || H.db.clients[0];
+    H.db._portal = { ["cd".repeat(24)]: client.id };
+    await page.goto(`${H.APP}/?portal=${"cd".repeat(24)}`, { waitUntil: "load" }); await page.waitForTimeout(2500);
+    const header = (await page.getByText("YOUR ACCOUNT").count()) > 0;
+    const name = (await page.getByText(client.company).count()) > 0;
+    const invShown = inv ? (await page.getByText(inv.invoice_number).count()) > 0 : true;
+    await page.getByRole("button", { name: "Statement" }).click(); await page.waitForTimeout(400);
+    const statement = inv ? (await page.getByText(`Invoice ${inv.invoice_number}`).count()) > 0 : true;
+    await shot("customer-portal");
+    await page.goto(`${H.APP}/?portal=${"ef".repeat(24)}`, { waitUntil: "load" }); await page.waitForTimeout(1500);
+    const bad = (await page.getByText("This link isn't working any more").count()) > 0;
+    rec("portal: customer opens their account page", header && name && invShown && statement && bad ? "PASS" : "FAIL",
+      `header=${header}; client=${name}; invoice listed=${invShown}; statement=${statement}; unknown link refused=${bad}`);
+  });
+
+  // 13g. Help: send a message to support; the platform console lists companies.
+  await safe("support: send a message from Help", async () => {
+    await go("Help", 2500);
+    await page.locator('label:text-is("Subject") + input').fill("Invoice PDF question");
+    await page.locator('label:text-is("Message") + textarea').fill("How do I change the invoice prefix?");
+    await page.getByRole("button", { name: /Send/ }).first().click(); await page.waitForTimeout(1500);
+    const row = (H.db.support_tickets || []).find(t => t.subject === "Invoice PDF question");
+    const shown = (await page.getByText("Sent. We'll reply here.").count()) > 0;
+    let consoleOk = true;
+    if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") {
+      await go("Platform", 2500);
+      const dashboard = (await page.getByText("Monthly income (paying plans)").count()) > 0 && (await page.getByText("Needs you").count()) > 0;
+      await page.getByRole("button", { name: /Companies \(/ }).click(); await page.waitForTimeout(800);
+      consoleOk = dashboard && (await page.getByText("cvanjaarsveld2@icloud.com").count()) > 0;
+      await page.getByText("cvanjaarsveld2@icloud.com").first().click(); await page.waitForTimeout(300);
+      consoleOk = consoleOk && (await page.getByRole("button", { name: "Give full access" }).count()) > 0;
+    }
+    rec("support: send a message from Help", row && row.user_id === H.UID && (row.status ?? "open") === "open" && shown && consoleOk ? "PASS" : "FAIL",
+      `ticket saved=${!!row} (status ${row?.status ?? "open (database default)"}); confirmation=${shown}; platform dashboard + company list + full-access button=${consoleOk}`);
+  });
+
+  // 13h. A customer accepts a quote online: link → page → name, signature, order no.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("quotes: customer accepts online", async () => {
+    await go("Quotes", 3000);
+    await page.getByRole("button", { name: "Make a PDF" }).first().click(); await page.waitForTimeout(300);
+    await page.evaluate(() => { try { navigator.share = undefined; } catch {} try { Object.defineProperty(navigator, "clipboard", { value: { writeText: async () => {} }, configurable: true }); } catch {} });
+    await page.getByRole("button", { name: "Send link to accept online" }).first().click(); await page.waitForTimeout(1200);
+    const q = H.db.quotes.find(x => x.share_token);
+    await page.goto(`${H.APP}/?quote=${q.share_token}`, { waitUntil: "load" }); await page.waitForTimeout(2500);
+    const shown = (await page.getByText(/QUOTATION/).count()) > 0;
+    await page.getByLabel("Your full name").fill("Jan Buyer");
+    await page.getByLabel("Order number").fill("PO-778");
+    const pad = page.getByLabel("Sign here"); const box = await pad.boundingBox();
+    await page.mouse.move(box.x + 20, box.y + 40); await page.mouse.down();
+    await page.mouse.move(box.x + 120, box.y + 80, { steps: 8 }); await page.mouse.move(box.x + 220, box.y + 30, { steps: 8 }); await page.mouse.up();
+    await page.getByRole("button", { name: "Accept quote" }).click(); await page.waitForTimeout(1500);
+    const thanks = (await page.getByText("Quote accepted — thank you!").count()) > 0;
+    await shot("quote-accepted-online");
+    rec("quotes: customer accepts online", shown && thanks && q.status === "Accepted" && q.accepted_by_name === "Jan Buyer" && q.accepted_po === "PO-778" && /^data:image\/png;base64,/.test(q.accepted_signature || "") ? "PASS" : "FAIL",
+      `page shown=${shown}; thanks=${thanks}; status=${q.status}; by=${q.accepted_by_name}; po=${q.accepted_po}; signature=${(q.accepted_signature || "").slice(0, 22)}`);
+  });
+
+  // 13i. Plans: a Starter company sees Products locked, the master account can pick a plan.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("plans: starter locks products, plan screen offers upgrade", async () => {
+    const before = H.SIM.plan;
+    H.SIM.plan = { ...before, plan: "starter", features: [], seats: 3, seats_used: 3, paid_until: "2099-01-01" };
+    try {
+      await go("Products", 2500);
+      const locked = (await page.getByText("Products & stock isn't in your plan").count()) > 0;
+      await page.getByRole("button", { name: "See plans" }).click(); await page.waitForTimeout(1500);
+      const onPlan = (await page.getByText("Choose Pro").count()) > 0 && (await page.getByText("3 users of 3").count()) > 0;
+      await go("Jobs", 2500);
+      const noClock = (await page.getByRole("button", { name: /Clock in/ }).count()) === 0;
+      await go("CompanyProfile", 2500);
+      const xeroLocked = (await page.getByText("Xero sync").count()) > 0 && (await page.getByText("isn't in your plan").count()) >= 3;
+      await go("Plan", 2000);
+      await page.getByRole("button", { name: "Choose Pro" }).click(); await page.waitForTimeout(800);
+      const called = log.functions.some(f => f.fn === "billing");
+      await shot("plans-starter");
+      rec("plans: starter locks products, plan screen offers upgrade", locked && onPlan && noClock && xeroLocked && called ? "PASS" : "FAIL",
+        `products locked=${locked}; plan screen with Choose Pro + seats=${onPlan}; no clock-in on jobs=${noClock}; PayFast/Xero/reminders locked=${xeroLocked}; billing checkout called=${called}`);
+    } finally {
+      H.SIM.plan = before;
+    }
   });
 
   // 14. Master account removes a teammate and hands their work over (runs last: it changes the team).

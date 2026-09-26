@@ -54,12 +54,31 @@ const email_quotes = [0, 1, 2].map(i => ({ id: uuid(), user_id: UID, gmail_messa
 const team_notifications = real.quotes.slice(0, 2).map((q, i) => ({ id: uuid(), team_id: TEAM, from_user_id: RPC.get_team_member_emails.find(m => m.user_id !== UID)?.user_id, to_user_id: UID, record_type: "quote", record_id: q.id, record_title: q.client_name || "Quote", message: "Please follow up", read: i === 1, created_at: day(i) + "T08:00:00Z", accepted: null, accepted_at: null, copied_record_id: null }));
 const machine_jack_confirmations = [{ id: uuid(), user_id: UID, team_id: TEAM, brand: "Sandvik", model: "LH410", closed_height: 250, jack_overrides: ["J-30T"], jack_stand: "Stand A", note: "", created_at: day(4) + "T08:00:00Z", updated_at: day(4) + "T08:00:00Z" }];
 
+const products = [
+  { id: uuid(), team_id: TEAM, user_id: "431dcb72-ea3f-43ed-9f73-74384e862300", part_number: "HF-100", name: "Hydraulic filter", description: null, category: "Filters", unit: "each", sell_price: 200, cost_price: 120, vat_applicable: true, supplier: "Sim Supplies", supplier_code: "SS-9", barcode: null, track_stock: true, stock_on_hand: 2, reorder_level: 3, active: true, created_at: day(20) + "T08:00:00Z", updated_at: day(20) + "T08:00:00Z" },
+  { id: uuid(), team_id: TEAM, user_id: "431dcb72-ea3f-43ed-9f73-74384e862300", part_number: "LAB-HR", name: "Labour (per hour)", description: null, category: "Labour", unit: "hour", sell_price: 650, cost_price: 0, vat_applicable: true, supplier: null, supplier_code: null, barcode: null, track_stock: false, stock_on_hand: 0, reorder_level: 0, active: true, created_at: day(20) + "T08:00:00Z", updated_at: day(20) + "T08:00:00Z" },
+];
 const db = { ...Object.fromEntries(Object.keys(schema).map(t => [t, []])), ...Object.fromEntries(Object.entries(real).filter(([k]) => k !== "_rpc")),
-  vehicle_checks: vc, expenses, equipment, leads, breakdown_reports, repair_reports, invoices, payments, activities, email_quotes, team_notifications, machine_jack_confirmations, custom_faults: [{ id: uuid(), user_id: UID, team_id: TEAM, label: "Sim fault", fault_group: "Hydraulics", sync_status: "synced", created_at: day(9) + "T08:00:00Z", updated_at: day(9) + "T08:00:00Z" }] };
+  vehicle_checks: vc, expenses, equipment, leads, breakdown_reports, repair_reports, invoices, payments, activities, email_quotes, team_notifications, machine_jack_confirmations, products, stock_movements: [], custom_faults: [{ id: uuid(), user_id: UID, team_id: TEAM, label: "Sim fault", fault_group: "Hydraulics", sync_status: "synced", created_at: day(9) + "T08:00:00Z", updated_at: day(9) + "T08:00:00Z" }] };
 if (!db.team_members.length) db.team_members = RPC.get_team_member_emails.map(m => ({ id: uuid(), team_id: TEAM, user_id: m.user_id, role: m.role, joined_at: m.joined_at }));
 
 // ─── Emulator ────────────────────────────────────────────────────────────────
 const log = { writes: [], violations: [], errors4xx: [], unhandled: [], functions: [], storage: [], reads: [] };
+// The company's plan (flows change it to check what a smaller plan locks).
+const ALL_FEATURES = ["products", "schedule", "service_plans", "timesheets", "reminders", "online_payments", "xero"];
+const SIM = { plan: { plan: "free", status: "active", trial_ends_at: null, paid_until: null, access: "full", features: ALL_FEATURES, seats: null, seats_used: 3, billing_status: null } };
+const SIM_CATALOGUE = {
+  starter: { name: "Starter", price: 499, seats: 3, features: [] },
+  pro: { name: "Pro", price: 1299, seats: 10, features: ALL_FEATURES.filter(f => f !== "xero") },
+  enterprise: { name: "Enterprise", price: 2999, seats: null, features: ALL_FEATURES },
+};
+// Column defaults the real database fills in on insert (only where the app
+// relies on them).
+const DEFAULTS = {
+  products: { unit: "each", sell_price: 0, cost_price: 0, vat_applicable: true, track_stock: false, stock_on_hand: 0, reorder_level: 0, active: true },
+  time_entries: { kind: "work", billable: true },
+  service_plans: { lead_days: 7, value: 0, active: true },
+};
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validate(table, row) {
   const cols = schema[table];
@@ -158,9 +177,71 @@ async function handle(route) {
       log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
       return json(route, 200, { records_moved: moved, assignments_moved: assigned, login_blocked: body.p_block_login !== false });
     }
+    // Company sign-up: a person with no company creates one or joins with a code.
+    if (fn === "create_team_for_user") { const team = { id: uuid(), name: body.p_name, invite_code: "NEWCO2345678", created_at: new Date().toISOString(), owner_user_id: UID }; db.teams.push(team); db.team_members.push({ id: uuid(), team_id: team.id, user_id: UID, role: "admin", joined_at: team.created_at, can_view_team: true }); (db.team_profiles ||= []).push({ id: uuid(), team_id: team.id, trading_name: body.p_name, quote_validity_days: 30, payment_terms_days: 30, invoice_prefix: "INV-", next_invoice_number: 1, brand_color: "#8B1A1A", vat_registered: true }); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, team); }
+    if (fn === "join_team_by_code") { const team = db.teams.find(t => String(t.invite_code).toUpperCase() === String(body.p_invite_code).toUpperCase()); if (!team) return json(route, 400, { code: "P0001", message: "Invalid invite code" }); db.team_members.push({ id: uuid(), team_id: team.id, user_id: UID, role: "member", joined_at: new Date().toISOString(), can_view_team: false }); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, team); }
+    // Online quote acceptance (the customer's page uses the public functions).
+    if (fn === "create_quote_link") { const q = db.quotes.find(x => x.id === body.p_quote_id); if (!q) return json(route, 400, { code: "P0001", message: "Quote not found" }); q.share_token = q.share_token || "ab".repeat(24); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, q.share_token); }
+    if (fn === "get_shared_quote") { const q = db.quotes.find(x => x.share_token && x.share_token === body.p_token); if (!q) return json(route, 200, null); const prof = (db.team_profiles || [])[0] || {}; return json(route, 200, { quote: { number: q.quote_number || "Q-1", description: q.description, line_items: q.line_items, value: q.value, vat_inclusive: q.vat_inclusive, date: q.sent_date || "2026-09-01", expiry_date: q.expiry_date || null, status: q.status, title: q.details?.title || null, intro: q.details?.intro || null, exclusions: q.details?.exclusions || null, accepted_at: q.accepted_at || null, declined_at: q.declined_at || null }, client: q.client_name, company: { name: prof.trading_name, legal_name: prof.legal_name, logo_data: null, brand_color: prof.brand_color, vat_no: prof.vat_no, vat_registered: prof.vat_registered !== false } }); }
+    if (fn === "respond_to_shared_quote") { const q = db.quotes.find(x => x.share_token === body.p_token); if (!q) return json(route, 400, { code: "P0001", message: "This link has expired" }); if (q.accepted_at || q.declined_at) return json(route, 400, { code: "P0001", message: "This quote has already been answered" }); if (body.p_accept) Object.assign(q, { status: "Accepted", accepted_at: new Date().toISOString(), accepted_by_name: body.p_name, accepted_signature: body.p_signature, accepted_po: body.p_po || null }); else Object.assign(q, { status: "Rejected", declined_at: new Date().toISOString(), decline_reason: body.p_reason || null }); log.writes.push({ screen: screenTag, kind: "rpc", fn, body: { ...body, p_signature: body.p_signature ? "(png)" : null } }); return json(route, 200, { ok: true, status: q.status }); }
+    if (fn === "adjust_stock") {
+      const pr = db.products.find(x => x.id === body.p_product_id);
+      if (!pr) return json(route, 400, { code: "P0001", message: "Product not found" });
+      if (UID !== OWNER) return json(route, 400, { code: "P0001", message: "Only the master account or an admin can change stock" });
+      const q = Number(body.p_qty), change = body.p_reason === "receive" ? Math.abs(q) : body.p_reason === "count" ? q - Number(pr.stock_on_hand) : q;
+      if (change) { db.stock_movements.push({ id: db.stock_movements.length + 1, team_id: pr.team_id, product_id: pr.id, qty_change: change, reason: body.p_reason, job_id: null, note: body.p_note || null, user_id: UID, created_at: new Date().toISOString() }); pr.stock_on_hand = Number(pr.stock_on_hand) + change; pr.updated_at = new Date().toISOString(); }
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, Number(pr.stock_on_hand));
+    }
+    if (fn === "import_products") {
+      let added = 0, updated = 0, skipped = 0;
+      for (const r of body.p_rows || []) {
+        if (!r.name) { skipped++; continue; }
+        const ex = r.part_number && db.products.find(x => x.team_id === body.p_team_id && String(x.part_number || "").toLowerCase() === String(r.part_number).toLowerCase());
+        if (ex) { Object.assign(ex, { name: r.name, ...(r.sell_price ? { sell_price: Number(r.sell_price) } : {}), ...(r.cost_price ? { cost_price: Number(r.cost_price) } : {}) }); updated++; }
+        else { db.products.push({ id: uuid(), team_id: body.p_team_id, user_id: UID, part_number: r.part_number || null, name: r.name, description: r.description || null, category: r.category || null, unit: r.unit || "each", sell_price: Number(r.sell_price) || 0, cost_price: Number(r.cost_price) || 0, vat_applicable: true, supplier: r.supplier || null, supplier_code: r.supplier_code || null, barcode: null, track_stock: r.stock_on_hand !== undefined, stock_on_hand: Number(r.stock_on_hand) || 0, reorder_level: Number(r.reorder_level) || 0, active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }); added++; }
+      }
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body: { rows: (body.p_rows || []).length } });
+      return json(route, 200, { added, updated, skipped });
+    }
+    if (fn === "create_service_job_now") {
+      const plan = (db.service_plans || []).find(x => x.id === body.p_plan_id);
+      if (!plan) return json(route, 400, { code: "P0001", message: "Only the master account or an admin can do this" });
+      const id = uuid();
+      db.jobs.push({ id, user_id: plan.user_id || UID, team_id: plan.team_id, client_id: plan.client_id, service_plan_id: plan.id, quote_id: null, job_number: `SVC-${plan.next_due.replace(/-/g, "").slice(2)}`, title: plan.title, description: plan.description || "Planned service", status: "scheduled", priority: "normal", scheduled_date: plan.next_due, scheduled_time: null, location: plan.location || "", assigned_to_user_id: plan.assigned_to_user_id, assigned_to: "", technician_notes: "", work_done: "", parts_used: [], photos: [], started_at: null, completed_at: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), sync_status: "synced" });
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, id);
+    }
+    if (fn === "client_portal_link") {
+      const c = db.clients.find(x => x.id === body.p_client_id);
+      if (!c) return json(route, 400, { code: "P0001", message: "Client not found" });
+      db._portal = db._portal || {};
+      const token = "cd".repeat(24);
+      db._portal[token] = c.id;
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, token);
+    }
+    if (fn === "get_client_portal") {
+      const cid = (db._portal || {})[body.p_token];
+      const c = cid && db.clients.find(x => x.id === cid);
+      if (!c) return json(route, 200, null);
+      const p = (db.team_profiles || []).find(x => x.team_id === TEAM) || {};
+      const invs = db.invoices.filter(i => i.client_id === c.id && i.status !== "draft");
+      return json(route, 200, {
+        client: { name: c.company, contact: c.contact, email: c.email, phone: c.phone, vat_no: c.vat_number || null, address: c.billing_address || null },
+        company: { trading_name: p.trading_name || "Sim Co", legal_name: p.legal_name, vat_registered: p.vat_registered !== false, brand_color: p.brand_color, bank_name: "Sim Bank", bank_account_no: "123456789", bank_branch_code: "250655", payment_terms_days: 30 },
+        quotes: db.quotes.filter(q => q.client_id === c.id).map(q => ({ id: q.id, number: q.quote_number || q.id.slice(0, 8), title: q.description, value: q.value, status: q.status, date: (q.created_at || "").slice(0, 10), expiry_date: q.expiry_date, accepted_at: q.accepted_at || null, can_accept: !q.accepted_at })),
+        invoices: invs.map(i => ({ id: i.id, invoice_number: i.invoice_number, status: i.status, issue_date: i.issue_date, due_date: i.due_date, subtotal: i.subtotal, vat: i.vat, total: i.total, amount_paid: i.amount_paid, balance_due: i.balance_due, line_items: i.line_items, notes: i.notes })),
+        payments: db.payments.filter(x => invs.some(i => i.id === x.invoice_id)).map(x => ({ invoice_number: invs.find(i => i.id === x.invoice_id).invoice_number, amount: x.amount, payment_date: x.payment_date, method: x.method, reference: x.reference })),
+        jobs: db.jobs.filter(j => j.client_id === c.id).map(j => ({ job_number: j.job_number, title: j.title, status: j.status, scheduled_date: j.scheduled_date, completed_at: j.completed_at, location: j.location, work_done: j.work_done })),
+        equipment: db.equipment.filter(e => e.client_id === c.id).map(e => ({ name: e.name, make: e.make, model: e.model, serial: e.serial, location: e.location, service_due: e.service_due })),
+        service_plans: [],
+      });
+    }
+    if (fn === "accept_terms") { log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "set_my_hidden_screens") { const bad = (body.p_screens || []).some(x => !/^[A-Za-z0-9]{1,40}$/.test(x)); if (bad) return json(route, 400, { code: "P0001", message: "Invalid screen name" }); const me = (db.users || []).find(u => u.id === UID); if (me) me.hidden_screens = [...new Set(body.p_screens)].sort(); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "request_team_view") { db.team_notifications.push({ id: uuid(), team_id: TEAM, from_user_id: UID, to_user_id: OWNER, record_type: "team_view_request", record_id: UID, record_title: "Whole-team view", message: "asked", read: false, accepted: false, created_at: new Date().toISOString() }); log.writes.push({ screen: screenTag, kind: "rpc", fn }); return json(route, 200, null); }
-    const map = { current_team_id: TEAM, get_my_effective_role: RPC.get_my_effective_role, get_team_member_emails: RPC.get_team_member_emails, get_my_team_access: access, set_my_timezone: null };
+    const map = { current_team_id: TEAM, get_my_effective_role: RPC.get_my_effective_role, get_team_member_emails: RPC.get_team_member_emails, get_my_team_access: access, set_my_timezone: null, regenerate_invite_code: "SIMNEWCODE234", my_team_plan: SIM.plan, plan_catalogue: SIM_CATALOGUE, billing_available: true, admin_get_billing: UID === OWNER ? { enabled: false, sandbox: true, merchant_id: null, has_key: false, has_passphrase: false } : null, admin_set_plans: null, admin_set_billing: null, is_platform_admin: UID === OWNER, admin_list_companies: UID === OWNER ? [{ id: TEAM, name: "Power Works", created_at: day(90) + "T08:00:00Z", owner_email: "cvanjaarsveld2@icloud.com", members: 3, last_active: new Date().toISOString(), clients: 40, quotes: 12, invoices: 1, plan: "free", status: "active", trial_ends_at: null, paid_until: null, seats: null, notes: null, access: "full", jobs: 4, paid_total: 0, last_payment_at: null, billing_status: null, seat_limit: null }, { id: "00000000-0000-4000-8000-00000000c0de", name: "Acme Hydraulics", created_at: day(5) + "T08:00:00Z", owner_email: "owner@acme.example", members: 2, last_active: null, clients: 3, quotes: 1, invoices: 0, jobs: 0, plan: "trial", status: "active", trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), paid_until: null, seats: null, notes: null, access: "full", paid_total: 0, last_payment_at: null, billing_status: null, seat_limit: null }] : null, get_platform_settings: UID === OWNER ? { signup_mode: "restricted", allowed_domains: ["pwrstart.com"], signup_codes: [] } : null, admin_update_plan: null, set_platform_setting: null, admin_answer_ticket: null };
     if (!(fn in map)) log.writes.push({ screen: screenTag, kind: "rpc", fn, body: req.postDataJSON?.() });
     return json(route, 200, fn in map ? map[fn] : null);
   }
@@ -183,10 +264,17 @@ async function handle(route) {
         const v = validate(table, row);
         if (v) { log.violations.push({ screen: screenTag, table, method: m, ...v }); return json(route, 400, v); }
       }
-      if (m === "PATCH") { const { rows } = query(table, url); rows.forEach(r => { const live = db[table].find(x => x.id === r.id); Object.assign(live, body); }); log.writes.push({ screen: screenTag, kind: "update", table, n: rows.length, keys: Object.keys(body || {}) }); }
-      else for (const row of rowsIn) { const i = db[table].findIndex(x => x.id === row.id && row.id); if (i >= 0) db[table][i] = { ...db[table][i], ...row }; else db[table].push({ id: row.id || uuid(), ...row }); log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
+      // Like PostgREST, return the stored rows (with generated ids), and a
+      // single object when the client asked for one (.single()).
+      const stored = [];
+      if (m === "PATCH") { const { rows } = query(table, url); rows.forEach(r => { const live = db[table].find(x => x.id === r.id); Object.assign(live, body); stored.push(live); }); log.writes.push({ screen: screenTag, kind: "update", table, n: rows.length, keys: Object.keys(body || {}) }); }
+      else for (const row of rowsIn) { const key = url.searchParams.get("on_conflict") || "id"; const i = db[table].findIndex(x => row[key] && x[key] === row[key]); if (i >= 0) { db[table][i] = { ...db[table][i], ...row }; stored.push(db[table][i]); } else { const added = { id: row.id || uuid(), ...(DEFAULTS[table] || {}), ...row }; db[table].push(added); stored.push(added); } log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
       const ret = (req.headers()["prefer"] || "").includes("return=representation");
-      return json(route, m === "POST" ? 201 : 200, ret ? rowsIn : undefined);
+      if (ret && (req.headers()["accept"] || "").includes("vnd.pgrst.object")) {
+        if (stored.length !== 1) return json(route, 406, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned" });
+        return json(route, m === "POST" ? 201 : 200, stored[0]);
+      }
+      return json(route, m === "POST" ? 201 : 200, ret ? stored : undefined);
     }
     if (m === "DELETE") { const { rows } = query(table, url); db[table] = db[table].filter(r => !rows.includes(r) && !rows.some(x => x.id === r.id)); log.writes.push({ screen: screenTag, kind: "delete", table, n: rows.length }); return json(route, 204); }
   }
@@ -209,7 +297,7 @@ async function handle(route) {
   }
   if (p.startsWith("/functions/v1/")) {
     const fn = p.split("/").pop(); log.functions.push({ screen: screenTag, fn });
-    const canned = { "technician-assist": { mode: "fallback", advice: { diagnosis: "Check hydraulic pressure", checks: ["Inspect hoses"], safety: "Isolate machine" } }, "polish-sales-email": { ok: true, mode: "fallback", email: { subject: "Sim", body: "Sim body" } }, "historical-rate": { rate: 1.62, date: day(1), source: "sim" }, "send-notifications": { ok: true, sent: 0 } };
+    const canned = { "technician-assist": { mode: "fallback", advice: { diagnosis: "Check hydraulic pressure", checks: ["Inspect hoses"], safety: "Isolate machine" } }, "polish-sales-email": { ok: true, mode: "fallback", email: { subject: "Sim", body: "Sim body" } }, "historical-rate": { rate: 1.62, date: day(1), source: "sim" }, "send-notifications": { ok: true, sent: 0 }, billing: { url: `${APP}/?screen=Plan`, fields: [] } };
     return json(route, 200, canned[fn] || { ok: true });
   }
   if (p.startsWith("/realtime/")) return route.abort();
@@ -255,7 +343,7 @@ async function run() {
     const r = cur();
     r.boundary = (await page.getByText("Something went wrong").count()) > 0;
     r.text = (await page.evaluate(() => document.body.innerText.length));
-    r.loginShown = (await page.getByText("Power Works Field Service CRM").count()) > 0;
+    r.loginShown = (await page.getByText("Field service CRM").count()) > 0;
     await page.screenshot({ path: path.join(OUT, `${s}.png`) });
   }
   fs.writeFileSync(path.join(OUT, "screens.json"), JSON.stringify(perScreen, null, 1));
@@ -263,5 +351,5 @@ async function run() {
   // hand the live objects to the flows script
   return { browser, context, page, perScreen, log, db, setTag: t => { screenTag = t; } };
 }
-module.exports = { run, newSimContext, db, log, UID, TEAM, APP };
+module.exports = { run, newSimContext, db, log, UID, TEAM, APP, SIM };
 if (require.main === module) run().then(async ({ browser }) => { await browser.close(); console.log("done"); }).catch(e => { console.error(e); process.exit(1); });

@@ -8,8 +8,12 @@
 //   const [vatInclusive, setVatInclusive] = useState(true);
 //   <QuoteLineItems items={lineItems} onChange={setLineItems} vatInclusive={vatInclusive} onVatToggle={setVatInclusive} />
 // ─────────────────────────────────────────────────────────────────────────────
-import React from "react";
-import { Plus, Trash2 } from "lucide-react";
+import React, { useState } from "react";
+import { Package, Plus, Trash2 } from "lucide-react";
+import { supabase } from "../supabase";
+import { activeTeamId } from "../lib/companyProfile";
+import { productLine, useProducts } from "../lib/products";
+import { ProductPicker } from "./ProductPicker";
 import { BRAND } from "../lib/constants";
 import { VAT_PERCENT, roundMoney, calculateVat } from "../lib/finance";
 
@@ -17,7 +21,9 @@ function emptyLine() {
   return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, description: "", qty: "1", unitPrice: "" };
 }
 
-export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVatToggle }) {
+export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVatToggle, vatRegistered = true }) {
+  const products = useProducts(supabase, activeTeamId());
+  const [picking, setPicking] = useState(false);
   function update(id, field, value) {
     onChange(items.map(i => i.id === id ? { ...i, [field]: value } : i));
   }
@@ -26,17 +32,21 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
 
   const lineSubtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0), 0);
   const subtotal = roundMoney(lineSubtotal);
-  const { vat: vatAmount, total } = calculateVat(subtotal, vatInclusive);
+  const { vat: vatAmount, total } = calculateVat(subtotal, vatInclusive, vatRegistered);
 
   return (
     <div className="stack-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs font-black text-slate-500 uppercase tracking-wider">Line items</p>
         <div className="flex items-center gap-2">
-          <button type="button" onClick={() => onVatToggle?.(!vatInclusive)}
-            className="text-[10px] font-bold px-2 py-1 rounded-full border border-slate-200 text-slate-500">
-            VAT {vatInclusive ? "incl" : "excl"}
-          </button>
+          {vatRegistered ? (
+            <button type="button" onClick={() => onVatToggle?.(!vatInclusive)}
+              className="text-[10px] font-bold px-2 py-1 rounded-full border border-slate-200 text-slate-500">
+              VAT {vatInclusive ? "incl" : "excl"}
+            </button>
+          ) : (
+            <span className="text-[10px] font-bold px-2 py-1 rounded-full border border-slate-200 text-slate-500">No VAT</span>
+          )}
         </div>
       </div>
 
@@ -45,6 +55,9 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
           <div className="flex items-start gap-2">
             <span className="text-xs font-black text-slate-300 mt-3 w-5 shrink-0">{idx + 1}.</span>
             <div className="flex-1 min-w-0">
+              {item.part_number && (
+                <p className="text-[10px] font-bold text-slate-500 mb-1 font-mono">{item.part_number}</p>
+              )}
               <input value={item.description} onChange={e => update(item.id, "description", e.target.value)}
                 placeholder="Item description" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-hidden focus:border-red-300" />
               <div className="grid grid-cols-[72px_1fr] gap-2 mt-2">
@@ -73,24 +86,43 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
         </div>
       ))}
 
-      <button type="button" onClick={add}
-        className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-3 text-sm font-bold text-slate-400 hover:border-slate-300 min-h-[48px]">
-        <Plus size={14} /> Add line item
-      </button>
+      <div className={products.length ? "grid grid-cols-2 gap-2" : ""}>
+        <button type="button" onClick={add}
+          className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-3 text-sm font-bold text-slate-400 hover:border-slate-300 min-h-[48px]">
+          <Plus size={14} /> Add line item
+        </button>
+        {products.length > 0 && (
+          <button type="button" onClick={() => setPicking(true)}
+            className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 py-3 text-sm font-bold text-slate-500 hover:border-slate-300 min-h-[48px]">
+            <Package size={14} /> From catalogue
+          </button>
+        )}
+      </div>
+      <ProductPicker
+        open={picking}
+        onClose={() => setPicking(false)}
+        products={products}
+        onPick={p => {
+          onChange([...items, productLine(p, { vatInclusive, vatRegistered })]);
+          setPicking(false);
+        }}
+      />
 
       {/* Totals */}
       {items.length > 0 && (
         <div className="rounded-xl bg-white border border-slate-100 p-3.5 stack-y-2">
-          {!vatInclusive && (
+          {vatRegistered && !vatInclusive && (
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Subtotal</span>
               <span className="font-bold text-slate-700">R {subtotal.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
             </div>
           )}
-          <div className="flex justify-between text-sm">
-            <span className="text-slate-500">VAT ({VAT_PERCENT}%){vatInclusive ? " incl." : ""}</span>
-            <span className="font-bold text-slate-500">R {vatAmount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
-          </div>
+          {vatRegistered && (
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">VAT ({VAT_PERCENT}%){vatInclusive ? " incl." : ""}</span>
+              <span className="font-bold text-slate-500">R {vatAmount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
+            </div>
+          )}
           <div className="flex justify-between text-base pt-1 border-t border-slate-100">
             <span className="font-black text-slate-900">Total</span>
             <span className="font-black" style={{ color: BRAND.primary }}>R {total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>

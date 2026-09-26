@@ -3,7 +3,7 @@
 // Cover page → itemised table → receipt thumbnails appendix.
 // ─────────────────────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
-import { PW_LOGO_B64 } from "./pwLogo";
+import { drawBandLogo } from "./pdfBrand";
 import autoTable from "jspdf-autotable";
 import { supabase } from "../supabase";
 
@@ -114,12 +114,8 @@ export async function buildExpensePDF({ expenses, submitter, periodLabel }) {
   doc.rect(0, 0, pageWidth, 80, "F");
   doc.setTextColor(255, 255, 255);
   // Logo — RIGHT side of header
-  try {
-    doc.addImage(PW_LOGO_B64, "JPEG", pageWidth - margin - 110, 10, 110, 23);
-  } catch {
-    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-    doc.text("Power Works (Pty) Ltd", pageWidth - margin, 20, { align: "right" });
-  }
+  drawBandLogo(doc, { right: pageWidth - margin, top: 12, maxW: 110, maxH: 23 });
+  doc.setTextColor(255, 255, 255);
   // "EXPENSE CLAIM" — LEFT side, vertically centred
   doc.setFont("helvetica", "bold");
   doc.setFontSize(26);

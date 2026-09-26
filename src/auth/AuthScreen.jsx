@@ -1,4 +1,5 @@
 // ─── Auth Screen ──────────────────────────────────────────────────────────────
+import { PRODUCT_NAME, PRODUCT_TAGLINE } from "../lib/brand";
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
@@ -6,7 +7,8 @@ import { supabase } from "../supabase";
 import { BRAND } from "../lib/constants";
 import { Card, Btn, Field } from "../components/ui";
 
-const ALLOWED_DOMAIN = "pwrstart.com";
+import { TERMS_VERSION, legalHref } from "../legal/LegalPage";
+import { pendingJoinCode, normaliseCode } from "../lib/joinCode";
 
 export function AuthScreen() {
   const [mode, setMode]       = useState("signin"); // 'signin' | 'signup'
@@ -16,6 +18,9 @@ export function AuthScreen() {
   const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg]         = useState({ text: "", type: "error" });
+  const [fullName, setFullName] = useState("");
+  const [code, setCode]       = useState(() => pendingJoinCode());
+  const [agreed, setAgreed]   = useState(false);
 
   function clearMsg() { setMsg({ text: "", type: "error" }); }
 
@@ -38,7 +43,7 @@ export function AuthScreen() {
           : code === "email_not_confirmed"
           ? "This account has not been confirmed yet. Please confirm the email address first."
           : code === "user_banned"
-          ? "This account is currently disabled. Please contact your PowerMate administrator."
+          ? `This account is currently disabled. Please contact your ${PRODUCT_NAME} administrator.`
           : code === "over_request_rate_limit"
           ? "Too many sign-in attempts. Please wait a moment and try again."
           : message.includes("network") || message.includes("fetch")
@@ -50,14 +55,9 @@ export function AuthScreen() {
   }
 
   async function signup() {
-    if (!email || !password) {
-      setMsg({ text: "Please enter your email and password.", type: "error" });
-      return;
-    }
-    // Domain check (client-side, friendly error)
     const emailLower = email.trim().toLowerCase();
-    if (!emailLower.endsWith("@" + ALLOWED_DOMAIN)) {
-      setMsg({ text: `Sign up is only available for @${ALLOWED_DOMAIN} email addresses.`, type: "error" });
+    if (!fullName.trim() || !emailLower || !password) {
+      setMsg({ text: "Please enter your name, email and a password.", type: "error" });
       return;
     }
     if (password.length < 8) {
@@ -68,21 +68,36 @@ export function AuthScreen() {
       setMsg({ text: "Passwords do not match.", type: "error" });
       return;
     }
+    if (!agreed) {
+      setMsg({ text: "Please accept the terms and privacy policy.", type: "error" });
+      return;
+    }
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({ email: emailLower, password });
+    const invite = normaliseCode(code);
+    // Remembered so company setup can join the company after sign-in.
+    try {
+      if (invite) localStorage.setItem("pm_join_code", invite);
+    } catch {}
+    const { data, error } = await supabase.auth.signUp({
+      email: emailLower,
+      password,
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: { full_name: fullName.trim(), invite_code: invite, terms_version: TERMS_VERSION },
+      },
+    });
     if (error) {
-      const text = error.message?.toLowerCase().includes("already")
+      const m = (error.message || "").toLowerCase();
+      const text = m.includes("already")
         ? "An account with this email already exists. Try signing in instead."
-        : error.message?.toLowerCase().includes("domain") || error.message?.toLowerCase().includes("not allowed")
-        ? `Sign up is only available for @${ALLOWED_DOMAIN} email addresses.`
-        : error.message || "Sign up failed. Please try again.";
+        : m.includes("invite code") || m.includes("sign-up code") || m.includes("database error saving new user")
+          ? "Sign-up needs a valid invite code. Ask your company for their invite link, or contact us for a sign-up code."
+          : error.message || "Sign up failed. Please try again.";
       setMsg({ text, type: "error" });
       setLoading(false);
       return;
     }
-    // Some Supabase projects require email confirmation; data.user will exist but session may be null
     if (data?.session) {
-      // Logged in immediately
       setMsg({ text: "Welcome! Setting up your account…", type: "success" });
     } else {
       setMsg({ text: "Check your email to confirm your account, then sign in.", type: "success" });
@@ -111,7 +126,7 @@ export function AuthScreen() {
       setMsg({ text: "Too many requests. Please wait a few minutes and try again.", type: "error" });
       return;
     }
-    setMsg({ text: "If that email has a PowerMate account, a link to set your password is on its way. Open it on this device.", type: "success" });
+    setMsg({ text: `If that email has a ${PRODUCT_NAME} account, a link to set your password is on its way. Open it on this device.`, type: "success" });
   }
 
   function switchMode(newMode) {
@@ -125,9 +140,9 @@ export function AuthScreen() {
     <div className="flex min-h-screen flex-col items-center justify-center px-4" style={{ background: BRAND.light }}>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <img src={BRAND.logo} alt="PW" className="mb-4 h-16 object-contain" onError={e => e.target.style.display = "none"} />
-          <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>PowerMate</h1>
-          <p className="mt-1 text-sm text-slate-400">Power Works Field Service CRM</p>
+          <img src="/icon.svg" alt="" className="mb-4 h-16 w-16 rounded-2xl" />
+          <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>{PRODUCT_NAME}</h1>
+          <p className="mt-1 text-sm text-slate-400">{PRODUCT_TAGLINE}</p>
         </div>
 
         <Card className="p-6 stack-y-4">
@@ -147,7 +162,10 @@ export function AuthScreen() {
             </button>
           </div>
 
-          <Field label="Email" value={email} onChange={setEmail} placeholder={`you@${ALLOWED_DOMAIN}`} type="email" />
+          {mode === "signup" && (
+            <Field label="Your name" value={fullName} onChange={setFullName} placeholder="Name and surname" />
+          )}
+          <Field label="Email" value={email} onChange={setEmail} placeholder="you@company.co.za" type="email" />
 
           {mode === "signin" && (
           <div>
@@ -177,18 +195,47 @@ export function AuthScreen() {
           )}
 
           {mode === "signup" && (
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 text-center">
-              <p className="text-sm font-bold text-slate-700 mb-1">Accounts are invite-only</p>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                New accounts are created by your administrator. Already invited? Enter your email above and set your password.
-              </p>
-            </div>
-          )}
-
-          {mode === "signup" && (
-            <Btn className="w-full" size="lg" onClick={sendReset} disabled={loading}>
-              {loading ? "Please wait…" : "Email me a link to set my password"}
-            </Btn>
+            <>
+              <Field label="Password (8+ characters)" value={password} onChange={setPassword} type="password" placeholder="••••••••" />
+              <Field label="Confirm password" value={confirmPw} onChange={setConfirmPw} type="password" placeholder="••••••••" />
+              <Field
+                label="Invite or sign-up code"
+                value={code}
+                onChange={v => setCode(v.toUpperCase())}
+                placeholder="From your company's invite link"
+              />
+              <label className="flex items-start gap-3 text-sm text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={e => setAgreed(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0"
+                  aria-label="I accept the terms and privacy policy"
+                />
+                <span>
+                  I accept the{" "}
+                  <a href={legalHref("terms")} target="_blank" rel="noreferrer" className="font-bold underline">
+                    Terms
+                  </a>{" "}
+                  and{" "}
+                  <a href={legalHref("privacy")} target="_blank" rel="noreferrer" className="font-bold underline">
+                    Privacy Policy
+                  </a>
+                  .
+                </span>
+              </label>
+              <Btn className="w-full" size="lg" onClick={signup} disabled={loading}>
+                {loading ? "Please wait…" : "Create account"}
+              </Btn>
+              <button
+                type="button"
+                onClick={sendReset}
+                disabled={loading}
+                className="w-full text-center text-xs font-bold text-slate-500 min-h-[44px]"
+              >
+                Already added by your company? Email me a link to set my password
+              </button>
+            </>
           )}
 
           {mode === "signin" && (
@@ -205,7 +252,7 @@ export function AuthScreen() {
           )}
         </Card>
 
-        <p className="mt-6 text-center text-xs text-slate-400">© 2026 Power Works (Pty) Ltd</p>
+        <p className="mt-6 text-center text-xs text-slate-400">© 2026 {PRODUCT_NAME}</p>
       </motion.div>
     </div>
   );
@@ -240,9 +287,9 @@ export function SetPasswordScreen({ onDone }) {
     <div className="flex min-h-screen flex-col items-center justify-center px-4" style={{ background: BRAND.light }}>
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center">
-          <img src={BRAND.logo} alt="PW" className="mb-4 h-16 object-contain" onError={e => e.target.style.display = "none"} />
+          <img src="/icon.svg" alt="" className="mb-4 h-16 w-16 rounded-2xl" />
           <h1 className="text-2xl font-black" style={{ color: BRAND.primary }}>Set your password</h1>
-          <p className="mt-1 text-sm text-slate-400">Choose a password for signing in to PowerMate</p>
+          <p className="mt-1 text-sm text-slate-400">Choose a password for signing in to {PRODUCT_NAME}</p>
         </div>
         <Card className="p-6 stack-y-4">
           <div className="relative">

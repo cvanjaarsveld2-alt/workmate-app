@@ -1,3 +1,5 @@
+import { PRODUCT_NAME } from "./brand";
+import { emailSignature } from "./me";
 import React, { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ChevronLeft, Mail, Sparkles, X } from "lucide-react";
@@ -106,9 +108,7 @@ export function generateIndustrialSalesEmail(contact, input) {
     "",
     "Would you be available for a short discussion next week?",
     "",
-    "Kind regards,",
-    "Renita",
-    "Power Works (Pty) Ltd",
+    ...emailSignature("Kind regards,").split("\n"),
   ];
 
   return {
@@ -237,7 +237,7 @@ export function SalesFollowupComposer({ contact, onClose }) {
           {step === 2 && <>
             <div>
               <p className="text-base font-black text-slate-900">Find the gap</p>
-              <p className="text-xs text-slate-500 mt-1">Only enter what you actually know. PowerMate will not invent costs, downtime or operational impact.</p>
+              <p className="text-xs text-slate-500 mt-1">Only enter what you actually know. {PRODUCT_NAME} will not invent costs, downtime or operational impact.</p>
             </div>
             <Field label="Current situation" value={input.currentSituation} onChange={v=>set("currentSituation",v)} placeholder="e.g. The plant is dealing with recurring conveyor failures." multiline />
             <Field label="Problem / requirement" value={input.problem} onChange={v=>set("problem",v)} placeholder="e.g. Repair turnaround is causing maintenance delays." multiline />

@@ -3,6 +3,7 @@
 // structured meeting minutes with action items using GPT-4o.
 // Saves as a Field Note linked to the client.
 // ─────────────────────────────────────────────────────────────────────────────
+import { companyName } from "../lib/companyProfile";
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -92,7 +93,7 @@ export function MeetingScreen({ data, setData, userId, userEmail, teamId, onNavi
       formData.append("audio", blob, "meeting.webm");
       formData.append("language", language === "mixed" ? "" : language);
       formData.append("prompt", "This is a business meeting in the mining and industrial sector. " +
-        "Participants may speak English and Afrikaans. Companies discussed include Power Works.");
+        `Participants may speak English and Afrikaans.${companyName() ? ` Companies discussed include ${companyName()}.` : ""}`);
 
       const transcribeRes = await fetch(`${SUPABASE_URL}/functions/v1/transcribe-audio`, {
         method: "POST", body: formData,

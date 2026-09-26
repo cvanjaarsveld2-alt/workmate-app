@@ -5,7 +5,13 @@ import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download } from
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, genId } from "../lib/helpers";
 import { QuoteLineItems } from "../components/QuoteLineItems";
-import { shareQuotePDF } from "../lib/quotePDF";
+import { QuoteDetailsEditor, emptyDetails, hasDetails } from "../components/QuoteDetailsEditor";
+import { resolveDocumentPhotos } from "../lib/documentPhotos";
+import { addDays } from "../lib/documentPDF";
+import { useCompanyProfile } from "../lib/companyProfile";
+import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
+import { jobToCard, jobsForQuote, quoteToDocument } from "../lib/documentData";
+import { offlineGetAll } from "../offline/offlineDb";
 import { autoCreateChaseFollowup, autoAdvanceOnAccept } from "../lib/quoteAutomation";
 import { offlineSave } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
@@ -65,6 +71,55 @@ export function QuotesScreen({
   searchSeed,
 }) {
   const isMine = useIsMine(userId);
+  const profile = useCompanyProfile(teamId);
+  const [pdfFor, setPdfFor] = useState(null);
+  const [jobs, setJobs] = useState([]);
+  const [attachJobs, setAttachJobs] = useState(false);
+  useEffect(() => {
+    if (!pdfFor) return;
+    setAttachJobs(false);
+    offlineGetAll("jobs").then(
+      rows => setJobs(rows || []),
+      () => {},
+    );
+  }, [pdfFor]);
+  // A link the customer opens to accept (with a signature) or decline online.
+  async function shareAcceptLink(q) {
+    if (q.sync_status === "pending") return setToast("Sync this quote first, then share the link");
+    const { data: token, error } = await supabase.rpc("create_quote_link", { p_quote_id: q.id });
+    if (error || !token) return setToast(error?.message || "Couldn't create the link");
+    const url = `${window.location.origin}/?quote=${token}`;
+    const text = `Please review and accept our quotation${q.quote_number ? ` ${q.quote_number}` : ""}: ${url}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "Quotation", text });
+      else {
+        await navigator.clipboard.writeText(url);
+        setToast("Link copied");
+      }
+    } catch {}
+    setPdfFor(null);
+  }
+  async function sharePdf(q, kind) {
+    try {
+      setToast(kind === "quote" && hasDetails(q.details) ? "Preparing PDF…" : "");
+      const me = teamMembers.find(m => m.user_id === userId || m.id === userId);
+      const preparedBy = me?.full_name || me?.name || userEmail || "";
+      const linked = attachJobs ? jobsForQuote(q, jobs) : [];
+      const doc = await resolveDocumentPhotos({
+        ...quoteToDocument(q, kind, { clients: data.clients || [], profile, preparedBy }),
+        ...(linked.length
+          ? { jobCards: linked.map(j => jobToCard(j, { clients: data.clients || [], quotes: data.quotes || [] })) }
+          : {}),
+      });
+      const blob = await buildDocumentPDF(doc, profile);
+      const r = await shareDocumentPDF(blob, documentFilename(doc, profile), `${documentTitle(kind, profile)} ${doc.number}`);
+      if (r !== "cancelled") setToast(r === "shared" ? "PDF shared" : "PDF downloaded");
+      setPdfFor(null);
+    } catch (err) {
+      console.error("Quote PDF failed:", err);
+      setToast("Couldn't generate PDF — try again");
+    }
+  }
   const [showForm, setShowForm] = useState(false),
     [search, setSearch] = useState(""),
     [filterStatus, setFilterStatus] = useState("All"),
@@ -79,6 +134,8 @@ export function QuotesScreen({
     }),
     [lineItems, setLineItems] = useState([]),
     [vatInclusive, setVatInclusive] = useState(true),
+    [details, setDetails] = useState(emptyDetails),
+    [validDays, setValidDays] = useState(""),
     [shareSheet, setShareSheet] = useState(null),
     [sharing, setSharing] = useState(false);
   const { confirm, dialog } = useConfirm();
@@ -95,6 +152,8 @@ export function QuotesScreen({
     setForm({ client_name: "", client_id: null, description: "", value: "", status: "Pending" });
     setLineItems([]);
     setVatInclusive(true);
+    setDetails(emptyDetails());
+    setValidDays("");
     setEditId(null);
     setShowForm(false);
   }
@@ -103,6 +162,22 @@ export function QuotesScreen({
       setToast("Please enter a description");
       return;
     }
+    const days = Math.round(Number(validDays));
+    if (validDays !== "" && !(days >= 1 && days <= 365)) {
+      setToast("Valid for must be 1 to 365 days");
+      return;
+    }
+    const extra = {
+      details: hasDetails(details) ? details : null,
+      ...(validDays !== ""
+        ? {
+            expiry_date: addDays(
+              (editId && quotes.find(q => q.id === editId)?.sent_date) || todayISO(),
+              days,
+            ),
+          }
+        : {}),
+    };
     if (editId) {
       const existing = quotes.find(q => q.id === editId);
       const totalFromLines = lineItems.reduce(
@@ -115,6 +190,7 @@ export function QuotesScreen({
         value: lineItems.length > 0 ? totalFromLines : parseFloat(form.value || 0),
         line_items: lineItems.length > 0 ? JSON.stringify(lineItems) : null,
         vat_inclusive: vatInclusive,
+        ...extra,
         sync_status: "pending",
       };
       setData(d => ({
@@ -151,6 +227,7 @@ export function QuotesScreen({
             value: quoteValue,
             line_items: lineItems.length > 0 ? JSON.stringify(lineItems) : null,
             vat_inclusive: vatInclusive,
+            ...extra,
             sent_date: todayISO(),
             created_at: new Date().toISOString(),
             sync_status: "pending",
@@ -200,6 +277,12 @@ export function QuotesScreen({
       setLineItems([]);
     }
     setVatInclusive(q.vat_inclusive !== false);
+    setDetails(q.details && typeof q.details === "object" ? { ...emptyDetails(), ...q.details } : emptyDetails());
+    setValidDays(
+      q.expiry_date && q.sent_date
+        ? String(Math.round((new Date(q.expiry_date) - new Date(q.sent_date)) / 86400000))
+        : "",
+    );
     setEditId(q.id);
     setShowForm(true);
   }
@@ -271,6 +354,7 @@ export function QuotesScreen({
           items={lineItems}
           onChange={setLineItems}
           vatInclusive={vatInclusive}
+          vatRegistered={profile.vat_registered !== false}
           onVatToggle={setVatInclusive}
         />
         {lineItems.length === 0 && (
@@ -282,6 +366,14 @@ export function QuotesScreen({
             placeholder="0.00"
           />
         )}
+        <Field
+          label="Valid for (days)"
+          type="number"
+          value={validDays}
+          onChange={setValidDays}
+          placeholder={`${profile.quote_validity_days || 30} (company default)`}
+        />
+        <QuoteDetailsEditor details={details} onChange={setDetails} />
         <SelectField
           label="Status"
           value={form.status}
@@ -394,6 +486,17 @@ export function QuotesScreen({
                   {q.sent_date && (
                     <p className="text-xs text-slate-400 mt-0.5">Sent {smartDate(q.sent_date)}</p>
                   )}
+                  {q.accepted_at && (
+                    <p className="text-xs font-bold text-green-700 mt-0.5">
+                      Accepted online by {q.accepted_by_name} · {smartDate(String(q.accepted_at).slice(0, 10))}
+                      {q.accepted_po ? ` · order ${q.accepted_po}` : ""}
+                    </p>
+                  )}
+                  {q.declined_at && (
+                    <p className="text-xs font-bold text-red-700 mt-0.5">
+                      Declined online{q.decline_reason ? `: ${q.decline_reason}` : ""}
+                    </p>
+                  )}
                   {q.sync_status === "pending" && (
                     <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
                       Not synced
@@ -413,37 +516,11 @@ export function QuotesScreen({
                     </button>
                   )}
                   <button
-                    onClick={async () => {
-                      try {
-                        let li;
-                        try {
-                          li = q.line_items ? JSON.parse(q.line_items) : null;
-                        } catch {
-                          li = null;
-                        }
-                        if (!Array.isArray(li) || li.length === 0)
-                          li = [
-                            {
-                              description: q.description || "Quote",
-                              qty: 1,
-                              unitPrice: parseFloat(q.value) || 0,
-                            },
-                          ];
-                        const r = await shareQuotePDF({
-                          clientName: q.client_name,
-                          date: q.sent_date || q.created_at?.slice(0, 10),
-                          lineItems: li,
-                          vatInclusive: q.vat_inclusive !== false,
-                          notes: q.description,
-                        });
-                        setToast(r === "shared" ? "Quote shared" : "Quote PDF downloaded");
-                      } catch (err) {
-                        console.error("Quote PDF failed:", err);
-                        setToast("Couldn't generate PDF — try again");
-                      }
-                    }}
-                    className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-green-600 flex items-center justify-center"
-                    title="Generate PDF"
+                    onClick={() => setPdfFor(pdfFor === q.id ? null : q.id)}
+                    className={`min-h-[44px] rounded-xl flex items-center justify-center ${pdfFor === q.id ? "bg-green-50 text-green-700" : "bg-slate-50 text-slate-400 active:bg-slate-100 active:text-green-600"}`}
+                    title="Make a PDF"
+                    aria-label="Make a PDF"
+                    aria-expanded={pdfFor === q.id}
                   >
                     <Download size={15} />
                   </button>
@@ -460,6 +537,39 @@ export function QuotesScreen({
                     <Trash2 size={15} />
                   </button>
                 </div>
+                {pdfFor === q.id && jobsForQuote(q, jobs).length > 0 && (
+                  <label className="mt-2 flex items-center gap-2 text-sm text-slate-600 min-h-[36px] cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={attachJobs}
+                      onChange={e => setAttachJobs(e.target.checked)}
+                      className="h-5 w-5"
+                    />
+                    Attach job card{jobsForQuote(q, jobs).length > 1 ? "s" : ""}
+                  </label>
+                )}
+                {pdfFor === q.id && (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => sharePdf(q, "quote")}
+                      className="min-h-[44px] rounded-xl bg-green-50 text-green-800 text-sm font-bold"
+                    >
+                      Quotation
+                    </button>
+                    <button
+                      onClick={() => sharePdf(q, "proforma")}
+                      className="min-h-[44px] rounded-xl bg-slate-50 text-slate-700 text-sm font-bold border border-slate-200"
+                    >
+                      Pro forma invoice
+                    </button>
+                    <button
+                      onClick={() => shareAcceptLink(q)}
+                      className="col-span-2 min-h-[44px] rounded-xl bg-blue-50 text-blue-800 text-sm font-bold"
+                    >
+                      Send link to accept online
+                    </button>
+                  </div>
+                )}
               </div>
             </Card>
           );

@@ -1,7 +1,7 @@
 // ─── PowerMate Service Worker ────────────────────────────────────────────────
 // Offline shell, push notifications and durable reminder scheduling.
 const CACHE_NAME = "powermate-v17";
-const PRECACHE = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest"];
+const PRECACHE = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 // Filled in at build time (vite.config.js) with every built JS/CSS/image file,
 // so every screen opens offline, not just the ones visited while online.
 const BUILD_ASSETS = [];
