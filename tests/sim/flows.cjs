@@ -578,6 +578,31 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       `page shown=${shown}; thanks=${thanks}; status=${q.status}; by=${q.accepted_by_name}; po=${q.accepted_po}; signature=${(q.accepted_signature || "").slice(0, 22)}`);
   });
 
+  // 13j. Message a customer from a job: WhatsApp opens with the message ready; SMS is queued.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("messages: WhatsApp and SMS from a job", async () => {
+    const client = H.db.clients.find(c => c.team_id === H.TEAM);
+    client.phone = "082 123 4567";
+    let job = H.db.jobs.find(j => j.team_id === H.TEAM && j.client_id === client.id && j.status !== "completed");
+    if (!job) {
+      job = { id: "00000000-0000-4000-8000-00000000a1b2", user_id: H.UID, team_id: H.TEAM, client_id: client.id, title: "Pump overhaul", status: "scheduled", scheduled_date: new Date().toISOString().slice(0, 10), job_number: "JOB-SIM-1", created_at: new Date().toISOString() };
+      H.db.jobs.push(job);
+    }
+    await go("Jobs", 3000);
+    const card = page.locator("div", { hasText: job.title }).filter({ has: page.getByRole("button", { name: "Message customer" }) }).last();
+    await card.getByRole("button", { name: "Message customer" }).click(); await page.waitForTimeout(800);
+    const text = await page.getByLabel("Message").inputValue();
+    const popup = context.waitForEvent("page", { timeout: 3000 }).catch(() => null);
+    await page.getByRole("button", { name: "WhatsApp" }).click();
+    const wa = await popup; const waUrl = wa ? wa.url() : ""; if (wa) await wa.close();
+    await page.waitForTimeout(800);
+    await card.getByRole("button", { name: "Message customer" }).click(); await page.waitForTimeout(800);
+    await page.getByRole("button", { name: "SMS", exact: true }).click(); await page.waitForTimeout(1200);
+    const logged = (H.db.customer_messages || []).filter(m => m.job_id === job.id);
+    await shot("messages-job");
+    rec("messages: WhatsApp and SMS from a job", /Hi \w+, .* has booked your job/.test(text) && /wa\.me\/27821234567\?text=/.test(waUrl) && logged.some(m => m.channel === "whatsapp" && m.status === "opened") && logged.some(m => m.channel === "sms" && m.status === "queued" && m.to_phone === "+27821234567") ? "PASS" : "FAIL",
+      `message="${text.slice(0, 80)}"; whatsapp url=${waUrl.slice(0, 50)}; logged=${JSON.stringify(logged.map(m => [m.channel, m.status, m.to_phone]))}`);
+  });
+
   // 13i. Plans: a Starter company sees Products locked, the master account can pick a plan.
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("plans: starter locks products, plan screen offers upgrade", async () => {
     const before = H.SIM.plan;

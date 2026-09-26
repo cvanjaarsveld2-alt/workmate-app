@@ -3,7 +3,7 @@ import { offlineGetAll, offlineSave } from "../offline/offlineDb";
 import { saveAndSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { Card, Btn, PageHeader } from "../components/ui";
-import { Bell, CreditCard, RefreshCw, Search, CheckCircle2, WifiOff, FileText, FileClock } from "lucide-react";
+import { Bell, CreditCard, RefreshCw, Search, CheckCircle2, WifiOff, FileText, FileClock, MessageCircle } from "lucide-react";
 import { daysOverdue, isOverdue, reminderMessage } from "../lib/reminders";
 import { formatPhone } from "../components/WhatsAppButton";
 import { useCompanyProfile } from "../lib/companyProfile";
@@ -12,6 +12,7 @@ import { invoiceToDocument, isTemporaryInvoiceNumber, jobToCard, jobsForInvoice 
 import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { FORMATS, accountingCsv } from "../lib/accountingExport";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { MessageCustomer } from "../components/MessageCustomer";
 const money = v =>
   `R ${Number(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const labels = {
@@ -36,7 +37,8 @@ function genIdempotencyKey() {
   } catch {}
   return `idem_${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 10)}`;
 }
-export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes = [] }) {
+export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes = [], canMessage = true }) {
+  const [messaging, setMessaging] = useState(null);
   const [invoices, setInvoices] = useState([]),
     [payments, setPayments] = useState([]),
     [loading, setLoading] = useState(true),
@@ -361,6 +363,12 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
                   {making === `remind:${inv.id}` ? "Preparing…" : `Remind customer · ${daysOverdue(inv)} days overdue`}
                 </Btn>
               )}
+              {canMessage && inv.client_id && online && (
+                <Btn size="sm" variant="secondary" onClick={() => setMessaging(inv)}>
+                  <MessageCircle size={13} />
+                  WhatsApp / SMS the invoice link
+                </Btn>
+              )}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Btn size="sm" variant="secondary" onClick={() => sharePdf(inv, "invoice")} disabled={!!making}>
                   <FileText size={13} />
@@ -374,6 +382,22 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
             </Card>
           );
         })
+      )}
+      {messaging && (
+        <MessageCustomer
+          open
+          onClose={() => setMessaging(null)}
+          kinds={["invoice"]}
+          teamId={teamId}
+          userId={userId}
+          client={clients.find(c => c.id === messaging.client_id)}
+          invoice={messaging}
+          getLink={async () => {
+            const { data } = await supabase.rpc("client_portal_link", { p_client_id: messaging.client_id, p_new: false });
+            return data ? `${window.location.origin}/?portal=${data}` : "";
+          }}
+          onSent={setNotice}
+        />
       )}
     </div>
   );

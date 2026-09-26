@@ -48,6 +48,10 @@ export const DEFAULT_PROFILE = {
   // Ledger account per expense category for the accounting exports, e.g.
   // { "Fuel": "4100/000" }. Missing categories use the app's defaults.
   expense_gl_codes: {},
+  // Customer messages: the company's own wording per message (blank = the
+  // app's), and which ones go out by SMS automatically ({ booking, done }).
+  message_templates: {},
+  auto_sms: {},
 };
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
@@ -127,6 +131,17 @@ export function cleanProfile(input) {
           .map(([c, code]) => [String(c).slice(0, 60), String(code ?? "").trim().slice(0, 20)])
           .filter(([, code]) => code),
       );
+    } else if (k === "message_templates") {
+      const src = v && typeof v === "object" ? v : {};
+      out[k] = Object.fromEntries(
+        Object.entries(src)
+          .filter(([kind]) => /^[a-z_]{1,20}$/.test(kind))
+          .map(([kind, text]) => [kind, String(text ?? "").trim().slice(0, 600)])
+          .filter(([, text]) => text),
+      );
+    } else if (k === "auto_sms") {
+      const src = v && typeof v === "object" ? v : {};
+      out[k] = { booking: src.booking === true, done: src.done === true };
     } else if (k === "disabled_modules") {
       out[k] = Array.isArray(v) ? [...new Set(v.map(String))] : [];
     } else if (k === "vat_registered") {

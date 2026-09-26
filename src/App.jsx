@@ -1139,6 +1139,7 @@ export default function PowerWorksApp() {
         setData={setData}
         clients={data.clients}
         canClock={hasFeature(teamPlan, "timesheets")}
+        canMessage={hasFeature(teamPlan, "messages")}
       />
     ),
     Invoices: (
@@ -1148,6 +1149,7 @@ export default function PowerWorksApp() {
         setData={setData}
         clients={data.clients}
         quotes={data.quotes}
+        canMessage={hasFeature(teamPlan, "messages")}
       />
     ),
     CompanyProfile: (

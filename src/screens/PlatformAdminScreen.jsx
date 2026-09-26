@@ -337,6 +337,75 @@ function BillingSettings({ onToast }) {
   );
 }
 
+// The SMS provider the platform sends customer texts through.
+function SmsSettings({ onToast }) {
+  const [c, setC] = useState(null);
+  const [form, setForm] = useState({ provider: "bulksms", username: "", secret: "", sender: "", monthly_limit: "300" });
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    supabase.rpc("admin_get_sms").then(({ data }) => {
+      setC(data || {});
+      if (data) setForm(f => ({ ...f, provider: data.provider || "bulksms", username: data.username || "", sender: data.sender || "", monthly_limit: String(data.monthly_limit ?? 300) }));
+    });
+  }, []);
+  if (!c) return null;
+  async function save(patch = {}) {
+    setSaving(true);
+    const { data, error } = await supabase.rpc("admin_set_sms", {
+      p_provider: form.provider,
+      p_username: form.username,
+      p_secret: form.secret,
+      p_sender: form.sender,
+      p_monthly_limit: Math.max(0, Math.round(Number(form.monthly_limit) || 0)),
+      p_enabled: patch.enabled ?? c.enabled,
+    });
+    setSaving(false);
+    if (error) return onToast(error.message);
+    setC(x => ({ ...x, ...data }));
+    setForm(f => ({ ...f, secret: "" }));
+    onToast("Saved");
+  }
+  const twilio = form.provider === "twilio";
+  return (
+    <Card className="p-4 stack-y-3">
+      <p className="text-base font-black text-slate-800">SMS to customers</p>
+      <p className="text-xs text-slate-500">
+        Companies on a plan with customer messages can text their customers (booking confirmed, job done, invoice links). You pay the SMS provider;
+        each company gets a monthly allowance. {c.sent_this_month ?? 0} sent this month across all companies.
+      </p>
+      <label className="block">
+        <span className="mb-1 block text-xs font-bold text-slate-500">Provider</span>
+        <select
+          value={form.provider}
+          onChange={e => setForm(f => ({ ...f, provider: e.target.value }))}
+          className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-3 py-2.5 text-base min-h-[48px]"
+        >
+          <option value="bulksms">BulkSMS (bulksms.com, South African)</option>
+          <option value="twilio">Twilio</option>
+        </select>
+      </label>
+      <Field label={twilio ? "Account SID" : "API token ID"} value={form.username} onChange={v => setForm(f => ({ ...f, username: v.trim() }))} maxLength={120} />
+      <Field
+        label={`${twilio ? "Auth token" : "API token secret"}${c.has_secret ? " (saved; type to replace)" : ""}`}
+        type="password"
+        value={form.secret}
+        onChange={v => setForm(f => ({ ...f, secret: v }))}
+        maxLength={200}
+      />
+      <div className="grid grid-cols-2 gap-2">
+        <Field label={twilio ? "From number (+27…)" : "Sender ID (optional)"} value={form.sender} onChange={v => setForm(f => ({ ...f, sender: v.trim() }))} maxLength={20} />
+        <Field label="SMS per company per month" type="number" value={form.monthly_limit} onChange={v => setForm(f => ({ ...f, monthly_limit: v.replace(/\D/g, "").slice(0, 6) }))} />
+      </div>
+      <Btn size="sm" variant="secondary" onClick={() => save()} disabled={saving}>
+        Save SMS details
+      </Btn>
+      <Btn size="sm" variant={c.enabled ? "danger" : "solid"} onClick={() => save({ enabled: !c.enabled })} disabled={saving}>
+        {c.enabled ? "Switch SMS off" : "Switch SMS on"}
+      </Btn>
+    </Card>
+  );
+}
+
 export function PlatformAdminScreen() {
   const [tab, setTab] = useState("overview");
   const [filter, setFilter] = useState("all");
@@ -458,7 +527,12 @@ export function PlatformAdminScreen() {
       )}
 
       {tab === "plans" && <PlansEditor onToast={setToast} />}
-      {tab === "billing" && <BillingSettings onToast={setToast} />}
+      {tab === "billing" && (
+        <>
+          <BillingSettings onToast={setToast} />
+          <SmsSettings onToast={setToast} />
+        </>
+      )}
 
       {tab === "signup" && settings && (
         <Card className="p-4 stack-y-3">

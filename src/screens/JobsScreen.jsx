@@ -17,6 +17,7 @@ import {
   Timer,
   Car,
   Square,
+  MessageCircle,
 } from "lucide-react";
 import { createInvoiceFromJob } from "../lib/jobInvoiceAutomation";
 import { CaptionedPhotos } from "../components/CaptionedPhotos";
@@ -29,8 +30,10 @@ import { buildDocumentPDF, documentFilename, shareDocumentPDF } from "../lib/doc
 import { jobToCard } from "../lib/documentData";
 import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { MessageCustomer } from "../components/MessageCustomer";
 
-export function JobsScreen({ userId, teamId, setData, clients = [], canClock = true }) {
+export function JobsScreen({ userId, teamId, setData, clients = [], canClock = true, canMessage = true }) {
+  const [messaging, setMessaging] = useState(null);
   const [jobs, setJobs] = useState([]),
     [quotes, setQuotes] = useState([]),
     [loading, setLoading] = useState(true),
@@ -378,6 +381,12 @@ export function JobsScreen({ userId, teamId, setData, clients = [], canClock = t
                     Open route
                   </a>
                 )}
+                {canMessage && job.client_id && (
+                  <Btn size="sm" variant="secondary" onClick={() => setMessaging(job)}>
+                    <MessageCircle size={13} />
+                    Message customer
+                  </Btn>
+                )}
                 <Btn size="sm" variant="secondary" onClick={() => shareJobCard(job)} disabled={making === job.id}>
                   <ClipboardList size={13} />
                   {making === job.id ? "Making…" : "Job card PDF"}
@@ -441,6 +450,27 @@ export function JobsScreen({ userId, teamId, setData, clients = [], canClock = t
           );
         })
       )}
+      {messaging && (
+        <MessageCustomer
+          open
+          onClose={() => setMessaging(null)}
+          kinds={messaging.status === "completed" ? ["done", "on_my_way", "booking"] : messaging.status === "in_progress" ? ["on_my_way", "done", "booking"] : ["booking", "on_my_way", "done"]}
+          teamId={teamId}
+          userId={userId}
+          client={clients.find(c => c.id === messaging.client_id)}
+          job={messaging}
+          getLink={messaging.status === "completed" ? portalLinkFor(messaging.client_id) : null}
+          onSent={() => {}}
+        />
+      )}
     </div>
   );
+}
+
+// The customer's portal link for "job done" messages (made on first use).
+function portalLinkFor(clientId) {
+  return async () => {
+    const { data } = await supabase.rpc("client_portal_link", { p_client_id: clientId, p_new: false });
+    return data ? `${window.location.origin}/?portal=${data}` : "";
+  };
 }

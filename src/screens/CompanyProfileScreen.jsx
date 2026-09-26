@@ -13,6 +13,7 @@ import { FEATURES, hasFeature, useTeamPlan } from "../lib/plan";
 import { OnlinePayments } from "../components/OnlinePayments";
 import { XeroConnection } from "../components/XeroConnection";
 import { CATEGORIES, CATEGORY_META } from "../lib/expenseAccounting";
+import { DEFAULT_TEMPLATES, MESSAGE_KINDS } from "../lib/messages";
 import { addDays, buildDocumentPDF, documentFilename, shareDocumentPDF } from "../lib/documentPDF";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -449,6 +450,51 @@ export function CompanyProfileScreen({ teamId, isOwner, onPlan }) {
           </label>
         ))}
       </Section>
+      )}
+
+      {!hasFeature(plan, "messages") ? (
+        <NotInPlan feature="messages" onPlan={onPlan} />
+      ) : (
+        <Section
+          title="Customer messages"
+          hint="WhatsApp opens on your phone with the message ready. SMS are sent for you (a monthly allowance comes with your plan)."
+        >
+          {[
+            ["booking", "SMS the customer when a job is booked or moved"],
+            ["done", "SMS the customer when a job is finished"],
+          ].map(([k, label]) => (
+            <label key={k} className="flex items-center gap-3 min-h-[52px] cursor-pointer">
+              <span className="flex-1 text-sm font-bold text-slate-800">{label}</span>
+              <input
+                type="checkbox"
+                checked={!!form.auto_sms?.[k]}
+                onChange={e => set("auto_sms")({ ...(form.auto_sms || {}), [k]: e.target.checked })}
+                aria-label={label}
+                className="h-6 w-6 shrink-0"
+              />
+            </label>
+          ))}
+          <details>
+            <summary className="text-sm font-bold text-slate-700 min-h-[44px] flex items-center cursor-pointer">Change the wording</summary>
+            <p className="text-xs text-slate-500 mb-2">
+              Blank uses the standard wording. You can use {"{client}"}, {"{company}"}, {"{job}"}, {"{date}"}, {"{time}"}, {"{technician}"}, {"{invoice}"},{" "}
+              {"{quote}"}, {"{amount}"}, {"{equipment}"} and {"{link}"}.
+            </p>
+            <div className="stack-y-3">
+              {Object.entries(MESSAGE_KINDS).map(([k, m]) => (
+                <Field
+                  key={k}
+                  label={m.label}
+                  value={form.message_templates?.[k] || ""}
+                  onChange={v => set("message_templates")({ ...(form.message_templates || {}), [k]: v })}
+                  placeholder={DEFAULT_TEMPLATES[k]}
+                  multiline
+                  maxLength={600}
+                />
+              ))}
+            </div>
+          </details>
+        </Section>
       )}
 
       <Section title="Modules" hint="Switch off what your company doesn't use. It disappears for everyone in your company.">
