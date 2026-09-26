@@ -124,6 +124,7 @@ const ServicePlansScreen = lazy(() =>
 );
 const ScheduleScreen = lazy(() => import("./screens/ScheduleScreen").then(m => ({ default: m.ScheduleScreen })));
 const PlanScreen = lazy(() => import("./screens/PlanScreen").then(m => ({ default: m.PlanScreen })));
+const PurchasingScreen = lazy(() => import("./screens/PurchasingScreen").then(m => ({ default: m.PurchasingScreen })));
 const JobProfitScreen = lazy(() => import("./screens/JobProfitScreen").then(m => ({ default: m.JobProfitScreen })));
 const HelpScreen = lazy(() => import("./screens/HelpScreen").then(m => ({ default: m.HelpScreen })));
 const PlatformAdminScreen = lazy(() =>
@@ -1191,6 +1192,7 @@ export default function PowerWorksApp() {
         vatRegistered={companyProfile.vat_registered !== false}
       />
     ),
+    Purchasing: <PurchasingScreen teamId={teamId} canManage={!!teamAccess?.is_owner || userRole === "admin"} />,
     JobProfit: (
       <JobProfitScreen
         teamId={teamId}

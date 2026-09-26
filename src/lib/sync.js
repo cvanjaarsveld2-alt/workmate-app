@@ -106,7 +106,6 @@ const REMOTE_EXCLUDED_FIELDS = {
     "linked_note_id",
     "linked_breakdown_id",
     "quote_id",
-    "job_id",
     "invoice_id",
     "sync_pending_quote_id",
     "sync_pending_job_id",

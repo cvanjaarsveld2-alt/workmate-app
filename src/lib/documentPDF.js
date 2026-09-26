@@ -16,6 +16,7 @@ export function documentTitle(kind, profile = {}) {
   if (kind === "quote") return "QUOTATION";
   if (kind === "proforma") return "PRO FORMA INVOICE";
   if (kind === "jobcard") return "JOB CARD";
+  if (kind === "purchase_order") return "PURCHASE ORDER";
   return chargesVat(profile) && profile.vat_no ? "TAX INVOICE" : "INVOICE";
 }
 
@@ -336,12 +337,12 @@ export async function buildDocumentPDF(doc, profile = {}) {
 
     const meta = [
       [
-        kind === "quote" ? "Quote no." : kind === "proforma" ? "Pro forma no." : "Invoice no.",
+        kind === "quote" ? "Quote no." : kind === "proforma" ? "Pro forma no." : kind === "purchase_order" ? "Order no." : "Invoice no.",
         doc.number || "—",
       ],
       ["Date", fmtDate(doc.date)],
       kind === "quote" && doc.validUntil ? ["Valid until", fmtDate(doc.validUntil)] : null,
-      kind !== "quote" && doc.dueDate ? ["Payment due", fmtDate(doc.dueDate)] : null,
+      kind !== "quote" && doc.dueDate ? [kind === "purchase_order" ? "Deliver by" : "Payment due", fmtDate(doc.dueDate)] : null,
       doc.reference ? ["Reference", doc.reference] : null,
       doc.orderNumber ? ["Order no.", doc.orderNumber] : null,
       kind === "quote" && doc.preparedBy ? ["Prepared by", doc.preparedBy] : null,
@@ -363,7 +364,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
     pdf.setFontSize(8);
     pdf.setFont("helvetica", "bold");
     pdf.setTextColor(...grey);
-    text(kind === "quote" ? "PREPARED FOR" : "BILL TO", M, y);
+    text(kind === "quote" ? "PREPARED FOR" : kind === "purchase_order" ? "SUPPLIER" : "BILL TO", M, y);
     pdf.setFont("helvetica", "normal");
     pdf.setTextColor(...ink);
     pdf.setFontSize(9.5);
@@ -520,7 +521,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
       profile.bank_swift ? ["SWIFT", profile.bank_swift] : null,
       ["Payment reference", doc.number || ""],
     ].filter(Boolean);
-    if (kind !== "quote" && bank.length > 1) {
+    if (kind !== "quote" && kind !== "purchase_order" && bank.length > 1) {
       const boxH = 7 + bank.length * 4.6;
       ensureSpace(boxH + 4);
       pdf.setFillColor(248, 246, 246);
@@ -544,7 +545,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
       y += boxH + 4;
     }
 
-    section("Terms and conditions", kind === "invoice" ? profile.invoice_terms : profile.quote_terms, 7.8);
+    if (kind !== "purchase_order") section("Terms and conditions", kind === "invoice" ? profile.invoice_terms : profile.quote_terms, 7.8);
 
     // ── Acceptance (quotes) ──
     if (kind === "quote") {

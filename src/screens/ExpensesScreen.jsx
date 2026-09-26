@@ -406,10 +406,21 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   const [manualZAR, setManualZAR]     = useState("");
   const [detailExpense, setDetailExpense] = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
+  // Open jobs an expense can be booked to (counts in Job profit). Online only:
+  // only jobs already saved on the server can be linked.
+  const [jobs, setJobs] = useState([]);
+  useEffect(() => {
+    if (!showForm || !navigator.onLine) return;
+    let live = true;
+    supabase.from("jobs").select("id, job_number, title, client_id").in("status", ["scheduled", "in_progress", "completed"])
+      .order("created_at", { ascending: false }).limit(200)
+      .then(({ data }) => live && setJobs(data || []), () => {});
+    return () => { live = false; };
+  }, [showForm]);
   const [form, setForm] = useState({
     vendor: "", vat_number: "", gl_code: defaultGl("Other"), gr_code: "", gl_manually_edited: false, amount: "", vat_amount: "", currency: "ZAR",
     expense_date: todayISO(), expense_time: "", category: "Other",
-    payment_method: "Card", notes: "", client_id: null, client_name: "",
+    payment_method: "Card", notes: "", client_id: null, client_name: "", job_id: null,
   });
   const { confirm, dialog } = useConfirm();
   const { showBanner: showReminderBanner, dismiss: dismissReminder } = useEndOfMonthReminder();
@@ -441,7 +452,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
     setForm({
       vendor: "", vat_number: "", gl_code: defaultGl("Other"), gr_code: "", gl_manually_edited: false, amount: "", vat_amount: "", currency: "ZAR",
       expense_date: todayISO(), expense_time: "", category: "Other",
-      payment_method: "Card", notes: "", client_id: null, client_name: "",
+      payment_method: "Card", notes: "", client_id: null, client_name: "", job_id: null,
     });
     setReceiptUrl(null);
     setPaymentSlipUrl(null);
@@ -511,6 +522,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       notes:          ex.notes || "",
       client_id:      ex.client_id || null,
       client_name:    ex.client_name || "",
+      job_id:         ex.job_id || null,
     });
     setReceiptUrl(ex.receipt_url || null);
     setPaymentSlipUrl(ex.payment_slip_url || null);
@@ -571,6 +583,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       ai_extracted:     scannedNotice,
       client_id:        form.client_id || null,
       client_name:      form.client_name || null,
+      job_id:           form.job_id || null,
       sync_status:      "pending",
       created_at:       editId
                           ? (expenses.find(e => e.id === editId)?.created_at || now)
@@ -999,6 +1012,24 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             setForm(f => ({ ...f, client_id: v || null, client_name: cl ? `${cl.company}${cl.branch ? " — " + cl.branch : ""}` : "" }));
           }}
           clients={(data.clients || []).filter(isMine)} placeholder="Link to a client…" />
+        {(jobs.length > 0 || form.job_id) && (
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-slate-500">Job (optional; counts in Job profit)</span>
+            <select value={form.job_id || ""} onChange={e => {
+                const j = jobs.find(x => x.id === e.target.value);
+                const cl = j?.client_id ? (data.clients || []).find(c => c.id === j.client_id) : null;
+                setForm(f => ({ ...f, job_id: e.target.value || null,
+                  ...(cl && !f.client_id ? { client_id: cl.id, client_name: `${cl.company}${cl.branch ? " — " + cl.branch : ""}` } : {}) }));
+              }}
+              className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base min-h-[56px]">
+              <option value="">Not for a job</option>
+              {form.job_id && !jobs.some(j => j.id === form.job_id) && <option value={form.job_id}>Linked job</option>}
+              {jobs.filter(j => !form.client_id || !j.client_id || j.client_id === form.client_id).map(j => (
+                <option key={j.id} value={j.id}>{j.job_number || "Job"} · {j.title}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <Field label="Notes (optional)" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What was this for?" multiline />
         <div className="flex gap-2">
