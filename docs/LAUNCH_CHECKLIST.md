@@ -17,7 +17,7 @@ How accounts, roles and memberships work is explained in
 | 6 | **Legal review** of the drafts: Terms, Privacy Policy, Data Processing Agreement. Fill in every [bracket] | `src/legal/*.md` (shown at `/?legal=terms`, `privacy`, `dpa`) | attorney |
 | 7 | **Information Officer** registered with the Information Regulator (POPIA) | inforeg.org.za | 30 min |
 | 8 | **Own domain**, e.g. `app.yourproduct.co.za` | Vercel → Domains; then Supabase → Authentication → URL Configuration: Site URL + Redirect URLs | 20 min |
-| 9 | **Email from your domain** (invites, confirmations, password resets) | Supabase → Authentication → SMTP (e.g. Resend, Postmark, Amazon SES); edit the email templates to your product name | 30 min |
+| 9 | **Email from your domain** (confirmations, password resets). Supabase's built-in email is for testing only: it may not reach outside users. Step by step: [EMAIL_SETUP.md](EMAIL_SETUP.md); ready-made templates in `docs/email-templates/` | Resend (or Postmark / SES), then Supabase → Authentication → Emails (SMTP, templates) and URL Configuration | 30 min |
 | 10 | **Uptime monitor**: app URL and `https://hrqzqyfvbfzrfnuxovvr.supabase.co/auth/v1/health`, every 5 minutes, alerts to your phone | UptimeRobot / Better Stack (free tiers) | 10 min |
 
 Then, when you're ready to take sign-ups from anyone: **App → Settings → Platform
