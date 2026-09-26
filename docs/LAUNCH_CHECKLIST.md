@@ -2,6 +2,8 @@
 
 Everything in the app for running several companies is built. This page covers
 what only you (the product owner) can do, and how to run the platform day to day.
+How accounts, roles and memberships work is explained in
+[ACCOUNTS_AND_MEMBERSHIPS.md](ACCOUNTS_AND_MEMBERSHIPS.md).
 
 ## 1. Before the first outside company (must do)
 
@@ -38,7 +40,9 @@ give to a prospect.
   - *Suspended* or *cancelled*: no access.
   - *Starter / Pro / Enterprise / Free*: full use while *active*.
 - **Taking payment today**: invoice the company yourself, then mark it paid in
-  the console (plan, status *active*, *paid until*).
+  the console (plan, status *active*, *paid until*). Every morning the app tells
+  a company's master account when its trial is about to end or its payment is
+  due, and makes it read-only 7 days after *paid until* (job `powermate-plan-checks`).
 - **Card / debit-order billing later** (PayFast, Paystack or Peach Payments):
   1. Open a merchant account.
   2. Add their keys as Supabase secrets.

@@ -12,6 +12,7 @@ import { buildCompanyZip } from "../lib/companyExport";
 import { useTeamPlan } from "../lib/plan";
 import { OnlinePayments } from "../components/OnlinePayments";
 import { XeroConnection } from "../components/XeroConnection";
+import { CATEGORIES, CATEGORY_META } from "../lib/expenseAccounting";
 import { addDays, buildDocumentPDF, documentFilename, shareDocumentPDF } from "../lib/documentPDF";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -388,6 +389,24 @@ export function CompanyProfileScreen({ teamId, isOwner }) {
             className="h-6 w-6 shrink-0"
           />
         </label>
+      </Section>
+
+      <Section
+        title="Expense account codes"
+        hint="The account in your accounting package (Sage, Xero or QuickBooks) each kind of expense goes to. Ask your bookkeeper once; the expense exports use these. Blank uses the default shown."
+      >
+        <div className="grid grid-cols-2 gap-2">
+          {CATEGORIES.map(c => (
+            <Field
+              key={c}
+              label={c}
+              value={(form.expense_gl_codes || {})[c] || ""}
+              onChange={v => set("expense_gl_codes")({ ...(form.expense_gl_codes || {}), [c]: v })}
+              placeholder={CATEGORY_META[c].gl}
+              maxLength={20}
+            />
+          ))}
+        </div>
       </Section>
 
       <Section title="Reminders" hint="Sent once a day, so nothing slips through.">

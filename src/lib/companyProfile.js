@@ -45,6 +45,9 @@ export const DEFAULT_PROFILE = {
   // services due, low stock), and overdue-invoice emails to customers.
   auto_reminders: true,
   email_customer_reminders: false,
+  // Ledger account per expense category for the accounting exports, e.g.
+  // { "Fuel": "4100/000" }. Missing categories use the app's defaults.
+  expense_gl_codes: {},
 };
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
@@ -117,6 +120,13 @@ export function cleanProfile(input) {
     } else if (k === "labour_rate" || k === "labour_cost") {
       const n = Math.round(Number(v) * 100) / 100;
       out[k] = Number.isFinite(n) && n > 0 ? n : 0;
+    } else if (k === "expense_gl_codes") {
+      const src = v && typeof v === "object" ? v : {};
+      out[k] = Object.fromEntries(
+        Object.entries(src)
+          .map(([c, code]) => [String(c).slice(0, 60), String(code ?? "").trim().slice(0, 20)])
+          .filter(([, code]) => code),
+      );
     } else if (k === "disabled_modules") {
       out[k] = Array.isArray(v) ? [...new Set(v.map(String))] : [];
     } else if (k === "vat_registered") {
