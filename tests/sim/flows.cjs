@@ -547,10 +547,14 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     let consoleOk = true;
     if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") {
       await go("Platform", 2500);
-      consoleOk = (await page.getByText("cvanjaarsveld2@icloud.com").count()) > 0;
+      const dashboard = (await page.getByText("Monthly income (paying plans)").count()) > 0 && (await page.getByText("Needs you").count()) > 0;
+      await page.getByRole("button", { name: /Companies \(/ }).click(); await page.waitForTimeout(800);
+      consoleOk = dashboard && (await page.getByText("cvanjaarsveld2@icloud.com").count()) > 0;
+      await page.getByText("cvanjaarsveld2@icloud.com").first().click(); await page.waitForTimeout(300);
+      consoleOk = consoleOk && (await page.getByRole("button", { name: "Give full access" }).count()) > 0;
     }
     rec("support: send a message from Help", row && row.user_id === H.UID && (row.status ?? "open") === "open" && shown && consoleOk ? "PASS" : "FAIL",
-      `ticket saved=${!!row} (status ${row?.status ?? "open (database default)"}); confirmation=${shown}; platform console lists companies=${consoleOk}`);
+      `ticket saved=${!!row} (status ${row?.status ?? "open (database default)"}); confirmation=${shown}; platform dashboard + company list + full-access button=${consoleOk}`);
   });
 
   // 13h. A customer accepts a quote online: link → page → name, signature, order no.

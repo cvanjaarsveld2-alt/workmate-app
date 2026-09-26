@@ -110,6 +110,43 @@ that opens Help.
 A payment for less than the plan's current price, e.g. after you raised prices, is recorded
 but doesn't upgrade. It shows in the events log as `billing_underpaid`.
 
+### Your dashboard (menu → Platform: all companies)
+
+**Overview** shows:
+
+- monthly income from paying companies;
+- how many companies are paying, on trial, on full access, read-only or suspended;
+- the total number of users;
+- sign-ups in the last 30 days and how many companies used the app this week.
+
+**Needs you** lists anything to act on:
+
+- trials ending within 3 days;
+- overdue companies;
+- cancelled PayFast subscriptions;
+- companies at their user limit;
+- requests to delete data;
+- open support messages.
+
+Tap a tile or a line to jump to those companies.
+
+**Companies** is the full list. You can:
+
+- search by name, owner email or your notes;
+- filter by Paying, On trial, Full access, Read-only or Suspended;
+- sort by newest, most recently active, name or number of users.
+
+Tap a company to see its users, clients, quotes, jobs and invoices, and what it has paid.
+Then use:
+
+- **Give full access**: everything, no end date, no payments. Sets the plan to *free* and
+  status *active*. Use this for your own company, partners or friends.
+- **+1 month paid**: extends *paid until* by a month, e.g. after an EFT. A company on trial
+  moves to Pro.
+- **+14 days trial**: gives a trial company more time.
+- **Suspend / Reactivate**: suspending locks everyone out; their data is kept.
+- **Or set it exactly**: choose the plan, status, paid-until date, user limit and private notes.
+
 ### Doing it by hand (EFT, deals)
 
 1. Settings → **Platform** → tap the company.

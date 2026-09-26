@@ -29,6 +29,7 @@ import {
   CheckCircle2,
   SlidersHorizontal,
   Lock,
+  LayoutGrid,
 } from "lucide-react";
 import { BRAND } from "../lib/constants";
 import { ALWAYS_SHOWN } from "../lib/menuPrefs";
@@ -79,6 +80,7 @@ const SECTIONS = [
       { key: "Notifications", label: "Notifications", icon: Bell, badgeKey: "unread" },
       { key: "SharedInbox", label: "Shared with me", icon: Inbox, badgeKey: "sharedInbox" },
       { key: "TeamDashboard", label: "Team Overview", icon: LayoutDashboard },
+      { key: "Platform", label: "Platform: all companies", icon: LayoutGrid, platformOnly: true },
       { key: "More", label: "Settings & More", icon: Settings, badgeKey: "pending" },
     ],
   },
@@ -95,6 +97,7 @@ export function NavDrawer({
   hiddenScreens = [],
   unavailableScreens = [],
   lockedScreens = [],
+  isPlatformAdmin = false,
   onSaveHidden,
 }) {
   // Editing the menu: a draft set of hidden screens, saved on Done.
@@ -105,7 +108,10 @@ export function NavDrawer({
   const off = new Set(unavailableScreens);
   // Not in the company's plan: still listed, with a lock (opens the upgrade page).
   const locked = new Set(lockedScreens);
-  const available = SECTIONS.map(s => ({ ...s, items: s.items.filter(i => !off.has(i.key)) })).filter(s => s.items.length);
+  const available = SECTIONS.map(s => ({
+    ...s,
+    items: s.items.filter(i => !off.has(i.key) && (!i.platformOnly || isPlatformAdmin)),
+  })).filter(s => s.items.length);
   const sections = available.map(s => ({
     ...s,
     items: s.items.filter(i => ALWAYS_SHOWN.has(i.key) || !hidden.has(i.key)),

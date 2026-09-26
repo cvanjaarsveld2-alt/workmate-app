@@ -1365,6 +1365,7 @@ export default function PowerWorksApp() {
               hiddenScreens={hiddenScreens}
               unavailableScreens={offScreens}
               lockedScreens={planLocked}
+              isPlatformAdmin={isPlatformAdmin}
               onSaveHidden={onSaveHidden}
               userId={session.user.id}
               teamId={teamId}
