@@ -647,12 +647,12 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     const approved = inv?.status === "sent" && !!inv?.approved_at;
     // Part payment.
     const card2 = page.locator("div.rounded-2xl", { hasText: inv?.invoice_number || "@@" }).filter({ has: page.getByRole("button", { name: "Record payment" }) }).last();
-    await card2.getByRole("button", { name: "Record payment" }).click(); await page.waitForTimeout(600);
+    await card2.getByRole("button", { name: "Record payment", exact: true }).click(); await page.waitForTimeout(600);
     await page.locator('label:has-text("Amount (R)") input').fill("500");
     await page.getByRole("button", { name: "Record a payment", exact: true }).last().click(); await page.waitForTimeout(2500);
     const partPaid = inv?.status === "part_paid" && Number(inv?.balance_due) === 535;
     // Credit note for part of what's owed.
-    await card2.getByRole("button", { name: "Credit note" }).click(); await page.waitForTimeout(600);
+    await card2.getByRole("button", { name: "Credit note", exact: true }).click(); await page.waitForTimeout(600);
     await page.locator('label:has-text("Amount (R)") input').fill("100");
     await page.locator('label:has-text("Reason") input').fill("SIM seal returned");
     await page.getByRole("button", { name: "Issue a credit note", exact: true }).last().click(); await page.waitForTimeout(2500);
