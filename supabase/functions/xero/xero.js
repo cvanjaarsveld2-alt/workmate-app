@@ -1,7 +1,12 @@
 // Invoice → Xero sales invoice, shared by the edge function (index.ts) and the
-// unit tests (tests/xero.test.mjs). Invoice lines in the app are kept
-// excluding VAT, so Xero gets them as "Exclusive" and applies the sales
-// account's VAT rate; a company that isn't VAT registered sends "NoTax".
+// unit tests (tests/xero.test.mjs). Line prices go as the invoice has them
+// ("Exclusive" or "Inclusive" of VAT); standard-rated lines use the sales
+// account's VAT rate, zero-rated and exempt lines say so, and each line's
+// discount goes as Xero's DiscountRate. A company that isn't VAT registered
+// sends "NoTax".
+
+// Xero's South African tax types for sales that aren't standard-rated.
+const TAX_TYPES = { zero: "ZERORATEDOUTPUT", exempt: "EXEMPTOUTPUT" };
 
 const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
 
@@ -19,6 +24,8 @@ function lines(raw) {
       description: [String(i?.part_number ?? i?.code ?? "").trim(), String(i?.description ?? "").trim()].filter(Boolean).join(" "),
       qty: Number(i?.qty ?? i?.quantity ?? 1) || 0,
       price: Number(i?.unitPrice ?? i?.unit_price ?? i?.price ?? 0) || 0,
+      discount: Math.min(Math.max(Number(i?.discount) || 0, 0), 100),
+      vat: i?.vat === "zero" || i?.vat === "exempt" ? i.vat : "standard",
     }))
     .filter(l => l.description || l.price);
 }
@@ -40,7 +47,7 @@ export function toXeroInvoice(inv, { accountCode = "200" } = {}) {
     InvoiceNumber: inv.invoice_number,
     Date: date,
     DueDate: inv.due_date || addDays(date, inv.terms ?? 30),
-    LineAmountTypes: inv.vat_registered === false ? "NoTax" : "Exclusive",
+    LineAmountTypes: inv.vat_registered === false ? "NoTax" : inv.vat_inclusive === true ? "Inclusive" : "Exclusive",
     Contact: {
       Name: String(inv.client || "Customer").slice(0, 255),
       ...(inv.email ? { EmailAddress: inv.email } : {}),
@@ -51,6 +58,8 @@ export function toXeroInvoice(inv, { accountCode = "200" } = {}) {
       Quantity: l.qty,
       UnitAmount: r2(l.price),
       AccountCode: accountCode,
+      ...(l.discount > 0 ? { DiscountRate: l.discount } : {}),
+      ...(inv.vat_registered !== false && TAX_TYPES[l.vat] ? { TaxType: TAX_TYPES[l.vat] } : {}),
     })),
   };
 }

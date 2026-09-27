@@ -51,3 +51,19 @@ test("tokens stay on the server and a synced invoice can't be unlinked by an old
   assert.match(fn, /xero_can_sync/);
   assert.match(fn, /cron_secret_matches/);
 });
+
+test("per-line VAT types, discounts and VAT-inclusive prices reach Xero", () => {
+  const x = toXeroInvoice({
+    invoice_number: "INV-00020", issue_date: "2026-09-01", due_date: "2026-10-01", client: "Mine Co", vat_registered: true, vat_inclusive: true,
+    line_items: [
+      { description: "Seal kit", qty: 2, unitPrice: 575, discount: 10 },
+      { description: "Export freight", qty: 1, unitPrice: 400, vat: "zero" },
+      { description: "Levy", qty: 1, unitPrice: 50, vat: "exempt" },
+    ],
+  });
+  assert.equal(x.LineAmountTypes, "Inclusive");
+  assert.equal(x.LineItems[0].DiscountRate, 10);
+  assert.equal(x.LineItems[0].TaxType, undefined);
+  assert.equal(x.LineItems[1].TaxType, "ZERORATEDOUTPUT");
+  assert.equal(x.LineItems[2].TaxType, "EXEMPTOUTPUT");
+});
