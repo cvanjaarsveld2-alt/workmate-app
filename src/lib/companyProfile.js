@@ -63,10 +63,16 @@ const ACTIVE_TEAM_KEY = "pm_active_team";
 // The company the signed-in person works for, so code outside React (PDFs,
 // message templates) can use its name and logo. Set by App when the team loads.
 export function setActiveTeamId(teamId) {
+  let changed = false;
   try {
+    changed = (localStorage.getItem(ACTIVE_TEAM_KEY) || null) !== (teamId || null);
     if (teamId) localStorage.setItem(ACTIVE_TEAM_KEY, teamId);
     else localStorage.removeItem(ACTIVE_TEAM_KEY);
   } catch {}
+  // The header's company name reads the active company: tell it (it would
+  // otherwise keep the product name after the team loads on start-up).
+  if (changed && typeof window !== "undefined")
+    window.dispatchEvent(new CustomEvent("pm:company-profile", { detail: { teamId, profile: readCachedProfile(teamId) } }));
 }
 export function activeTeamId() {
   try {

@@ -51,6 +51,13 @@ export function TeamMapScreen({ teamId, teamMembers = [], isManager = false, isO
 
   // The map (Leaflet is loaded only on this screen).
   useEffect(() => {
+    // The map's element is unmounted while the list is empty; drop the old map
+    // so a new one is made on the new element.
+    if (map.current && map.current.getContainer() !== mapEl.current) {
+      map.current.remove();
+      map.current = null;
+      layer.current = null;
+    }
     if (!rows || !rows.length || !mapEl.current) return;
     let cancelled = false;
     import("leaflet").then(({ default: L }) => {
