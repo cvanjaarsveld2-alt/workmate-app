@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { offlineDelete, offlineGetAll, offlineSave } from "../offline/offlineDb";
 import { saveAndSync, triggerImmediateSync } from "../lib/sync";
 import { supabase } from "../supabase";
-import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
+import { Card, Btn, FilterPills, PageHeader, useConfirm } from "../components/ui";
 import { BottomSheet } from "../components/BottomSheet";
 import {
   Bell,
@@ -25,7 +25,7 @@ import {
 import { daysOverdue, isOverdue, reminderMessage } from "../lib/reminders";
 import { formatPhone } from "../components/WhatsAppButton";
 import { useCompanyProfile } from "../lib/companyProfile";
-import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
+import { buildDocumentPDF, documentFilename, documentTitle, money, shareDocumentPDF } from "../lib/documentPDF";
 import { creditNoteToDocument, invoiceToDocument, isTemporaryInvoiceNumber, jobToCard, jobsForInvoice } from "../lib/documentData";
 import { resolveDocumentPhotos } from "../lib/documentPhotos";
 import { FORMATS, accountingCsv } from "../lib/accountingExport";
@@ -36,29 +36,19 @@ import { AgedDebtors } from "../components/AgedDebtors";
 import { publicUrl } from "../lib/appUrl";
 import { round2 } from "../lib/lineTotals";
 import { genId } from "../lib/helpers";
+import { todayISO as today } from "../lib/dates";
+import { downloadText } from "../lib/csv";
+import { INVOICE_LABELS, isApproved, isDraft, isOpen, isSettled, isVoid } from "../lib/invoiceState";
 
-const money = v =>
-  `R ${Number(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-export const INVOICE_LABELS = {
-  draft: "Draft",
-  sent: "Awaiting payment",
-  part_paid: "Partly paid",
-  partially_paid: "Partly paid",
-  paid: "Paid",
-  credited: "Credited",
-  overdue: "Overdue",
-  cancelled: "Void",
-};
 const METHODS = { eft: "EFT", cash: "Cash", card: "Card", instant_eft: "Instant EFT", other: "Other" };
 const FILTERS = ["All", "Draft", "Awaiting payment", "Overdue", "Paid", "Void"];
-const isOpen = inv => !["draft", "cancelled", "paid", "credited"].includes(inv.status) && Number(inv.balance_due || 0) > 0;
 const matchesFilter = (inv, f) =>
   f === "All" ||
-  (f === "Draft" && inv.status === "draft") ||
+  (f === "Draft" && isDraft(inv)) ||
   (f === "Awaiting payment" && isOpen(inv)) ||
-  (f === "Overdue" && isOpen(inv) && isOverdue(inv)) ||
-  (f === "Paid" && ["paid", "credited"].includes(inv.status)) ||
-  (f === "Void" && inv.status === "cancelled");
+  (f === "Overdue" && isOverdue(inv)) ||
+  (f === "Paid" && isSettled(inv)) ||
+  (f === "Void" && isVoid(inv));
 
 // Generated ONCE per payment intent (here, before the offline/online branch) and
 // carried as part of the record itself — every retry of the same queued item (offline
@@ -72,7 +62,43 @@ function genIdempotencyKey() {
   } catch {}
   return `idem_${Date.now()}_${Math.random().toString(36).slice(2, 10)}_${Math.random().toString(36).slice(2, 10)}`;
 }
-const today = () => new Date().toISOString().slice(0, 10);
+
+// The action sheets. `rpc` (online only) is called with the invoice or
+// payment and the reason; `done` is the notice afterwards.
+const SHEETS = {
+  pay: {
+    title: "Record a payment",
+    amount: "Amount (R)",
+    textLabel: "Reference (optional)",
+    placeholder: "e.g. bank reference",
+    maxLength: 100,
+  },
+  credit: {
+    title: "Issue a credit note",
+    amount: "Amount (R), including VAT",
+    placeholder: "e.g. faulty part returned",
+    help:
+      "The credit note gets its own number and reduces what the customer owes on this invoice. For the whole invoice, its lines are copied; otherwise the VAT is split in the same way as the invoice.",
+    rpc: (inv, v) => ["create_credit_note", { p_invoice_id: inv.id, p_amount: v.amount, p_reason: v.text }],
+    done: (inv, data) => `Credit note ${data?.credit_number || ""} issued for ${money(data?.total)}.`,
+  },
+  void: {
+    title: "Void this invoice",
+    placeholder: "e.g. billed to the wrong customer",
+    help: "The invoice keeps its number and stays on record marked VOID; the customer owes nothing on it. This can't be undone.",
+    danger: true,
+    rpc: inv => ["void_invoice", { p_invoice_id: inv.id, p_reason: null }],
+    done: inv => `Invoice ${inv.invoice_number} voided.`,
+  },
+  reverse: {
+    title: "Reverse this payment",
+    placeholder: "e.g. EFT bounced",
+    help: "The payment stays on record marked reversed and no longer counts towards the invoice. Record the correct one after.",
+    danger: true,
+    rpc: (inv, v, payment) => ["void_payment", { p_payment_id: payment.id, p_reason: null }],
+    done: () => "Payment reversed.",
+  },
+};
 
 // The action sheets: record a payment, credit note, void, reverse a payment.
 function ActionSheet({ sheet, onClose, onSubmit, busy, error }) {
@@ -83,27 +109,22 @@ function ActionSheet({ sheet, onClose, onSubmit, busy, error }) {
   const [method, setMethod] = useState("eft");
   const [text, setText] = useState("");
   useEffect(() => {
-    setAmount(sheet && (sheet.type === "pay" || sheet.type === "credit") ? owed.toFixed(2) : "");
+    setAmount(sheet && SHEETS[sheet.type].amount ? owed.toFixed(2) : "");
     setDate(today());
     setMethod("eft");
     setText("");
   }, [sheet?.type, sheet?.inv?.id, sheet?.payment?.id]);
   if (!sheet) return null;
-  const titles = {
-    pay: "Record a payment",
-    credit: "Issue a credit note",
-    void: "Void this invoice",
-    reverse: "Reverse this payment",
-  };
+  const cfg = SHEETS[sheet.type];
   const input = "w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3 text-base min-h-[52px]";
   const label = "block text-sm font-bold text-slate-500 mb-1";
   const submit = () => onSubmit({ amount: Number(String(amount).replace(/[, ]/g, "")), date, method, text: text.trim() });
   return (
-    <BottomSheet open onClose={onClose} title={titles[sheet.type]} subtitle={inv?.invoice_number ? `Invoice ${inv.invoice_number} · owed ${money(owed)}` : ""}>
+    <BottomSheet open onClose={onClose} title={cfg.title} subtitle={inv?.invoice_number ? `Invoice ${inv.invoice_number} · owed ${money(owed)}` : ""}>
       <div className="stack-y-3 pb-2">
-        {(sheet.type === "pay" || sheet.type === "credit") && (
+        {cfg.amount && (
           <label className={label}>
-            Amount (R){sheet.type === "credit" ? ", including VAT" : ""}
+            {cfg.amount}
             <input className={input} type="number" inputMode="decimal" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} />
           </label>
         )}
@@ -126,46 +147,17 @@ function ActionSheet({ sheet, onClose, onSubmit, busy, error }) {
           </>
         )}
         <label className={label}>
-          {sheet.type === "pay" ? "Reference (optional)" : "Reason"}
-          <input
-            className={input}
-            value={text}
-            maxLength={sheet.type === "pay" ? 100 : 300}
-            placeholder={
-              sheet.type === "pay"
-                ? "e.g. bank reference"
-                : sheet.type === "credit"
-                  ? "e.g. faulty part returned"
-                  : sheet.type === "void"
-                    ? "e.g. billed to the wrong customer"
-                    : "e.g. EFT bounced"
-            }
-            onChange={e => setText(e.target.value)}
-          />
+          {cfg.textLabel || "Reason"}
+          <input className={input} value={text} maxLength={cfg.maxLength || 300} placeholder={cfg.placeholder} onChange={e => setText(e.target.value)} />
         </label>
-        {sheet.type === "credit" && (
-          <p className="text-xs text-slate-500">
-            The credit note gets its own number and reduces what the customer owes on this invoice. For the whole invoice,
-            its lines are copied; otherwise the VAT is split in the same way as the invoice.
-          </p>
-        )}
-        {sheet.type === "void" && (
-          <p className="text-xs text-slate-500">
-            The invoice keeps its number and stays on record marked VOID; the customer owes nothing on it. This can't be undone.
-          </p>
-        )}
-        {sheet.type === "reverse" && (
-          <p className="text-xs text-slate-500">
-            The payment stays on record marked reversed and no longer counts towards the invoice. Record the correct one after.
-          </p>
-        )}
+        {cfg.help && <p className="text-xs text-slate-500">{cfg.help}</p>}
         {error && (
           <div role="alert" className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
             {error}
           </div>
         )}
-        <Btn onClick={submit} disabled={busy} variant={sheet.type === "void" || sheet.type === "reverse" ? "danger" : "solid"}>
-          {busy ? "Saving…" : titles[sheet.type]}
+        <Btn onClick={submit} disabled={busy} variant={cfg.danger ? "danger" : "solid"}>
+          {busy ? "Saving…" : cfg.title}
         </Btn>
       </div>
     </BottomSheet>
@@ -191,24 +183,28 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
   const { confirm, dialog } = useConfirm();
   const [making, setMaking] = useState(null);
   const [notice, setNotice] = useState("");
-  const clientName = inv => clients.find(c => c.id === inv.client_id)?.company || quotes.find(q => q.id === inv.quote_id)?.client_name || "";
+  // Lookups indexed once, not searched per card.
+  const clientName = useMemo(() => {
+    const byClient = new Map(clients.map(c => [c.id, c.company]));
+    const byQuote = new Map(quotes.map(q => [q.id, q.client_name]));
+    return inv => byClient.get(inv.client_id) || byQuote.get(inv.quote_id) || "";
+  }, [clients, quotes]);
+  const byInvoice = useMemo(() => {
+    const group = rows =>
+      rows.reduce((m, r) => (m.get(r.invoice_id) ? m.get(r.invoice_id).push(r) : m.set(r.invoice_id, [r]), m), new Map());
+    return { payments: group(payments), credits: group(creditNotes) };
+  }, [payments, creditNotes]);
+  const openSheet = (type, inv, payment) => {
+    setSheetError("");
+    setSheet({ type, inv, payment });
+  };
 
   // Export for accounting packages (Xero / Sage / QuickBooks), by month.
   const [exportMonth, setExportMonth] = useState(() => new Date().toISOString().slice(0, 7));
   function exportAccounting(format) {
-    const list = invoices.filter(
-      i => String(i.issue_date || "").startsWith(exportMonth) && !["cancelled", "draft"].includes(i.status),
-    );
+    const list = invoices.filter(i => String(i.issue_date || "").startsWith(exportMonth) && isApproved(i));
     if (!list.length) return setNotice(`No approved invoices in ${exportMonth}.`);
-    const csv = accountingCsv(format, list, { clients, quotes, profile });
-    const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Invoices_${exportMonth}_${FORMATS[format].label}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    downloadText(accountingCsv(format, list, { clients, quotes, profile }), `Invoices_${exportMonth}_${FORMATS[format].label}.csv`);
     setNotice(`${list.length} invoice${list.length === 1 ? "" : "s"} exported for ${FORMATS[format].label}.`);
   }
   // Jobs, to attach their job cards to an invoice or pro forma.
@@ -280,20 +276,19 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
   }
 
   // Approving issues the invoice: it gets locked on the server.
-  async function approve(inv, { quiet = false } = {}) {
+  async function approve(
+    inv,
+    {
+      message = `Approve invoice ${inv.invoice_number || ""}? Once approved it can't be changed, only credited or voided.`,
+      confirmLabel = "Approve",
+    } = {},
+  ) {
     if (!online) {
       setError("Connect to the internet to approve an invoice.");
       return null;
     }
     if (notYetSynced(inv)) return null;
-    if (
-      !quiet &&
-      !(await confirm(`Approve invoice ${inv.invoice_number || ""}? Once approved it can't be changed, only credited or voided.`, {
-        confirmLabel: "Approve",
-        confirmVariant: "success",
-      }))
-    )
-      return null;
+    if (!(await confirm(message, { confirmLabel, confirmVariant: "success" }))) return null;
     setError("");
     const { data, error: e } = await supabase.from("invoices").update({ status: "sent" }).eq("id", inv.id).select("*").single();
     if (e) {
@@ -303,6 +298,10 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
     replace(data);
     setNotice(`Invoice ${data.invoice_number} approved.`);
     return data;
+  }
+  function startEdit(inv) {
+    if (!online) return setError("Connect to the internet to edit an invoice.");
+    if (!notYetSynced(inv)) setEditing(inv);
   }
   async function removeDraft(inv) {
     if (!online) return setError("Connect to the internet to delete a draft.");
@@ -321,15 +320,11 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
   async function sharePdf(inv, kind) {
     setNotice("");
     let row = inv;
-    if (kind === "invoice" && inv.status === "draft") {
-      if (
-        !(await confirm(`Approve invoice ${inv.invoice_number || ""} to issue it? Once approved it can't be changed.`, {
-          confirmLabel: "Approve and make PDF",
-          confirmVariant: "success",
-        }))
-      )
-        return;
-      row = await approve(inv, { quiet: true });
+    if (kind === "invoice" && isDraft(inv)) {
+      row = await approve(inv, {
+        message: `Approve invoice ${inv.invoice_number || ""} to issue it? Once approved it can't be changed.`,
+        confirmLabel: "Approve and make PDF",
+      });
       if (!row) return;
     }
     setMaking(inv.id + kind);
@@ -428,7 +423,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
               .includes(t),
           ),
       );
-  }, [invoices, query, filter, clients]);
+  }, [invoices, query, filter, clientName]);
 
   // Record a payment. Online it goes straight to the server, which checks it
   // against what's owed; offline it's queued.
@@ -465,11 +460,9 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
       balance_due: Math.max(0, round2(Number(inv.total || 0) - paid - Number(inv.amount_credited || 0))),
       status: owed - p.amount <= 0.004 ? "paid" : "part_paid",
     };
-    await offlineSave("payments", p);
-    await offlineSave("invoices", updated);
     setPayments(x => [p, ...x]);
     setInvoices(x => x.map(i => (i.id === inv.id ? updated : i)));
-    await saveAndSync(p, "payments", "insert", setData || (() => {}), online);
+    await Promise.all([offlineSave("invoices", updated), saveAndSync(p, "payments", "insert", setData || (() => {}), online)]);
     setNotice("Payment saved offline and queued for sync.");
     return true;
   }
@@ -483,22 +476,11 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
       else {
         if (!online) return setSheetError("Connect to the internet to do this.");
         if (!values.text) return setSheetError("Give a reason; it's kept on record.");
-        const call =
-          type === "credit"
-            ? supabase.rpc("create_credit_note", { p_invoice_id: inv.id, p_amount: values.amount, p_reason: values.text })
-            : type === "void"
-              ? supabase.rpc("void_invoice", { p_invoice_id: inv.id, p_reason: values.text })
-              : supabase.rpc("void_payment", { p_payment_id: payment.id, p_reason: values.text });
-        const { data, error: e } = await call;
+        const [fn, args] = SHEETS[type].rpc(inv, values, payment);
+        const { data, error: e } = await supabase.rpc(fn, { ...args, p_reason: values.text });
         if (e) return setSheetError(e.message);
         await reloadInvoice(inv.id);
-        setNotice(
-          type === "credit"
-            ? `Credit note ${data?.credit_number || ""} issued for ${money(data?.total)}.`
-            : type === "void"
-              ? `Invoice ${inv.invoice_number} voided.`
-              : "Payment reversed.",
-        );
+        setNotice(SHEETS[type].done(inv, data));
         ok = true;
       }
     } finally {
@@ -507,8 +489,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
     if (ok) setSheet(null);
   }
 
-  const approved = invoices.filter(x => !["draft", "cancelled"].includes(x.status));
-  const outstanding = approved.reduce((s, x) => s + Number(x.balance_due || 0), 0),
+  const outstanding = invoices.filter(isApproved).reduce((s, x) => s + Number(x.balance_due || 0), 0),
     received = payments.filter(p => !p.voided_at).reduce((s, x) => s + Number(x.amount || 0), 0);
 
   if (editing)
@@ -569,7 +550,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
           <p className="text-lg font-black">{money(received)}</p>
         </Card>
       </div>
-      <AgedDebtors invoices={invoices} clients={clients} quotes={quotes} profile={profile} />
+      <AgedDebtors invoices={invoices} customerName={clientName} paymentTermsDays={profile.payment_terms_days ?? 30} />
       <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
         <summary className="text-sm font-bold text-slate-600 cursor-pointer min-h-[40px] flex items-center">Export for accounting</summary>
         <div className="stack-y-2 pb-2">
@@ -609,22 +590,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
           <RefreshCw size={14} />
         </Btn>
       </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Show">
-        {FILTERS.map(f => (
-          <button
-            key={f}
-            type="button"
-            role="tab"
-            aria-selected={filter === f}
-            onClick={() => setFilter(f)}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold min-h-[36px] ${
-              filter === f ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-600"
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-      </div>
+      <FilterPills options={FILTERS} value={filter} onChange={setFilter} />
       {loading ? (
         <Card className="p-6 text-center text-slate-400">Loading invoices…</Card>
       ) : visible.length === 0 ? (
@@ -634,20 +600,20 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
         </Card>
       ) : (
         visible.map(inv => {
-          const draft = inv.status === "draft";
-          const voided = inv.status === "cancelled";
-          const settled = ["paid", "credited"].includes(inv.status) || (!draft && !voided && Number(inv.balance_due || 0) <= 0);
-          const pays = payments.filter(p => p.invoice_id === inv.id);
-          const cns = creditNotes.filter(c => c.invoice_id === inv.id);
+          const draft = isDraft(inv);
+          const voided = isVoid(inv);
+          const settled = isSettled(inv);
+          const pays = byInvoice.payments.get(inv.id) || [];
+          const cns = byInvoice.credits.get(inv.id) || [];
           const livePays = pays.filter(p => !p.voided_at);
-          const overdue = !draft && !voided && !settled && isOverdue(inv);
+          const overdue = isOverdue(inv);
           return (
             <Card key={inv.id} className="p-4 stack-y-3">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <p className="font-black truncate">{inv.invoice_number || "Invoice"}</p>
                   <p className="text-sm text-slate-600 truncate">{clientName(inv) || "No customer yet"}</p>
-                  <p className={`text-xs font-bold ${overdue ? "text-red-700" : voided ? "text-slate-500" : draft ? "text-amber-700" : "text-slate-500"}`}>
+                  <p className={`text-xs font-bold ${overdue ? "text-red-700" : draft ? "text-amber-700" : "text-slate-500"}`}>
                     {overdue ? `Overdue · ${daysOverdue(inv)} days` : INVOICE_LABELS[inv.status] || String(inv.status || "").replaceAll("_", " ")}
                     {inv.due_date && !draft && !voided && !settled ? ` · due ${inv.due_date}` : ""}
                   </p>
@@ -668,7 +634,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
 
               {draft && (
                 <div className="grid grid-cols-3 gap-2">
-                  <Btn size="sm" variant="secondary" onClick={() => (!online ? setError("Connect to the internet to edit an invoice.") : notYetSynced(inv) ? null : setEditing(inv))}>
+                  <Btn size="sm" variant="secondary" onClick={() => startEdit(inv)}>
                     <Pencil size={13} /> Edit
                   </Btn>
                   <Btn size="sm" onClick={() => approve(inv)}>
@@ -680,7 +646,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
                 </div>
               )}
               {!draft && !voided && !settled && (
-                <Btn size="sm" onClick={() => { setSheetError(""); setSheet({ type: "pay", inv }); }}>
+                <Btn size="sm" onClick={() => openSheet("pay", inv)}>
                   <CreditCard size={13} />
                   Record payment
                 </Btn>
@@ -728,11 +694,11 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
               </div>
               {isManager && !draft && !voided && !settled && (
                 <div className="grid grid-cols-2 gap-2">
-                  <Btn size="sm" variant="ghost" onClick={() => { setSheetError(""); setSheet({ type: "credit", inv }); }} disabled={!online}>
+                  <Btn size="sm" variant="ghost" onClick={() => openSheet("credit", inv)} disabled={!online}>
                     <FileMinus size={13} /> Credit note
                   </Btn>
                   {livePays.length === 0 && cns.length === 0 && (
-                    <Btn size="sm" variant="ghost" onClick={() => { setSheetError(""); setSheet({ type: "void", inv }); }} disabled={!online}>
+                    <Btn size="sm" variant="ghost" onClick={() => openSheet("void", inv)} disabled={!online}>
                       <XCircle size={13} /> Void
                     </Btn>
                   )}
@@ -768,7 +734,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
                             online && (
                               <button
                                 type="button"
-                                onClick={() => { setSheetError(""); setSheet({ type: "reverse", inv, payment: p }); }}
+                                onClick={() => openSheet("reverse", inv, p)}
                                 className="text-xs font-bold text-red-700 flex items-center gap-1 min-h-[36px] px-2"
                               >
                                 <Undo2 size={12} /> Reverse

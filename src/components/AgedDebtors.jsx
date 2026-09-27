@@ -2,31 +2,17 @@
 import React, { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { AGE_BUCKETS, agedDebtors, agedDebtorsCsv } from "../lib/agedDebtors";
+import { money } from "../lib/documentPDF";
+import { downloadText } from "../lib/csv";
 import { Btn } from "./ui";
 
-const money = v => `R ${Number(v || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-export function AgedDebtors({ invoices = [], clients = [], quotes = [], profile = {} }) {
+export function AgedDebtors({ invoices = [], customerName = () => "", paymentTermsDays = 30 }) {
   const [openRow, setOpenRow] = useState(null);
   const report = useMemo(
-    () =>
-      agedDebtors(invoices, {
-        paymentTermsDays: profile.payment_terms_days ?? 30,
-        customerName: inv =>
-          clients.find(c => c.id === inv.client_id)?.company || quotes.find(q => q.id === inv.quote_id)?.client_name || "",
-      }),
-    [invoices, clients, quotes, profile.payment_terms_days],
+    () => agedDebtors(invoices, { paymentTermsDays, customerName }),
+    [invoices, customerName, paymentTermsDays],
   );
-  function download() {
-    const url = URL.createObjectURL(new Blob(["﻿" + agedDebtorsCsv(report)], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Aged_debtors_${report.asAt}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-  }
+  const download = () => downloadText(agedDebtorsCsv(report), `Aged_debtors_${report.asAt}.csv`);
   const overdue = report.totals.total - report.totals.current;
   return (
     <details className="rounded-xl border border-slate-200 bg-white px-3 py-2" data-testid="aged-debtors">

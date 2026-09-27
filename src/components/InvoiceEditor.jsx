@@ -9,10 +9,10 @@ import { supabase } from "../supabase";
 import { offlineSave } from "../offline/offlineDb";
 import { Btn, Card, ClientSelector, Field } from "./ui";
 import { QuoteLineItems } from "./QuoteLineItems";
-import { lineTotals, parseLines } from "../lib/lineTotals";
-import { addDays } from "../lib/documentPDF";
+import { lineTotals, num, parseLines } from "../lib/lineTotals";
+import { addDays, todayISO } from "../lib/dates";
 import { withTeamId } from "../lib/teamId";
-import { genId, todayISO } from "../lib/helpers";
+import { genId } from "../lib/helpers";
 
 // Lines as the editor shows them (text inputs, a key per line).
 const editorLines = raw =>
@@ -31,10 +31,10 @@ export function cleanLines(lines) {
       const out = {
         ...l,
         description: String(l.description || "").trim().slice(0, 500),
-        qty: Number(l.qty) || (l.qty === "0" ? 0 : 1),
-        unitPrice: Number(l.unitPrice) || 0,
+        qty: num(l.qty, 1),
+        unitPrice: num(l.unitPrice, 0),
       };
-      const d = Number(l.discount);
+      const d = num(l.discount, 0);
       if (d > 0) out.discount = Math.min(d, 100);
       else delete out.discount;
       if (l.vat === "zero" || l.vat === "exempt") out.vat = l.vat;

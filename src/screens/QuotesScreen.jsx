@@ -1,6 +1,6 @@
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
-import { lineAmounts, round2 } from "../lib/lineTotals";
+import { lineTotals } from "../lib/lineTotals";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download, CopyPlus, Lock } from "lucide-react";
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
@@ -64,9 +64,9 @@ function ExpandableText({ text, limit = 110, className = "" }) {
 
 // A quote's value: the sum of its lines after discounts, as entered
 // (including VAT when the prices include it).
-const linesValue = (lines, vatInclusive) =>
-  round2(lines.reduce((sum, l) => sum + lineAmounts(l, { vatInclusive, vatRegistered: false }).amount, 0));
-
+const linesValue = (lines, vatInclusive) => lineTotals(lines, { vatInclusive, vatRegistered: false }).total;
+// The quote card's small square buttons.
+const iconBtn = "min-h-[44px] rounded-xl bg-slate-50 flex items-center justify-center";
 
 export function QuotesScreen({
   data,
@@ -148,6 +148,7 @@ export function QuotesScreen({
     [sharing, setSharing] = useState(false);
   const { confirm, dialog } = useConfirm();
   const quotes = (data.quotes || []).filter(isMine);
+  const quoteNumbers = new Map((data.quotes || []).map(x => [x.id, x.quote_number]));
   useEffect(() => {
     if (quickAddTrigger?.screen !== "Quotes") return;
     setEditId(null);
@@ -264,11 +265,15 @@ export function QuotesScreen({
     if (!navigator.onLine) return setToast("Connect to the internet to revise a quote.");
     const { data: r, error } = await supabase.rpc("revise_quote", { p_quote_id: q.id });
     if (error) return setToast(error.message);
-    const { data: rows } = await supabase.from("quotes").select("*").in("id", [q.id, r.id]);
-    for (const row of rows || []) await offlineSave("quotes", { ...row, sync_status: "synced" });
     // The server moved the job made from it to the new version; so does this phone.
-    const { data: movedJobs } = await supabase.from("jobs").select("*").eq("quote_id", r.id);
-    for (const j of movedJobs || []) await offlineSave("jobs", { ...j, sync_status: "synced" });
+    const [{ data: rows }, { data: movedJobs }] = await Promise.all([
+      supabase.from("quotes").select("*").in("id", [q.id, r.id]),
+      supabase.from("jobs").select("*").eq("quote_id", r.id),
+    ]);
+    await Promise.all([
+      ...(rows || []).map(row => offlineSave("quotes", { ...row, sync_status: "synced" })),
+      ...(movedJobs || []).map(j => offlineSave("jobs", { ...j, sync_status: "synced" })),
+    ]);
     setData(d => ({
       ...d,
       quotes: [
@@ -526,8 +531,7 @@ export function QuotesScreen({
                       {[
                         q.invoiced_at && "Invoiced",
                         q.revision > 0 && `Revision ${q.revision}`,
-                        q.superseded_by &&
-                          `Replaced by ${quotes.find(x => x.id === q.superseded_by)?.quote_number || "a newer version"}`,
+                        q.superseded_by && `Replaced by ${quoteNumbers.get(q.superseded_by) || "a newer version"}`,
                       ]
                         .filter(Boolean)
                         .join(" · ")}
@@ -570,35 +574,27 @@ export function QuotesScreen({
                       {q.status !== "Superseded" && !q.invoiced_at ? (
                         <button
                           onClick={() => revise(q)}
-                          className="min-h-[44px] rounded-xl bg-slate-50 text-slate-500 active:bg-slate-100 active:text-blue-600 flex items-center justify-center gap-1 text-xs font-bold"
+                          className={`${iconBtn} gap-1 text-xs font-bold text-slate-500 active:bg-slate-100 active:text-blue-600`}
                           title="Make a new version to change it"
                           aria-label="Revise"
                         >
                           <CopyPlus size={15} /> Revise
                         </button>
                       ) : (
-                        <span className="min-h-[44px]" />
+                        <span />
                       )}
-                      <span
-                        className="min-h-[44px] rounded-xl bg-slate-50 text-slate-300 flex items-center justify-center"
-                        title="Accepted quotes are locked"
-                        aria-label="Locked"
-                      >
+                      <span className={`${iconBtn} text-slate-300`} title="Accepted quotes are locked" aria-label="Locked">
                         <Lock size={15} />
                       </span>
                     </>
                   ) : (
                     <>
-                      <button
-                        onClick={() => startEdit(q)}
-                        className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-blue-600 flex items-center justify-center"
-                        aria-label="Edit"
-                      >
+                      <button onClick={() => startEdit(q)} className={`${iconBtn} text-slate-400 active:bg-slate-100 active:text-blue-600`} aria-label="Edit">
                         <Edit2 size={15} />
                       </button>
                       <button
                         onClick={() => deleteQuote(q.id, q.client_name)}
-                        className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-red-600 flex items-center justify-center"
+                        className={`${iconBtn} text-slate-400 active:bg-slate-100 active:text-red-600`}
                         aria-label="Delete"
                       >
                         <Trash2 size={15} />

@@ -8,6 +8,7 @@
 //   const blob = await buildDocumentPDF({ kind: "invoice", number, date, client, items, ... }, profile);
 //   await shareDocumentPDF(blob, documentFilename(doc));
 
+import { addDays } from "./dates.js";
 import { hasDiscounts, hasMixedVat, lineAmounts, lineTotals, round2, vatCode, VAT_CODES } from "./lineTotals.js";
 
 export const VAT_RATE = 15;
@@ -42,11 +43,7 @@ export function documentTotals(
   return { ...t, paid, credited, balance: round2(t.total - paid - credited) };
 }
 
-export function addDays(isoDate, days) {
-  const d = new Date((isoDate || new Date().toISOString().slice(0, 10)) + "T12:00:00");
-  d.setDate(d.getDate() + (Number(days) || 0));
-  return d.toISOString().slice(0, 10);
-}
+export { addDays };
 
 const fmtDate = iso => {
   if (!iso) return "";

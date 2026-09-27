@@ -7,13 +7,12 @@
 import { invoiceToDocument } from "./documentData.js";
 import { chargesVat } from "./documentPDF.js";
 import { toCsv } from "./companyExport.js";
-import { lineAmounts, vatCode } from "./lineTotals.js";
+import { lineAmounts, round2 as r2, vatCode } from "./lineTotals.js";
 
 const dmy = iso => {
   const [y, m, d] = String(iso || "").slice(0, 10).split("-");
   return y && m && d ? `${d}/${m}/${y}` : "";
 };
-const r2 = n => Math.round((Number(n) || 0) * 100) / 100;
 
 // One row per invoice line, shared by every format.
 export function invoiceLines(invoices, { clients = [], quotes = [], profile = {} } = {}) {

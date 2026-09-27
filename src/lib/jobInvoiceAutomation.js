@@ -4,7 +4,7 @@ import { saveAndSync } from "./sync";
 import { withTeamId } from "./teamId";
 import { genId } from "./helpers";
 import { lineTotals, parseLines as parseStoredLines } from "./lineTotals";
-import { addDays } from "./documentPDF";
+import { addDays, todayISO } from "./dates";
 import { readCachedProfile } from "./companyProfile";
 import { partsToLines } from "./products";
 
@@ -134,7 +134,8 @@ export async function createInvoiceFromJob(
       billedQuoteId = quote.id;
     }
   }
-  const vatRegistered = readCachedProfile(teamId || job.team_id).vat_registered !== false;
+  const profile = readCachedProfile(teamId || job.team_id);
+  const vatRegistered = profile.vat_registered !== false;
   // An invoice carries its own lines, so it stays the same whatever later
   // happens to the quote: the quote's lines (or one line for its value), else
   // the parts and labour used on the job.
@@ -148,8 +149,8 @@ export async function createInvoiceFromJob(
     quoteVatInclusive = false;
   }
   const money = lineTotals(lines, { vatInclusive: quoteVatInclusive, vatRegistered });
-  const terms = readCachedProfile(teamId || job.team_id).payment_terms_days ?? 30;
-  const today = new Date().toISOString().slice(0, 10);
+  const terms = profile.payment_terms_days ?? 30;
+  const today = todayISO();
   const item = withTeamId(
     {
       id: genId(),

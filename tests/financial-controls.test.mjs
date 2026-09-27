@@ -78,7 +78,12 @@ test("aged debtors buckets by days past the due date", () => {
     { current: 1000, d30: 0, d60: 500, d90: 0, older: 200, total: 1700 },
   );
   assert.equal(r.rows[0].name, "Mine Co");
-  assert.match(agedDebtorsCsv(r), /"Mine Co",1000\.00,0\.00,500\.00,0\.00,0\.00,1500\.00/);
+  const csv = agedDebtorsCsv(r);
+  assert.match(csv, /Mine Co,1000\.00,0\.00,500\.00,0\.00,0\.00,1500\.00/);
+  assert.match(csv, /^Aged debtors as at 2026-09-29\r\nCustomer,Current,1–30 days/);
+  // Customer names can't smuggle spreadsheet formulas into the CSV.
+  const evil = agedDebtorsCsv(agedDebtors([{ ...invoices[0], client_id: "x" }], { asAt: "2026-09-29", customerName: () => "=HYPERLINK(1)" }));
+  assert.match(evil, /'=HYPERLINK\(1\)/);
 });
 
 test("documents: draft and void marks, credited amounts, credit notes", () => {

@@ -16,6 +16,7 @@ import { productLine, useProducts } from "../lib/products";
 import { ProductPicker } from "./ProductPicker";
 import { BRAND } from "../lib/constants";
 import { VAT_CODES, lineAmounts, lineTotals } from "../lib/lineTotals";
+import { money as fmt } from "../lib/documentPDF";
 
 function emptyLine() {
   return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, description: "", qty: "1", unitPrice: "" };
@@ -32,7 +33,6 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
 
   const opts = { vatInclusive, vatRegistered };
   const { subtotal, vat: vatAmount, total } = lineTotals(items, opts);
-  const fmt = n => `R ${Number(n || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="stack-y-3">

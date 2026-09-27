@@ -30,7 +30,9 @@ export const VAT_CODES = {
 };
 
 const NUM = /^\s*-?\d+(\.\d+)?\s*$/;
-const num = (v, fallback) => {
+// A number from a stored field, or the fallback for a blank or non-number
+// (a blank quantity is 1, as on the server).
+export const num = (v, fallback) => {
   if (typeof v === "number") return Number.isFinite(v) ? v : fallback;
   return NUM.test(String(v ?? "")) ? Number(v) : fallback;
 };
@@ -57,18 +59,15 @@ export function lineAmounts(line, { vatInclusive = false, vatRegistered = true }
 export function lineTotals(lines = [], { vatInclusive = false, vatRegistered = true } = {}) {
   let subtotal = 0,
     vat = 0;
-  const byCode = {};
   for (const line of Array.isArray(lines) ? lines : []) {
     if (!line || typeof line !== "object") continue;
     const a = lineAmounts(line, { vatInclusive, vatRegistered });
     subtotal += a.net;
     vat += a.vat;
-    const code = vatRegistered ? vatCode(line) : "none";
-    byCode[code] = round2((byCode[code] || 0) + a.net);
   }
   subtotal = round2(subtotal);
   vat = round2(vat);
-  return { subtotal, vat, total: round2(subtotal + vat), byCode };
+  return { subtotal, vat, total: round2(subtotal + vat) };
 }
 
 // Lines that aren't all standard-rated, or carry a discount, need the extra

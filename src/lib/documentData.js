@@ -4,27 +4,22 @@
 // in tests/documentData.test.mjs.
 import { addDays, chargesVat, documentTotals } from "./documentPDF.js";
 import { normaliseParts } from "./products.js";
+import { num, parseLines, vatCode } from "./lineTotals.js";
 
 export function parseItems(raw) {
-  let list = raw;
-  if (typeof list === "string") {
-    try {
-      list = JSON.parse(list);
-    } catch {
-      list = null;
-    }
-  }
-  if (!Array.isArray(list)) return [];
-  return list
-    .map(i => ({
-      description: String(i?.description ?? i?.desc ?? "").trim(),
-      // A blank quantity counts as 1, as on the server (private.line_totals).
-      qty: /^\s*-?\d+(\.\d+)?\s*$/.test(String(i?.qty ?? i?.quantity ?? "")) ? Number(i?.qty ?? i?.quantity) : 1,
-      unitPrice: Number(i?.unitPrice ?? i?.unit_price ?? i?.price ?? 0) || 0,
-      ...(Number(i?.discount) > 0 ? { discount: Math.min(Number(i.discount), 100) } : {}),
-      ...(i?.vat === "zero" || i?.vat === "exempt" ? { vat: i.vat } : {}),
-      ...(String(i?.part_number ?? i?.code ?? "").trim() ? { code: String(i.part_number ?? i.code).trim() } : {}),
-    }))
+  return parseLines(raw)
+    .map(i => {
+      const discount = Math.min(Math.max(num(i.discount, 0), 0), 100);
+      const code = String(i.part_number ?? i.code ?? "").trim();
+      return {
+        description: String(i.description ?? i.desc ?? "").trim(),
+        qty: num(i.qty ?? i.quantity, 1),
+        unitPrice: num(i.unitPrice ?? i.unit_price ?? i.price, 0),
+        ...(discount > 0 ? { discount } : {}),
+        ...(vatCode(i) !== "standard" ? { vat: vatCode(i) } : {}),
+        ...(code ? { code } : {}),
+      };
+    })
     .filter(i => i.description || i.unitPrice);
 }
 

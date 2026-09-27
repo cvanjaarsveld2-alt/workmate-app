@@ -5,13 +5,8 @@
 // returned *yesterday's* date from 22:00–00:00 local time every night,
 // causing follow-up and escalation checks to be wrong for 2 hours per day.
 // Now uses the local calendar date so it matches what the user sees on screen.
-export function todayISO() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
+import { todayISO } from "./dates";
+export { todayISO };
 
 export function niceDate(d) {
   if (!d) d = new Date();
