@@ -22,6 +22,8 @@ const profile = {
   brand_color: "#123456",
 };
 
+const pickTotals = ({ subtotal, vat, total, paid, balance }) => ({ subtotal, vat, total, paid, balance });
+
 test("titles follow the document type and VAT registration", () => {
   assert.equal(documentTitle("quote", profile), "QUOTATION");
   assert.equal(documentTitle("proforma", profile), "PRO FORMA INVOICE");
@@ -33,7 +35,7 @@ test("titles follow the document type and VAT registration", () => {
 test("money and VAT totals", () => {
   assert.equal(money(1234567.5), "R 1 234 567.50");
   assert.equal(money(-5), "-R 5.00");
-  assert.deepEqual(documentTotals([{ qty: 2, unitPrice: 575 }], { vatInclusive: true }), {
+  assert.deepEqual(pickTotals(documentTotals([{ qty: 2, unitPrice: 575 }], { vatInclusive: true })), {
     subtotal: 1000,
     vat: 150,
     total: 1150,
@@ -140,7 +142,7 @@ test("the company profile is owner-only and invoices get server numbers", () => 
 test("companies not registered for VAT charge none and never issue tax invoices", async () => {
   const noVat = { ...profile, vat_registered: false };
   assert.equal(documentTitle("invoice", noVat), "INVOICE");
-  assert.deepEqual(documentTotals([{ qty: 2, unitPrice: 500 }], { vatInclusive: false, vatRegistered: false }), {
+  assert.deepEqual(pickTotals(documentTotals([{ qty: 2, unitPrice: 500 }], { vatInclusive: false, vatRegistered: false })), {
     subtotal: 1000,
     vat: 0,
     total: 1000,

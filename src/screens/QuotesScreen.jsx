@@ -1,4 +1,5 @@
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
+import { lineAmounts, round2 } from "../lib/lineTotals";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download } from "lucide-react";
@@ -60,6 +61,11 @@ function ExpandableText({ text, limit = 110, className = "" }) {
     </div>
   );
 }
+
+// A quote's value: the sum of its lines after discounts, as entered
+// (including VAT when the prices include it).
+const linesValue = (lines, vatInclusive) =>
+  round2(lines.reduce((sum, l) => sum + lineAmounts(l, { vatInclusive, vatRegistered: false }).amount, 0));
 
 export function QuotesScreen({
   data,
@@ -181,10 +187,7 @@ export function QuotesScreen({
     };
     if (editId) {
       const existing = quotes.find(q => q.id === editId);
-      const totalFromLines = lineItems.reduce(
-        (sum, i) => sum + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0),
-        0,
-      );
+      const totalFromLines = linesValue(lineItems, vatInclusive);
       const updated = {
         ...existing,
         ...form,
@@ -215,10 +218,7 @@ export function QuotesScreen({
       setToast("Quote updated");
       triggerImmediateSync();
     } else {
-      const totalFromLines = lineItems.reduce(
-          (s, i) => s + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0),
-          0,
-        ),
+      const totalFromLines = linesValue(lineItems, vatInclusive),
         quoteValue = lineItems.length > 0 ? totalFromLines : parseFloat(form.value || 0),
         item = withTeamId(
           {

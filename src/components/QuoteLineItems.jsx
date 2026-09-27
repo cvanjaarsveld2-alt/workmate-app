@@ -15,7 +15,7 @@ import { activeTeamId } from "../lib/companyProfile";
 import { productLine, useProducts } from "../lib/products";
 import { ProductPicker } from "./ProductPicker";
 import { BRAND } from "../lib/constants";
-import { VAT_PERCENT, roundMoney, calculateVat } from "../lib/finance";
+import { VAT_CODES, lineAmounts, lineTotals } from "../lib/lineTotals";
 
 function emptyLine() {
   return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, description: "", qty: "1", unitPrice: "" };
@@ -30,9 +30,9 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
   function add() { onChange([...items, emptyLine()]); }
   function remove(id) { onChange(items.filter(i => i.id !== id)); }
 
-  const lineSubtotal = items.reduce((s, i) => s + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0), 0);
-  const subtotal = roundMoney(lineSubtotal);
-  const { vat: vatAmount, total } = calculateVat(subtotal, vatInclusive, vatRegistered);
+  const opts = { vatInclusive, vatRegistered };
+  const { subtotal, vat: vatAmount, total } = lineTotals(items, opts);
+  const fmt = n => `R ${Number(n || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="stack-y-3">
@@ -71,10 +71,24 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
                   <input type="number" step="0.01" value={item.unitPrice} onChange={e => update(item.id, "unitPrice", e.target.value)}
                     placeholder="0.00" className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-hidden focus:border-red-300" />
                 </div>
+                <div className="min-w-0">
+                  <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">Discount %</label>
+                  <input type="number" min="0" max="100" step="0.5" value={item.discount ?? ""} onChange={e => update(item.id, "discount", e.target.value)}
+                    placeholder="0" aria-label={`Line ${idx + 1} discount`} className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm outline-hidden focus:border-red-300 text-center" />
+                </div>
+                {vatRegistered ? (
+                  <div className="min-w-0">
+                    <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">VAT</label>
+                    <select value={item.vat || "standard"} onChange={e => update(item.id, "vat", e.target.value)} aria-label={`Line ${idx + 1} VAT`}
+                      className="w-full rounded-lg border border-slate-200 bg-white px-2 py-2 text-sm outline-hidden focus:border-red-300">
+                      {Object.entries(VAT_CODES).map(([k, v]) => (
+                        <option key={k} value={k}>{v.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : <div />}
                 <div className="col-span-2 flex items-center justify-between gap-2 pt-1">
-                  <p className="text-sm font-black text-slate-700 truncate">
-                    R {roundMoney((parseFloat(item.qty) || 1) * (parseFloat(item.unitPrice) || 0)).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
-                  </p>
+                  <p className="text-sm font-black text-slate-700 truncate">{fmt(lineAmounts(item, opts).amount)}</p>
                 </div>
               </div>
             </div>
@@ -114,18 +128,18 @@ export function QuoteLineItems({ items = [], onChange, vatInclusive = true, onVa
           {vatRegistered && !vatInclusive && (
             <div className="flex justify-between text-sm">
               <span className="text-slate-500">Subtotal</span>
-              <span className="font-bold text-slate-700">R {subtotal.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-slate-700">{fmt(subtotal)}</span>
             </div>
           )}
           {vatRegistered && (
             <div className="flex justify-between text-sm">
-              <span className="text-slate-500">VAT ({VAT_PERCENT}%){vatInclusive ? " incl." : ""}</span>
-              <span className="font-bold text-slate-500">R {vatAmount.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
+              <span className="text-slate-500">VAT{vatInclusive ? " incl." : ""}</span>
+              <span className="font-bold text-slate-500">{fmt(vatAmount)}</span>
             </div>
           )}
           <div className="flex justify-between text-base pt-1 border-t border-slate-100">
             <span className="font-black text-slate-900">Total</span>
-            <span className="font-black" style={{ color: BRAND.primary }}>R {total.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
+            <span className="font-black" style={{ color: BRAND.primary }}>{fmt(total)}</span>
           </div>
         </div>
       )}
