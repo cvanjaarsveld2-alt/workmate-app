@@ -143,7 +143,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 const b64 = o => Buffer.from(JSON.stringify(o)).toString("base64url");
 const exp = Math.floor(Date.now() / 1000) + 86400;
 const JWT = b64({ alg: "HS256", typ: "JWT" }) + "." + b64({ sub: UID, email: EMAIL, role: "authenticated", aud: "authenticated", exp, session_id: "sim" }) + ".sig";
-const USER = { id: UID, aud: "authenticated", role: "authenticated", email: EMAIL, email_confirmed_at: day(90) + "T00:00:00Z", app_metadata: { provider: "email" }, user_metadata: { full_name: "Christo van Jaarsveld" }, created_at: day(90) + "T00:00:00Z" };
+const USER = { id: UID, aud: "authenticated", role: "authenticated", email: EMAIL, email_confirmed_at: day(90) + "T00:00:00Z", app_metadata: { provider: "email" }, user_metadata: { full_name: process.env.SIM_NAME || "Christo van Jaarsveld" }, created_at: day(90) + "T00:00:00Z" };
 let screenTag = "boot";
 
 async function handle(route) {
@@ -329,8 +329,8 @@ async function handle(route) {
   log.unhandled.push(`${m} ${p}`); return json(route, 404, {});
 }
 
-async function newSimContext(browser, { serviceWorkers = "block" } = {}) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers, colorScheme: process.env.SIM_DARK ? "dark" : "light" });
+async function newSimContext(browser, { serviceWorkers = "block", recordVideo } = {}) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers, colorScheme: process.env.SIM_DARK ? "dark" : "light", ...(recordVideo ? { recordVideo } : {}) });
   await context.route(`${SUPA}/**`, handle);
   await context.route("https://api.frankfurter.app/**", r => json(r, 200, { amount: 1, base: "GHS", date: day(1), rates: { ZAR: 1.62 } }));
   await context.route(/^https:\/\/(?!localhost)/, r => { if (r.request().url().startsWith(SUPA)) return handle(r); log.unhandled.push("external " + new URL(r.request().url()).host); return r.abort(); });
@@ -378,5 +378,5 @@ async function run() {
   // hand the live objects to the flows script
   return { browser, context, page, perScreen, log, db, setTag: t => { screenTag = t; } };
 }
-module.exports = { run, newSimContext, db, log, UID, TEAM, APP, SIM };
+module.exports = { run, newSimContext, db, log, UID, TEAM, APP, SIM, RPC };
 if (require.main === module) run().then(async ({ browser }) => { await browser.close(); console.log("done"); }).catch(e => { console.error(e); process.exit(1); });
