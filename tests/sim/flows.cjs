@@ -19,14 +19,19 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
   // 1. Historic vehicle checks render (85/90 prod rows store data as a JSON string)
   await safe("vehicle: historic day renders", async () => {
     await go("VehicleCheck");
+    // The latest weekday before today (checks are Mon–Fri, so on a Sunday or Monday that's Friday).
+    let n = 1;
     const d = new Date(); d.setDate(d.getDate() - 1);
-    const wd = d.toLocaleDateString("en-US", { weekday: "short" });
-    await page.locator("button", { hasText: new RegExp(`^\\s*${wd}\\s*${d.getDate()}\\s*$`) }).first().click();
+    while (d.getDay() === 0 || d.getDay() === 6) { d.setDate(d.getDate() - 1); n++; }
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    // Seeded n days ago: item j is an issue when (n - 1 + j) % 9 === 0 (harness.cjs).
+    const issues = Array.from({ length: 10 }, (_, j) => (n - 1 + j) % 9 === 0).filter(Boolean).length;
+    await page.locator('input[type="date"]').first().fill(iso);
     await page.waitForTimeout(800);
     await shot("vehicle-yesterday");
     const body = await page.evaluate(() => document.body.innerText);
     const status = (body.match(/\d+ issues? flagged|\d+ \/ \d+ checked|All good[^\n]*/i) || ["?"])[0];
-    rec("vehicle: historic day renders", /2 issues flagged/.test(status) ? "PASS" : "FAIL", `yesterday shows "${status}" (seeded: 10 answered, 2 issues, stored as JSON text like 85/90 prod rows)`);
+    rec("vehicle: historic day renders", new RegExp(`^${issues} issues? flagged`).test(status) ? "PASS" : "FAIL", `${iso} shows "${status}" (seeded: 10 answered, ${issues} issue(s), stored as JSON text like 85/90 prod rows)`);
   });
   await safe("vehicle: history tab", async () => {
     await page.getByText("History", { exact: true }).click(); await page.waitForTimeout(1000);
