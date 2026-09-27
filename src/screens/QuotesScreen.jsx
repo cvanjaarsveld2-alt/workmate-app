@@ -1,6 +1,6 @@
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
-import { lineAmounts, round2 } from "../lib/lineTotals";
 import React, { useState, useEffect } from "react";
+import { lineAmounts, round2 } from "../lib/lineTotals";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download, CopyPlus, Lock } from "lucide-react";
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
@@ -266,6 +266,9 @@ export function QuotesScreen({
     if (error) return setToast(error.message);
     const { data: rows } = await supabase.from("quotes").select("*").in("id", [q.id, r.id]);
     for (const row of rows || []) await offlineSave("quotes", { ...row, sync_status: "synced" });
+    // The server moved the job made from it to the new version; so does this phone.
+    const { data: movedJobs } = await supabase.from("jobs").select("*").eq("quote_id", r.id);
+    for (const j of movedJobs || []) await offlineSave("jobs", { ...j, sync_status: "synced" });
     setData(d => ({
       ...d,
       quotes: [

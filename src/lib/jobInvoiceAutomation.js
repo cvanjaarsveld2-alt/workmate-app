@@ -3,27 +3,13 @@ import { offlineGetAll, offlineSave } from "../offline/offlineDb";
 import { saveAndSync } from "./sync";
 import { withTeamId } from "./teamId";
 import { genId } from "./helpers";
-import { lineTotals } from "./lineTotals";
+import { lineTotals, parseLines as parseStoredLines } from "./lineTotals";
+import { addDays } from "./documentPDF";
 import { readCachedProfile } from "./companyProfile";
 import { partsToLines } from "./products";
 
-// Line items as stored (JSON text or an array), keeping discounts and VAT codes.
-function parseLines(raw) {
-  let list = raw;
-  if (typeof list === "string") {
-    try {
-      list = JSON.parse(list);
-    } catch {
-      list = null;
-    }
-  }
-  return Array.isArray(list) ? list.filter(l => l && typeof l === "object" && (l.description || Number(l.unitPrice))) : [];
-}
-const addDaysISO = (iso, days) => {
-  const d = new Date(iso + "T12:00:00");
-  d.setDate(d.getDate() + (Number(days) || 0));
-  return d.toISOString().slice(0, 10);
-};
+// Lines worth billing: something described or priced.
+const parseLines = raw => parseStoredLines(raw).filter(l => l.description || Number(l.unitPrice ?? l.unit_price ?? l.price));
 
 const onlineNow = value =>
   value !== undefined ? value : typeof navigator !== "undefined" ? navigator.onLine : true;
@@ -108,14 +94,17 @@ export async function createInvoiceFromJob(
   isOnline = onlineNow(),
 ) {
   if (!job?.id || !userId) return { ok: false, reason: "missing-job" };
+  // A voided invoice no longer holds the job (the server frees it), so the
+  // job can be invoiced again.
   const localInvoices = await offlineGetAll("invoices").catch(() => []);
-  const localExisting = localInvoices.find(invoice => invoice.job_id === job.id);
+  const localExisting = localInvoices.find(invoice => invoice.job_id === job.id && invoice.status !== "cancelled");
   if (localExisting) return { ok: true, invoice: localExisting, created: false, local: true };
   if (isOnline) {
     const { data: existing, error } = await supabase
       .from("invoices")
       .select("id, invoice_number")
       .eq("job_id", job.id)
+      .neq("status", "cancelled")
       .maybeSingle();
     if (!error && existing) return { ok: true, invoice: existing, created: false };
   }
@@ -123,20 +112,29 @@ export async function createInvoiceFromJob(
   let total = Number(job._quoteValue ?? job.quote_value ?? 0);
   let quoteLines = parseLines(job._quoteLines);
   let quoteText = job._quoteDescription || "";
-  if ((!total || !quoteLines.length) && job.quote_id && isOnline) {
-    const { data: quote } = await supabase
-      .from("quotes")
-      .select("value, vat_inclusive, line_items, description")
-      .eq("id", job.quote_id)
-      .maybeSingle();
-    if (!total) total = Number(quote?.value || 0);
-    if (quote?.vat_inclusive !== undefined && quote?.vat_inclusive !== null) quoteVatInclusive = quote.vat_inclusive !== false;
-    if (!quoteLines.length) quoteLines = parseLines(quote?.line_items);
-    quoteText = quoteText || quote?.description || "";
+  let billedQuoteId = job.quote_id || null;
+  if (job.quote_id && isOnline) {
+    // Online, bill the quote as the server has it, following any revision
+    // (Q-00012 → Q-00012-R1) to the newest version.
+    let quote = null;
+    for (let id = job.quote_id, n = 0; id && n < 20; n++) {
+      const { data } = await supabase
+        .from("quotes")
+        .select("id, value, vat_inclusive, line_items, description, superseded_by")
+        .eq("id", id)
+        .maybeSingle();
+      quote = data;
+      id = data?.superseded_by;
+    }
+    if (quote) {
+      total = Number(quote.value || 0);
+      quoteLines = parseLines(quote.line_items);
+      quoteText = quote.description || quoteText;
+      if (quote.vat_inclusive !== undefined && quote.vat_inclusive !== null) quoteVatInclusive = quote.vat_inclusive !== false;
+      billedQuoteId = quote.id;
+    }
   }
   const vatRegistered = readCachedProfile(teamId || job.team_id).vat_registered !== false;
-  // No quote to bill from: bill the priced catalogue parts used on the job and
-  // its billable timesheet hours (invoice lines are kept excluding VAT).
   // An invoice carries its own lines, so it stays the same whatever later
   // happens to the quote: the quote's lines (or one line for its value), else
   // the parts and labour used on the job.
@@ -157,12 +155,12 @@ export async function createInvoiceFromJob(
       id: genId(),
       user_id: userId,
       client_id: job.client_id || null,
-      quote_id: job.quote_id || null,
+      quote_id: billedQuoteId,
       job_id: job.id,
       invoice_number: `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
       status: "draft",
       issue_date: today,
-      due_date: addDaysISO(today, terms),
+      due_date: addDays(today, terms),
       subtotal: money.subtotal,
       vat: money.vat,
       total: money.total,

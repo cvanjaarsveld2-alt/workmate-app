@@ -22,7 +22,8 @@ function lines(raw) {
   return (Array.isArray(list) ? list : [])
     .map(i => ({
       description: [String(i?.part_number ?? i?.code ?? "").trim(), String(i?.description ?? "").trim()].filter(Boolean).join(" "),
-      qty: Number(i?.qty ?? i?.quantity ?? 1) || 0,
+      // A blank quantity counts as 1, as in the app and on the server.
+      qty: /^\s*-?\d+(\.\d+)?\s*$/.test(String(i?.qty ?? i?.quantity ?? "")) ? Number(i?.qty ?? i?.quantity) : 1,
       price: Number(i?.unitPrice ?? i?.unit_price ?? i?.price ?? 0) || 0,
       discount: Math.min(Math.max(Number(i?.discount) || 0, 0), 100),
       vat: i?.vat === "zero" || i?.vat === "exempt" ? i.vat : "standard",
@@ -36,6 +37,24 @@ const addDays = (iso, n) => {
   return d.toISOString().slice(0, 10);
 };
 
+// Line amounts as the document has them; the VAT type for lines that aren't
+// standard-rated.
+const lineAmountTypes = doc => (doc.vat_registered === false ? "NoTax" : doc.vat_inclusive === true ? "Inclusive" : "Exclusive");
+const xeroLines = (items, doc, accountCode) =>
+  items.map(l => ({
+    Description: l.description.slice(0, 4000) || "Services",
+    Quantity: l.qty,
+    UnitAmount: r2(l.price),
+    AccountCode: accountCode,
+    ...(l.discount > 0 ? { DiscountRate: l.discount } : {}),
+    ...(doc.vat_registered !== false && TAX_TYPES[l.vat] ? { TaxType: TAX_TYPES[l.vat] } : {}),
+  }));
+const contact = doc => ({
+  Name: String(doc.client || "Customer").slice(0, 255),
+  ...(doc.email ? { EmailAddress: doc.email } : {}),
+  ...(doc.vat_number ? { TaxNumber: doc.vat_number } : {}),
+});
+
 export function toXeroInvoice(inv, { accountCode = "200" } = {}) {
   let items = lines(inv.line_items);
   if (!items.length)
@@ -47,29 +66,34 @@ export function toXeroInvoice(inv, { accountCode = "200" } = {}) {
     InvoiceNumber: inv.invoice_number,
     Date: date,
     DueDate: inv.due_date || addDays(date, inv.terms ?? 30),
-    LineAmountTypes: inv.vat_registered === false ? "NoTax" : inv.vat_inclusive === true ? "Inclusive" : "Exclusive",
-    Contact: {
-      Name: String(inv.client || "Customer").slice(0, 255),
-      ...(inv.email ? { EmailAddress: inv.email } : {}),
-      ...(inv.vat_number ? { TaxNumber: inv.vat_number } : {}),
-    },
-    LineItems: items.map(l => ({
-      Description: l.description.slice(0, 4000) || "Services",
-      Quantity: l.qty,
-      UnitAmount: r2(l.price),
-      AccountCode: accountCode,
-      ...(l.discount > 0 ? { DiscountRate: l.discount } : {}),
-      ...(inv.vat_registered !== false && TAX_TYPES[l.vat] ? { TaxType: TAX_TYPES[l.vat] } : {}),
-    })),
+    LineAmountTypes: lineAmountTypes(inv),
+    Contact: contact(inv),
+    LineItems: xeroLines(items, inv, accountCode),
   };
 }
 
-// Xero's answer for one invoice → { xero_id } or { error }.
-export function readResult(x) {
+// A credit note made in the app → Xero sales credit note (allocated to its
+// invoice by the edge function once created).
+export function toXeroCreditNote(cn, { accountCode = "200" } = {}) {
+  const items = lines(cn.line_items);
+  return {
+    Type: "ACCRECCREDIT",
+    Status: "AUTHORISED",
+    CreditNoteNumber: cn.credit_number,
+    Reference: [cn.invoice_number, cn.reason].filter(Boolean).join(" · ").slice(0, 255),
+    Date: String(cn.issue_date || new Date().toISOString()).slice(0, 10),
+    LineAmountTypes: lineAmountTypes(cn),
+    Contact: contact(cn),
+    LineItems: xeroLines(items.length ? items : [{ description: cn.reason || "Credit", qty: 1, price: Number(cn.total) || 0, discount: 0, vat: "standard" }], cn, accountCode),
+  };
+}
+
+// Xero's answer for one invoice (or credit note) → { xero_id } or { error }.
+export function readResult(x, idKey = "InvoiceID") {
   if (!x) return { error: "No answer from Xero" };
   if (x.HasErrors || (x.ValidationErrors && x.ValidationErrors.length))
     return { error: (x.ValidationErrors || []).map(e => e.Message).join("; ") || "Rejected by Xero" };
-  return x.InvoiceID ? { xero_id: x.InvoiceID } : { error: "No invoice ID from Xero" };
+  return x[idKey] ? { xero_id: x[idKey] } : { error: "No ID from Xero" };
 }
 
 export const isDuplicateNumber = msg => /must be unique/i.test(String(msg || ""));

@@ -125,7 +125,7 @@ export function JobsScreen({ userId, teamId, setData, clients = [], canClock = t
           .select("*")
           .order("scheduled_date", { ascending: true })
           .order("scheduled_time", { ascending: true }),
-        supabase.from("quotes").select("id,value,client_name,description").eq("user_id", userId),
+        supabase.from("quotes").select("*").eq("user_id", userId),
       ]);
       if (!jq.error) {
         apply(jq.data || []);

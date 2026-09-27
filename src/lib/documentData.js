@@ -18,7 +18,8 @@ export function parseItems(raw) {
   return list
     .map(i => ({
       description: String(i?.description ?? i?.desc ?? "").trim(),
-      qty: Number(i?.qty ?? i?.quantity ?? 1) || 0,
+      // A blank quantity counts as 1, as on the server (private.line_totals).
+      qty: /^\s*-?\d+(\.\d+)?\s*$/.test(String(i?.qty ?? i?.quantity ?? "")) ? Number(i?.qty ?? i?.quantity) : 1,
       unitPrice: Number(i?.unitPrice ?? i?.unit_price ?? i?.price ?? 0) || 0,
       ...(Number(i?.discount) > 0 ? { discount: Math.min(Number(i.discount), 100) } : {}),
       ...(i?.vat === "zero" || i?.vat === "exempt" ? { vat: i.vat } : {}),

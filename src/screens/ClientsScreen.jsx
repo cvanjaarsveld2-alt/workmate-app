@@ -13,7 +13,7 @@ import { ShareSheet } from "../components/ShareSheet";
 import { sendAssignmentNotification } from "../lib/teamNotifications";
 import { BRAND, PIPELINE_STAGES, REMINDER_OPTIONS, NOTE_URGENCY, STAGE_COLORS } from "../lib/constants";
 import { todayISO, smartDate, genId } from "../lib/helpers";
-import { offlineSave, offlineDelete } from "../offline/offlineDb";
+import { offlineGetAll, offlineSave, offlineDelete } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
 import { WhatsAppButton } from "../components/WhatsAppButton";
@@ -474,6 +474,16 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
   }
 
   async function deleteClient(id, companyName) {
+    // Their approved invoices and accepted quotes are the company's books; the
+    // server refuses the delete, so say so up front.
+    const invoices = await offlineGetAll("invoices").catch(() => []);
+    if (
+      invoices.some(i => i.client_id === id && i.status && i.status !== "draft") ||
+      (data.quotes || []).some(q => q.client_id === id && isLockedQuote(q))
+    ) {
+      setToast(`${companyName} has approved invoices or accepted quotes, so it can't be deleted.`);
+      return;
+    }
     const linkedFUs = followups.filter(f => f.client_id === id);
     const linkedContacts = (data.contacts || []).filter(c => c.client_id === id);
     const linkedLeads = (data.leads || []).filter(l => l.client_id === id);
@@ -494,8 +504,7 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
     for (const r of linkedNotes) { await deleteRecord("notes", r.id, userId, setData); }
     for (const r of linkedEquip) { await deleteRecord("equipment", r.id, userId, setData); }
     for (const r of linkedActs) { await deleteRecord("activities", r.id, userId, setData); }
-    // Accepted or invoiced quotes stay on record (the server keeps them).
-    for (const r of linkedQuotes.filter(q => !isLockedQuote(q))) { await deleteRecord("quotes", r.id, userId, setData); }
+    for (const r of linkedQuotes) { await deleteRecord("quotes", r.id, userId, setData); }
     setToast(`${companyName} and ${total} linked records deleted`);
   }
 

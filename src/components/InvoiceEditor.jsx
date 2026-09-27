@@ -9,32 +9,19 @@ import { supabase } from "../supabase";
 import { offlineSave } from "../offline/offlineDb";
 import { Btn, Card, ClientSelector, Field } from "./ui";
 import { QuoteLineItems } from "./QuoteLineItems";
-import { lineTotals } from "../lib/lineTotals";
+import { lineTotals, parseLines } from "../lib/lineTotals";
+import { addDays } from "../lib/documentPDF";
 import { withTeamId } from "../lib/teamId";
 import { genId, todayISO } from "../lib/helpers";
 
-const addDays = (iso, days) => {
-  const d = new Date(iso + "T12:00:00");
-  d.setDate(d.getDate() + (Number(days) || 0));
-  return d.toISOString().slice(0, 10);
-};
-
-function parseLines(raw) {
-  let list = raw;
-  if (typeof list === "string") {
-    try {
-      list = JSON.parse(list);
-    } catch {
-      list = null;
-    }
-  }
-  return (Array.isArray(list) ? list : []).map((l, n) => ({
+// Lines as the editor shows them (text inputs, a key per line).
+const editorLines = raw =>
+  parseLines(raw).map((l, n) => ({
     ...l,
     id: l.id || `li_${n}_${Math.random().toString(36).slice(2, 6)}`,
-    qty: String(l.qty ?? 1),
-    unitPrice: String(l.unitPrice ?? ""),
+    qty: String(l.qty ?? l.quantity ?? 1),
+    unitPrice: String(l.unitPrice ?? l.unit_price ?? l.price ?? ""),
   }));
-}
 
 // What's saved: numbers as numbers, empty lines dropped, no UI-only keys.
 export function cleanLines(lines) {
@@ -70,7 +57,7 @@ export function InvoiceEditor({ invoice = null, clients = [], userId, teamId, pr
     };
   });
   const [lines, setLines] = useState(() => {
-    const l = parseLines(invoice?.line_items);
+    const l = editorLines(invoice?.line_items);
     return l.length ? l : [{ id: "li_new", description: "", qty: "1", unitPrice: "" }];
   });
   const [incl, setIncl] = useState(invoice ? invoice.vat_inclusive === true : false);

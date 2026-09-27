@@ -3,6 +3,7 @@
 // Current (not yet due), 1–30, 31–60, 61–90 and over 90 days past the due
 // date. Only approved invoices with something still owed count (not drafts
 // or voided invoices).
+import { addDays } from "./documentPDF.js";
 
 export const AGE_BUCKETS = [
   { key: "current", label: "Current" },
@@ -12,11 +13,6 @@ export const AGE_BUCKETS = [
   { key: "older", label: "90+ days" },
 ];
 
-const addDays = (iso, days) => {
-  const d = new Date(String(iso).slice(0, 10) + "T12:00:00");
-  d.setDate(d.getDate() + (Number(days) || 0));
-  return d.toISOString().slice(0, 10);
-};
 const daysBetween = (fromIso, toIso) =>
   Math.round((new Date(toIso + "T12:00:00") - new Date(String(fromIso).slice(0, 10) + "T12:00:00")) / 86400000);
 const r2 = n => Math.round((Number(n) || 0) * 100) / 100;

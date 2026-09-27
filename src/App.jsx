@@ -1172,7 +1172,7 @@ export default function PowerWorksApp() {
         clients={data.clients}
         quotes={data.quotes}
         canMessage={hasFeature(teamPlan, "messages")}
-        isManager={!!teamAccess?.is_owner || userRole === "admin"}
+        isManager={!teamId || !!teamAccess?.is_owner || userRole === "admin"}
       />
     ),
     CompanyProfile: (

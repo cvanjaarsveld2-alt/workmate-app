@@ -9,6 +9,20 @@
 // supabase/migrations/20260929100000_financial_controls.sql) and is the
 // authority for invoices and credit notes; this is for screens and PDFs.
 
+// Line items as stored: an array, or JSON text (older quotes). Keeps every
+// field (discounts, VAT codes, part numbers).
+export function parseLines(raw) {
+  let list = raw;
+  if (typeof list === "string") {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      list = null;
+    }
+  }
+  return Array.isArray(list) ? list.filter(l => l && typeof l === "object") : [];
+}
+
 export const VAT_CODES = {
   standard: { label: "15%", short: "S", rate: 0.15 },
   zero: { label: "Zero-rated (0%)", short: "Z", rate: 0 },

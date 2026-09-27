@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { offlineGetAll, offlineSave } from "../offline/offlineDb";
-import { saveAndSync } from "../lib/sync";
+import { offlineDelete, offlineGetAll, offlineSave } from "../offline/offlineDb";
+import { saveAndSync, triggerImmediateSync } from "../lib/sync";
 import { supabase } from "../supabase";
 import { Card, Btn, PageHeader, useConfirm } from "../components/ui";
 import { BottomSheet } from "../components/BottomSheet";
@@ -270,12 +270,22 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
     }
   }
 
+  // An invoice made offline reaches the server with the next sync; until
+  // then it can't be approved or edited there.
+  function notYetSynced(inv) {
+    if (inv.sync_status !== "pending") return false;
+    triggerImmediateSync();
+    setError(`Invoice ${inv.invoice_number || ""} is still being sent to the server. Try again in a moment.`);
+    return true;
+  }
+
   // Approving issues the invoice: it gets locked on the server.
   async function approve(inv, { quiet = false } = {}) {
     if (!online) {
       setError("Connect to the internet to approve an invoice.");
       return null;
     }
+    if (notYetSynced(inv)) return null;
     if (
       !quiet &&
       !(await confirm(`Approve invoice ${inv.invoice_number || ""}? Once approved it can't be changed, only credited or voided.`, {
@@ -296,9 +306,11 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
   }
   async function removeDraft(inv) {
     if (!online) return setError("Connect to the internet to delete a draft.");
+    if (notYetSynced(inv)) return;
     if (!(await confirm(`Delete draft invoice ${inv.invoice_number || ""}?`, { confirmLabel: "Delete" }))) return;
     const { error: e } = await supabase.from("invoices").delete().eq("id", inv.id);
     if (e) return setError(e.message);
+    await offlineDelete("invoices", inv.id).catch(() => {});
     setInvoices(list => list.filter(x => x.id !== inv.id));
     setNotice("Draft deleted.");
   }
@@ -656,7 +668,7 @@ export function InvoicesScreen({ userId, teamId, setData, clients = [], quotes =
 
               {draft && (
                 <div className="grid grid-cols-3 gap-2">
-                  <Btn size="sm" variant="secondary" onClick={() => (online ? setEditing(inv) : setError("Connect to the internet to edit an invoice."))}>
+                  <Btn size="sm" variant="secondary" onClick={() => (!online ? setError("Connect to the internet to edit an invoice.") : notYetSynced(inv) ? null : setEditing(inv))}>
                     <Pencil size={13} /> Edit
                   </Btn>
                   <Btn size="sm" onClick={() => approve(inv)}>

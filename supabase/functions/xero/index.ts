@@ -16,7 +16,7 @@
 // caller's sign-in or the cron secret are checked here.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { authorizeUrl, DEFAULT_SCOPES, isDuplicateNumber, readResult, toXeroInvoice } from "./xero.js";
+import { authorizeUrl, DEFAULT_SCOPES, isDuplicateNumber, readResult, toXeroCreditNote, toXeroInvoice } from "./xero.js";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -83,7 +83,47 @@ async function syncTeam(db: SupabaseClient, teamId: string) {
     if (!res.ok && res.status !== 400) break;
     if (results.every(r => !r.xero_id)) break; // nothing moving: stop, show the errors
   }
+  await syncChanges(db, teamId, headers, c.sales_account_code);
   return { sent, failed };
+}
+
+// Invoices voided in the app are voided in Xero; credit notes are created in
+// Xero and allocated to their invoice. Idempotency keys make a retry safe.
+async function syncChanges(db: SupabaseClient, teamId: string, headers: Record<string, string>, accountCode: string) {
+  const { data } = await db.rpc("xero_changes_to_sync", { p_team_id: teamId, p_limit: 50 });
+  const results: Record<string, unknown>[] = [];
+  const voids = data?.voids || [];
+  if (voids.length) {
+    const res = await fetch(`${API}/Invoices?summarizeErrors=false`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ Invoices: voids.map((v: Record<string, string>) => ({ InvoiceID: v.xero_invoice_id, Status: "VOIDED" })) }),
+    });
+    const body = await res.json().catch(() => ({}));
+    voids.forEach((v: Record<string, string>, n: number) => {
+      const r = res.ok || res.status === 400 ? readResult(body?.Invoices?.[n]) : { error: `Xero said ${res.status}` };
+      results.push({ kind: "void", id: v.id, ok: !!r.xero_id, ...(r.error ? { error: `Void ${v.invoice_number}: ${r.error}` } : {}) });
+    });
+  }
+  for (const cn of data?.credit_notes || []) {
+    const res = await fetch(`${API}/CreditNotes?summarizeErrors=false`, {
+      method: "PUT",
+      headers: { ...headers, "Idempotency-Key": `cn-${cn.id}` },
+      body: JSON.stringify({ CreditNotes: [toXeroCreditNote(cn, { accountCode })] }),
+    });
+    const body = await res.json().catch(() => ({}));
+    let r: { xero_id?: string; error?: string } = res.ok || res.status === 400 ? readResult(body?.CreditNotes?.[0], "CreditNoteID") : { error: `Xero said ${res.status}` };
+    if (r.xero_id) {
+      const a = await fetch(`${API}/CreditNotes/${r.xero_id}/Allocations`, {
+        method: "PUT",
+        headers: { ...headers, "Idempotency-Key": `alloc-${cn.id}` },
+        body: JSON.stringify({ Allocations: [{ Invoice: { InvoiceID: cn.xero_invoice_id }, Amount: cn.total, Date: cn.issue_date }] }),
+      });
+      if (!a.ok) r = { ...r, error: `made in Xero but not allocated to ${cn.invoice_number} (${a.status}); allocate it there` };
+    }
+    results.push({ kind: "credit_note", id: cn.id, xero_id: r.xero_id ?? null, ...(r.error ? { error: `Credit note ${cn.credit_number}: ${r.error}` } : {}) });
+  }
+  if (results.length) await db.rpc("xero_mark_changes", { p_team_id: teamId, p_results: results });
 }
 
 Deno.serve(async (req: Request) => {
