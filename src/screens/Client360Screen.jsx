@@ -34,6 +34,7 @@ import {
   DollarSign,
   Send,
   ExternalLink,
+  Globe,
   Receipt,
   AlertTriangle,
   ChevronDown,
@@ -44,6 +45,8 @@ import { genId, todayISO, smartDate, formatCurrency, daysDiff } from "../lib/hel
 import { withTeamId } from "../lib/teamId";
 import { offlineSave } from "../offline/offlineDb";
 import { Card, Field, StagePill, UrgencyBadge, ServiceBadge, Toast } from "../components/ui";
+import { supabase } from "../supabase";
+import { shareClientPortal } from "../lib/portal";
 import { InteractionLog } from "./InteractionLog";
 import { ShareToTeamModal } from "../components/ShareToTeamModal";
 
@@ -843,6 +846,18 @@ export function Client360Screen({
             onClick={() => setShareTarget({ id: client.id, title: client.company, type: "client" })}
             color="#92400E"
             bg="#FEF3C7"
+          />
+        )}
+        {teamId && navigator.onLine && (
+          <ActionBtn
+            icon={Globe}
+            label="Portal"
+            onClick={async () => {
+              const msg = await shareClientPortal(supabase, client);
+              if (msg) setToast(msg);
+            }}
+            color="#0F766E"
+            bg="#CCFBF1"
           />
         )}
       </div>

@@ -1,0 +1,50 @@
+name: Android app (test build)
+
+# Builds an installable Android test app (APK) from the same code as the
+# website, to try on a phone before a Play Store release. Download it from the
+# run's "Artifacts". Store releases are signed builds (docs/APP_STORES.md).
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "android/**"
+      - "capacitor.config.json"
+      - "scripts/native-assets.cjs"
+      - "scripts/check-native-env.cjs"
+      - ".github/workflows/android.yml"
+      - "package.json"
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://hrqzqyfvbfzrfnuxovvr.supabase.co' }}
+      # The publishable key: it's in the website's code anyway.
+      VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ZAA9TAKKvXwyEpF7EGWM7g_Nwhk5Qni' }}
+      VITE_PUBLIC_APP_URL: ${{ vars.PUBLIC_APP_URL }}
+      NATIVE_TEST_BUILD: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build the app and copy it into the Android project
+        run: node scripts/check-native-env.cjs && npx vite build && npx cap sync android
+      - name: Build the APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: powermate-android-test
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14

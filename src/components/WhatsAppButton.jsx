@@ -3,6 +3,8 @@
 // No API needed — uses wa.me links which work on all devices.
 // Import and use: <WhatsAppButton phone="0821234567" contactName="John" clientName="Anglo American" followupTitle="Quote follow-up" />
 
+import { companyName, companyOffering } from "../lib/companyProfile";
+import { chatSignature } from "../lib/me";
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
@@ -16,47 +18,47 @@ export const WA_TEMPLATES = [
     label: "Quote Follow-up",
     emoji: "📄",
     message: (contact, client) =>
-      `Hi ${contact || "there"},\n\nI'm following up on the quote we sent through to ${client || "you"}. Please let me know if you have any questions or if you'd like to discuss anything further.\n\nKind regards\nPower Works`,
+      `Hi ${contact || "there"},\n\nI'm following up on the quote we sent through to ${client || "you"}. Please let me know if you have any questions or if you'd like to discuss anything further.\n\n${chatSignature()}`,
   },
   {
     id: "meeting_request",
     label: "Meeting Request",
     emoji: "📅",
     message: (contact, client) =>
-      `Hi ${contact || "there"},\n\nI'd like to arrange a meeting to discuss how Power Works can assist ${client || "your team"}. Would you be available for a quick call or site visit this week?\n\nKind regards\nPower Works`,
+      `Hi ${contact || "there"},\n\nI'd like to arrange a meeting to discuss how ${companyName() || "we"} can assist ${client || "your team"}. Would you be available for a quick call or site visit this week?\n\n${chatSignature()}`,
   },
   {
     id: "general_checkin",
     label: "General Check-in",
     emoji: "👋",
     message: (contact, client) =>
-      `Hi ${contact || "there"},\n\nJust checking in to see how things are going at ${client || "your site"} and if there's anything Power Works can assist with.\n\nKind regards\nPower Works`,
+      `Hi ${contact || "there"},\n\nJust checking in to see how things are going at ${client || "your site"} and if there's anything ${companyName() || "we"} can assist with.\n\n${chatSignature()}`,
   },
   {
     id: "product_intro",
     label: "Product Introduction",
     emoji: "🔧",
     message: (contact, client) =>
-      `Hi ${contact || "there"},\n\nI wanted to reach out regarding our range of jacks, tyre handlers, and industrial equipment that could benefit ${client || "your operations"}. I'd love the opportunity to present our products to you.\n\nKind regards\nPower Works`,
+      `Hi ${contact || "there"},\n\nI wanted to reach out regarding ${companyOffering()} that could benefit ${client || "your operations"}. I'd love the opportunity to present our products to you.\n\n${chatSignature()}`,
   },
   {
     id: "after_visit",
     label: "After Site Visit",
     emoji: "🏭",
     message: (contact, client) =>
-      `Hi ${contact || "there"},\n\nThank you for your time during our visit to ${client || "your site"}. It was great meeting you. I'll follow up with the information we discussed shortly.\n\nKind regards\nPower Works`,
+      `Hi ${contact || "there"},\n\nThank you for your time during our visit to ${client || "your site"}. It was great meeting you. I'll follow up with the information we discussed shortly.\n\n${chatSignature()}`,
   },
   {
     id: "urgent_followup",
     label: "Urgent Follow-up",
     emoji: "⚡",
     message: (contact, client) =>
-      `Hi ${contact || "there"},\n\nI'm following up urgently regarding ${client || "your account"}. Please could you get back to me at your earliest convenience.\n\nKind regards\nPower Works`,
+      `Hi ${contact || "there"},\n\nI'm following up urgently regarding ${client || "your account"}. Please could you get back to me at your earliest convenience.\n\n${chatSignature()}`,
   },
 ];
 
 // ─── Format phone for WhatsApp ─────────────────────────────────────────────────
-function formatPhone(phone) {
+export function formatPhone(phone) {
   if (!phone) return null;
   // Strip spaces, dashes, brackets
   let clean = phone.replace(/[\s\-()]/g, "");

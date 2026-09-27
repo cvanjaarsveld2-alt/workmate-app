@@ -9,8 +9,10 @@ export function roundMoney(value) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-export function calculateVat(total, vatInclusive = true) {
+// vatRegistered = false: a company not registered for VAT charges none.
+export function calculateVat(total, vatInclusive = true, vatRegistered = true) {
   const amount = roundMoney(total);
+  if (!vatRegistered) return { subtotal: amount, vat: 0, total: amount };
   if (vatInclusive) {
     const subtotal = roundMoney(amount / (1 + VAT_RATE));
     const vat = roundMoney(amount - subtotal);

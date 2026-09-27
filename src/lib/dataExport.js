@@ -2,11 +2,12 @@
 // Settings → "Export my data" → Excel workbook with one sheet per entity.
 // Uses ExcelJS (already in package.json).
 // ─────────────────────────────────────────────────────────────────────────────
+import { PRODUCT_NAME } from "./brand";
 
 export async function exportAllData(data, userId) {
   const ExcelJS = await import("exceljs");
   const wb = new ExcelJS.Workbook();
-  wb.creator = "PowerMate";
+  wb.creator = PRODUCT_NAME;
   wb.created = new Date();
 
   const headerStyle = { font: { bold: true, color: { argb: "FFFFFFFF" } }, fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FF8B1A1A" } } };
@@ -91,13 +92,13 @@ export async function exportAllData(data, userId) {
   // Generate and download
   const buffer = await wb.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-  const filename = `PowerMate_Export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filename = `${PRODUCT_NAME}_Export_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
   if (navigator.share && navigator.canShare) {
     try {
       const file = new File([blob], filename, { type: blob.type });
       if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: "PowerMate Data Export" });
+        await navigator.share({ files: [file], title: `${PRODUCT_NAME} Data Export` });
         return "shared";
       }
     } catch {}

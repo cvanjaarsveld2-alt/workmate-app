@@ -1,4 +1,6 @@
 // ─── Expenses Screen ──────────────────────────────────────────────────────────
+import { activeProfile, companyName } from "../lib/companyProfile";
+import { emailSignature } from "../lib/me";
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -33,32 +35,17 @@ import { convertToZAR } from "../lib/exchangeRate";
 import { DetailSheet, DetailRow } from "../components/DetailSheet";
 import { ImageViewer } from "../components/ImageViewer";
 import { neutralizeFormula } from "../lib/csv";
+import { CATEGORIES, CATEGORY_META, EXPENSE_FORMATS, expenseCsv, glFor } from "../lib/expenseAccounting";
 import {
   Card, Btn, Field, SelectField, SearchBar,
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 import { useIsMine } from "../lib/teamView";
 
-// ─── Expense categories with GL codes + SA VAT treatment ──────────────────────
-// GL codes are SENSIBLE SA DEFAULTS — your financial manager should edit these
-// once to match your actual Sage chart of accounts (her account numbers may
-// differ). vatClaim flags whether input VAT is claimable per SARS: entertainment
-// is NOT claimable (SARS s17(2)(a)); most others are if you hold a valid tax invoice.
-const CATEGORY_META = {
-  "Fuel":                 { gl: "5200", vatClaim: true,  note: "Diesel/petrol — input VAT claimable with valid tax invoice." },
-  "Accommodation":        { gl: "5210", vatClaim: true,  note: "Business travel accommodation — claimable." },
-  "Subsistence (meals)":  { gl: "5220", vatClaim: true,  note: "Meals while travelling for work — claimable." },
-  "Entertainment":        { gl: "5230", vatClaim: false, note: "Client/staff entertainment — input VAT NOT claimable (SARS)." },
-  "Tools & Equipment":    { gl: "5300", vatClaim: true,  note: "Tools/equipment — claimable (may be capitalised if >R7,000)." },
-  "Parts & Materials":    { gl: "5100", vatClaim: true,  note: "Job materials/consumables — claimable." },
-  "Travel":               { gl: "5240", vatClaim: true,  note: "Flights, parking — claimable (passenger vehicle hire has restrictions)." },
-  "Tolls":                { gl: "5241", vatClaim: true,  note: "SANRAL/e-toll fees — standard-rated 15%, input VAT claimable with the toll slip. Falls under Travel & motor vehicle expenses." },
-  "Office":               { gl: "5400", vatClaim: true,  note: "Office consumables/admin — claimable." },
-  "Other":                { gl: "5900", vatClaim: true,  note: "Uncategorised — confirm GL code with finance." },
-};
-const defaultGl = category => (CATEGORY_META[category] || {}).gl || "";
-
-const CATEGORIES = Object.keys(CATEGORY_META);
+// Categories, default ledger codes and SA VAT treatment live in
+// lib/expenseAccounting (shared with the accounting exports); each company can
+// set its own ledger code per category in Company Details.
+const defaultGl = category => glFor(category, activeProfile().expense_gl_codes);
 
 const CATEGORY_COLORS = {
   "Fuel":                 { bg: "#FEF3C7", text: "#92400E" },
@@ -81,8 +68,10 @@ const STATUS_COLORS = {
   reimbursed:  { bg: "#DCFCE7", text: "#166534", label: "Reimbursed" },
 };
 
-// ⚠️ SET YOUR FINANCE DEPARTMENT EMAIL HERE
-const FINANCE_EMAIL = "vicky@pwrstart.com";
+// Where expense claims go: set per company in Company Details → Finance email.
+const financeEmail = () => activeProfile().finance_email || "";
+// "Acme_Hydraulics" for file names.
+const fileStem = () => (companyName() || "Company").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "") || "Company";
 
 // ─── Calendar month grouping ─────────────────────────────────────────────────
 // Groups expenses by calendar month (1st → last day). Returns:
@@ -114,7 +103,7 @@ function currentCalendarMonth() {
 
 // ─── End-of-month push notification reminder ─────────────────────────────────
 // Shows an in-app banner in the last 3 days of each calendar month,
-// reminding the user to submit their expenses to Vicky.
+// reminding the user to submit their expenses to finance.
 // Uses localStorage to avoid showing more than once per month.
 function useEndOfMonthReminder() {
   const [showBanner, setShowBanner] = useState(false);
@@ -417,10 +406,21 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   const [manualZAR, setManualZAR]     = useState("");
   const [detailExpense, setDetailExpense] = useState(null);
   const [viewerImages, setViewerImages] = useState(null);
+  // Open jobs an expense can be booked to (counts in Job profit). Online only:
+  // only jobs already saved on the server can be linked.
+  const [jobs, setJobs] = useState([]);
+  useEffect(() => {
+    if (!showForm || !navigator.onLine) return;
+    let live = true;
+    supabase.from("jobs").select("id, job_number, title, client_id").in("status", ["scheduled", "in_progress", "completed"])
+      .order("created_at", { ascending: false }).limit(200)
+      .then(({ data }) => live && setJobs(data || []), () => {});
+    return () => { live = false; };
+  }, [showForm]);
   const [form, setForm] = useState({
     vendor: "", vat_number: "", gl_code: defaultGl("Other"), gr_code: "", gl_manually_edited: false, amount: "", vat_amount: "", currency: "ZAR",
     expense_date: todayISO(), expense_time: "", category: "Other",
-    payment_method: "Card", notes: "", client_id: null, client_name: "",
+    payment_method: "Card", notes: "", client_id: null, client_name: "", job_id: null,
   });
   const { confirm, dialog } = useConfirm();
   const { showBanner: showReminderBanner, dismiss: dismissReminder } = useEndOfMonthReminder();
@@ -452,7 +452,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
     setForm({
       vendor: "", vat_number: "", gl_code: defaultGl("Other"), gr_code: "", gl_manually_edited: false, amount: "", vat_amount: "", currency: "ZAR",
       expense_date: todayISO(), expense_time: "", category: "Other",
-      payment_method: "Card", notes: "", client_id: null, client_name: "",
+      payment_method: "Card", notes: "", client_id: null, client_name: "", job_id: null,
     });
     setReceiptUrl(null);
     setPaymentSlipUrl(null);
@@ -522,6 +522,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       notes:          ex.notes || "",
       client_id:      ex.client_id || null,
       client_name:    ex.client_name || "",
+      job_id:         ex.job_id || null,
     });
     setReceiptUrl(ex.receipt_url || null);
     setPaymentSlipUrl(ex.payment_slip_url || null);
@@ -582,6 +583,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
       ai_extracted:     scannedNotice,
       client_id:        form.client_id || null,
       client_name:      form.client_name || null,
+      job_id:           form.job_id || null,
       sync_status:      "pending",
       created_at:       editId
                           ? (expenses.find(e => e.id === editId)?.created_at || now)
@@ -656,10 +658,28 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
     const a = document.createElement("a");
     a.href = url;
-    a.download = `PowerWorks_Expenses_${todayISO()}.csv`;
+    a.download = `${fileStem()}_Expenses_${todayISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     setToast(`Exported ${selected.length} expense${selected.length !== 1 ? "s" : ""} to CSV`);
+  }
+
+  // Supplier invoices for Sage / Xero / QuickBooks, one line per expense.
+  function exportAccounting(format) {
+    const selected = expenses.filter(e => selectedIds.has(e.id));
+    if (selected.length === 0) { setToast("Select expenses to export"); return; }
+    const profile = activeProfile();
+    const csv = expenseCsv(format, selected, {
+      vatRegistered: profile.vat_registered !== false,
+      glCodes: profile.expense_gl_codes || {},
+    });
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${fileStem()}_Expenses_${EXPENSE_FORMATS[format].label}_${todayISO()}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setToast(`${selected.length} expense${selected.length !== 1 ? "s" : ""} ready for ${EXPENSE_FORMATS[format].label} (${EXPENSE_FORMATS[format].hint})`);
   }
 
   async function sendToFinance() {
@@ -779,11 +799,11 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
     const a = document.createElement("a");
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    const body = `Hi Vicky,\n\nPlease find attached my expense claim ${ref}.\n\nSummary:\n  • ${count} item${count !== 1 ? "s" : ""}\n  • Period: ${periodLabel}\n  • Total claim: ${fmtMoney(totalZAR, "ZAR")}\n\nThe attached PDF (${filename}) contains the full breakdown, totals by category, and all receipt images.\n\nKind regards`;
+    const body = `Hi,\n\nPlease find attached my expense claim ${ref}.\n\nSummary:\n  • ${count} item${count !== 1 ? "s" : ""}\n  • Period: ${periodLabel}\n  • Total claim: ${fmtMoney(totalZAR, "ZAR")}\n\nThe attached PDF (${filename}) contains the full breakdown, totals by category, and all receipt images.\n\n${emailSignature("Kind regards,")}`;
     const subject = encodeURIComponent(`Expense Claim ${ref} — ${fmtMoney(totalZAR, "ZAR")}`);
     setToast("PDF downloaded — attach it to the email that just opened");
     setTimeout(() => {
-      window.open(`mailto:${encodeURIComponent(FINANCE_EMAIL)}?subject=${subject}&body=${encodeURIComponent(body)}`, "_blank");
+      window.open(`mailto:${encodeURIComponent(financeEmail())}?subject=${subject}&body=${encodeURIComponent(body)}`, "_blank");
       markPackSubmitted();
     }, 500);
   }
@@ -992,6 +1012,24 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             setForm(f => ({ ...f, client_id: v || null, client_name: cl ? `${cl.company}${cl.branch ? " — " + cl.branch : ""}` : "" }));
           }}
           clients={(data.clients || []).filter(isMine)} placeholder="Link to a client…" />
+        {(jobs.length > 0 || form.job_id) && (
+          <label className="block">
+            <span className="mb-2 block text-sm font-bold text-slate-500">Job (optional; counts in Job profit)</span>
+            <select value={form.job_id || ""} onChange={e => {
+                const j = jobs.find(x => x.id === e.target.value);
+                const cl = j?.client_id ? (data.clients || []).find(c => c.id === j.client_id) : null;
+                setForm(f => ({ ...f, job_id: e.target.value || null,
+                  ...(cl && !f.client_id ? { client_id: cl.id, client_name: `${cl.company}${cl.branch ? " — " + cl.branch : ""}` } : {}) }));
+              }}
+              className="w-full rounded-xl border-2 border-slate-100 bg-slate-50 px-4 py-3.5 text-base min-h-[56px]">
+              <option value="">Not for a job</option>
+              {form.job_id && !jobs.some(j => j.id === form.job_id) && <option value={form.job_id}>Linked job</option>}
+              {jobs.filter(j => !form.client_id || !j.client_id || j.client_id === form.client_id).map(j => (
+                <option key={j.id} value={j.id}>{j.job_number || "Job"} · {j.title}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <Field label="Notes (optional)" value={form.notes} onChange={v => setForm(f => ({ ...f, notes: v }))} placeholder="What was this for?" multiline />
         <div className="flex gap-2">
@@ -1182,7 +1220,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                   </button>
                   <button onClick={emailFinancePack}
                     className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold border-2 border-slate-200 bg-white text-slate-700 min-h-[48px]">
-                    <Mail size={14} /> Email to Vicky
+                    <Mail size={14} /> Email to finance
                   </button>
                 </div>
               </div>
@@ -1204,7 +1242,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             <div className="flex-1 min-w-0">
               <p className="text-sm font-black text-amber-800">Submit your expenses</p>
               <p className="text-xs text-amber-700 mt-0.5">
-                End of month is coming — {unsubmittedCount} unsubmitted expense{unsubmittedCount !== 1 ? "s" : ""}. Send your pack to Vicky before month-end.
+                End of month is coming — {unsubmittedCount} unsubmitted expense{unsubmittedCount !== 1 ? "s" : ""}. Send your pack to finance before month-end.
               </p>
             </div>
             <button onClick={dismissReminder} className="w-11 h-11 flex items-center justify-center rounded-lg text-amber-500 hover:bg-amber-100 shrink-0">
@@ -1276,8 +1314,17 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             </button>
             <button onClick={exportCSV} disabled={selectedIds.size === 0}
               className="flex items-center justify-center gap-1.5 rounded-xl py-3 px-4 text-sm font-bold border border-slate-200 bg-white text-slate-700 disabled:opacity-40 min-h-[48px]">
-              <FileDown size={15} /> CSV
+              <FileDown size={15} /> Spreadsheet
             </button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {Object.entries(EXPENSE_FORMATS).map(([key, f]) => (
+              <button key={key} onClick={() => exportAccounting(key)} disabled={selectedIds.size === 0}
+                aria-label={`Export for ${f.label}`}
+                className="flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-bold border border-slate-200 bg-white text-slate-700 disabled:opacity-40 min-h-[44px]">
+                <FileDown size={13} /> {f.label}
+              </button>
+            ))}
           </div>
         </div>
       )}

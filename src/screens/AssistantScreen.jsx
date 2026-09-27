@@ -13,6 +13,7 @@
 //    the actual "remind me to chase this" list; the auto-created chase
 //    follow-up (3 business days out) still lands in Follow-ups as before —
 //    this is just a faster way to act on it without leaving the app.
+import { emailSignature } from "../lib/me";
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Check, X, Edit2, Clock, Inbox, ChevronDown, ChevronUp, Send } from "lucide-react";
@@ -54,8 +55,7 @@ Is this still on your radar, or has anything changed that we should account for?
 
 Happy to jump on a quick call if that's easier than email.
 
-Thanks,
-Christo`;
+${emailSignature("Thanks,")}`;
   const params = new URLSearchParams({ subject, body });
   return `mailto:${encodeURIComponent(toEmail || "")}?${params.toString()}`;
 }

@@ -6,6 +6,8 @@
 // Add to MoreScreen: <ReportExport data={data} />
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { PRODUCT_NAME } from "./lib/brand";
+import { companyLegalName } from "./lib/companyProfile";
 import React, { useState } from "react";
 import { FileText, Download, Calendar } from "lucide-react";
 import { neutralizeFormula } from "./lib/csv";
@@ -50,7 +52,7 @@ function generateFullReport(data, dateRange) {
 
   // ── HEADER ──
   rows.push(["POWERMATE MANAGEMENT REPORT"]);
-  rows.push(["Power Works (Pty) Ltd"]);
+  rows.push([companyLegalName()]);
   rows.push([`Generated: ${smartDate(today)}`]);
   rows.push([`Period: ${dateRange}`]);
   rows.push([]);
@@ -204,7 +206,7 @@ export default function ReportExport({ data }) {
     setExporting(true);
     try {
       const today = todayISO();
-      const filename = `PowerMate_Report_${today}.csv`;
+      const filename = `${PRODUCT_NAME}_Report_${today}.csv`;
 
       let rows;
       let dateRange;

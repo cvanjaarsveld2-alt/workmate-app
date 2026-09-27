@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { PW_LOGO_B64 } from "./pwLogo";
+import { drawBandLogo } from "./pdfBrand";
 
 const BRAND_RED  = "#8B1A1A";
 const RED_RGB    = [139, 26, 26];
@@ -93,14 +93,8 @@ export async function buildVehicleCheckPDF({ checkDate, dayData, settings, check
   doc.text("VEHICLE INSPECTION REPORT", margin, 50);
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  // Power Works logo — right side of the header bar
-  try {
-    doc.addImage(PW_LOGO_B64, "JPEG", pageWidth - margin - 110, 10, 110, 23);
-  } catch {
-    doc.setFontSize(11); doc.setFont("helvetica", "normal");
-    doc.setTextColor(255, 255, 255);
-    doc.text("Power Works (Pty) Ltd", margin, 68);
-  }
+  // Company logo — right side of the header bar
+  drawBandLogo(doc, { right: pageWidth - margin, top: 12, maxW: 110, maxH: 23 });
 
   doc.setTextColor(30, 30, 30);
 

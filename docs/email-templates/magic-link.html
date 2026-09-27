@@ -1,0 +1,13 @@
+<!-- Paste into Supabase → Authentication → Emails → "Magic link".
+     Subject: Your PowerMate sign-in link
+     Replace PowerMate if you rename the product. -->
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#0f172a">
+  <p style="font-size:20px;font-weight:bold;color:#8B1A1A;margin:0 0 16px">PowerMate</p>
+  <p style="font-size:15px;line-height:1.5">Tap below to sign in to PowerMate.</p>
+  <p style="margin:24px 0">
+    <a href="{{ .ConfirmationURL }}"
+       style="background:#8B1A1A;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:10px;display:inline-block">Sign in</a>
+  </p>
+  <p style="font-size:13px;color:#64748b;line-height:1.5">If you didn't ask to sign in, you can ignore this email.</p>
+  <p style="font-size:12px;color:#94a3b8;margin-top:24px">If the button doesn't work, copy this link into your browser:<br>{{ .ConfirmationURL }}</p>
+</div>

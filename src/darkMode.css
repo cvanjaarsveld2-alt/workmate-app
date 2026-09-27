@@ -46,6 +46,8 @@
 /* inverted dark chips (dark bg in light mode) → light in dark mode */
 .dark .bg-slate-800        { background-color: #EBEBF0 !important; }
 .dark .bg-slate-900        { background-color: #F5F5F7 !important; }
+/* A selected chip (dark with white text) turns light here, so its text turns dark. */
+.dark .bg-slate-900.text-white { color: #111114 !important; }
 
 /* ── Text — iOS label hierarchy (neutral, high-contrast) ──────────────────── */
 .dark .text-slate-900      { color: #FFFFFF !important; }        /* label */

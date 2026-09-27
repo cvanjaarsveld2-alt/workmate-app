@@ -1,9 +1,10 @@
 // ─── Analytics Screen ─────────────────────────────────────────────────────────
-// Business intelligence dashboard for Power Works (Pty) Ltd.
+// Business intelligence dashboard for the signed-in company.
 // Shows: quarterly new leads, win/loss ratio, best customers, follow-up
 // effectiveness, pipeline velocity, and expense trends.
 // All data is derived from what's already in the app — no extra syncing needed.
 // ─────────────────────────────────────────────────────────────────────────────
+import { companyLegalName } from "../lib/companyProfile";
 import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
@@ -260,7 +261,7 @@ export function AnalyticsScreen({ data, onNavigate }) {
     <div className="stack-y-5 pb-6">
       <PageHeader
         title="Analytics"
-        subtitle="Business performance · Power Works (Pty) Ltd"
+        subtitle={["Business performance", companyLegalName()].filter(Boolean).join(" · ")}
       />
 
       {/* ── Section: Pipeline overview ── */}

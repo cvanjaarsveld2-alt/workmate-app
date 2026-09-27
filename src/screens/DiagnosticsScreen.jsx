@@ -1,6 +1,7 @@
 // ─── Diagnostics Screen ──────────────────────────────────────────────────────
 // What's broken right now? — surfaces sync queue errors, finance workflow,
 // Edge Function health, and recent crashes in one place.
+import { PRODUCT_NAME } from "../lib/brand";
 import React, { useState } from "react";
 import {
   ArrowLeft,
@@ -104,7 +105,7 @@ export function DiagnosticsScreen({ data, setData, userId, isOnline, onBack, onB
   }
   async function copyReport() {
     const lines = [
-      `PowerMate Diagnostics — ${new Date().toLocaleString()}`,
+      `${PRODUCT_NAME} Diagnostics — ${new Date().toLocaleString()}`,
       `User: ${userId}`,
       `Online: ${isOnline ? "yes" : "no"}`,
       `Sync queue: ${pending.length} pending, ${failed.length} failed`,

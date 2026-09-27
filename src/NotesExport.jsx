@@ -5,7 +5,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import jsPDF from "jspdf";
-import { PW_LOGO_B64 } from "./lib/pwLogo";
+import { drawBandLogo } from "./lib/pdfBrand";
+import { companyLegalName } from "./lib/companyProfile";
+import { PRODUCT_NAME } from "./lib/brand";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 
@@ -38,7 +40,7 @@ function fileSafe(name) {
 }
 
 function autoFilename(prefix, count, customName) {
-  const base = customName ? fileSafe(customName) : `PowerMate_Notes_${todayISO()}_${count}items`;
+  const base = customName ? fileSafe(customName) : `${PRODUCT_NAME}_Notes_${todayISO()}_${count}items`;
   return base;
 }
 
@@ -100,16 +102,14 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
   doc.setFillColor(BRAND.primary);
   doc.rect(0, 0, pageWidth, 50, "F");
   // Logo right side
-  try {
-    doc.addImage(PW_LOGO_B64, "JPEG", pageWidth - margin - 100, 8, 100, 21);
-  } catch {}
+  drawBandLogo(doc, { right: pageWidth - margin, top: 10, maxW: 100, maxH: 21 });
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.text("Field Notes Report", margin, 28);
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text("Power Works (Pty) Ltd", margin, 38);
+  doc.text(companyLegalName(), margin, 38);
 
   doc.setTextColor(BRAND.text);
   doc.setFontSize(10);
@@ -159,7 +159,7 @@ export async function exportNotesPDF(selectedNotes, options = {}) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(180, 180, 190);
-    doc.text(`PowerMate · Power Works (Pty) Ltd · Generated ${smartDate(todayISO())}`, pageWidth / 2, pageHeight - 8, { align: "center" });
+    doc.text(`${[PRODUCT_NAME, companyLegalName()].filter(Boolean).join(" · ")} · Generated ${smartDate(todayISO())}`, pageWidth / 2, pageHeight - 8, { align: "center" });
   }
 
   // Ensure at least `needed` mm remain on the current page — if not, start a
@@ -379,8 +379,8 @@ export async function exportNotesExcel(selectedNotes, options = {}) {
   onProgress({ step: "init", percent: 10 });
 
   const wb = new ExcelJS.Workbook();
-  wb.creator = "PowerMate";
-  wb.lastModifiedBy = "Power Works";
+  wb.creator = PRODUCT_NAME;
+  wb.lastModifiedBy = companyLegalName() || PRODUCT_NAME;
   wb.created = new Date();
   wb.modified = new Date();
 

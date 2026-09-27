@@ -2,6 +2,8 @@
 // Bottom sheet that lets a user pick company documents and send them
 // via a pre-filled email or WhatsApp message to a contact/client/lead.
 // ─────────────────────────────────────────────────────────────────────────────
+import { companyLegalName, companyName } from "../lib/companyProfile";
+import { emailSignature } from "../lib/me";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, FileText, Mail, CheckSquare, Square, Send } from "lucide-react";
@@ -77,28 +79,26 @@ export function SendCompanyInfoSheet({ recipientName, recipientEmail, recipientP
 
 Good to connect with you.
 
-As discussed, I've included the Power Works information below:
+As discussed, I've included our company information below:
 
 ${docLines}
 
 Have a look when you get a chance. If there's anything you'd like to know more about, just let me know.
 
-Regards,
-Renita
-Power Works (Pty) Ltd`.trim();
+${emailSignature("Regards,")}`.trim();
   }
 
   function buildWhatsAppBody(selectedDocs) {
     const firstName = (recipientName || "").split(" ")[0] || "there";
     const docLines = selectedDocs.map(d => `• *${d.name}*: ${d.shareUrl}`).join("\n");
 
-    return `Hi ${firstName}, thank you for connecting with *Power Works (Pty) Ltd*!\n\nPlease find our documents below:\n\n${docLines}\n\nFeel free to reach out if you have any questions. 👍`;
+    return `Hi ${firstName}, thank you for connecting with *${companyLegalName() || "us"}*!\n\nPlease find our documents below:\n\n${docLines}\n\nFeel free to reach out if you have any questions. 👍`;
   }
 
   function handleEmail() {
     const sel = getSelectedDocs();
     if (sel.length === 0) return;
-    const subject = encodeURIComponent("Power Works information");
+    const subject = encodeURIComponent(`${companyName() || "Company"} information`);
     const body    = encodeURIComponent(buildEmailBody(sel));
     const to      = encodeURIComponent(recipientEmail || "");
     window.open(`mailto:${to}?subject=${subject}&body=${body}`, "_blank");

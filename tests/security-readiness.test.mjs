@@ -75,7 +75,7 @@ test("notification clicks only open same-origin pages", () => {
 test("password reset never reveals whether an account exists", () => {
   const source = read("src/auth/AuthScreen.jsx");
   assert.match(source, /resetPasswordForEmail/);
-  assert.match(source, /If that email has a PowerMate account/);
+  assert.match(source, /If that email has a \$\{PRODUCT_NAME\} account/);
   assert.match(read("src/App.jsx"), /PASSWORD_RECOVERY/);
 });
 

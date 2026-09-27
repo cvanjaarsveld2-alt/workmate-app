@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PowerMate</string>
+    <string name="title_activity_main">PowerMate</string>
+    <string name="package_name">com.powermate.fieldservice</string>
+    <string name="custom_url_scheme">com.powermate.fieldservice</string>
+</resources>

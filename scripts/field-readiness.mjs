@@ -3,7 +3,7 @@ import path from "node:path";
 const root=process.cwd();
 const read=f=>fs.readFileSync(path.join(root,f),"utf8");
 const app=read("src/App.jsx");
-const required=["src/offline/offlineDb.js","src/lib/sync.js","src/lib/notifications.js","src/components/QuickCaptureFAB.jsx","src/components/VoiceInput.jsx","src/screens/JobsScreen.jsx","src/screens/InvoicesScreen.jsx","src/screens/Client360Screen.jsx","src/screens/TeamDashboardScreen.jsx","src/lib/jobInvoiceAutomation.js","src/lib/quoteAutomation.js","public/service-worker.js","manifest.webmanifest"];
+const required=["src/offline/offlineDb.js","src/lib/sync.js","src/lib/notifications.js","src/components/QuickCaptureFAB.jsx","src/components/VoiceInput.jsx","src/screens/JobsScreen.jsx","src/screens/InvoicesScreen.jsx","src/screens/Client360Screen.jsx","src/screens/TeamDashboardScreen.jsx","src/lib/jobInvoiceAutomation.js","src/lib/quoteAutomation.js","public/service-worker.js","public/manifest.webmanifest"];
 const fail=[];
 for(const f of required)if(!fs.existsSync(path.join(root,f)))fail.push(`Missing ${f}`);
 const lazy=[...app.matchAll(/const\s+(\w+)\s*=\s*lazy\(\(\)\s*=>\s*import\("\.\/screens\/([^\"]+)"\)/g)];

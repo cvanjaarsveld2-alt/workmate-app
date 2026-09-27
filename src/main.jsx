@@ -6,6 +6,12 @@ import { initTheme } from "./lib/theme";
 import PowerMateApp from "./App.jsx";
 import { installGlobalErrorReporting, logEvent } from "./lib/helpers";
 import { requestPersistentStorage } from "./offline/offlineDb";
+import { LegalPage, legalPageFromUrl } from "./legal/LegalPage";
+import { QuoteAcceptPage, sharedQuoteTokenFromUrl } from "./legal/QuoteAcceptPage";
+import { captureJoinCode } from "./lib/joinCode";
+import { CustomerPortalPage } from "./legal/CustomerPortalPage";
+import { portalTokenFromUrl } from "./lib/portal";
+import { isNativeApp } from "./lib/appUrl";
 
 // Uncaught errors and promise rejections go to the events table (buffered offline).
 installGlobalErrorReporting();
@@ -42,13 +48,34 @@ window.addEventListener("vite:preloadError", (event) => {
 // first paint, so there's no flash of the wrong theme on load.
 initTheme();
 
+// An invite link (/?join=CODE) is remembered until the person has signed in
+// and joined, so it survives signing up and confirming their email.
+captureJoinCode();
+
+// Terms, privacy and data processing pages are public: /?legal=terms etc.
+const legal = legalPageFromUrl();
+// A customer opening a quote link (/?quote=TOKEN) — no sign-in needed.
+const sharedQuote = sharedQuoteTokenFromUrl();
+// A customer's own account page (/?portal=TOKEN) — no sign-in needed.
+const portal = portalTokenFromUrl();
+
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <PowerMateApp />
+    {legal ? (
+      <LegalPage which={legal} />
+    ) : sharedQuote ? (
+      <QuoteAcceptPage token={sharedQuote} />
+    ) : portal ? (
+      <CustomerPortalPage token={portal} />
+    ) : (
+      <PowerMateApp />
+    )}
   </React.StrictMode>
 );
 
-if ("serviceWorker" in navigator) {
+// Inside the iPhone/Android app the app is already on the phone (offline);
+// the service worker is for the website.
+if ("serviceWorker" in navigator && !isNativeApp()) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/service-worker.js", {
       updateViaCache: "none",
