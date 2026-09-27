@@ -93,16 +93,25 @@ export function autoAdvanceOnAccept(quote, clients, setData) {
     typeof navigator === "undefined" ? true : navigator.onLine,
   ).catch(e => console.warn("Quote→job creation failed:", e));
 }
+// Accepted, invoiced or replaced quotes can't be changed (the server enforces it).
+export const isLockedQuote = q => q?.status === "Accepted" || q?.status === "Superseded" || !!q?.invoiced_at;
+
+// A pending quote past its expiry date is Expired (the server also does this
+// every night). Quotes without a date expire 30 days after they were sent.
 export function autoExpireStaleQuotes(quotes, setData, userId) {
-  const cutoffDate = new Date(`${todayISO()}T12:00:00`);
-  cutoffDate.setDate(cutoffDate.getDate() - 14);
-  const cutoff = `${cutoffDate.getFullYear()}-${String(cutoffDate.getMonth() + 1).padStart(2, "0")}-${String(cutoffDate.getDate()).padStart(2, "0")}`;
+  const today = todayISO();
+  const fallback = q => {
+    const d = new Date(`${(q.sent_date || q.created_at || today).slice(0, 10)}T12:00:00`);
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  };
   const updates = (quotes || [])
     .filter(
       q =>
         q.status === "Pending" &&
         q.user_id === userId &&
-        (q.sent_date || q.created_at?.slice(0, 10) || "") < cutoff,
+        !q.accepted_at &&
+        (q.expiry_date || fallback(q)) < today,
     )
     .map(q => ({ ...q, status: "Expired", sync_status: "pending" }));
   if (!updates.length) return;

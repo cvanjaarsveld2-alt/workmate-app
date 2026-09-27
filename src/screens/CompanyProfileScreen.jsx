@@ -404,6 +404,18 @@ export function CompanyProfileScreen({ teamId, isOwner, onPlan }) {
           Next quote: <b>{`${form.quote_prefix || ""}${String(form.next_quote_number || 1).padStart(5, "0")}`}</b>.
           Every quote gets the next number when it syncs, so nobody on the team ever gets the same one.
         </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Credit note prefix" value={form.credit_prefix} onChange={set("credit_prefix")} maxLength={12} />
+          <Field
+            label="Next credit note no."
+            value={String(form.next_credit_number ?? "")}
+            onChange={set("next_credit_number")}
+            type="number"
+          />
+        </div>
+        <p className="text-xs text-slate-500 leading-snug">
+          Next credit note: <b>{`${form.credit_prefix || ""}${String(form.next_credit_number || 1).padStart(5, "0")}`}</b>.
+        </p>
       </Section>
 
       <Section title="Security">

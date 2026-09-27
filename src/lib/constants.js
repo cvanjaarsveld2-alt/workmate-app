@@ -48,6 +48,7 @@ export const QUOTE_STATUS_COLORS = {
   Accepted: { bg: "#F0FDF4", text: "#15803D" },
   Rejected: { bg: "#FFF1F2", text: "#BE123C" },
   Expired:  { bg: "#F8FAFC", text: "#64748B" },
+  Superseded: { bg: "#F1F5F9", text: "#475569" },
 };
 
 // ─── Notes ────────────────────────────────────────────────────────────────────

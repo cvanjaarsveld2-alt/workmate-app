@@ -583,6 +583,22 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       `page shown=${shown}; thanks=${thanks}; status=${q.status}; by=${q.accepted_by_name}; po=${q.accepted_po}; signature=${(q.accepted_signature || "").slice(0, 22)}`);
   });
 
+  // An accepted quote is locked: no edit or delete, but Revise makes the next
+  // version (-R1) and marks the old one Superseded.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("quotes: accepted quote is locked, Revise makes R1", async () => {
+    const acc = db.quotes.find(q => q.status === "Accepted" && q.accepted_at);
+    if (!acc) { rec("quotes: accepted quote is locked, Revise makes R1", "FAIL", "no accepted quote to revise"); return; }
+    await go("Quotes", 2500);
+    const card = page.locator("div.rounded-2xl", { hasText: acc.quote_number }).filter({ has: page.getByRole("button", { name: "Revise" }) }).last();
+    const locked = (await card.count()) > 0 && (await card.getByRole("button", { name: "Edit" }).count()) === 0;
+    await card.getByRole("button", { name: "Revise" }).click(); await page.waitForTimeout(2500);
+    const nq = db.quotes.find(q => q.revision_of === acc.id);
+    await shot("quote-revised");
+    rec("quotes: accepted quote is locked, Revise makes R1",
+      locked && nq && nq.quote_number === acc.quote_number + "-R1" && acc.status === "Superseded" && nq.status === "Pending" ? "PASS" : "FAIL",
+      `locked (no edit)=${locked}; new version=${nq?.quote_number} ${nq?.status}; old status=${acc.status}`);
+  });
+
   // Quote numbers: two quotes added one after the other get the company's next
   // two numbers from the server, and the list shows them.
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("quotes: new quotes get their own numbers", async () => {
@@ -604,6 +620,50 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     rec("quotes: new quotes get their own numbers",
       nums.every(n => /^Q-\d{5}$/.test(n || "")) && nums[0] !== nums[1] && shown === 2 ? "PASS" : "FAIL",
       `numbers=${JSON.stringify(nums)}; shown in list=${shown}/2; schema errors=${JSON.stringify(errsSince(v0))}`);
+  });
+
+  // Invoices to the standard of Sage/Xero: a hand-made draft with a discount,
+  // approved (locked), part-paid, then a credit note; aged debtors shows it.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("invoices: draft, approve, pay, credit note", async () => {
+    await go("Invoices", 2500);
+    const v0 = log.violations.length;
+    const client = db.clients.find(c => c.team_id === H.TEAM && c.company) || db.clients[0];
+    await page.getByRole("button", { name: "New", exact: true }).click(); await page.waitForTimeout(600);
+    const editor = page.getByTestId("invoice-editor");
+    await editor.getByRole("button", { name: /Select customer/ }).click(); await page.waitForTimeout(300);
+    await editor.getByPlaceholder("Search clients…").fill(client.company);
+    await editor.locator("button", { hasText: client.company }).first().click(); await page.waitForTimeout(300);
+    await editor.getByPlaceholder("Item description").first().fill("SIM pump service");
+    await editor.locator('label:text-is("Qty") + input').first().fill("2");
+    await editor.locator('label:text-is("Unit price (R)") + input').first().fill("500");
+    await editor.getByLabel("Line 1 discount").fill("10");
+    await editor.getByRole("button", { name: "Save draft" }).click(); await page.waitForTimeout(2500);
+    const inv = db.invoices.find(i => (i.line_items || []).some(l => l.description === "SIM pump service"));
+    const draftOk = inv && inv.status === "draft" && Number(inv.total) === 1035 && Number(inv.vat) === 135;
+    // Approve from the list.
+    const card = page.locator("div.rounded-2xl", { hasText: inv?.invoice_number || "@@" }).filter({ has: page.getByRole("button", { name: "Approve" }) }).last();
+    await card.getByRole("button", { name: "Approve", exact: true }).click(); await page.waitForTimeout(400);
+    await page.getByRole("button", { name: "Approve", exact: true }).last().click(); await page.waitForTimeout(2500);
+    const approved = inv?.status === "sent" && !!inv?.approved_at;
+    // Part payment.
+    const card2 = page.locator("div.rounded-2xl", { hasText: inv?.invoice_number || "@@" }).filter({ has: page.getByRole("button", { name: "Record payment" }) }).last();
+    await card2.getByRole("button", { name: "Record payment" }).click(); await page.waitForTimeout(600);
+    await page.locator('label:has-text("Amount (R)") input').fill("500");
+    await page.getByRole("button", { name: "Record a payment", exact: true }).last().click(); await page.waitForTimeout(2500);
+    const partPaid = inv?.status === "part_paid" && Number(inv?.balance_due) === 535;
+    // Credit note for part of what's owed.
+    await card2.getByRole("button", { name: "Credit note" }).click(); await page.waitForTimeout(600);
+    await page.locator('label:has-text("Amount (R)") input').fill("100");
+    await page.locator('label:has-text("Reason") input').fill("SIM seal returned");
+    await page.getByRole("button", { name: "Issue a credit note", exact: true }).last().click(); await page.waitForTimeout(2500);
+    const cn = (db.credit_notes || []).find(c => c.invoice_id === inv?.id);
+    const credited = cn && /^CN-\d{5}$/.test(cn.credit_number) && Number(inv?.balance_due) === 435;
+    await go("Invoices", 2500);
+    const body = await page.evaluate(() => document.body.innerText);
+    await shot("invoices-standard");
+    rec("invoices: draft, approve, pay, credit note",
+      draftOk && approved && partPaid && credited && /Aged debtors/.test(body) ? "PASS" : "FAIL",
+      `draft total=${inv?.total} vat=${inv?.vat} (want 1035/135); approved=${approved}; after R500 status=${inv?.status} owed=${inv?.balance_due}; credit note=${cn?.credit_number} ${cn?.total}; aged debtors shown=${/Aged debtors/.test(body)}; schema errors=${JSON.stringify(errsSince(v0))}`);
   });
 
   // 13j. Message a customer from a job: WhatsApp opens with the message ready; SMS is queued.

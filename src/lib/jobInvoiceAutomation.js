@@ -3,9 +3,27 @@ import { offlineGetAll, offlineSave } from "../offline/offlineDb";
 import { saveAndSync } from "./sync";
 import { withTeamId } from "./teamId";
 import { genId } from "./helpers";
-import { calculateVat } from "./finance";
+import { lineTotals } from "./lineTotals";
 import { readCachedProfile } from "./companyProfile";
 import { partsToLines } from "./products";
+
+// Line items as stored (JSON text or an array), keeping discounts and VAT codes.
+function parseLines(raw) {
+  let list = raw;
+  if (typeof list === "string") {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      list = null;
+    }
+  }
+  return Array.isArray(list) ? list.filter(l => l && typeof l === "object" && (l.description || Number(l.unitPrice))) : [];
+}
+const addDaysISO = (iso, days) => {
+  const d = new Date(iso + "T12:00:00");
+  d.setDate(d.getDate() + (Number(days) || 0));
+  return d.toISOString().slice(0, 10);
+};
 
 const onlineNow = value =>
   value !== undefined ? value : typeof navigator !== "undefined" ? navigator.onLine : true;
@@ -103,26 +121,37 @@ export async function createInvoiceFromJob(
   }
   let quoteVatInclusive = job._quoteVatInclusive ?? job.vat_inclusive ?? true;
   let total = Number(job._quoteValue ?? job.quote_value ?? 0);
-  if (!total && job.quote_id && isOnline) {
+  let quoteLines = parseLines(job._quoteLines);
+  let quoteText = job._quoteDescription || "";
+  if ((!total || !quoteLines.length) && job.quote_id && isOnline) {
     const { data: quote } = await supabase
       .from("quotes")
-      .select("value, vat_inclusive")
+      .select("value, vat_inclusive, line_items, description")
       .eq("id", job.quote_id)
       .maybeSingle();
-    total = Number(quote?.value || 0);
-    if (quote?.vat_inclusive !== undefined) quoteVatInclusive = quote.vat_inclusive !== false;
+    if (!total) total = Number(quote?.value || 0);
+    if (quote?.vat_inclusive !== undefined && quote?.vat_inclusive !== null) quoteVatInclusive = quote.vat_inclusive !== false;
+    if (!quoteLines.length) quoteLines = parseLines(quote?.line_items);
+    quoteText = quoteText || quote?.description || "";
   }
   const vatRegistered = readCachedProfile(teamId || job.team_id).vat_registered !== false;
   // No quote to bill from: bill the priced catalogue parts used on the job and
   // its billable timesheet hours (invoice lines are kept excluding VAT).
-  const partLines = total
-    ? []
-    : [...partsToLines(job.parts_used, { vatInclusive: false }), ...(job._labourLines || [])];
-  if (partLines.length) {
-    total = partLines.reduce((s, l) => s + l.qty * l.unitPrice, 0);
+  // An invoice carries its own lines, so it stays the same whatever later
+  // happens to the quote: the quote's lines (or one line for its value), else
+  // the parts and labour used on the job.
+  let lines;
+  if (total) {
+    lines = quoteLines.length
+      ? quoteLines
+      : [{ description: (quoteText || job.title || "Services rendered").split("\n")[0].slice(0, 200), qty: 1, unitPrice: total }];
+  } else {
+    lines = [...partsToLines(job.parts_used, { vatInclusive: false }), ...(job._labourLines || [])];
     quoteVatInclusive = false;
   }
-  const money = calculateVat(total, quoteVatInclusive, vatRegistered);
+  const money = lineTotals(lines, { vatInclusive: quoteVatInclusive, vatRegistered });
+  const terms = readCachedProfile(teamId || job.team_id).payment_terms_days ?? 30;
+  const today = new Date().toISOString().slice(0, 10);
   const item = withTeamId(
     {
       id: genId(),
@@ -132,14 +161,15 @@ export async function createInvoiceFromJob(
       job_id: job.id,
       invoice_number: `INV-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
       status: "draft",
-      issue_date: new Date().toISOString().slice(0, 10),
-      due_date: null,
+      issue_date: today,
+      due_date: addDaysISO(today, terms),
       subtotal: money.subtotal,
       vat: money.vat,
       total: money.total,
       amount_paid: 0,
       balance_due: money.total,
-      line_items: partLines,
+      line_items: lines,
+      vat_inclusive: quoteVatInclusive,
       notes: job.work_done || "",
       created_at: new Date().toISOString(),
       sync_status: "pending",

@@ -1,4 +1,5 @@
 // ─── Clients Screen ───────────────────────────────────────────────────────────
+import { isLockedQuote } from "../lib/quoteAutomation";
 import { companyName } from "../lib/companyProfile";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -493,7 +494,8 @@ export function ClientsScreen({ data, setData, userId, userEmail, teamId, teamMe
     for (const r of linkedNotes) { await deleteRecord("notes", r.id, userId, setData); }
     for (const r of linkedEquip) { await deleteRecord("equipment", r.id, userId, setData); }
     for (const r of linkedActs) { await deleteRecord("activities", r.id, userId, setData); }
-    for (const r of linkedQuotes) { await deleteRecord("quotes", r.id, userId, setData); }
+    // Accepted or invoiced quotes stay on record (the server keeps them).
+    for (const r of linkedQuotes.filter(q => !isLockedQuote(q))) { await deleteRecord("quotes", r.id, userId, setData); }
     setToast(`${companyName} and ${total} linked records deleted`);
   }
 

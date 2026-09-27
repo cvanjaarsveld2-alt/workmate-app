@@ -2,7 +2,7 @@
 import { lineAmounts, round2 } from "../lib/lineTotals";
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download } from "lucide-react";
+import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download, CopyPlus, Lock } from "lucide-react";
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, genId } from "../lib/helpers";
 import { QuoteLineItems } from "../components/QuoteLineItems";
@@ -13,7 +13,7 @@ import { useCompanyProfile } from "../lib/companyProfile";
 import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
 import { jobToCard, jobsForQuote, quoteToDocument } from "../lib/documentData";
 import { offlineGetAll } from "../offline/offlineDb";
-import { autoCreateChaseFollowup, autoAdvanceOnAccept } from "../lib/quoteAutomation";
+import { autoCreateChaseFollowup, autoAdvanceOnAccept, isLockedQuote } from "../lib/quoteAutomation";
 import { offlineSave } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
@@ -66,6 +66,7 @@ function ExpandableText({ text, limit = 110, className = "" }) {
 // (including VAT when the prices include it).
 const linesValue = (lines, vatInclusive) =>
   round2(lines.reduce((sum, l) => sum + lineAmounts(l, { vatInclusive, vatRegistered: false }).amount, 0));
+
 
 export function QuotesScreen({
   data,
@@ -257,6 +258,26 @@ export function QuotesScreen({
     }
     resetForm();
   }
+  // An accepted or invoiced quote is locked (the server enforces it). Revise
+  // makes a new version (Q-00012-R1) to change; the old one is superseded.
+  async function revise(q) {
+    if (!navigator.onLine) return setToast("Connect to the internet to revise a quote.");
+    const { data: r, error } = await supabase.rpc("revise_quote", { p_quote_id: q.id });
+    if (error) return setToast(error.message);
+    const { data: rows } = await supabase.from("quotes").select("*").in("id", [q.id, r.id]);
+    for (const row of rows || []) await offlineSave("quotes", { ...row, sync_status: "synced" });
+    setData(d => ({
+      ...d,
+      quotes: [
+        ...(rows || []).filter(x => x.id === r.id),
+        ...(d.quotes || []).map(x => (rows || []).find(y => y.id === x.id) || x),
+      ],
+    }));
+    setToast(`New version ${r.quote_number} made. Change it, then send it to the customer.`);
+    const fresh = (rows || []).find(x => x.id === r.id);
+    if (fresh) startEdit(fresh);
+  }
+
   async function deleteQuote(id, name) {
     const ok = await confirm(`Delete quote for ${name || "this client"}?`, { confirmLabel: "Delete" });
     if (!ok) return;
@@ -445,7 +466,7 @@ export function QuotesScreen({
           groups={[
             {
               label: "Status",
-              options: ["All", "Pending", "Accepted", "Rejected", "Expired"],
+              options: ["All", "Pending", "Accepted", "Rejected", "Expired", "Superseded"],
               value: filterStatus,
               onChange: setFilterStatus,
               dangerValue: "Rejected",
@@ -497,6 +518,18 @@ export function QuotesScreen({
                       {q.accepted_po ? ` · order ${q.accepted_po}` : ""}
                     </p>
                   )}
+                  {(q.invoiced_at || q.revision > 0 || q.superseded_by) && (
+                    <p className="text-xs font-bold text-slate-500 mt-0.5">
+                      {[
+                        q.invoiced_at && "Invoiced",
+                        q.revision > 0 && `Revision ${q.revision}`,
+                        q.superseded_by &&
+                          `Replaced by ${quotes.find(x => x.id === q.superseded_by)?.quote_number || "a newer version"}`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
                   {q.declined_at && (
                     <p className="text-xs font-bold text-red-700 mt-0.5">
                       Declined online{q.decline_reason ? `: ${q.decline_reason}` : ""}
@@ -529,18 +562,46 @@ export function QuotesScreen({
                   >
                     <Download size={15} />
                   </button>
-                  <button
-                    onClick={() => startEdit(q)}
-                    className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-blue-600 flex items-center justify-center"
-                  >
-                    <Edit2 size={15} />
-                  </button>
-                  <button
-                    onClick={() => deleteQuote(q.id, q.client_name)}
-                    className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-red-600 flex items-center justify-center"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {isLockedQuote(q) ? (
+                    <>
+                      {q.status !== "Superseded" && !q.invoiced_at ? (
+                        <button
+                          onClick={() => revise(q)}
+                          className="min-h-[44px] rounded-xl bg-slate-50 text-slate-500 active:bg-slate-100 active:text-blue-600 flex items-center justify-center gap-1 text-xs font-bold"
+                          title="Make a new version to change it"
+                          aria-label="Revise"
+                        >
+                          <CopyPlus size={15} /> Revise
+                        </button>
+                      ) : (
+                        <span className="min-h-[44px]" />
+                      )}
+                      <span
+                        className="min-h-[44px] rounded-xl bg-slate-50 text-slate-300 flex items-center justify-center"
+                        title="Accepted quotes are locked"
+                        aria-label="Locked"
+                      >
+                        <Lock size={15} />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => startEdit(q)}
+                        className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-blue-600 flex items-center justify-center"
+                        aria-label="Edit"
+                      >
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        onClick={() => deleteQuote(q.id, q.client_name)}
+                        className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-red-600 flex items-center justify-center"
+                        aria-label="Delete"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </>
+                  )}
                 </div>
                 {pdfFor === q.id && jobsForQuote(q, jobs).length > 0 && (
                   <label className="mt-2 flex items-center gap-2 text-sm text-slate-600 min-h-[36px] cursor-pointer">
