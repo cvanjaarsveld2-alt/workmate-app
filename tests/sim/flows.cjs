@@ -124,6 +124,29 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     rec("quotes: edit keeps line items", JSON.stringify(beforeItems?.length) === JSON.stringify(afterItems?.length) ? "PASS" : "FAIL", `line items ${beforeItems?.length ?? 0}→${afterItems?.length ?? 0}; value ${q?.value}→${after?.value}; schema errors=${JSON.stringify(errsSince(v0))}`);
   });
 
+  // Quote numbers: two quotes added one after the other get the company's next
+  // two numbers from the server, and the list shows them.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("quotes: new quotes get their own numbers", async () => {
+    await go("Quotes");
+    const v0 = log.violations.length;
+    for (const [desc, value] of [["SIM numbered quote A", "1200"], ["SIM numbered quote B", "3400"]]) {
+      await page.getByRole("button", { name: "Add", exact: true }).first().click(); await page.waitForTimeout(500);
+      await page.locator('label:text-is("Description") + textarea, label:text-is("Description") + input').first().fill(desc);
+      await page.locator('label:text-is("Value (R)") + input').first().fill(value);
+      await page.getByRole("button", { name: "Add Quote", exact: true }).click(); await page.waitForTimeout(1500);
+    }
+    await page.waitForTimeout(3000);
+    const rows = ["SIM numbered quote A", "SIM numbered quote B"].map(d => db.quotes.find(q => q.description === d));
+    const nums = rows.map(r => r?.quote_number || null);
+    await go("Quotes", 3000);
+    const body = await page.evaluate(() => document.body.innerText);
+    const shown = nums.filter(n => n && body.includes(n)).length;
+    await shot("quote-numbers");
+    rec("quotes: new quotes get their own numbers",
+      nums.every(n => /^Q-\d{5}$/.test(n || "")) && nums[0] !== nums[1] && shown === 2 ? "PASS" : "FAIL",
+      `numbers=${JSON.stringify(nums)}; shown in list=${shown}/2; schema errors=${JSON.stringify(errsSince(v0))}`);
+  });
+
   // 7. Jobs: save a field report with parts (the old false-conflict path)
   await safe("jobs: save field report with parts", async () => {
     await go("Jobs");

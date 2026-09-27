@@ -31,6 +31,8 @@ export const DEFAULT_PROFILE = {
   invoice_terms: "",
   invoice_prefix: "INV-",
   next_invoice_number: 1,
+  quote_prefix: "Q-",
+  next_quote_number: 1,
   brand_color: "#8B1A1A",
   logo_data: null,
   // Nothing off unless the company chose it (new companies start without
@@ -126,7 +128,7 @@ export function cleanProfile(input) {
   const out = {};
   for (const k of EDITABLE_FIELDS) {
     const v = input[k];
-    if (["quote_validity_days", "payment_terms_days", "next_invoice_number"].includes(k)) {
+    if (["quote_validity_days", "payment_terms_days", "next_invoice_number", "next_quote_number"].includes(k)) {
       const n = Math.round(Number(v));
       out[k] = Number.isFinite(n) ? n : DEFAULT_PROFILE[k];
     } else if (k === "labour_rate" || k === "labour_cost") {
@@ -162,7 +164,7 @@ export function cleanProfile(input) {
       out[k] = v || null;
     } else {
       const t = String(v ?? "").trim();
-      out[k] = t || (k === "invoice_prefix" ? "" : k === "brand_color" ? DEFAULT_PROFILE.brand_color : null);
+      out[k] = t || (k === "invoice_prefix" || k === "quote_prefix" ? "" : k === "brand_color" ? DEFAULT_PROFILE.brand_color : null);
     }
   }
   return out;
@@ -173,6 +175,8 @@ export function validateProfile(p) {
   if (p.payment_terms_days < 0 || p.payment_terms_days > 365) return "Payment terms must be 0 to 365 days.";
   if (p.next_invoice_number < 1) return "The next invoice number must be 1 or more.";
   if (!/^[A-Za-z0-9/_-]{0,12}$/.test(p.invoice_prefix || "")) return "Invoice prefix: up to 12 letters, digits, - / or _.";
+  if (p.next_quote_number < 1) return "The next quote number must be 1 or more.";
+  if (!/^[A-Za-z0-9/_-]{0,12}$/.test(p.quote_prefix || "")) return "Quote prefix: up to 12 letters, digits, - / or _.";
   if (!/^#[0-9A-Fa-f]{6}$/.test(p.brand_color || "")) return "Brand colour must look like #8B1A1A.";
   if (p.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email)) return "The email address doesn't look right.";
   if (p.finance_email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.finance_email)) return "The finance email doesn't look right.";

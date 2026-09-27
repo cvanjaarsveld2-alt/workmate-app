@@ -82,6 +82,18 @@ const DEFAULTS = {
   purchase_orders: { status: "draft", lines: [], subtotal: 0, vat: 0, total: 0 },
   customer_messages: { kind: "custom" },
 };
+// Mirrors private.assign_quote_number: a new company quote gets the next
+// number (prefix + 5 digits) and keeps it on later saves.
+function serverAssigns(table, row) {
+  if (table !== "quotes" || !row.team_id || row.quote_number) return;
+  const prof = (db.team_profiles || []).find(p => p.team_id === row.team_id);
+  const prefix = prof?.quote_prefix ?? "Q-";
+  let n = prof?.next_quote_number || 1;
+  while (db.quotes.some(q => q.team_id === row.team_id && q.quote_number === prefix + String(n).padStart(5, "0"))) n++;
+  row.quote_number = prefix + String(n).padStart(5, "0");
+  if (prof) prof.next_quote_number = n + 1;
+}
+const serverKeeps = (table, old) => (table === "quotes" && old.quote_number ? { quote_number: old.quote_number } : {});
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validate(table, row) {
   const cols = schema[table];
@@ -293,7 +305,7 @@ async function handle(route) {
       // single object when the client asked for one (.single()).
       const stored = [];
       if (m === "PATCH") { const { rows } = query(table, url); rows.forEach(r => { const live = db[table].find(x => x.id === r.id); Object.assign(live, body); stored.push(live); }); log.writes.push({ screen: screenTag, kind: "update", table, n: rows.length, keys: Object.keys(body || {}) }); }
-      else for (const row of rowsIn) { const key = url.searchParams.get("on_conflict") || "id"; const i = db[table].findIndex(x => row[key] && x[key] === row[key]); if (i >= 0) { db[table][i] = { ...db[table][i], ...row }; stored.push(db[table][i]); } else { const added = { id: row.id || uuid(), ...(DEFAULTS[table] || {}), ...row }; db[table].push(added); stored.push(added); } log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
+      else for (const row of rowsIn) { const key = url.searchParams.get("on_conflict") || "id"; const i = db[table].findIndex(x => row[key] && x[key] === row[key]); if (i >= 0) { db[table][i] = { ...db[table][i], ...row, ...serverKeeps(table, db[table][i]) }; stored.push(db[table][i]); } else { const added = { id: row.id || uuid(), ...(DEFAULTS[table] || {}), ...row }; serverAssigns(table, added); db[table].push(added); stored.push(added); } log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
       const ret = (req.headers()["prefer"] || "").includes("return=representation");
       if (ret && (req.headers()["accept"] || "").includes("vnd.pgrst.object")) {
         if (stored.length !== 1) return json(route, 406, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned" });

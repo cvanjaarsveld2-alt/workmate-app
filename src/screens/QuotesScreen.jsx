@@ -398,7 +398,7 @@ export function QuotesScreen({
       .filter(
         q =>
           !search ||
-          [q.client_name, q.description].some(x => x?.toLowerCase().includes(search.toLowerCase())),
+          [q.client_name, q.description, q.quote_number].some(x => x?.toLowerCase().includes(search.toLowerCase())),
       ),
     totalValue = filtered.reduce((s, q) => s + parseFloat(q.value || 0), 0);
   return (
@@ -484,8 +484,12 @@ export function QuotesScreen({
                   <p className="mt-1.5 text-lg font-black" style={{ color: BRAND.primary }}>
                     {formatCurrency(q.value)}
                   </p>
-                  {q.sent_date && (
-                    <p className="text-xs text-slate-400 mt-0.5">Sent {smartDate(q.sent_date)}</p>
+                  {(q.quote_number || q.sent_date) && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {q.quote_number && <span className="font-bold text-slate-600">{q.quote_number}</span>}
+                      {q.quote_number && q.sent_date && " · "}
+                      {q.sent_date && `Sent ${smartDate(q.sent_date)}`}
+                    </p>
                   )}
                   {q.accepted_at && (
                     <p className="text-xs font-bold text-green-700 mt-0.5">

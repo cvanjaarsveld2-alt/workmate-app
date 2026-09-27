@@ -97,6 +97,8 @@ export function quoteToDocument(q, kind, { clients = [], profile = {}, today, pr
       parseItems(q.line_items).length && !(kind === "quote" && quoteDetails(q.details).intro)
         ? q.description || ""
         : "",
+    // A company's quote gets its number from the server when it syncs.
+    draft: kind === "quote" && !!q.team_id && !q.quote_number,
   };
 }
 

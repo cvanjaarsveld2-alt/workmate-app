@@ -391,6 +391,19 @@ export function CompanyProfileScreen({ teamId, isOwner, onPlan }) {
           Numbers are handed out in order as invoices sync, so they never repeat. Only change the next number when
           carrying on from another system.
         </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Quote prefix" value={form.quote_prefix} onChange={set("quote_prefix")} maxLength={12} />
+          <Field
+            label="Next quote no."
+            value={String(form.next_quote_number ?? "")}
+            onChange={set("next_quote_number")}
+            type="number"
+          />
+        </div>
+        <p className="text-xs text-slate-500 leading-snug">
+          Next quote: <b>{`${form.quote_prefix || ""}${String(form.next_quote_number || 1).padStart(5, "0")}`}</b>.
+          Every quote gets the next number when it syncs, so nobody on the team ever gets the same one.
+        </p>
       </Section>
 
       <Section title="Security">
