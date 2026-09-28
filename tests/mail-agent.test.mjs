@@ -176,6 +176,12 @@ test("the server side: private credentials, owner-only items, auto-filing as the
   assert.match(sql, /return private\.inbox_file\(p_id, p_action, coalesce\(p_fields, '\{\}'::jsonb\), it\.owner_user_id, true\);/);
   assert.match(sql, /create trigger team_members_drop_mailboxes after delete on public\.team_members/);
   assert.match(sql, /where exists \(select 1 from private\.mail_connections where status = 'active'\)/);
+  // Anyone who can see an inbox item (or the expense made from it) can open
+  // its file, wherever it's stored; nobody else.
+  const files = read("../supabase/migrations/20260929190000_inbox_file_access.sql");
+  assert.match(files, /create policy receipts_read_inbox on storage\.objects for select to authenticated/);
+  assert.match(files, /exists \(select 1 from public\.inbox_items i where i\.file_path = objects\.name\)/);
+  assert.match(files, /exists \(select 1 from public\.expenses e where e\.receipt_url = objects\.name\)/);
   const fn = read("../supabase/functions/mail-agent/index.ts");
   assert.match(fn, /cron_secret_matches/);
   assert.match(fn, /mail_state_provider", \{ p_state: body\.state \|\| "", p_user: who\.user\.id \}/);
