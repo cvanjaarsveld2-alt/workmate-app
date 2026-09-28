@@ -24,6 +24,62 @@ export function itemState(item, now = Date.now()) {
   return age > 5 * 60 * 1000 ? "failed" : "new";
 }
 
+// What an item is (from a connected mailbox it can be more than a receipt),
+// and what filing it does.
+export const KIND_LABELS = {
+  expense: "Receipt / bill",
+  quote_request: "Quote request",
+  customer_email: "Customer email",
+  supplier_doc: "Supplier document",
+};
+export const FILE_AS = [
+  { action: "expense", label: "An expense", button: "Approve" },
+  { action: "lead", label: "A new lead", button: "Create lead" },
+  { action: "customer_note", label: "A note on the customer", button: "File on customer" },
+  { action: "purchase_order", label: "A note on a purchase order", button: "Add to purchase order" },
+];
+export const actionForKind = kind =>
+  ({ expense: "expense", quote_request: "lead", customer_email: "customer_note", supplier_doc: "purchase_order" })[kind] || "expense";
+
+// The form for filing as a lead, a customer note or a purchase-order note.
+export function filingForm(item = {}) {
+  const x = item.extracted || {};
+  const q = x.quote_request || {};
+  const s = x.supplier_doc || {};
+  return {
+    client_id: item.client_id || "",
+    purchase_order_id: item.purchase_order_id || "",
+    title: q.what ? `Quote: ${q.what}`.slice(0, 200) : item.subject || "",
+    description: [q.what, q.location && `Site: ${q.location}`, q.needed_by && `Needed by ${q.needed_by}`, q.phone && `Phone ${q.phone}`]
+      .filter(Boolean)
+      .join("\n") || String(item.body_excerpt || "").slice(0, 2000),
+    company: q.company || "",
+    contact_name: q.contact_name || item.from_name || "",
+    summary: x.summary || item.subject || "",
+    supplier_ref: s.supplier_ref || "",
+    expected_date: s.expected_date || "",
+  };
+}
+
+// What's missing before filing (the server checks again).
+export function filingProblem(action, form) {
+  if (action === "customer_note" && !form.client_id) return "Choose the customer to file this on.";
+  if (action === "purchase_order" && !form.purchase_order_id) return "Choose the purchase order.";
+  if (action === "lead" && !String(form.title || "").trim()) return "Give the lead a title.";
+  return "";
+}
+
+// Where a filed item went, for the "Filed by the agent" list.
+export function filedTo(item = {}) {
+  if (item.expense_id) return "Expenses";
+  if (item.lead_id) return "Leads";
+  if (item.activity_id) return "Customer timeline";
+  if (item.purchase_order_id && item.status === "approved") return "Purchase order";
+  return "";
+}
+
+export const PROVIDER_LABELS = { microsoft: "Microsoft 365 / Outlook", google: "Gmail", imap: "Other mailbox (IMAP)" };
+
 export const DOCUMENT_LABELS = {
   receipt: "Receipt",
   invoice: "Supplier invoice",

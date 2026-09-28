@@ -25,6 +25,10 @@ verify_jwt = false
 # Called by PayFast (notifications) and by the app (checks the sign-in itself).
 verify_jwt = false
 
+[functions.mail-agent]
+# Sign-in callbacks (state checked), the person's sign-in, or the cron secret.
+verify_jwt = false
+
 [functions.inbound-email]
 # Called by the inbound-mail service (Postmark) with INBOUND_EMAIL_SECRET.
 verify_jwt = false

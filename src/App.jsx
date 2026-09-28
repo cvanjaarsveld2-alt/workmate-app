@@ -1082,6 +1082,7 @@ export default function PowerWorksApp() {
         userId={session.user.id}
         userEmail={session.user.email}
         quickAddTrigger={quickAddTrigger}
+        isOwner={!!teamAccess?.is_owner}
       />
     ),
     Analytics: (

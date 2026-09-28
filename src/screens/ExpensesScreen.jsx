@@ -398,7 +398,7 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigger }) {
+export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigger, isOwner = false }) {
   const isMine = useIsMine(userId);
   const exportProgress = useExportProgress();
   const [showForm, setShowForm]       = useState(false);
@@ -1351,7 +1351,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
 
       {/* ── Receipts and bills emailed in ── */}
       {!selectMode && !showForm && !showScanner && !editId && (
-        <ReceiptInbox userId={userId} expenses={expenses} setData={setData} onToast={setToast} />
+        <ReceiptInbox userId={userId} expenses={expenses} clients={data.clients || []} isOwner={isOwner} setData={setData} onToast={setToast} />
       )}
 
       {/* ── Scanner ── */}

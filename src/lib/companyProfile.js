@@ -58,7 +58,12 @@ export const DEFAULT_PROFILE = {
   auto_sms: {},
   // Technicians' locations shared with the office while they're clocked in.
   share_location: false,
+  // Mail agent: what it brings in from connected mailboxes, and whether it
+  // may file sure items by itself (otherwise everything waits for a person).
+  mail_agent_auto: false,
+  mail_agent_kinds: ["expense", "quote_request", "customer_email", "supplier_doc"],
 };
+export const MAIL_AGENT_KINDS = ["expense", "quote_request", "customer_email", "supplier_doc"];
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
 const cacheKey = teamId => `pm_company_profile__${teamId}`;
@@ -158,7 +163,9 @@ export function cleanProfile(input) {
       out[k] = Array.isArray(v) ? [...new Set(v.map(String))] : [];
     } else if (k === "vat_registered") {
       out[k] = v !== false;
-    } else if (k === "require_admin_mfa" || k === "email_customer_reminders" || k === "share_location") {
+    } else if (k === "mail_agent_kinds") {
+      out[k] = Array.isArray(v) ? MAIL_AGENT_KINDS.filter(x => v.includes(x)) : [...MAIL_AGENT_KINDS];
+    } else if (k === "require_admin_mfa" || k === "email_customer_reminders" || k === "share_location" || k === "mail_agent_auto") {
       out[k] = v === true;
     } else if (k === "auto_reminders") {
       out[k] = v !== false;

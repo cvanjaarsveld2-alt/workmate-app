@@ -721,7 +721,7 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     await go("Expenses", 3500);
     const box = page.getByTestId("receipt-inbox");
     const address = (await box.getByText("4a0e4956c351@in.powermate.test").count()) > 0;
-    const counted = (await box.getByText("2 to check").count()) > 0;
+    const counted = (await box.getByText("3 to check").count()) > 0;
     await box.getByRole("button", { name: /Engen Garsfontein/ }).click(); await page.waitForTimeout(800);
     const openPdf = (await box.getByRole("link", { name: /Open INV-2231\.pdf/ }).count()) > 0;
     await shot("inbox-review");
@@ -733,12 +733,29 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     // The other one couldn't be read: it's removed as not an expense.
     await box.getByRole("button", { name: /Joe's Welding/ }).click(); await page.waitForTimeout(600);
     const needsAmount = (await box.getByRole("button", { name: "Approve", exact: true }).count()) > 0;
-    await box.getByRole("button", { name: "Not an expense" }).click(); await page.waitForTimeout(1200);
+    await box.getByRole("button", { name: "Not needed" }).click(); await page.waitForTimeout(1200);
     const joe = H.db.inbox_items.find(x => x.message_id === "<sim-2@welding.example>");
     await shot("inbox-done");
     rec("expenses: emailed bill approved from the inbox",
       address && counted && openPdf && e?.receipt_url?.endsWith("sim-1.pdf") && e?.vat_amount === 150 && e?.payment_method === "Account" && item?.status === "approved" && item?.expense_id === e?.id && listed && needsAmount && joe?.status === "rejected" ? "PASS" : "FAIL",
-      `address shown=${address}; "2 to check"=${counted}; PDF link=${openPdf}; expense=${e ? `${e.amount}/${e.vat_amount}/${e.payment_method}/${e.receipt_url}` : "none"}; item=${item?.status}; confirmed=${listed}; second item=${joe?.status}`);
+      `address shown=${address}; "3 to check"=${counted}; PDF link=${openPdf}; expense=${e ? `${e.amount}/${e.vat_amount}/${e.payment_method}/${e.receipt_url}` : "none"}; item=${item?.status}; confirmed=${listed}; second item=${joe?.status}`);
+  });
+
+  // 13h3. The mail agent found a quote request in a connected mailbox: it becomes a lead.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("mail agent: quote request becomes a lead", async () => {
+    const box = page.getByTestId("receipt-inbox");
+    const agent = (await page.getByTestId("mailbox-agent").getByRole("button", { name: /Connect a mailbox/ }).count()) > 0;
+    await box.getByRole("button", { name: /Jan Buyer/ }).click(); await page.waitForTimeout(600);
+    const labelled = (await box.getByText(/Quote request ·/).count()) > 0;
+    const values = await box.locator("input").evaluateAll(els => els.map(e => e.value));
+    const title = values.find(v => v.startsWith("Quote:")) || "";
+    await shot("inbox-quote-request");
+    await box.getByRole("button", { name: "Create lead", exact: true }).click();
+    const done = await page.getByText("Lead created ✓").waitFor({ timeout: 4000 }).then(() => true, () => false);
+    const lead = H.db.leads.find(l => l.title === "Quote: 2x 30T low-profile jacks");
+    const item = H.db.inbox_items.find(x => x.message_id === "<sim-3@mine.example>");
+    rec("mail agent: quote request becomes a lead", agent && labelled && title === "Quote: 2x 30T low-profile jacks" && done && lead?.stage === "New" && item?.lead_id === lead?.id ? "PASS" : "FAIL",
+      `connect button=${agent}; labelled=${labelled}; title="${title}"; confirmed=${done}; lead=${lead ? lead.stage + "/" + lead.contact_name : "none"}; item=${item?.status}`);
   });
 
   // 13i. Plans: a Starter company sees Products locked, the master account can pick a plan.
