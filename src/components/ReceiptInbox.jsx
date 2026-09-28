@@ -13,7 +13,7 @@ import { activeTeamId } from "../lib/companyProfile";
 import { CATEGORIES } from "../lib/expenseAccounting";
 import { convertToZAR } from "../lib/exchangeRate";
 import {
-  DOCUMENT_LABELS, FILE_AS, KIND_LABELS, OPEN_STATUSES, actionForKind, filedTo, filingForm, filingProblem, inboxAddress, isPdfPath,
+  DOCUMENT_LABELS, FILE_AS, KIND_LABELS, OPEN_STATUSES, actionForKind, filedTo, filingForm, filingProblem, documentLabel, inboxAddress, isDocumentPath,
   itemState, possibleDuplicate, reviewForm, reviewProblem,
 } from "../lib/inbox";
 import { Btn, ClientSelector, Field, SelectField } from "./ui";
@@ -51,11 +51,11 @@ function FilePreview({ item }) {
     ) : null;
   }
   if (!url) return <div className="h-24 rounded-lg bg-slate-50" />;
-  if (isPdfPath(item.file_path) || /heic/.test(item.content_type || "")) {
+  if (isDocumentPath(item.file_path)) {
     return (
       <a href={url} target="_blank" rel="noopener noreferrer"
         className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 py-3 text-sm font-bold text-slate-700 min-h-[48px]">
-        <FileText size={16} /> Open {item.file_name || "the file"}
+        <FileText size={16} /> Open {item.file_name || `the ${documentLabel(item.file_path)}`}
       </a>
     );
   }

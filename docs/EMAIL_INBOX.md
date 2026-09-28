@@ -15,9 +15,12 @@ mailbox.
 
 1. An inbound-mail service (Postmark) receives the email and posts it to the
    `inbound-email` Edge Function.
-2. The function works out the company from the address, then stores each PDF
-   or photo (up to 5 per email, 10 MB each) with the company's receipts. When
-   there's no attachment, it stores the email text instead, for online orders.
+2. The function works out the company from the address, then stores each
+   attachment (up to 5 per email, 10 MB each) with the company's receipts.
+   PDFs, photos (including iPhone HEIC), Word (.docx), Excel (.xlsx) and CSV
+   files are read. Older .doc and .xls files are kept for a person to open.
+   When there's no attachment, it stores the email text instead, for online
+   orders.
 3. AI reads each file: supplier, VAT number, total, VAT, date, due date and
    category. Each value is checked before it's saved. The sender is matched to
    the company's suppliers by email address, email domain or name.

@@ -75,7 +75,7 @@ export function prefilter(msg, dir = {}) {
   const known = !!(matches.client || matches.contact || matches.supplier);
   const subject = msg.subject || "";
   const text = messageText(msg).slice(0, 3000);
-  const docs = (msg.attachments || []).filter(a => /pdf|image\//i.test(a.ContentType || "") || /\.(pdf|jpe?g|png|webp|heic)$/i.test(a.Name || ""));
+  const docs = (msg.attachments || []).filter(a => /pdf|image\/|word|excel|spreadsheet|csv/i.test(a.ContentType || "") || /\.(pdf|jpe?g|png|webp|heic|docx?|xlsx?|csv)$/i.test(a.Name || ""));
   const financeWords = FINANCE.test(subject) || FINANCE.test(text) || docs.some(a => FINANCE.test(a.Name || ""));
   // Newsletters and marketing: only if it's plainly a receipt or bill.
   if (headerValue(msg, "list-unsubscribe") && !known && !FINANCE.test(subject)) return no("newsletter");
@@ -211,10 +211,13 @@ export function fallbackKind(matches = {}, kinds = KINDS) {
   return kinds.includes(k) ? k : null;
 }
 
-// The file worth keeping with the item (the bill, the quotation), if any.
+// The file worth keeping with the item (the bill, the quotation), if any: a
+// PDF first, then a photo, then a Word, Excel or CSV file, then an old
+// .doc/.xls (kept, but not read).
+const FILE_PREFERENCE = ["pdf", "jpg", "png", "webp", "heic", "xlsx", "docx", "csv", "xls", "doc"];
 export function mainAttachment(msg) {
   const { files } = usableAttachments({ Attachments: msg.attachments || [] });
-  return files.find(f => f.ext === "pdf") || files[0] || null;
+  return [...files].sort((a, b) => FILE_PREFERENCE.indexOf(a.ext) - FILE_PREFERENCE.indexOf(b.ext))[0] || null;
 }
 
 // The row for the review inbox.

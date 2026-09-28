@@ -20,6 +20,8 @@ import {
   bodyText, extractionPrompt, findTokens, isAutoReply, looksLikeReceipt, matchSupplier,
   parseExtraction, sender, usableAttachments,
 } from "./inbound.js";
+import { aiParts } from "./documents.js";
+import { heicAsJpeg } from "./heic.js";
 
 const env = (k: string) => Deno.env.get(k) ?? "";
 const json = (body: unknown, status = 200) =>
@@ -57,12 +59,16 @@ type Part = { name: string; size: number; content?: string; ext?: string; conten
 async function readWithAI(part: Part): Promise<{ extracted?: Record<string, unknown>; error?: string }> {
   const key = env("OPENAI_API_KEY");
   if (!key) return { error: "Automatic reading isn't set up yet. Enter the details from the file." };
-  if (part.ext === "heic") return { error: "iPhone HEIC photos can't be read automatically. Open it and enter the details." };
   const content: unknown[] = [{ type: "text", text: extractionPrompt() }];
   if (part.text) content.push({ type: "text", text: `The email:\n\n${part.text}` });
-  else if (part.ext === "pdf")
-    content.push({ type: "file", file: { filename: part.name || "document.pdf", file_data: `data:application/pdf;base64,${part.content}` } });
-  else content.push({ type: "image_url", image_url: { url: `data:${part.contentType};base64,${part.content}`, detail: "high" } });
+  else {
+    // PDFs and photos as they are; Word, Excel and CSV as their text; iPhone
+    // photos converted to JPEG first.
+    const file = (part.ext === "heic" && (await heicAsJpeg(part))) || part;
+    const read = await aiParts(file);
+    if (read.error) return { error: read.error };
+    content.push(...read.parts);
+  }
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 60_000);
@@ -177,7 +183,7 @@ async function takeIn(db: SupabaseClient, p: Record<string, unknown>) {
     } else if (part.text) {
       result = await readWithAI(part);
     } else {
-      result = { error: "No PDF or photo was attached, and no amount was found in the email." };
+      result = { error: "No file was attached, and no amount was found in the email." };
     }
 
     const extracted = result.extracted ?? {};

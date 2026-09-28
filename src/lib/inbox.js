@@ -1,8 +1,12 @@
 // ─── Receipts and bills emailed in (the Inbox on the Expenses screen) ────────
 // Items arrive through the inbound-email Edge Function; see docs/EMAIL_INBOX.md.
 
-// Slips emailed in can be PDFs; photos taken in the app are always images.
+// Slips emailed in can be PDFs, Word or Excel files, or iPhone photos the
+// browser can't show; photos taken in the app are always images.
 export const isPdfPath = path => /\.pdf(\?|$)/i.test(String(path || ""));
+export const isDocumentPath = path => /\.(pdf|docx?|xlsx?|csv|heic)(\?|$)/i.test(String(path || ""));
+const DOC_NAMES = { pdf: "PDF", doc: "Word file", docx: "Word file", xls: "Excel file", xlsx: "Excel file", csv: "CSV file", heic: "iPhone photo" };
+export const documentLabel = path => DOC_NAMES[(String(path || "").match(/\.([a-z]+)(\?|$)/i)?.[1] || "").toLowerCase()] || "file";
 
 // The address shown to the company. VITE_INBOX_ADDRESS is the pattern for the
 // platform's inbound mail, e.g. "{token}@in.example.co.za" or

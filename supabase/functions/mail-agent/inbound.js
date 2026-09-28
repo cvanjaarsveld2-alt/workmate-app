@@ -25,8 +25,19 @@ const TYPES = {
   "image/webp": "webp",
   "image/heic": "heic",
   "image/heif": "heic",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/msword": "doc",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-excel": "xls",
+  "text/csv": "csv",
 };
-const EXT_TYPES = { pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", heic: "image/heic", heif: "image/heic" };
+const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const EXT_TYPES = {
+  pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", heic: "image/heic", heif: "image/heic",
+  docx: DOCX, doc: "application/msword", xlsx: XLSX, xls: "application/vnd.ms-excel", csv: "text/csv",
+};
+const IMAGE_EXTS = ["jpg", "png", "webp", "heic"];
 
 const lower = s => String(s || "").trim().toLowerCase();
 
@@ -68,8 +79,10 @@ export function sender(p = {}) {
 
 export function fileKind(att = {}) {
   const type = lower(att.ContentType).split(";")[0];
-  if (TYPES[type]) return { ext: TYPES[type], contentType: type === "image/jpg" ? "image/jpeg" : type === "image/heif" ? "image/heic" : type };
   const ext = lower(att.Name).split(".").pop();
+  // Excel sometimes labels .xlsx as the old type; the name decides.
+  if (type === "application/vnd.ms-excel" && ext === "xlsx") return { ext: "xlsx", contentType: XLSX };
+  if (TYPES[type]) return { ext: TYPES[type], contentType: type === "image/jpg" ? "image/jpeg" : type === "image/heif" ? "image/heic" : type };
   if (EXT_TYPES[ext]) return { ext: ext === "jpeg" ? "jpg" : ext === "heif" ? "heic" : ext, contentType: EXT_TYPES[ext] };
   return null;
 }
@@ -80,8 +93,8 @@ export const base64Bytes = b64 => {
   return Math.floor((s.length * 3) / 4) - (s.endsWith("==") ? 2 : s.endsWith("=") ? 1 : 0);
 };
 
-// The attachments worth keeping: PDFs and photos, not tiny inline images,
-// not too big, at most MAX_FILES. Returns { files, skipped }.
+// The attachments worth keeping: PDFs, photos, Word, Excel and CSV files; not
+// tiny inline images, not too big, at most MAX_FILES. Returns { files, skipped }.
 export function usableAttachments(p = {}) {
   const files = [];
   const skipped = [];
@@ -89,9 +102,9 @@ export function usableAttachments(p = {}) {
     const kind = fileKind(att);
     const size = Number(att.ContentLength) || base64Bytes(att.Content);
     const name = String(att.Name || "attachment").slice(0, 200);
-    if (!kind) { skipped.push({ name, why: "not a PDF or photo" }); continue; }
+    if (!kind) { skipped.push({ name, why: "not a document, spreadsheet or photo" }); continue; }
     if (!att.Content) { skipped.push({ name, why: "empty" }); continue; }
-    if (att.ContentID && kind.ext !== "pdf" && size < MIN_INLINE_BYTES) continue; // logo or signature
+    if (att.ContentID && IMAGE_EXTS.includes(kind.ext) && size < MIN_INLINE_BYTES) continue; // logo or signature
     if (size > MAX_FILE_BYTES) { skipped.push({ name, why: "larger than 10 MB" }); continue; }
     if (files.length >= MAX_FILES) { skipped.push({ name, why: `more than ${MAX_FILES} files in one email` }); continue; }
     files.push({ name, size, content: att.Content, ...kind });

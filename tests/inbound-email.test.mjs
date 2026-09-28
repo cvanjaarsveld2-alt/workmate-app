@@ -24,21 +24,23 @@ test("finds the company's token in the address, the +part or Postmark's MailboxH
   assert.deepEqual(findTokens({ To: "christo12345@acme.co.za", Cc: "ab12cd34ef56@in.example.co.za" }), ["christo12345", "ab12cd34ef56"]);
 });
 
-test("keeps PDFs and photos, drops logos, oversized and unknown files", () => {
+test("keeps PDFs, photos and Office files; drops logos, oversized and unknown files", () => {
   const { files, skipped } = usableAttachments({
     Attachments: [
       { Name: "Invoice 123.pdf", ContentType: "application/pdf", Content: b64(2000) },
       { Name: "logo.png", ContentType: "image/png", Content: b64(4000), ContentID: "logo@x" },
       { Name: "slip.JPG", ContentType: "application/octet-stream", Content: b64(50000) },
       { Name: "terms.docx", ContentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", Content: b64(10) },
+      { Name: "archive.zip", ContentType: "application/zip", Content: b64(10) },
       { Name: "huge.pdf", ContentType: "application/pdf", Content: "x", ContentLength: 11 * 1024 * 1024 },
     ],
   });
   assert.deepEqual(files.map(f => [f.name, f.ext, f.contentType]), [
     ["Invoice 123.pdf", "pdf", "application/pdf"],
     ["slip.JPG", "jpg", "image/jpeg"],
+    ["terms.docx", "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
   ]);
-  assert.deepEqual(skipped.map(s => s.name), ["terms.docx", "huge.pdf"]);
+  assert.deepEqual(skipped.map(s => s.name), ["archive.zip", "huge.pdf"]);
   const many = usableAttachments({ Attachments: Array.from({ length: 7 }, (_, i) => ({ Name: `${i}.pdf`, ContentType: "application/pdf", Content: b64(10) })) });
   assert.equal(many.files.length, 5);
   assert.equal(many.skipped.length, 2);

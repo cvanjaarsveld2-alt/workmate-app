@@ -45,6 +45,25 @@ week before.
    - If the AI can't be reached, the email is still kept for a person to check
      and file by hand. It's never silently lost.
 
+## Attachments it reads
+
+| File | What happens |
+|---|---|
+| PDF, including scanned ones | Read |
+| Photos (JPG, PNG, WebP) | Read |
+| iPhone HEIC photos | Converted to JPEG for the AI and read; the original is kept |
+| Word (.docx) | Its text and tables are read |
+| Excel (.xlsx) | Every sheet, up to 300 rows each, is read |
+| CSV | Read |
+| Older Word and Excel files (.doc, .xls) | Kept with the item for a person to open, but not read |
+| Anything else (zip files, calendar invites and so on) | Ignored |
+
+Details:
+- Up to 5 files per email, each up to 10 MB.
+- When an email has several files, the agent reads the most useful one: a PDF
+  first, then a photo, then an Excel, Word or CSV file.
+- The file is kept with the item and opens from the Inbox and from the expense.
+
 ## Privacy and security
 
 - The agent only **reads** mail. It can't send, delete or move anything:

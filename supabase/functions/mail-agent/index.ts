@@ -22,6 +22,8 @@ import {
 } from "./agent.js";
 import * as ms from "./microsoft.js";
 import * as gm from "./google.js";
+import { aiParts } from "./documents.js";
+import { heicAsJpeg } from "./heic.js";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -65,10 +67,14 @@ async function readWithAI(prompt: string, msg: Msg, file: Msg | null) {
     { type: "text", text: prompt },
     { type: "text", text: `From: ${msg.from?.name || ""} <${msg.from?.email || ""}>\nSubject: ${msg.subject || ""}\n\n${messageText(msg).slice(0, 12000)}` },
   ];
-  if (file?.content && file.ext === "pdf")
-    content.push({ type: "file", file: { filename: file.name || "document.pdf", file_data: `data:application/pdf;base64,${file.content}` } });
-  else if (file?.content && file.ext !== "heic")
-    content.push({ type: "image_url", image_url: { url: `data:${file.contentType};base64,${file.content}`, detail: "high" } });
+  if (file?.content) {
+    // PDFs and photos as they are; Word, Excel and CSV as their text; iPhone
+    // photos converted to JPEG first. A file that can't be read is mentioned,
+    // and the email's own text is still read.
+    const read = await aiParts((file.ext === "heic" && (await heicAsJpeg(file))) || file);
+    if (read.parts) content.push(...read.parts);
+    else content.push({ type: "text", text: `(The attached file "${file.name}" couldn't be read automatically.)` });
+  }
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 45_000);
   try {
@@ -158,7 +164,7 @@ async function runConnection(db: SupabaseClient, c: Conn) {
       }
       const d = aiFailed ? { keep: !!triage.kind, kind: triage.kind, auto: null } : decide(triage, pre.matches, { autoFile: c.auto_file, kinds: c.kinds });
       if (!d.keep) continue;
-      const row = inboxRow({ msg, triage, matches: pre.matches, connection: c, file: d.kind === "expense" || d.kind === "supplier_doc" ? file : null });
+      const row = inboxRow({ msg, triage, matches: pre.matches, connection: c, file });
       if (aiFailed) Object.assign(row, { status: "failed", error: "This couldn't be read automatically. Check it and file it by hand." });
       if (row.file_name && file?.content) {
         const path = `receipts/${c.owner_user_id}/inbox/${crypto.randomUUID()}.${file.ext}`;
