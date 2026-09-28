@@ -24,3 +24,7 @@ verify_jwt = false
 [functions.billing]
 # Called by PayFast (notifications) and by the app (checks the sign-in itself).
 verify_jwt = false
+
+[functions.inbound-email]
+# Called by the inbound-mail service (Postmark) with INBOUND_EMAIL_SECRET.
+verify_jwt = false

@@ -41,6 +41,8 @@ import {
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 import { useIsMine } from "../lib/teamView";
+import { isPdfPath } from "../lib/inbox";
+import { ReceiptInbox } from "../components/ReceiptInbox";
 
 // Categories, default ledger codes and SA VAT treatment live in
 // lib/expenseAccounting (shared with the accounting exports); each company can
@@ -184,6 +186,15 @@ function SignedReceiptImg({ stored, className }) {
       <div className="w-full h-32 bg-slate-50 flex items-center justify-center">
         <Receipt size={24} className="text-slate-300" />
       </div>
+    );
+  }
+  if (isPdfPath(stored)) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+        className="w-full h-32 bg-slate-50 flex flex-col items-center justify-center gap-1 text-slate-600">
+        <FileText size={24} />
+        <span className="text-xs font-bold">Open PDF</span>
+      </a>
     );
   }
   return <img src={url} alt="Receipt" className={className} />;
@@ -753,8 +764,17 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   }
 
   async function openExpenseImages(ex, startWith = "till") {
+    // A bill emailed in as a PDF opens in the browser's PDF viewer. The tab is
+    // opened before the wait so phones don't block it as a pop-up.
+    if (startWith === "till" && isPdfPath(ex.receipt_url)) {
+      const tab = window.open("", "_blank");
+      const url = await signReceipt(ex.receipt_url);
+      if (url && tab) tab.location.href = url;
+      else { tab?.close(); setToast("Couldn't open the PDF. Check your connection."); }
+      return;
+    }
     const items = [];
-    const tillSigned = await signReceipt(ex.receipt_url);
+    const tillSigned = isPdfPath(ex.receipt_url) ? null : await signReceipt(ex.receipt_url);
     if (tillSigned) items.push({ url: tillSigned, caption: `Till slip — ${ex.vendor || ""}` });
     const paySigned = await signReceipt(ex.payment_slip_url);
     if (paySigned) items.push({ url: paySigned, caption: `Payment slip — ${ex.vendor || ""}` });
@@ -1060,7 +1080,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               <button onClick={() => openExpenseImages(detailExpense, "till")}
                 className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
                 style={{ background: "#8B1A1A" }}>
-                📄 View till slip
+                📄 {isPdfPath(detailExpense.receipt_url) ? "Open PDF" : "View till slip"}
               </button>
             )}
             {detailExpense.payment_slip_url && (
@@ -1327,6 +1347,11 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             ))}
           </div>
         </div>
+      )}
+
+      {/* ── Receipts and bills emailed in ── */}
+      {!selectMode && !showForm && !showScanner && !editId && (
+        <ReceiptInbox userId={userId} expenses={expenses} setData={setData} onToast={setToast} />
       )}
 
       {/* ── Scanner ── */}

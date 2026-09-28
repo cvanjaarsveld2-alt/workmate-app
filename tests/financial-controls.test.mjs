@@ -47,6 +47,10 @@ test("the server locks approved invoices and payments, and works out balances", 
   assert.match(sql, /set_config\(''pm\.finance_bypass'', ''on'', true\)/);
   assert.match(sql, /credit_prefix text not null default 'CN-'/);
   assert.match(sql, /array\['credit_notes',/);
+  // A one-person account (no company) gets a clear refusal, not a NOT NULL error.
+  const solo = fs.readFileSync("supabase/migrations/20260929170000_credit_note_needs_company.sql", "utf8");
+  assert.match(solo, /if i\.team_id is null then/);
+  assert.match(solo, /Credit notes are numbered per company\./);
 });
 
 test("accepted quotes are locked; revisions and expiry", () => {

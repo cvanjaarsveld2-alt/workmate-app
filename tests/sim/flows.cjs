@@ -716,6 +716,31 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       `template saved=${!!tpl} (${(tpl?.fields || []).length} questions); nagged when incomplete=${nagged}; submission=${!!sub}; signature=${(sub?.signature || "").slice(0, 22)}; answers=${JSON.stringify(sub?.answers || {}).slice(0, 80)}`);
   });
 
+  // 13h2. Receipts and bills emailed in: approve one into an expense, reject another.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("expenses: emailed bill approved from the inbox", async () => {
+    await go("Expenses", 3500);
+    const box = page.getByTestId("receipt-inbox");
+    const address = (await box.getByText("4a0e4956c351@in.powermate.test").count()) > 0;
+    const counted = (await box.getByText("2 to check").count()) > 0;
+    await box.getByRole("button", { name: /Engen Garsfontein/ }).click(); await page.waitForTimeout(800);
+    const openPdf = (await box.getByRole("link", { name: /Open INV-2231\.pdf/ }).count()) > 0;
+    await shot("inbox-review");
+    await box.getByRole("button", { name: "Approve", exact: true }).click();
+    const listed = await page.getByText("Added to your expenses ✓").waitFor({ timeout: 4000 }).then(() => true, () => false);
+    await page.waitForTimeout(800);
+    const e = H.db.expenses.find(x => x.vendor === "Engen Garsfontein" && Number(x.amount) === 1150);
+    const item = H.db.inbox_items.find(x => x.message_id === "<sim-1@engen.example>");
+    // The other one couldn't be read: it's removed as not an expense.
+    await box.getByRole("button", { name: /Joe's Welding/ }).click(); await page.waitForTimeout(600);
+    const needsAmount = (await box.getByRole("button", { name: "Approve", exact: true }).count()) > 0;
+    await box.getByRole("button", { name: "Not an expense" }).click(); await page.waitForTimeout(1200);
+    const joe = H.db.inbox_items.find(x => x.message_id === "<sim-2@welding.example>");
+    await shot("inbox-done");
+    rec("expenses: emailed bill approved from the inbox",
+      address && counted && openPdf && e?.receipt_url?.endsWith("sim-1.pdf") && e?.vat_amount === 150 && e?.payment_method === "Account" && item?.status === "approved" && item?.expense_id === e?.id && listed && needsAmount && joe?.status === "rejected" ? "PASS" : "FAIL",
+      `address shown=${address}; "2 to check"=${counted}; PDF link=${openPdf}; expense=${e ? `${e.amount}/${e.vat_amount}/${e.payment_method}/${e.receipt_url}` : "none"}; item=${item?.status}; confirmed=${listed}; second item=${joe?.status}`);
+  });
+
   // 13i. Plans: a Starter company sees Products locked, the master account can pick a plan.
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("plans: starter locks products, plan screen offers upgrade", async () => {
     const before = H.SIM.plan;
