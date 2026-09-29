@@ -108,6 +108,23 @@
     }
   }
 
+  /* iPhone Safari gives date and time fields a built-in minimum width, wider
+     than half a phone screen, and ignores width: 100%. Two side by side
+     (Date | Time on an expense) pushed the second one off the screen. */
+  input[type="date"],
+  input[type="time"],
+  input[type="datetime-local"],
+  input[type="month"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+  }
+  input::-webkit-date-and-time-value {
+    text-align: left;
+  }
+
   /* Tailwind 3's placeholder grey (v4 uses half-transparent text colour).
      Dark mode sets its own placeholder colour in darkMode.css. */
   input::placeholder,

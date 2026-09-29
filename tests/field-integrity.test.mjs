@@ -170,3 +170,8 @@ test("expense camera buttons open the camera straight from the tap (iPhone)", ()
   const scanner = read("src/components/ReceiptScanner.jsx");
   assert.match(scanner, /if \(initialFile\) \{\s*handleFile\(initialFile\);/);
 });
+
+test("date and time fields fit their column on iPhone", () => {
+  const css = read("src/index.css");
+  assert.match(css, /input\[type="date"\],\s*input\[type="time"\],[\s\S]*?appearance: none;[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;/);
+});
