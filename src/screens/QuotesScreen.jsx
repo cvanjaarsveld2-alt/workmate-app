@@ -1,7 +1,8 @@
 // ─── Quotes Screen ────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from "react";
+import { lineTotals } from "../lib/lineTotals";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download } from "lucide-react";
+import { Plus, X, Save, Edit2, Trash2, File as FileIcon, Share2, Download, CopyPlus, Lock } from "lucide-react";
 import { BRAND, QUOTE_STATUS_COLORS } from "../lib/constants";
 import { todayISO, smartDate, formatCurrency, genId } from "../lib/helpers";
 import { QuoteLineItems } from "../components/QuoteLineItems";
@@ -12,7 +13,7 @@ import { useCompanyProfile } from "../lib/companyProfile";
 import { buildDocumentPDF, documentFilename, documentTitle, shareDocumentPDF } from "../lib/documentPDF";
 import { jobToCard, jobsForQuote, quoteToDocument } from "../lib/documentData";
 import { offlineGetAll } from "../offline/offlineDb";
-import { autoCreateChaseFollowup, autoAdvanceOnAccept } from "../lib/quoteAutomation";
+import { autoCreateChaseFollowup, autoAdvanceOnAccept, isLockedQuote } from "../lib/quoteAutomation";
 import { offlineSave } from "../offline/offlineDb";
 import { deleteRecord } from "../lib/deleteHelpers";
 import { withTeamId } from "../lib/teamId";
@@ -60,6 +61,12 @@ function ExpandableText({ text, limit = 110, className = "" }) {
     </div>
   );
 }
+
+// A quote's value: the sum of its lines after discounts, as entered
+// (including VAT when the prices include it).
+const linesValue = (lines, vatInclusive) => lineTotals(lines, { vatInclusive, vatRegistered: false }).total;
+// The quote card's small square buttons.
+const iconBtn = "min-h-[44px] rounded-xl bg-slate-50 flex items-center justify-center";
 
 export function QuotesScreen({
   data,
@@ -141,6 +148,7 @@ export function QuotesScreen({
     [sharing, setSharing] = useState(false);
   const { confirm, dialog } = useConfirm();
   const quotes = (data.quotes || []).filter(isMine);
+  const quoteNumbers = new Map((data.quotes || []).map(x => [x.id, x.quote_number]));
   useEffect(() => {
     if (quickAddTrigger?.screen !== "Quotes") return;
     setEditId(null);
@@ -181,10 +189,7 @@ export function QuotesScreen({
     };
     if (editId) {
       const existing = quotes.find(q => q.id === editId);
-      const totalFromLines = lineItems.reduce(
-        (sum, i) => sum + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0),
-        0,
-      );
+      const totalFromLines = linesValue(lineItems, vatInclusive);
       const updated = {
         ...existing,
         ...form,
@@ -215,10 +220,7 @@ export function QuotesScreen({
       setToast("Quote updated");
       triggerImmediateSync();
     } else {
-      const totalFromLines = lineItems.reduce(
-          (s, i) => s + (parseFloat(i.qty) || 1) * (parseFloat(i.unitPrice) || 0),
-          0,
-        ),
+      const totalFromLines = linesValue(lineItems, vatInclusive),
         quoteValue = lineItems.length > 0 ? totalFromLines : parseFloat(form.value || 0),
         item = withTeamId(
           {
@@ -257,6 +259,33 @@ export function QuotesScreen({
     }
     resetForm();
   }
+  // An accepted or invoiced quote is locked (the server enforces it). Revise
+  // makes a new version (Q-00012-R1) to change; the old one is superseded.
+  async function revise(q) {
+    if (!navigator.onLine) return setToast("Connect to the internet to revise a quote.");
+    const { data: r, error } = await supabase.rpc("revise_quote", { p_quote_id: q.id });
+    if (error) return setToast(error.message);
+    // The server moved the job made from it to the new version; so does this phone.
+    const [{ data: rows }, { data: movedJobs }] = await Promise.all([
+      supabase.from("quotes").select("*").in("id", [q.id, r.id]),
+      supabase.from("jobs").select("*").eq("quote_id", r.id),
+    ]);
+    await Promise.all([
+      ...(rows || []).map(row => offlineSave("quotes", { ...row, sync_status: "synced" })),
+      ...(movedJobs || []).map(j => offlineSave("jobs", { ...j, sync_status: "synced" })),
+    ]);
+    setData(d => ({
+      ...d,
+      quotes: [
+        ...(rows || []).filter(x => x.id === r.id),
+        ...(d.quotes || []).map(x => (rows || []).find(y => y.id === x.id) || x),
+      ],
+    }));
+    setToast(`New version ${r.quote_number} made. Change it, then send it to the customer.`);
+    const fresh = (rows || []).find(x => x.id === r.id);
+    if (fresh) startEdit(fresh);
+  }
+
   async function deleteQuote(id, name) {
     const ok = await confirm(`Delete quote for ${name || "this client"}?`, { confirmLabel: "Delete" });
     if (!ok) return;
@@ -398,7 +427,7 @@ export function QuotesScreen({
       .filter(
         q =>
           !search ||
-          [q.client_name, q.description].some(x => x?.toLowerCase().includes(search.toLowerCase())),
+          [q.client_name, q.description, q.quote_number].some(x => x?.toLowerCase().includes(search.toLowerCase())),
       ),
     totalValue = filtered.reduce((s, q) => s + parseFloat(q.value || 0), 0);
   return (
@@ -445,7 +474,7 @@ export function QuotesScreen({
           groups={[
             {
               label: "Status",
-              options: ["All", "Pending", "Accepted", "Rejected", "Expired"],
+              options: ["All", "Pending", "Accepted", "Rejected", "Expired", "Superseded"],
               value: filterStatus,
               onChange: setFilterStatus,
               dangerValue: "Rejected",
@@ -484,13 +513,28 @@ export function QuotesScreen({
                   <p className="mt-1.5 text-lg font-black" style={{ color: BRAND.primary }}>
                     {formatCurrency(q.value)}
                   </p>
-                  {q.sent_date && (
-                    <p className="text-xs text-slate-400 mt-0.5">Sent {smartDate(q.sent_date)}</p>
+                  {(q.quote_number || q.sent_date) && (
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {q.quote_number && <span className="font-bold text-slate-600">{q.quote_number}</span>}
+                      {q.quote_number && q.sent_date && " · "}
+                      {q.sent_date && `Sent ${smartDate(q.sent_date)}`}
+                    </p>
                   )}
                   {q.accepted_at && (
                     <p className="text-xs font-bold text-green-700 mt-0.5">
                       Accepted online by {q.accepted_by_name} · {smartDate(String(q.accepted_at).slice(0, 10))}
                       {q.accepted_po ? ` · order ${q.accepted_po}` : ""}
+                    </p>
+                  )}
+                  {(q.invoiced_at || q.revision > 0 || q.superseded_by) && (
+                    <p className="text-xs font-bold text-slate-500 mt-0.5">
+                      {[
+                        q.invoiced_at && "Invoiced",
+                        q.revision > 0 && `Revision ${q.revision}`,
+                        q.superseded_by && `Replaced by ${quoteNumbers.get(q.superseded_by) || "a newer version"}`,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                   )}
                   {q.declined_at && (
@@ -525,18 +569,38 @@ export function QuotesScreen({
                   >
                     <Download size={15} />
                   </button>
-                  <button
-                    onClick={() => startEdit(q)}
-                    className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-blue-600 flex items-center justify-center"
-                  >
-                    <Edit2 size={15} />
-                  </button>
-                  <button
-                    onClick={() => deleteQuote(q.id, q.client_name)}
-                    className="min-h-[44px] rounded-xl bg-slate-50 text-slate-400 active:bg-slate-100 active:text-red-600 flex items-center justify-center"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {isLockedQuote(q) ? (
+                    <>
+                      {q.status !== "Superseded" && !q.invoiced_at ? (
+                        <button
+                          onClick={() => revise(q)}
+                          className={`${iconBtn} gap-1 text-xs font-bold text-slate-500 active:bg-slate-100 active:text-blue-600`}
+                          title="Make a new version to change it"
+                          aria-label="Revise"
+                        >
+                          <CopyPlus size={15} /> Revise
+                        </button>
+                      ) : (
+                        <span />
+                      )}
+                      <span className={`${iconBtn} text-slate-300`} title="Accepted quotes are locked" aria-label="Locked">
+                        <Lock size={15} />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => startEdit(q)} className={`${iconBtn} text-slate-400 active:bg-slate-100 active:text-blue-600`} aria-label="Edit">
+                        <Edit2 size={15} />
+                      </button>
+                      <button
+                        onClick={() => deleteQuote(q.id, q.client_name)}
+                        className={`${iconBtn} text-slate-400 active:bg-slate-100 active:text-red-600`}
+                        aria-label="Delete"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </>
+                  )}
                 </div>
                 {pdfFor === q.id && jobsForQuote(q, jobs).length > 0 && (
                   <label className="mt-2 flex items-center gap-2 text-sm text-slate-600 min-h-[36px] cursor-pointer">

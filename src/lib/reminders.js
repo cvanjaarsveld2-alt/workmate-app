@@ -2,16 +2,21 @@
 // The wording for an overdue-invoice reminder, used by "Remind customer" on
 // the Invoices screen (and matched by the customer-reminders emails).
 
+import { daysBetween, todayISO } from "./dates.js";
+import { isOpen } from "./invoiceState.js";
+
 const rand = n => `R ${(Number(n) || 0).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function daysOverdue(inv, today = new Date().toISOString().slice(0, 10)) {
+export function daysOverdue(inv, today = todayISO()) {
   if (!inv?.due_date || inv.due_date >= today) return 0;
-  return Math.round((new Date(today + "T12:00:00") - new Date(inv.due_date + "T12:00:00")) / 86400000);
+  return daysBetween(inv.due_date, today);
 }
 
+// Only an approved invoice with something still owed can be overdue (not a
+// draft, a voided one, or one settled by payments or credit notes).
 export function isOverdue(inv, today) {
-  const balance = Number(inv?.balance_due ?? inv?.total) || 0;
-  return balance > 0 && inv?.status !== "paid" && daysOverdue(inv, today) > 0;
+  const owed = Number(inv?.balance_due ?? inv?.total) || 0;
+  return owed > 0 && (!inv?.status || isOpen({ ...inv, balance_due: owed })) && daysOverdue(inv, today) > 0;
 }
 
 export function reminderMessage({ contact, company, invoice, url, today }) {

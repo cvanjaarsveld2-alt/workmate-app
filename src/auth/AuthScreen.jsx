@@ -12,7 +12,8 @@ import { pendingJoinCode, normaliseCode } from "../lib/joinCode";
 import { publicUrl } from "../lib/appUrl";
 
 export function AuthScreen() {
-  const [mode, setMode]       = useState("signin"); // 'signin' | 'signup'
+  // The website's "Start free trial" links here with ?signup=1.
+  const [mode, setMode]       = useState(() => (new URLSearchParams(window.location.search).has("signup") ? "signup" : "signin")); // 'signin' | 'signup'
   const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
   const [confirmPw, setConfirmPw] = useState("");

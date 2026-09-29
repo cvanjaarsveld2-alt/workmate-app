@@ -31,6 +31,10 @@ export const DEFAULT_PROFILE = {
   invoice_terms: "",
   invoice_prefix: "INV-",
   next_invoice_number: 1,
+  quote_prefix: "Q-",
+  next_quote_number: 1,
+  credit_prefix: "CN-",
+  next_credit_number: 1,
   brand_color: "#8B1A1A",
   logo_data: null,
   // Nothing off unless the company chose it (new companies start without
@@ -54,7 +58,12 @@ export const DEFAULT_PROFILE = {
   auto_sms: {},
   // Technicians' locations shared with the office while they're clocked in.
   share_location: false,
+  // Mail agent: what it brings in from connected mailboxes, and whether it
+  // may file sure items by itself (otherwise everything waits for a person).
+  mail_agent_auto: false,
+  mail_agent_kinds: ["expense", "quote_request", "customer_email", "supplier_doc"],
 };
+export const MAIL_AGENT_KINDS = ["expense", "quote_request", "customer_email", "supplier_doc"];
 export const EDITABLE_FIELDS = Object.keys(DEFAULT_PROFILE);
 
 const cacheKey = teamId => `pm_company_profile__${teamId}`;
@@ -126,7 +135,7 @@ export function cleanProfile(input) {
   const out = {};
   for (const k of EDITABLE_FIELDS) {
     const v = input[k];
-    if (["quote_validity_days", "payment_terms_days", "next_invoice_number"].includes(k)) {
+    if (["quote_validity_days", "payment_terms_days", "next_invoice_number", "next_quote_number", "next_credit_number"].includes(k)) {
       const n = Math.round(Number(v));
       out[k] = Number.isFinite(n) ? n : DEFAULT_PROFILE[k];
     } else if (k === "labour_rate" || k === "labour_cost") {
@@ -154,7 +163,9 @@ export function cleanProfile(input) {
       out[k] = Array.isArray(v) ? [...new Set(v.map(String))] : [];
     } else if (k === "vat_registered") {
       out[k] = v !== false;
-    } else if (k === "require_admin_mfa" || k === "email_customer_reminders" || k === "share_location") {
+    } else if (k === "mail_agent_kinds") {
+      out[k] = Array.isArray(v) ? MAIL_AGENT_KINDS.filter(x => v.includes(x)) : [...MAIL_AGENT_KINDS];
+    } else if (k === "require_admin_mfa" || k === "email_customer_reminders" || k === "share_location" || k === "mail_agent_auto") {
       out[k] = v === true;
     } else if (k === "auto_reminders") {
       out[k] = v !== false;
@@ -162,7 +173,7 @@ export function cleanProfile(input) {
       out[k] = v || null;
     } else {
       const t = String(v ?? "").trim();
-      out[k] = t || (k === "invoice_prefix" ? "" : k === "brand_color" ? DEFAULT_PROFILE.brand_color : null);
+      out[k] = t || (k === "invoice_prefix" || k === "quote_prefix" || k === "credit_prefix" ? "" : k === "brand_color" ? DEFAULT_PROFILE.brand_color : null);
     }
   }
   return out;
@@ -173,6 +184,10 @@ export function validateProfile(p) {
   if (p.payment_terms_days < 0 || p.payment_terms_days > 365) return "Payment terms must be 0 to 365 days.";
   if (p.next_invoice_number < 1) return "The next invoice number must be 1 or more.";
   if (!/^[A-Za-z0-9/_-]{0,12}$/.test(p.invoice_prefix || "")) return "Invoice prefix: up to 12 letters, digits, - / or _.";
+  if (p.next_quote_number < 1) return "The next quote number must be 1 or more.";
+  if (!/^[A-Za-z0-9/_-]{0,12}$/.test(p.quote_prefix || "")) return "Quote prefix: up to 12 letters, digits, - / or _.";
+  if (p.next_credit_number < 1) return "The next credit note number must be 1 or more.";
+  if (!/^[A-Za-z0-9/_-]{0,12}$/.test(p.credit_prefix || "")) return "Credit note prefix: up to 12 letters, digits, - / or _.";
   if (!/^#[0-9A-Fa-f]{6}$/.test(p.brand_color || "")) return "Brand colour must look like #8B1A1A.";
   if (p.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.email)) return "The email address doesn't look right.";
   if (p.finance_email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(p.finance_email)) return "The finance email doesn't look right.";

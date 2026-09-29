@@ -8,6 +8,9 @@
 //   const blob = await buildDocumentPDF({ kind: "invoice", number, date, client, items, ... }, profile);
 //   await shareDocumentPDF(blob, documentFilename(doc));
 
+import { addDays } from "./dates.js";
+import { hasDiscounts, hasMixedVat, lineAmounts, lineTotals, round2, vatCode, VAT_CODES } from "./lineTotals.js";
+
 export const VAT_RATE = 15;
 
 export const chargesVat = profile => profile?.vat_registered !== false;
@@ -17,6 +20,7 @@ export function documentTitle(kind, profile = {}) {
   if (kind === "proforma") return "PRO FORMA INVOICE";
   if (kind === "jobcard") return "JOB CARD";
   if (kind === "purchase_order") return "PURCHASE ORDER";
+  if (kind === "credit_note") return chargesVat(profile) && profile.vat_no ? "TAX CREDIT NOTE" : "CREDIT NOTE";
   return chargesVat(profile) && profile.vat_no ? "TAX INVOICE" : "INVOICE";
 }
 
@@ -31,28 +35,15 @@ export const money = v => {
 // Line totals and VAT. Prices are entered VAT-inclusive or exclusive per document.
 export function documentTotals(
   items = [],
-  { vatInclusive = true, vatRate = VAT_RATE, amountPaid = 0, vatRegistered = true } = {},
+  { vatInclusive = true, amountPaid = 0, amountCredited = 0, vatRegistered = true } = {},
 ) {
-  const gross = items.reduce((s, i) => s + (Number(i.qty) || 0) * (Number(i.unitPrice) || 0), 0);
-  const r = vatRegistered ? vatRate / 100 : 0;
-  const subtotal = vatInclusive ? gross / (1 + r) : gross;
-  const vat = vatInclusive ? gross - subtotal : gross * r;
-  const total = subtotal + vat;
-  const round = n => Math.round(n * 100) / 100;
-  return {
-    subtotal: round(subtotal),
-    vat: round(vat),
-    total: round(total),
-    paid: round(Number(amountPaid) || 0),
-    balance: round(total - (Number(amountPaid) || 0)),
-  };
+  const t = lineTotals(items, { vatInclusive, vatRegistered });
+  const paid = round2(Number(amountPaid) || 0),
+    credited = round2(Number(amountCredited) || 0);
+  return { ...t, paid, credited, balance: round2(t.total - paid - credited) };
 }
 
-export function addDays(isoDate, days) {
-  const d = new Date((isoDate || new Date().toISOString().slice(0, 10)) + "T12:00:00");
-  d.setDate(d.getDate() + (Number(days) || 0));
-  return d.toISOString().slice(0, 10);
-}
+export { addDays };
 
 const fmtDate = iso => {
   if (!iso) return "";
@@ -323,7 +314,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
     if (doc.draft) {
       pdf.setFontSize(9);
       pdf.setTextColor(200, 120, 0);
-      text("DRAFT · number is assigned once synced", right, y, { align: "right" });
+      text(doc.draftNote || "DRAFT · number is assigned once synced", right, y, { align: "right" });
     }
     y += 8;
     if (doc.title) {
@@ -337,12 +328,12 @@ export async function buildDocumentPDF(doc, profile = {}) {
 
     const meta = [
       [
-        kind === "quote" ? "Quote no." : kind === "proforma" ? "Pro forma no." : kind === "purchase_order" ? "Order no." : "Invoice no.",
+        kind === "quote" ? "Quote no." : kind === "proforma" ? "Pro forma no." : kind === "purchase_order" ? "Order no." : kind === "credit_note" ? "Credit note no." : "Invoice no.",
         doc.number || "—",
       ],
       ["Date", fmtDate(doc.date)],
       kind === "quote" && doc.validUntil ? ["Valid until", fmtDate(doc.validUntil)] : null,
-      kind !== "quote" && doc.dueDate ? [kind === "purchase_order" ? "Deliver by" : "Payment due", fmtDate(doc.dueDate)] : null,
+      kind !== "quote" && kind !== "credit_note" && doc.dueDate ? [kind === "purchase_order" ? "Deliver by" : "Payment due", fmtDate(doc.dueDate)] : null,
       doc.reference ? ["Reference", doc.reference] : null,
       doc.orderNumber ? ["Order no.", doc.orderNumber] : null,
       kind === "quote" && doc.preparedBy ? ["Prepared by", doc.preparedBy] : null,
@@ -438,44 +429,43 @@ export async function buildDocumentPDF(doc, profile = {}) {
 
     // ── Line items ──
     const items = (doc.items || []).filter(i => i && (i.description || Number(i.unitPrice)));
-    // A code column only when some line carries a part number.
+    // Extra columns only when needed: part numbers, discounts, and a VAT code
+    // when not every line is standard-rated.
     const codes = items.some(i => i.code);
+    const vatOn = chargesVat(profile);
+    const discounts = hasDiscounts(items);
+    const vatCol = vatOn && hasMixedVat(items);
+    const incl = doc.vatInclusive !== false;
+    const cols = [
+      { head: "#", cell: (i, n) => n + 1, style: { cellWidth: 9, halign: "center" } },
+      codes && { head: "Code", cell: i => i.code || "", style: { cellWidth: 24, fontSize: 8 } },
+      { head: "Description", cell: i => i.description || "", style: {} },
+      { head: "Qty", cell: (i, n, a) => (a.qty % 1 ? a.qty.toFixed(2) : a.qty), style: { cellWidth: 13, halign: "center" } },
+      { head: "Unit price", cell: (i, n, a) => money(a.price), style: { cellWidth: 26, halign: "right" } },
+      discounts && { head: "Disc.", cell: (i, n, a) => (a.discount ? `${a.discount % 1 ? a.discount.toFixed(1) : a.discount}%` : ""), style: { cellWidth: 13, halign: "center" } },
+      vatCol && { head: "VAT", cell: i => VAT_CODES[vatCode(i)].short, style: { cellWidth: 11, halign: "center" } },
+      { head: "Amount", cell: (i, n, a) => money(a.amount), style: { cellWidth: 28, halign: "right" } },
+    ].filter(Boolean);
     autoTable(pdf, {
       startY: y,
-      head: [codes ? ["#", "Code", "Description", "Qty", "Unit price", "Amount"] : ["#", "Description", "Qty", "Unit price", "Amount"]],
+      head: [cols.map(c => c.head)],
       body: items.map((i, n) => {
-        const qty = Number(i.qty) || 0,
-          price = Number(i.unitPrice) || 0;
-        const row = [n + 1, i.description || "", qty % 1 ? qty.toFixed(2) : qty, money(price), money(qty * price)];
-        if (codes) row.splice(1, 0, i.code || "");
-        return row;
+        const a = lineAmounts(i, { vatInclusive: incl, vatRegistered: vatOn });
+        return cols.map(c => c.cell(i, n, a));
       }),
       margin: { left: M, right: M, bottom: FOOT + 4 },
       styles: { fontSize: 9, cellPadding: 2.6, textColor: ink, lineColor: [230, 230, 230], lineWidth: 0.1 },
       headStyles: { fillColor: brand, textColor: [255, 255, 255], fontStyle: "bold" },
       alternateRowStyles: { fillColor: [248, 248, 248] },
-      columnStyles: codes
-        ? {
-            0: { cellWidth: 9, halign: "center" },
-            1: { cellWidth: 26, fontSize: 8 },
-            3: { cellWidth: 14, halign: "center" },
-            4: { cellWidth: 28, halign: "right" },
-            5: { cellWidth: 30, halign: "right" },
-          }
-        : {
-            0: { cellWidth: 9, halign: "center" },
-            2: { cellWidth: 14, halign: "center" },
-            3: { cellWidth: 30, halign: "right" },
-            4: { cellWidth: 32, halign: "right" },
-          },
+      columnStyles: Object.fromEntries(cols.map((c, n) => [n, c.style])),
     });
     y = pdf.lastAutoTable.finalY + 6;
 
     // ── Totals ──
-    const vatOn = chargesVat(profile);
     const t = documentTotals(items, {
-      vatInclusive: doc.vatInclusive !== false,
+      vatInclusive: incl,
       amountPaid: doc.amountPaid,
+      amountCredited: doc.amountCredited,
       vatRegistered: vatOn,
     });
     const rows = vatOn
@@ -485,9 +475,10 @@ export async function buildDocumentPDF(doc, profile = {}) {
           ["Total (incl. VAT)", money(t.total), true],
         ]
       : [["Total", money(t.total), true]];
-    if (kind === "invoice" && t.paid > 0) {
-      rows.push(["Paid", money(t.paid)]);
-      rows.push(["Balance due", money(t.balance), true]);
+    if (kind === "invoice" && (t.paid > 0 || t.credited > 0)) {
+      if (t.paid > 0) rows.push(["Paid", money(t.paid)]);
+      if (t.credited > 0) rows.push(["Credited", money(t.credited)]);
+      rows.push(["Balance due", money(Math.max(t.balance, 0)), true]);
     }
     ensureSpace(rows.length * 6 + 4);
     for (const [k, v, bold] of rows) {
@@ -501,7 +492,9 @@ export async function buildDocumentPDF(doc, profile = {}) {
     }
     y += 3;
 
-    section("Notes", doc.notes, 9);
+    if (vatCol)
+      section("VAT", "S = standard-rated at 15%.  Z = zero-rated (0%).  E = exempt from VAT.", 8);
+    section(kind === "credit_note" ? "Reason" : "Notes", doc.notes, 9);
     section("Exclusions", doc.exclusions, 8.5);
     if (kind === "proforma")
       section(
@@ -521,7 +514,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
       profile.bank_swift ? ["SWIFT", profile.bank_swift] : null,
       ["Payment reference", doc.number || ""],
     ].filter(Boolean);
-    if (kind !== "quote" && kind !== "purchase_order" && bank.length > 1) {
+    if (kind !== "quote" && kind !== "purchase_order" && kind !== "credit_note" && bank.length > 1) {
       const boxH = 7 + bank.length * 4.6;
       ensureSpace(boxH + 4);
       pdf.setFillColor(248, 246, 246);
@@ -545,7 +538,7 @@ export async function buildDocumentPDF(doc, profile = {}) {
       y += boxH + 4;
     }
 
-    if (kind !== "purchase_order") section("Terms and conditions", kind === "invoice" ? profile.invoice_terms : profile.quote_terms, 7.8);
+    if (kind !== "purchase_order" && kind !== "credit_note") section("Terms and conditions", kind === "invoice" ? profile.invoice_terms : profile.quote_terms, 7.8);
 
     // ── Acceptance (quotes) ──
     if (kind === "quote") {
@@ -696,14 +689,14 @@ export async function buildDocumentPDF(doc, profile = {}) {
     pdf.setTextColor(...grey);
     text(footer, M, H - FOOT + 9);
     text(`${title} ${doc.number || ""} · Page ${p} of ${pages}`, right, H - FOOT + 9, { align: "right" });
-    if (doc.draft) {
+    if (doc.draft || doc.void) {
       try {
         pdf.setGState(new pdf.GState({ opacity: 0.12 }));
       } catch {}
-      pdf.setTextColor(200, 120, 0);
+      pdf.setTextColor(...(doc.void ? [200, 30, 30] : [200, 120, 0]));
       pdf.setFontSize(90);
       pdf.setFont("helvetica", "bold");
-      text("DRAFT", W / 2, H / 2 + 20, { align: "center", angle: 35 });
+      text(doc.void ? "VOID" : "DRAFT", W / 2, H / 2 + 20, { align: "center", angle: 35 });
       try {
         pdf.setGState(new pdf.GState({ opacity: 1 }));
       } catch {}

@@ -583,6 +583,89 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
       `page shown=${shown}; thanks=${thanks}; status=${q.status}; by=${q.accepted_by_name}; po=${q.accepted_po}; signature=${(q.accepted_signature || "").slice(0, 22)}`);
   });
 
+  // An accepted quote is locked: no edit or delete, but Revise makes the next
+  // version (-R1) and marks the old one Superseded.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("quotes: accepted quote is locked, Revise makes R1", async () => {
+    const acc = db.quotes.find(q => q.status === "Accepted" && q.accepted_at);
+    if (!acc) { rec("quotes: accepted quote is locked, Revise makes R1", "FAIL", "no accepted quote to revise"); return; }
+    await go("Quotes", 2500);
+    const card = page.locator("div.rounded-2xl", { hasText: acc.quote_number }).filter({ has: page.getByRole("button", { name: "Revise" }) }).last();
+    const locked = (await card.count()) > 0 && (await card.getByRole("button", { name: "Edit" }).count()) === 0;
+    await card.getByRole("button", { name: "Revise" }).click(); await page.waitForTimeout(2500);
+    const nq = db.quotes.find(q => q.revision_of === acc.id);
+    await shot("quote-revised");
+    rec("quotes: accepted quote is locked, Revise makes R1",
+      locked && nq && nq.quote_number === acc.quote_number + "-R1" && acc.status === "Superseded" && nq.status === "Pending" ? "PASS" : "FAIL",
+      `locked (no edit)=${locked}; new version=${nq?.quote_number} ${nq?.status}; old status=${acc.status}`);
+  });
+
+  // Quote numbers: two quotes added one after the other get the company's next
+  // two numbers from the server, and the list shows them.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("quotes: new quotes get their own numbers", async () => {
+    await go("Quotes");
+    const v0 = log.violations.length;
+    for (const [desc, value] of [["SIM numbered quote A", "1200"], ["SIM numbered quote B", "3400"]]) {
+      await page.getByRole("button", { name: "Add", exact: true }).first().click(); await page.waitForTimeout(500);
+      await page.locator('label:text-is("Description") + textarea, label:text-is("Description") + input').first().fill(desc);
+      await page.locator('label:text-is("Value (R)") + input').first().fill(value);
+      await page.getByRole("button", { name: "Add Quote", exact: true }).click(); await page.waitForTimeout(1500);
+    }
+    await page.waitForTimeout(3000);
+    const rows = ["SIM numbered quote A", "SIM numbered quote B"].map(d => db.quotes.find(q => q.description === d));
+    const nums = rows.map(r => r?.quote_number || null);
+    await go("Quotes", 3000);
+    const body = await page.evaluate(() => document.body.innerText);
+    const shown = nums.filter(n => n && body.includes(n)).length;
+    await shot("quote-numbers");
+    rec("quotes: new quotes get their own numbers",
+      nums.every(n => /^Q-\d{5}$/.test(n || "")) && nums[0] !== nums[1] && shown === 2 ? "PASS" : "FAIL",
+      `numbers=${JSON.stringify(nums)}; shown in list=${shown}/2; schema errors=${JSON.stringify(errsSince(v0))}`);
+  });
+
+  // Invoices to the standard of Sage/Xero: a hand-made draft with a discount,
+  // approved (locked), part-paid, then a credit note; aged debtors shows it.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("invoices: draft, approve, pay, credit note", async () => {
+    await go("Invoices", 2500);
+    const v0 = log.violations.length;
+    const client = db.clients.find(c => c.team_id === H.TEAM && c.company) || db.clients[0];
+    await page.getByRole("button", { name: "New", exact: true }).click(); await page.waitForTimeout(600);
+    const editor = page.getByTestId("invoice-editor");
+    await editor.getByRole("button", { name: /Select customer/ }).click(); await page.waitForTimeout(300);
+    await editor.getByPlaceholder("Search clients…").fill(client.company);
+    await editor.locator("button", { hasText: client.company }).first().click(); await page.waitForTimeout(300);
+    await editor.getByPlaceholder("Item description").first().fill("SIM pump service");
+    await editor.locator('label:text-is("Qty") + input').first().fill("2");
+    await editor.locator('label:text-is("Unit price (R)") + input').first().fill("500");
+    await editor.getByLabel("Line 1 discount").fill("10");
+    await editor.getByRole("button", { name: "Save draft" }).click(); await page.waitForTimeout(2500);
+    const inv = db.invoices.find(i => (i.line_items || []).some(l => l.description === "SIM pump service"));
+    const draftOk = inv && inv.status === "draft" && Number(inv.total) === 1035 && Number(inv.vat) === 135;
+    // Approve from the list.
+    const card = page.locator("div.rounded-2xl", { hasText: inv?.invoice_number || "@@" }).filter({ has: page.getByRole("button", { name: "Approve" }) }).last();
+    await card.getByRole("button", { name: "Approve", exact: true }).click(); await page.waitForTimeout(400);
+    await page.getByRole("button", { name: "Approve", exact: true }).last().click(); await page.waitForTimeout(2500);
+    const approved = inv?.status === "sent" && !!inv?.approved_at;
+    // Part payment.
+    const card2 = page.locator("div.rounded-2xl", { hasText: inv?.invoice_number || "@@" }).filter({ has: page.getByRole("button", { name: "Record payment" }) }).last();
+    await card2.getByRole("button", { name: "Record payment", exact: true }).click(); await page.waitForTimeout(600);
+    await page.locator('label:has-text("Amount (R)") input').fill("500");
+    await page.getByRole("button", { name: "Record a payment", exact: true }).last().click(); await page.waitForTimeout(2500);
+    const partPaid = inv?.status === "part_paid" && Number(inv?.balance_due) === 535;
+    // Credit note for part of what's owed.
+    await card2.getByRole("button", { name: "Credit note", exact: true }).click(); await page.waitForTimeout(600);
+    await page.locator('label:has-text("Amount (R)") input').fill("100");
+    await page.locator('label:has-text("Reason") input').fill("SIM seal returned");
+    await page.getByRole("button", { name: "Issue a credit note", exact: true }).last().click(); await page.waitForTimeout(2500);
+    const cn = (db.credit_notes || []).find(c => c.invoice_id === inv?.id);
+    const credited = cn && /^CN-\d{5}$/.test(cn.credit_number) && Number(inv?.balance_due) === 435;
+    await go("Invoices", 2500);
+    const body = await page.evaluate(() => document.body.innerText);
+    await shot("invoices-standard");
+    rec("invoices: draft, approve, pay, credit note",
+      draftOk && approved && partPaid && credited && /Aged debtors/.test(body) ? "PASS" : "FAIL",
+      `draft total=${inv?.total} vat=${inv?.vat} (want 1035/135); approved=${approved}; after R500 status=${inv?.status} owed=${inv?.balance_due}; credit note=${cn?.credit_number} ${cn?.total}; aged debtors shown=${/Aged debtors/.test(body)}; schema errors=${JSON.stringify(errsSince(v0))}`);
+  });
+
   // 13j. Message a customer from a job: WhatsApp opens with the message ready; SMS is queued.
   if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("messages: WhatsApp and SMS from a job", async () => {
     const client = H.db.clients.find(c => c.team_id === H.TEAM);
@@ -631,6 +714,48 @@ const rec = (flow, status, detail) => { results.push({ flow, status, detail }); 
     await shot("forms-filled");
     rec("forms: build, fill in and sign", !!tpl && nagged && !!sub && /^data:image\/png;base64,/.test(sub.signature || "") && Object.values(sub.answers || {}).includes("Jan Buyer") ? "PASS" : "FAIL",
       `template saved=${!!tpl} (${(tpl?.fields || []).length} questions); nagged when incomplete=${nagged}; submission=${!!sub}; signature=${(sub?.signature || "").slice(0, 22)}; answers=${JSON.stringify(sub?.answers || {}).slice(0, 80)}`);
+  });
+
+  // 13h2. Receipts and bills emailed in: approve one into an expense, reject another.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("expenses: emailed bill approved from the inbox", async () => {
+    await go("Expenses", 3500);
+    const box = page.getByTestId("receipt-inbox");
+    const address = (await box.getByText("4a0e4956c351@in.powermate.test").count()) > 0;
+    const counted = (await box.getByText("3 to check").count()) > 0;
+    await box.getByRole("button", { name: /Engen Garsfontein/ }).click(); await page.waitForTimeout(800);
+    const openPdf = (await box.getByRole("link", { name: /Open INV-2231\.pdf/ }).count()) > 0;
+    await shot("inbox-review");
+    await box.getByRole("button", { name: "Approve", exact: true }).click();
+    const listed = await page.getByText("Added to your expenses ✓").waitFor({ timeout: 4000 }).then(() => true, () => false);
+    await page.waitForTimeout(800);
+    const e = H.db.expenses.find(x => x.vendor === "Engen Garsfontein" && Number(x.amount) === 1150);
+    const item = H.db.inbox_items.find(x => x.message_id === "<sim-1@engen.example>");
+    // The other one couldn't be read: it's removed as not an expense.
+    await box.getByRole("button", { name: /Joe's Welding/ }).click(); await page.waitForTimeout(600);
+    const needsAmount = (await box.getByRole("button", { name: "Approve", exact: true }).count()) > 0;
+    await box.getByRole("button", { name: "Not needed" }).click(); await page.waitForTimeout(1200);
+    const joe = H.db.inbox_items.find(x => x.message_id === "<sim-2@welding.example>");
+    await shot("inbox-done");
+    rec("expenses: emailed bill approved from the inbox",
+      address && counted && openPdf && e?.receipt_url?.endsWith("sim-1.pdf") && e?.vat_amount === 150 && e?.payment_method === "Account" && item?.status === "approved" && item?.expense_id === e?.id && listed && needsAmount && joe?.status === "rejected" ? "PASS" : "FAIL",
+      `address shown=${address}; "3 to check"=${counted}; PDF link=${openPdf}; expense=${e ? `${e.amount}/${e.vat_amount}/${e.payment_method}/${e.receipt_url}` : "none"}; item=${item?.status}; confirmed=${listed}; second item=${joe?.status}`);
+  });
+
+  // 13h3. The mail agent found a quote request in a connected mailbox: it becomes a lead.
+  if (H.UID === "431dcb72-ea3f-43ed-9f73-74384e862300") await safe("mail agent: quote request becomes a lead", async () => {
+    const box = page.getByTestId("receipt-inbox");
+    const agent = (await page.getByTestId("mailbox-agent").getByRole("button", { name: /Connect a mailbox/ }).count()) > 0;
+    await box.getByRole("button", { name: /Jan Buyer/ }).click(); await page.waitForTimeout(600);
+    const labelled = (await box.getByText(/Quote request ·/).count()) > 0;
+    const values = await box.locator("input").evaluateAll(els => els.map(e => e.value));
+    const title = values.find(v => v.startsWith("Quote:")) || "";
+    await shot("inbox-quote-request");
+    await box.getByRole("button", { name: "Create lead", exact: true }).click();
+    const done = await page.getByText("Lead created ✓").waitFor({ timeout: 4000 }).then(() => true, () => false);
+    const lead = H.db.leads.find(l => l.title === "Quote: 2x 30T low-profile jacks");
+    const item = H.db.inbox_items.find(x => x.message_id === "<sim-3@mine.example>");
+    rec("mail agent: quote request becomes a lead", agent && labelled && title === "Quote: 2x 30T low-profile jacks" && done && lead?.stage === "New" && item?.lead_id === lead?.id ? "PASS" : "FAIL",
+      `connect button=${agent}; labelled=${labelled}; title="${title}"; confirmed=${done}; lead=${lead ? lead.stage + "/" + lead.contact_name : "none"}; item=${item?.status}`);
   });
 
   // 13i. Plans: a Starter company sees Products locked, the master account can pick a plan.

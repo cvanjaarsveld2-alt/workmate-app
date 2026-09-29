@@ -9,3 +9,16 @@ export function neutralizeFormula(value) {
   const str = String(value ?? "");
   return FORMULA_START.test(str) && !PLAIN_NUMBER.test(str) ? `'${str}` : str;
 }
+
+// Saves text as a file on the device (a CSV opens in Excel with the right
+// characters thanks to the byte-order mark).
+export function downloadText(text, filename, type = "text/csv;charset=utf-8") {
+  const url = URL.createObjectURL(new Blob(["﻿" + text], { type }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}

@@ -41,6 +41,8 @@ import {
   Toast, Empty, PageHeader, useConfirm, ClientSelector,
 } from "../components/ui";
 import { useIsMine } from "../lib/teamView";
+import { documentLabel, isDocumentPath } from "../lib/inbox";
+import { ReceiptInbox } from "../components/ReceiptInbox";
 
 // Categories, default ledger codes and SA VAT treatment live in
 // lib/expenseAccounting (shared with the accounting exports); each company can
@@ -184,6 +186,15 @@ function SignedReceiptImg({ stored, className }) {
       <div className="w-full h-32 bg-slate-50 flex items-center justify-center">
         <Receipt size={24} className="text-slate-300" />
       </div>
+    );
+  }
+  if (isDocumentPath(stored)) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+        className="w-full h-32 bg-slate-50 flex flex-col items-center justify-center gap-1 text-slate-600">
+        <FileText size={24} />
+        <span className="text-xs font-bold">Open {documentLabel(stored)}</span>
+      </a>
     );
   }
   return <img src={url} alt="Receipt" className={className} />;
@@ -387,11 +398,13 @@ function MonthSection({ monthKey, label, items, duplicateIds, editId, renderExpe
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigger }) {
+export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigger, isOwner = false }) {
   const isMine = useIsMine(userId);
   const exportProgress = useExportProgress();
   const [showForm, setShowForm]       = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [scannerFile, setScannerFile] = useState(null);
+  const cameraInputRef = useRef(null);
   const [editId, setEditId]           = useState(null);
   const [search, setSearch]           = useState("");
   const [toast, setToast]             = useState("");
@@ -425,6 +438,26 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   const { confirm, dialog } = useConfirm();
   const { showBanner: showReminderBanner, dismiss: dismissReminder } = useEndOfMonthReminder();
   const expenses = data.expenses || [];
+
+  // iPhone Safari only opens the camera when the tap itself opens the file
+  // input; a click made later in code (as the scanner does when it appears)
+  // is ignored. So the camera buttons open this input directly, and the
+  // scanner starts with the photo already taken.
+  function openCamera(mode) {
+    setScannerMode(mode);
+    if (cameraInputRef.current) cameraInputRef.current.click();
+    else setShowScanner(true);
+  }
+  function onCameraPhoto(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setScannerFile(file);
+    setShowScanner(true);
+  }
+  useEffect(() => {
+    if (!showScanner) setScannerFile(null);
+  }, [showScanner]);
 
   // quickAddTrigger → open scanner OR enter select mode pre-filled with unsubmitted
   useEffect(() => {
@@ -753,8 +786,17 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
   }
 
   async function openExpenseImages(ex, startWith = "till") {
+    // A bill emailed in as a PDF opens in the browser's PDF viewer. The tab is
+    // opened before the wait so phones don't block it as a pop-up.
+    if (startWith === "till" && isDocumentPath(ex.receipt_url)) {
+      const tab = window.open("", "_blank");
+      const url = await signReceipt(ex.receipt_url);
+      if (url && tab) tab.location.href = url;
+      else { tab?.close(); setToast("Couldn't open the file. Check your connection."); }
+      return;
+    }
     const items = [];
-    const tillSigned = await signReceipt(ex.receipt_url);
+    const tillSigned = isDocumentPath(ex.receipt_url) ? null : await signReceipt(ex.receipt_url);
     if (tillSigned) items.push({ url: tillSigned, caption: `Till slip — ${ex.vendor || ""}` });
     const paySigned = await signReceipt(ex.payment_slip_url);
     if (paySigned) items.push({ url: paySigned, caption: `Payment slip — ${ex.vendor || ""}` });
@@ -878,7 +920,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 <SignedReceiptImg stored={receiptUrl} className="w-full h-32 object-contain" />
                 {/* Overlay: tap anywhere to re-scan */}
                 <button type="button"
-                  onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
+                  onClick={() => openCamera("receipt")}
                   className="absolute inset-0 flex items-end justify-center pb-2 bg-black/0 hover:bg-black/20 active:bg-black/30 transition-colors">
                   <span className="rounded-full bg-black/50 text-white text-[10px] font-bold px-2 py-1 flex items-center gap-1">
                     <Camera size={10} /> Replace
@@ -888,7 +930,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             ) : (
               <div className="stack-y-1.5">
                 <button type="button"
-                  onClick={() => { setScannerMode("receipt"); setShowScanner(true); }}
+                  onClick={() => openCamera("receipt")}
                   className="w-full h-24 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
                     <Camera size={18} style={{ color: "#8B1A1A" }} />
@@ -917,7 +959,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
                 <SignedReceiptImg stored={paymentSlipUrl} className="w-full h-32 object-contain" />
                 <div className="absolute top-1 right-1 flex gap-1">
                   <button type="button"
-                    onClick={() => { setScannerMode("payment"); setShowScanner(true); }}
+                    onClick={() => openCamera("payment")}
                     className="p-1.5 rounded-full bg-black/50 text-white">
                     <Camera size={11} />
                   </button>
@@ -930,7 +972,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               </div>
             ) : (
               <button type="button"
-                onClick={() => { setScannerMode("payment"); setShowScanner(true); }}
+                onClick={() => openCamera("payment")}
                 className="w-full h-32 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center gap-1.5 hover:border-red-300 hover:bg-red-50 active:scale-98 transition-all">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#F7F3F3" }}>
                   <Camera size={18} style={{ color: "#8B1A1A" }} />
@@ -1060,7 +1102,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
               <button onClick={() => openExpenseImages(detailExpense, "till")}
                 className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
                 style={{ background: "#8B1A1A" }}>
-                📄 View till slip
+                📄 {isDocumentPath(detailExpense.receipt_url) ? `Open ${documentLabel(detailExpense.receipt_url)}` : "View till slip"}
               </button>
             )}
             {detailExpense.payment_slip_url && (
@@ -1072,7 +1114,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             )}
             {!detailExpense.receipt_url && !detailExpense.payment_slip_url && (
               <button
-                onClick={() => { setDetailExpense(null); startEdit(detailExpense); setScannerMode("receipt"); setShowScanner(true); setShowForm(false); }}
+                onClick={() => { setDetailExpense(null); startEdit(detailExpense); setShowForm(false); openCamera("receipt"); }}
                 className="flex items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold text-white min-h-[48px]"
                 style={{ background: "#8B1A1A" }}>
                 <Camera size={15} /> Add slip photo
@@ -1275,7 +1317,7 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
             </button>
             <button onClick={() => {
               if (showForm || showScanner || editId) { resetForm(); }
-              else { setShowScanner(true); setScannerMode("receipt"); }
+              else openCamera("receipt");
             }} className="flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-white"
               style={{ background: "#8B1A1A" }}>
               {(showForm || showScanner || editId) ? <X size={13} /> : <Camera size={13} />}
@@ -1329,11 +1371,19 @@ export function ExpensesScreen({ data, setData, userId, userEmail, quickAddTrigg
         </div>
       )}
 
+      {/* ── Receipts and bills emailed in ── */}
+      {!selectMode && !showForm && !showScanner && !editId && (
+        <ReceiptInbox userId={userId} expenses={expenses} clients={data.clients || []} isOwner={isOwner} setData={setData} onToast={setToast} />
+      )}
+
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={onCameraPhoto} className="hidden" />
+
       {/* ── Scanner ── */}
       <AnimatePresence>
         {showScanner && (
           <ReceiptScanner
             userId={userId}
+            initialFile={scannerFile}
             slipType={scannerMode === "payment" ? "payment" : "till"}
             onExtracted={handleScanComplete}
             onCancel={() => {

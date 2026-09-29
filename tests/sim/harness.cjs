@@ -58,8 +58,15 @@ const products = [
   { id: uuid(), team_id: TEAM, user_id: "431dcb72-ea3f-43ed-9f73-74384e862300", part_number: "HF-100", name: "Hydraulic filter", description: null, category: "Filters", unit: "each", sell_price: 200, cost_price: 120, vat_applicable: true, supplier: "Sim Supplies", supplier_code: "SS-9", barcode: null, track_stock: true, stock_on_hand: 2, reorder_level: 3, active: true, created_at: day(20) + "T08:00:00Z", updated_at: day(20) + "T08:00:00Z" },
   { id: uuid(), team_id: TEAM, user_id: "431dcb72-ea3f-43ed-9f73-74384e862300", part_number: "LAB-HR", name: "Labour (per hour)", description: null, category: "Labour", unit: "hour", sell_price: 650, cost_price: 0, vat_applicable: true, supplier: null, supplier_code: null, barcode: null, track_stock: false, stock_on_hand: 0, reorder_level: 0, active: true, created_at: day(20) + "T08:00:00Z", updated_at: day(20) + "T08:00:00Z" },
 ];
+// Receipts and bills emailed in (the Inbox on Expenses): one read by the AI,
+// one where reading failed and the details are typed in.
+const inbox_items = [
+  { id: uuid(), team_id: TEAM, message_id: "<sim-1@engen.example>", part: 0, from_email: "accounts@engen.example", from_name: "Engen Accounts", subject: "Tax invoice INV-2231", body_excerpt: null, received_at: new Date(Date.now() - 3 * 3600000).toISOString(), file_path: `receipts/431dcb72-ea3f-43ed-9f73-74384e862300/inbox/sim-1.pdf`, file_name: "INV-2231.pdf", content_type: "application/pdf", file_size: 48000, status: "ready", extracted: { document_type: "invoice", vendor: "Engen Garsfontein", vat_number: "4123456789", document_number: "INV-2231", amount: 1150, vat_amount: 150, currency: "ZAR", expense_date: day(1), due_date: "", category: "Fuel", payment_method: "Account", description: "Diesel" }, supplier_id: null, expense_id: null, error: null, reviewed_by: null, reviewed_at: null, created_at: new Date(Date.now() - 3 * 3600000).toISOString() },
+  { id: uuid(), team_id: TEAM, message_id: "<sim-3@mine.example>", part: 0, kind: "quote_request", source: "mailbox", owner_user_id: "431dcb72-ea3f-43ed-9f73-74384e862300", connection_id: null, confidence: 0.8, from_email: "buyer@mine.example", from_name: "Jan Buyer", subject: "Quote for 2 jacks", body_excerpt: "Please quote 2x 30T low-profile jacks for Sishen, needed by Friday.", received_at: new Date(Date.now() - 1 * 3600000).toISOString(), file_path: null, file_name: null, content_type: null, file_size: null, status: "ready", extracted: { summary: "Jan Buyer asks for a quote for 2 jacks", quote_request: { company: "Sishen Mine", contact_name: "Jan Buyer", phone: "", what: "2x 30T low-profile jacks", location: "Sishen", needed_by: "Friday" } }, supplier_id: null, client_id: null, contact_id: null, purchase_order_id: null, lead_id: null, activity_id: null, auto_filed: false, expense_id: null, error: null, reviewed_by: null, reviewed_at: null, created_at: new Date(Date.now() - 1 * 3600000).toISOString() },
+  { id: uuid(), team_id: TEAM, message_id: "<sim-2@welding.example>", part: 0, from_email: "joe@welding.example", from_name: "Joe's Welding", subject: "Your order", body_excerpt: "Thanks for your order. Total due R 2 300.00", received_at: new Date(Date.now() - 26 * 3600000).toISOString(), file_path: null, file_name: null, content_type: "text/plain", file_size: null, status: "failed", extracted: {}, supplier_id: null, expense_id: null, error: "The file couldn't be read automatically. Enter the details from the file.", reviewed_by: null, reviewed_at: null, created_at: new Date(Date.now() - 26 * 3600000).toISOString() },
+];
 const db = { ...Object.fromEntries(Object.keys(schema).map(t => [t, []])), ...Object.fromEntries(Object.entries(real).filter(([k]) => k !== "_rpc")),
-  vehicle_checks: vc, expenses, equipment, leads, breakdown_reports, repair_reports, invoices, payments, activities, email_quotes, team_notifications, machine_jack_confirmations, products, stock_movements: [], custom_faults: [{ id: uuid(), user_id: UID, team_id: TEAM, label: "Sim fault", fault_group: "Hydraulics", sync_status: "synced", created_at: day(9) + "T08:00:00Z", updated_at: day(9) + "T08:00:00Z" }] };
+  inbox_items, vehicle_checks: vc, expenses, equipment, leads, breakdown_reports, repair_reports, invoices, payments, activities, email_quotes, team_notifications, machine_jack_confirmations, products, stock_movements: [], custom_faults: [{ id: uuid(), user_id: UID, team_id: TEAM, label: "Sim fault", fault_group: "Hydraulics", sync_status: "synced", created_at: day(9) + "T08:00:00Z", updated_at: day(9) + "T08:00:00Z" }] };
 if (!db.team_members.length) db.team_members = RPC.get_team_member_emails.map(m => ({ id: uuid(), team_id: TEAM, user_id: m.user_id, role: m.role, joined_at: m.joined_at }));
 
 // ─── Emulator ────────────────────────────────────────────────────────────────
@@ -82,6 +89,56 @@ const DEFAULTS = {
   purchase_orders: { status: "draft", lines: [], subtotal: 0, vat: 0, total: 0 },
   customer_messages: { kind: "custom" },
 };
+// Mirrors private.assign_quote_number: a new company quote gets the next
+// number (prefix + 5 digits) and keeps it on later saves.
+function serverAssigns(table, row) {
+  if (table !== "quotes" || !row.team_id || row.quote_number) return;
+  const prof = (db.team_profiles || []).find(p => p.team_id === row.team_id);
+  const prefix = prof?.quote_prefix ?? "Q-";
+  let n = prof?.next_quote_number || 1;
+  while (db.quotes.some(q => q.team_id === row.team_id && q.quote_number === prefix + String(n).padStart(5, "0"))) n++;
+  row.quote_number = prefix + String(n).padStart(5, "0");
+  if (prof) prof.next_quote_number = n + 1;
+}
+const serverKeeps = (table, old) => (table === "quotes" && old.quote_number ? { quote_number: old.quote_number } : {});
+// Mirrors the financial rules (supabase/migrations/20260929100000_financial_controls.sql):
+// invoice numbers, totals from lines, and paid/credited/owed/status from
+// payments and credit notes.
+const r2 = n => (Math.sign(Number(n) || 0) * Math.round(Math.abs(Number(n) || 0) * 100 + 1e-7)) / 100;
+function lineTotalsSim(lines, incl, vatOn = true) {
+  let sub = 0, vat = 0;
+  for (const l of Array.isArray(lines) ? lines : []) {
+    const qty = /^\s*-?\d+(\.\d+)?\s*$/.test(String(l?.qty ?? "")) ? Number(l.qty) : 1;
+    const price = Number(l?.unitPrice) || 0, disc = Math.min(Number(l?.discount) || 0, 100);
+    const rate = !vatOn || l?.vat === "zero" || l?.vat === "exempt" ? 0 : 0.15;
+    const amt = r2(qty * price * (1 - disc / 100));
+    const v = incl ? r2((amt * rate) / (1 + rate)) : r2(amt * rate);
+    sub += incl ? amt - v : amt; vat += v;
+  }
+  return { subtotal: r2(sub), vat: r2(vat), total: r2(sub + vat) };
+}
+function recalcInvoice(inv) {
+  if (!inv) return;
+  const paid = r2(db.payments.filter(p => p.invoice_id === inv.id && !p.voided_at).reduce((a, p) => a + Number(p.amount || 0), 0));
+  const credited = r2((db.credit_notes || []).filter(c => c.invoice_id === inv.id).reduce((a, c) => a + Number(c.total || 0), 0));
+  inv.amount_paid = paid; inv.amount_credited = credited;
+  if (inv.status === "cancelled") { inv.balance_due = 0; return; }
+  const bal = r2(Number(inv.total || 0) - paid - credited);
+  inv.balance_due = Math.max(bal, 0);
+  if (inv.status !== "draft") inv.status = bal <= 0.004 ? (paid > 0 ? "paid" : "credited") : paid > 0 || credited > 0 ? "part_paid" : "sent";
+}
+function invoiceRules(row, old) {
+  if (old && old.status !== "draft") { for (const k of ["line_items", "subtotal", "vat", "total", "issue_date", "vat_inclusive"]) row[k] = old[k]; if (old.status === "cancelled" || row.status === "draft") row.status = old.status; }
+  else if (Array.isArray(row.line_items) && row.line_items.length) Object.assign(row, lineTotalsSim(row.line_items, row.vat_inclusive === true));
+  if (!old && row.team_id && (!row.invoice_number || /^INV-\d{4}-\d{6,7}$/.test(row.invoice_number))) {
+    const prof = (db.team_profiles || []).find(p => p.team_id === row.team_id);
+    const n = prof?.next_invoice_number || 1;
+    row.invoice_number = (prof?.invoice_prefix ?? "INV-") + String(n).padStart(5, "0");
+    if (prof) prof.next_invoice_number = n + 1;
+  } else if (old) row.invoice_number = old.invoice_number;
+  if (row.status && row.status !== "draft" && row.status !== "cancelled" && !row.approved_at) row.approved_at = new Date().toISOString();
+  recalcInvoice(row);
+}
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validate(table, row) {
   const cols = schema[table];
@@ -186,6 +243,10 @@ async function handle(route) {
     // Online quote acceptance (the customer's page uses the public functions).
     if (fn === "create_quote_link") { const q = db.quotes.find(x => x.id === body.p_quote_id); if (!q) return json(route, 400, { code: "P0001", message: "Quote not found" }); q.share_token = q.share_token || "ab".repeat(24); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, q.share_token); }
     if (fn === "get_shared_quote") { const q = db.quotes.find(x => x.share_token && x.share_token === body.p_token); if (!q) return json(route, 200, null); const prof = (db.team_profiles || [])[0] || {}; return json(route, 200, { quote: { number: q.quote_number || "Q-1", description: q.description, line_items: q.line_items, value: q.value, vat_inclusive: q.vat_inclusive, date: q.sent_date || "2026-09-01", expiry_date: q.expiry_date || null, status: q.status, title: q.details?.title || null, intro: q.details?.intro || null, exclusions: q.details?.exclusions || null, accepted_at: q.accepted_at || null, declined_at: q.declined_at || null }, client: q.client_name, company: { name: prof.trading_name, legal_name: prof.legal_name, logo_data: null, brand_color: prof.brand_color, vat_no: prof.vat_no, vat_registered: prof.vat_registered !== false } }); }
+    if (fn === "revise_quote") { const q = db.quotes.find(x => x.id === body.p_quote_id); if (!q) return json(route, 400, { code: "P0001", message: "Quote not found" }); if (q.status === "Superseded") return json(route, 400, { code: "P0001", message: "This quote has already been revised." }); if (q.invoiced_at) return json(route, 400, { code: "P0001", message: "This quote has been invoiced." }); const root = q.revision_of || q.id; const rev = Math.max(0, ...db.quotes.filter(x => x.id === root || x.revision_of === root).map(x => x.revision || 0)) + 1; const nq = { ...q, id: uuid(), user_id: UID, quote_number: String(q.quote_number || "Q").replace(/-R\d+$/, "") + "-R" + rev, status: "Pending", sent_date: new Date().toISOString().slice(0, 10), accepted_at: null, accepted_by_name: null, accepted_signature: null, accepted_po: null, declined_at: null, share_token: null, revision: rev, revision_of: root, superseded_by: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }; db.quotes.push(nq); Object.assign(q, { status: "Superseded", superseded_by: nq.id, share_token: null, updated_at: new Date().toISOString() }); db.jobs.filter(j => j.quote_id === q.id).forEach(j => { j.quote_id = nq.id; }); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, { ok: true, id: nq.id, quote_number: nq.quote_number }); }
+    if (fn === "create_credit_note") { const inv = db.invoices.find(x => x.id === body.p_invoice_id); if (!inv) return json(route, 400, { code: "P0001", message: "Invoice not found" }); if (UID !== OWNER) return json(route, 400, { code: "42501", message: "Only the master account or an admin can do this" }); if (!String(body.p_reason || "").trim()) return json(route, 400, { code: "P0001", message: "Give the reason for the credit note" }); const amt = r2(body.p_amount); if (!(amt > 0) || amt > r2(inv.balance_due) + 0.004) return json(route, 400, { code: "P0001", message: `You can credit at most the R ${Number(inv.balance_due).toFixed(2)} still owed on invoice ${inv.invoice_number}.` }); const prof = (db.team_profiles || []).find(x => x.team_id === inv.team_id); const n = prof?.next_credit_number || 1; if (prof) prof.next_credit_number = n + 1; const lines = [{ description: "Credit: " + body.p_reason, qty: 1, unitPrice: amt }]; const t = lineTotalsSim(lines, true); const cn = { id: uuid(), team_id: inv.team_id, user_id: UID, invoice_id: inv.id, client_id: inv.client_id, credit_number: (prof?.credit_prefix ?? "CN-") + String(n).padStart(5, "0"), issue_date: new Date().toISOString().slice(0, 10), reason: body.p_reason, line_items: lines, vat_inclusive: true, ...t, created_at: new Date().toISOString() }; (db.credit_notes = db.credit_notes || []).push(cn); recalcInvoice(inv); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, { ok: true, id: cn.id, credit_number: cn.credit_number, total: cn.total }); }
+    if (fn === "void_invoice") { const inv = db.invoices.find(x => x.id === body.p_invoice_id); if (!inv) return json(route, 400, { code: "P0001", message: "Invoice not found" }); if (db.payments.some(p => p.invoice_id === inv.id && !p.voided_at)) return json(route, 400, { code: "P0001", message: `Invoice ${inv.invoice_number} has payments. Reverse them first, or issue a credit note.` }); Object.assign(inv, { status: "cancelled", voided_at: new Date().toISOString(), void_reason: body.p_reason }); recalcInvoice(inv); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, { ok: true }); }
+    if (fn === "void_payment") { const p = db.payments.find(x => x.id === body.p_payment_id); if (!p) return json(route, 400, { code: "P0001", message: "Payment not found" }); Object.assign(p, { voided_at: new Date().toISOString(), void_reason: body.p_reason }); recalcInvoice(db.invoices.find(x => x.id === p.invoice_id)); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, { ok: true }); }
     if (fn === "respond_to_shared_quote") { const q = db.quotes.find(x => x.share_token === body.p_token); if (!q) return json(route, 400, { code: "P0001", message: "This link has expired" }); if (q.accepted_at || q.declined_at) return json(route, 400, { code: "P0001", message: "This quote has already been answered" }); if (body.p_accept) Object.assign(q, { status: "Accepted", accepted_at: new Date().toISOString(), accepted_by_name: body.p_name, accepted_signature: body.p_signature, accepted_po: body.p_po || null }); else Object.assign(q, { status: "Rejected", declined_at: new Date().toISOString(), decline_reason: body.p_reason || null }); log.writes.push({ screen: screenTag, kind: "rpc", fn, body: { ...body, p_signature: body.p_signature ? "(png)" : null } }); return json(route, 200, { ok: true, status: q.status }); }
     if (fn === "adjust_stock") {
       const pr = db.products.find(x => x.id === body.p_product_id);
@@ -266,7 +327,59 @@ async function handle(route) {
     if (fn === "accept_terms") { log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "set_my_hidden_screens") { const bad = (body.p_screens || []).some(x => !/^[A-Za-z0-9]{1,40}$/.test(x)); if (bad) return json(route, 400, { code: "P0001", message: "Invalid screen name" }); const me = (db.users || []).find(u => u.id === UID); if (me) me.hidden_screens = [...new Set(body.p_screens)].sort(); log.writes.push({ screen: screenTag, kind: "rpc", fn, body }); return json(route, 200, null); }
     if (fn === "request_team_view") { db.team_notifications.push({ id: uuid(), team_id: TEAM, from_user_id: UID, to_user_id: OWNER, record_type: "team_view_request", record_id: UID, record_title: "Whole-team view", message: "asked", read: false, accepted: false, created_at: new Date().toISOString() }); log.writes.push({ screen: screenTag, kind: "rpc", fn }); return json(route, 200, null); }
-    const map = { current_team_id: TEAM, get_my_effective_role: RPC.get_my_effective_role, get_team_member_emails: RPC.get_team_member_emails, get_my_team_access: access, set_my_timezone: null, regenerate_invite_code: "SIMNEWCODE234", my_team_plan: SIM.plan, plan_catalogue: SIM_CATALOGUE, billing_available: true, admin_get_billing: UID === OWNER ? { enabled: false, sandbox: true, merchant_id: null, has_key: false, has_passphrase: false } : null, admin_set_plans: null, admin_set_billing: null, sms_status: { available: true, limit: 300, used: 2 }, location_sharing_on: true, latest_tech_locations: UID === OWNER ? [{ user_id: "f16f3dd1-c87c-4066-8a38-750d7bc31d65", lat: -26.2041, lng: 28.0473, accuracy_m: 12, job_id: null, recorded_at: new Date(Date.now() - 6 * 60000).toISOString(), job_number: null, job_title: null, job_location: null }] : null, admin_get_sms: UID === OWNER ? { provider: "bulksms", has_secret: false, monthly_limit: 300, enabled: false, sent_this_month: 0 } : null, admin_set_sms: null, is_platform_admin: UID === OWNER, admin_list_companies: UID === OWNER ? [{ id: TEAM, name: "Power Works", created_at: day(90) + "T08:00:00Z", owner_email: "cvanjaarsveld2@icloud.com", members: 3, last_active: new Date().toISOString(), clients: 40, quotes: 12, invoices: 1, plan: "free", status: "active", trial_ends_at: null, paid_until: null, seats: null, notes: null, access: "full", jobs: 4, paid_total: 0, last_payment_at: null, billing_status: null, seat_limit: null }, { id: "00000000-0000-4000-8000-00000000c0de", name: "Acme Hydraulics", created_at: day(5) + "T08:00:00Z", owner_email: "owner@acme.example", members: 2, last_active: null, clients: 3, quotes: 1, invoices: 0, jobs: 0, plan: "trial", status: "active", trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), paid_until: null, seats: null, notes: null, access: "full", paid_total: 0, last_payment_at: null, billing_status: null, seat_limit: null }] : null, get_platform_settings: UID === OWNER ? { signup_mode: "restricted", allowed_domains: ["pwrstart.com"], signup_codes: [] } : null, admin_update_plan: null, set_platform_setting: null, admin_answer_ticket: null };
+    // Mirrors public.approve_inbox_item / review_inbox_item (email_inbox migration).
+    if (fn === "approve_inbox_item") {
+      const it = db.inbox_items.find(x => x.id === body.p_id && x.team_id === TEAM);
+      if (!it) return json(route, 400, { code: "P0002", message: "Inbox item not found" });
+      if (it.status === "approved") return json(route, 400, { code: "23505", message: "This item has already been approved" });
+      const f = body.p_fields || {};
+      const amount = Math.round(Number(f.amount) * 100) / 100;
+      if (!(amount > 0)) return json(route, 400, { code: "22023", message: "Enter the amount before approving" });
+      const vat = f.vat_amount === "" || f.vat_amount == null ? null : Math.round(Number(f.vat_amount) * 100) / 100;
+      if (vat != null && (vat < 0 || vat > amount)) return json(route, 400, { code: "22023", message: "The VAT can't be more than the amount" });
+      const currency = String(f.currency || "ZAR").toUpperCase();
+      const now = new Date().toISOString();
+      const e = { id: uuid(), user_id: UID, team_id: it.team_id, vendor: f.vendor || null, vat_number: f.vat_number || "", amount, vat_amount: vat, currency, amount_zar: currency === "ZAR" ? amount : f.amount_zar ?? null, exchange_rate: currency === "ZAR" ? 1 : null, rate_date: currency === "ZAR" ? now.slice(0, 10) : null, rate_source: currency === "ZAR" ? "ZAR" : null, expense_date: f.expense_date || it.received_at.slice(0, 10), expense_time: null, category: f.category || "Other", payment_method: f.payment_method || "Card", notes: f.notes || null, receipt_url: it.file_path, status: "unsubmitted", ai_extracted: true, sync_status: "synced", client_id: null, client_name: null, job_id: null, no_receipt: null, gl_code: null, gr_code: null, payment_slip_url: null, created_at: now, updated_at: now };
+      db.expenses.push(e);
+      Object.assign(it, { status: "approved", expense_id: e.id, reviewed_by: UID, reviewed_at: now, error: null });
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, e);
+    }
+    if (fn === "file_inbox_item") {
+      const it = db.inbox_items.find(x => x.id === body.p_id && x.team_id === TEAM);
+      if (!it) return json(route, 400, { code: "P0002", message: "Inbox item not found" });
+      if (it.status === "approved") return json(route, 400, { code: "23505", message: "This item has already been dealt with" });
+      const f = body.p_fields || {};
+      const now = new Date().toISOString();
+      if (body.p_action === "lead") {
+        const client = f.client_id ? db.clients.find(c => c.id === f.client_id) : null;
+        const lead = { id: uuid(), user_id: UID, team_id: TEAM, title: f.title || it.subject || "Quote request", description: f.description || it.body_excerpt || "", categories: null, client_id: client?.id || null, client_name: client?.company || f.company || null, contact_id: null, contact_name: f.contact_name || it.from_name, captured_by: "Email", assigned_to: null, stage: "New", estimated_value: null, lead_date: now.slice(0, 10), follow_up_date: null, closed_date: null, notes: null, outcome_notes: null, sync_status: "synced", created_at: now, updated_at: now, assigned_to_user_id: null };
+        db.leads.push(lead);
+        Object.assign(it, { status: "approved", lead_id: lead.id, reviewed_by: UID, reviewed_at: now });
+        log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+        return json(route, 200, { lead_id: lead.id });
+      }
+      if (body.p_action === "customer_note") {
+        if (!f.client_id) return json(route, 400, { code: "22023", message: "Choose the customer to file this on" });
+        const a = { id: uuid(), user_id: UID, team_id: TEAM, client_id: f.client_id, activity_type: "email", summary: f.summary || it.subject, created_at: now, updated_at: now };
+        (db.activities = db.activities || []).push(a);
+        Object.assign(it, { status: "approved", activity_id: a.id, client_id: f.client_id, reviewed_by: UID, reviewed_at: now });
+        log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+        return json(route, 200, { activity_id: a.id });
+      }
+      return json(route, 400, { code: "22023", message: "Unknown action" });
+    }
+    if (fn === "review_inbox_item") {
+      const it = db.inbox_items.find(x => x.id === body.p_id && x.team_id === TEAM);
+      if (!it) return json(route, 400, { code: "P0002", message: "Inbox item not found" });
+      if (it.status === "approved") return json(route, 400, { code: "42501", message: "This item is already an expense; change or delete the expense instead" });
+      if (body.p_action === "reject") Object.assign(it, { status: "rejected", reviewed_by: UID, reviewed_at: new Date().toISOString() });
+      else if (body.p_action === "restore") Object.assign(it, { status: Object.keys(it.extracted || {}).length ? "ready" : "failed", reviewed_by: null, reviewed_at: null });
+      else return json(route, 400, { code: "22023", message: "Unknown action" });
+      log.writes.push({ screen: screenTag, kind: "rpc", fn, body });
+      return json(route, 200, it);
+    }
+    const map = { current_team_id: TEAM, inbox_address: "4a0e4956c351", mail_connections: [], get_my_effective_role: RPC.get_my_effective_role, get_team_member_emails: RPC.get_team_member_emails, get_my_team_access: access, set_my_timezone: null, regenerate_invite_code: "SIMNEWCODE234", my_team_plan: SIM.plan, plan_catalogue: SIM_CATALOGUE, billing_available: true, admin_get_billing: UID === OWNER ? { enabled: false, sandbox: true, merchant_id: null, has_key: false, has_passphrase: false } : null, admin_set_plans: null, admin_set_billing: null, sms_status: { available: true, limit: 300, used: 2 }, location_sharing_on: true, latest_tech_locations: UID === OWNER ? [{ user_id: "f16f3dd1-c87c-4066-8a38-750d7bc31d65", lat: -26.2041, lng: 28.0473, accuracy_m: 12, job_id: null, recorded_at: new Date(Date.now() - 6 * 60000).toISOString(), job_number: null, job_title: null, job_location: null }] : null, admin_get_sms: UID === OWNER ? { provider: "bulksms", has_secret: false, monthly_limit: 300, enabled: false, sent_this_month: 0 } : null, admin_set_sms: null, is_platform_admin: UID === OWNER, admin_list_companies: UID === OWNER ? [{ id: TEAM, name: "Power Works", created_at: day(90) + "T08:00:00Z", owner_email: "cvanjaarsveld2@icloud.com", members: 3, last_active: new Date().toISOString(), clients: 40, quotes: 12, invoices: 1, plan: "free", status: "active", trial_ends_at: null, paid_until: null, seats: null, notes: null, access: "full", jobs: 4, paid_total: 0, last_payment_at: null, billing_status: null, seat_limit: null }, { id: "00000000-0000-4000-8000-00000000c0de", name: "Acme Hydraulics", created_at: day(5) + "T08:00:00Z", owner_email: "owner@acme.example", members: 2, last_active: null, clients: 3, quotes: 1, invoices: 0, jobs: 0, plan: "trial", status: "active", trial_ends_at: new Date(Date.now() + 2 * 86400000).toISOString(), paid_until: null, seats: null, notes: null, access: "full", paid_total: 0, last_payment_at: null, billing_status: null, seat_limit: null }] : null, get_platform_settings: UID === OWNER ? { signup_mode: "restricted", allowed_domains: ["pwrstart.com"], signup_codes: [] } : null, admin_update_plan: null, set_platform_setting: null, admin_answer_ticket: null };
     if (!(fn in map)) log.writes.push({ screen: screenTag, kind: "rpc", fn, body: req.postDataJSON?.() });
     return json(route, 200, fn in map ? map[fn] : null);
   }
@@ -292,8 +405,8 @@ async function handle(route) {
       // Like PostgREST, return the stored rows (with generated ids), and a
       // single object when the client asked for one (.single()).
       const stored = [];
-      if (m === "PATCH") { const { rows } = query(table, url); rows.forEach(r => { const live = db[table].find(x => x.id === r.id); Object.assign(live, body); stored.push(live); }); log.writes.push({ screen: screenTag, kind: "update", table, n: rows.length, keys: Object.keys(body || {}) }); }
-      else for (const row of rowsIn) { const key = url.searchParams.get("on_conflict") || "id"; const i = db[table].findIndex(x => row[key] && x[key] === row[key]); if (i >= 0) { db[table][i] = { ...db[table][i], ...row }; stored.push(db[table][i]); } else { const added = { id: row.id || uuid(), ...(DEFAULTS[table] || {}), ...row }; db[table].push(added); stored.push(added); } log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
+      if (m === "PATCH") { const { rows } = query(table, url); rows.forEach(r => { const live = db[table].find(x => x.id === r.id); const before = { ...live }; Object.assign(live, body); if (table === "invoices") invoiceRules(live, before); stored.push(live); }); log.writes.push({ screen: screenTag, kind: "update", table, n: rows.length, keys: Object.keys(body || {}) }); }
+      else for (const row of rowsIn) { const key = url.searchParams.get("on_conflict") || "id"; const i = db[table].findIndex(x => row[key] && x[key] === row[key]); if (i >= 0) { const before = { ...db[table][i] }; db[table][i] = { ...db[table][i], ...row, ...serverKeeps(table, db[table][i]) }; if (table === "invoices") invoiceRules(db[table][i], before); stored.push(db[table][i]); } else { const added = { id: row.id || uuid(), ...(DEFAULTS[table] || {}), ...row }; serverAssigns(table, added); if (table === "invoices") invoiceRules(added, null); db[table].push(added); if (table === "payments") recalcInvoice(db.invoices.find(x => x.id === added.invoice_id)); stored.push(added); } log.writes.push({ screen: screenTag, kind: url.searchParams.get("on_conflict") || (req.headers()["prefer"] || "").includes("merge") ? "upsert" : "insert", table, id: row.id, keys: Object.keys(row) }); }
       const ret = (req.headers()["prefer"] || "").includes("return=representation");
       if (ret && (req.headers()["accept"] || "").includes("vnd.pgrst.object")) {
         if (stored.length !== 1) return json(route, 406, { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned" });

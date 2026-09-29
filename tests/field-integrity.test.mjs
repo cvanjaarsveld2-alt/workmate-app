@@ -159,3 +159,19 @@ test("queued changes are persisted and pushed without waiting for a new save", (
   const sync = compact("src/lib/sync.js");
   assert.match(sync, /pushSyncQueue\(_globalQueueRef\?\.current\|\|\[\],setData\)/);
 });
+
+test("expense camera buttons open the camera straight from the tap (iPhone)", () => {
+  const screen = read("src/screens/ExpensesScreen.jsx");
+  assert.match(screen, /ref=\{cameraInputRef\} type="file" accept="image\/\*" capture="environment"/);
+  assert.match(screen, /cameraInputRef\.current\.click\(\)/);
+  assert.match(screen, /initialFile=\{scannerFile\}/);
+  // Every camera button goes through openCamera, never straight to the scanner.
+  assert.doesNotMatch(screen, /setScannerMode\("(receipt|payment)"\); setShowScanner\(true\)/);
+  const scanner = read("src/components/ReceiptScanner.jsx");
+  assert.match(scanner, /if \(initialFile\) \{\s*handleFile\(initialFile\);/);
+});
+
+test("date and time fields fit their column on iPhone", () => {
+  const css = read("src/index.css");
+  assert.match(css, /input\[type="date"\],\s*input\[type="time"\],[\s\S]*?appearance: none;[\s\S]*?min-width: 0;[\s\S]*?max-width: 100%;/);
+});

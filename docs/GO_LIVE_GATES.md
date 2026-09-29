@@ -252,6 +252,9 @@ uses the app keeps its own (`team_profiles`, one row per team).
   e.g. `INV-00001`) when an invoice syncs. An invoice made offline prints as
   a *Draft* until then. Only change *Next invoice no.* when carrying on
   from another system.
+- Quote numbers work the same way (e.g. `Q-00001`, set under *Quote prefix*
+  and *Next quote no.*). Several people quoting at once still get different
+  numbers; a quote made offline gets its number when it syncs.
 - Customer VAT number and billing address: edit the client → *Invoicing
   details*. SARS requires these on tax invoices over R5 000.
 - *Registered for VAT* off: no VAT is added to new quotes or job invoices,

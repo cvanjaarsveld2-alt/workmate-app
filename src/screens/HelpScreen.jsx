@@ -2,12 +2,15 @@
 // Send a question or report a problem to the product team, and see replies.
 // Messages land in support_tickets; platform admins answer them in the console.
 import React, { useEffect, useState } from "react";
-import { LifeBuoy, Send, CheckCircle2 } from "lucide-react";
+import { LifeBuoy, Send, CheckCircle2, BookOpen } from "lucide-react";
 import { supabase } from "../supabase";
 import { Btn, Card, Field, PageHeader } from "../components/ui";
 import { PRODUCT_NAME, PRODUCT_VERSION } from "../lib/brand";
 import { legalHref } from "../legal/LegalPage";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+
+// The user manual on the public website (site/), when its address is set.
+const MANUAL_URL = String(import.meta.env?.VITE_MANUAL_URL || "").replace(/\/$/, "");
 
 const STATUS = { open: "Waiting for a reply", answered: "Answered", closed: "Closed" };
 
@@ -59,6 +62,17 @@ export function HelpScreen({ userId, userEmail, teamId, fromScreen = "" }) {
   return (
     <div className="stack-y-4">
       <PageHeader title="Help & support" subtitle={`Questions, problems or ideas about ${PRODUCT_NAME}`} />
+      {MANUAL_URL && (
+        <a href={`${MANUAL_URL}/`} target="_blank" rel="noopener" className="block">
+          <Card className="p-4 flex items-center gap-3">
+            <BookOpen size={20} className="shrink-0" style={{ color: "#8B1A1A" }} />
+            <div className="min-w-0">
+              <p className="text-base font-black text-slate-800">User manual</p>
+              <p className="text-sm text-slate-500">Step-by-step guides for every screen</p>
+            </div>
+          </Card>
+        </a>
+      )}
       <Card className="p-4 stack-y-3">
         <div className="flex items-center gap-2">
           <LifeBuoy size={18} className="text-slate-400" />

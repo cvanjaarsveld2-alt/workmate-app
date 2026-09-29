@@ -40,7 +40,7 @@ function runScript(script, account) {
   // The URL only needs to match what the harness intercepts; nothing is contacted.
   execSync(`npx vite build --outDir ${DIST} --emptyOutDir`, {
     cwd: ROOT, stdio: "inherit",
-    env: { ...process.env, VITE_SUPABASE_URL: "https://hrqzqyfvbfzrfnuxovvr.supabase.co", VITE_SUPABASE_ANON_KEY: "sim-key" },
+    env: { ...process.env, VITE_SUPABASE_URL: "https://hrqzqyfvbfzrfnuxovvr.supabase.co", VITE_SUPABASE_ANON_KEY: "sim-key", VITE_INBOX_ADDRESS: "{token}@in.powermate.test" },
   });
   const server = spawn("npx", ["vite", "preview", "--outDir", DIST, "--port", PORT, "--strictPort"], { cwd: ROOT, stdio: "ignore", detached: true });
   let ok = true;

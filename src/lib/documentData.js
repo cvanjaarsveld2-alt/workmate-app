@@ -4,24 +4,22 @@
 // in tests/documentData.test.mjs.
 import { addDays, chargesVat, documentTotals } from "./documentPDF.js";
 import { normaliseParts } from "./products.js";
+import { num, parseLines, vatCode } from "./lineTotals.js";
 
 export function parseItems(raw) {
-  let list = raw;
-  if (typeof list === "string") {
-    try {
-      list = JSON.parse(list);
-    } catch {
-      list = null;
-    }
-  }
-  if (!Array.isArray(list)) return [];
-  return list
-    .map(i => ({
-      description: String(i?.description ?? i?.desc ?? "").trim(),
-      qty: Number(i?.qty ?? i?.quantity ?? 1) || 0,
-      unitPrice: Number(i?.unitPrice ?? i?.unit_price ?? i?.price ?? 0) || 0,
-      ...(String(i?.part_number ?? i?.code ?? "").trim() ? { code: String(i.part_number ?? i.code).trim() } : {}),
-    }))
+  return parseLines(raw)
+    .map(i => {
+      const discount = Math.min(Math.max(num(i.discount, 0), 0), 100);
+      const code = String(i.part_number ?? i.code ?? "").trim();
+      return {
+        description: String(i.description ?? i.desc ?? "").trim(),
+        qty: num(i.qty ?? i.quantity, 1),
+        unitPrice: num(i.unitPrice ?? i.unit_price ?? i.price, 0),
+        ...(discount > 0 ? { discount } : {}),
+        ...(vatCode(i) !== "standard" ? { vat: vatCode(i) } : {}),
+        ...(code ? { code } : {}),
+      };
+    })
     .filter(i => i.description || i.unitPrice);
 }
 
@@ -97,6 +95,8 @@ export function quoteToDocument(q, kind, { clients = [], profile = {}, today, pr
       parseItems(q.line_items).length && !(kind === "quote" && quoteDetails(q.details).intro)
         ? q.description || ""
         : "",
+    // A company's quote gets its number from the server when it syncs.
+    draft: kind === "quote" && !!q.team_id && !q.quote_number,
   };
 }
 
@@ -106,7 +106,7 @@ export function invoiceToDocument(inv, kind, { clients = [], quotes = [], profil
   // Use the invoice's own lines, else the quote's if they add up to the same
   // total, else one line for the invoiced amount — the PDF must match the books.
   let items = parseItems(inv.line_items),
-    vatInclusive = false;
+    vatInclusive = inv.vat_inclusive === true;
   if (!items.length && quote) {
     const qItems = parseItems(quote.line_items);
     const qIncl = quote.vat_inclusive !== false;
@@ -133,7 +133,7 @@ export function invoiceToDocument(inv, kind, { clients = [], quotes = [], profil
     number: kind === "proforma" ? `PF-${number}` : number,
     date: issue,
     dueDate: inv.due_date || addDays(issue, profile.payment_terms_days ?? 30),
-    reference: quote?.quote_number ? `Quote ${quote.quote_number}` : "",
+    reference: [inv.reference, quote?.quote_number ? `Quote ${quote.quote_number}` : ""].filter(Boolean).join(" · "),
     client: clientDetails(
       clients.find(c => c.id === inv.client_id),
       quote?.client_name,
@@ -141,9 +141,32 @@ export function invoiceToDocument(inv, kind, { clients = [], quotes = [], profil
     items,
     vatInclusive,
     amountPaid: kind === "invoice" ? Number(inv.amount_paid) || 0 : 0,
+    amountCredited: kind === "invoice" ? Number(inv.amount_credited) || 0 : 0,
     notes: items.length > 1 || parseItems(inv.line_items).length ? inv.notes || "" : "",
     draft:
-      kind === "invoice" && (inv.sync_status === "pending" || isTemporaryInvoiceNumber(inv.invoice_number)),
+      kind === "invoice" &&
+      (inv.status === "draft" || inv.sync_status === "pending" || isTemporaryInvoiceNumber(inv.invoice_number)),
+    draftNote:
+      kind === "invoice" && inv.status === "draft" ? "DRAFT · not yet approved" : undefined,
+    void: kind === "invoice" && inv.status === "cancelled",
+  };
+}
+
+// A credit note (made on the server by create_credit_note) → its document.
+export function creditNoteToDocument(cn, { invoice = {}, clients = [], quotes = [] } = {}) {
+  const quote = quotes.find(q => q.id === invoice.quote_id);
+  return {
+    kind: "credit_note",
+    number: cn.credit_number || shortId(cn.id),
+    date: cn.issue_date,
+    reference: invoice.invoice_number ? `Invoice ${invoice.invoice_number}` : "",
+    client: clientDetails(
+      clients.find(c => c.id === (cn.client_id || invoice.client_id)),
+      quote?.client_name,
+    ),
+    items: parseItems(cn.line_items),
+    vatInclusive: cn.vat_inclusive !== false,
+    notes: cn.reason || "",
   };
 }
 

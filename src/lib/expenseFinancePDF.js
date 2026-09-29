@@ -6,6 +6,7 @@ import jsPDF from "jspdf";
 import { drawBandLogo } from "./pdfBrand";
 import autoTable from "jspdf-autotable";
 import { supabase } from "../supabase";
+import { documentLabel, isDocumentPath } from "./inbox";
 
 const BRAND_RED = "#8B1A1A";
 
@@ -266,9 +267,11 @@ export async function buildExpensePDF({ expenses, submitter, periodLabel }) {
   for (let i = 0; i < expenses.length; i++) {
     const e = expenses[i];
     if (signedTills[i]) {
+      const pdf = isDocumentPath(e.receipt_url);
       slots.push({
         url: signedTills[i],
-        kind: "Till slip",
+        pdf,
+        kind: pdf ? `Invoice / receipt (${documentLabel(e.receipt_url)})` : "Till slip",
         caption: `#${i + 1} · ${e.vendor || "—"} · ${fmtMoney(e.amount, e.currency)}`,
       });
     }
@@ -314,8 +317,13 @@ export async function buildExpensePDF({ expenses, submitter, periodLabel }) {
         doc.setDrawColor(220, 220, 220);
         doc.rect(x, y, SLOT_SIZE, SLOT_SIZE);
 
-        const img = await urlToDataURLWithSize(slot.url);
-        if (img) {
+        // Bills emailed in as PDFs can't be drawn as a picture: link them.
+        const img = slot.pdf ? null : await urlToDataURLWithSize(slot.url);
+        if (slot.pdf) {
+          doc.setFontSize(9);
+          doc.setTextColor(90);
+          doc.text("Document: open it with the link below", x + 8, y + SLOT_SIZE / 2, { maxWidth: SLOT_SIZE - 16 });
+        } else if (img) {
           try {
             // Fit inside the square without distortion — preserves the
             // receipt's real aspect ratio, centred with white space top/bottom

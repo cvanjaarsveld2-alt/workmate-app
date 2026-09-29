@@ -1082,6 +1082,7 @@ export default function PowerWorksApp() {
         userId={session.user.id}
         userEmail={session.user.email}
         quickAddTrigger={quickAddTrigger}
+        isOwner={!!teamAccess?.is_owner}
       />
     ),
     Analytics: (
@@ -1172,6 +1173,7 @@ export default function PowerWorksApp() {
         clients={data.clients}
         quotes={data.quotes}
         canMessage={hasFeature(teamPlan, "messages")}
+        isManager={!teamId || !!teamAccess?.is_owner || userRole === "admin"}
       />
     ),
     CompanyProfile: (

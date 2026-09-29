@@ -35,6 +35,14 @@ import { MessageCustomer } from "../components/MessageCustomer";
 import { FillForm } from "../components/FillForm";
 import { publicUrl } from "../lib/appUrl";
 
+// What an invoice made from this job copies from its quote.
+const quoteFields = q => ({
+  _quoteValue: q?.value || 0,
+  _quoteLines: q?.line_items || null,
+  _quoteVatInclusive: q ? q.vat_inclusive !== false : undefined,
+  _quoteDescription: q?.description || "",
+});
+
 export function JobsScreen({ userId, teamId, setData, clients = [], canClock = true, canMessage = true, canForms = true }) {
   const [messaging, setMessaging] = useState(null);
   const [formFor, setFormFor] = useState(null);
@@ -117,7 +125,7 @@ export function JobsScreen({ userId, teamId, setData, clients = [], canClock = t
           .select("*")
           .order("scheduled_date", { ascending: true })
           .order("scheduled_time", { ascending: true }),
-        supabase.from("quotes").select("id,value,client_name,description").eq("user_id", userId),
+        supabase.from("quotes").select("*").eq("user_id", userId),
       ]);
       if (!jq.error) {
         apply(jq.data || []);
@@ -163,7 +171,7 @@ export function JobsScreen({ userId, teamId, setData, clients = [], canClock = t
     setError("");
     const q = quotes.find(x => x.id === job.quote_id);
     const r = await createInvoiceFromJob(
-      { ...job, _quoteValue: q?.value || 0, _labourLines: labourFor(job) },
+      { ...job, ...quoteFields(q), _labourLines: labourFor(job) },
       userId,
       teamId,
       setData,
@@ -201,7 +209,7 @@ export function JobsScreen({ userId, teamId, setData, clients = [], canClock = t
     const r = await createInvoiceFromJob(
       {
         ...(saved || updated),
-        _quoteValue: q?.value || 0,
+        ...quoteFields(q),
         _labourLines: labourLines(
           stopped ? [stopped, ...time.entries.filter(e => e.id !== stopped.id)] : time.entries,
           job.id,
