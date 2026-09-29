@@ -81,7 +81,7 @@ async function describeFunctionError(functionError) {
   };
 }
 
-export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till" }) {
+export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till", initialFile = null }) {
   const [stage, setStage]       = useState("idle"); // idle | uploading | scanning
   const [preview, setPreview]   = useState(null);
   const [error, setError]       = useState("");
@@ -96,8 +96,14 @@ export function ReceiptScanner({ userId, onExtracted, onCancel, slipType = "till
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
   }, []);
 
-  // Auto-open camera immediately on mount — no choice screen needed
+  // A photo already taken (the screen's camera button opens the camera straight
+  // from the tap) is read at once. Otherwise try to open the camera; iPhone
+  // Safari ignores that because it isn't a tap, so the Open Camera button stays.
   React.useEffect(() => {
+    if (initialFile) {
+      handleFile(initialFile);
+      return;
+    }
     const t = setTimeout(() => cameraRef.current?.click(), 100);
     return () => clearTimeout(t);
   }, []);
